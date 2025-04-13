@@ -9,9 +9,9 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # impermanence = {
-    #   url = "github:nix-community/impermanence";
-    # };
+    impermanence = {
+      url = "github:nix-community/impermanence";
+    };
 
     # home-manager = {
     #   url = "github:nix-community/home-manager";
@@ -30,7 +30,7 @@
         ./configuration.nix
               
         # inputs.home-manager.nixosModules.default
-        # inputs.impermanence.nixosModules.impermanence
+        inputs.impermanence.nixosModules.impermanence
       ];
     };
   };
