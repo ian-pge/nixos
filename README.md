@@ -9,19 +9,15 @@ replace `'"/dev/nvme0n1"'` with your drive
 sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko /tmp/NixOS/disko.nix --arg device '"/dev/nvme0n1"'
 ```
 
-## downloading disko.nix
-```bash
-curl -o /tmp/disko.nix https://raw.githubusercontent.com/ian-pge/NixOS/main/disko.nix
-```
-
-
-
 ## generate initial config
 ```bash
 sudo nixos-generate-config --no-filesystems --root /mnt
 ```
 
-
+## move config
+```bash
+mv /tmp/NixOS /mnt/etc/nixos
+```
 
 ## installing nixos
 ```bash
