@@ -13,9 +13,9 @@
 
   system.stateVersion = "23.05"; # Did you read the comment?
 
-    users.users."vimjoyer" = {
+    users.users."ian " = {
     isNormalUser = true;
-    initialPassword = "1";
+    initialPassword = "ianbage";
     extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
   };
 
