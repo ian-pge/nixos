@@ -1,3 +1,8 @@
+## generate initial config
+```bash
+sudo nixos-generate-config --no-filesystems --root /mnt
+```
+
 ## clone configuration repository
 ```bash
 nix-shell -p git
