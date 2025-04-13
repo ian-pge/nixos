@@ -1,6 +1,6 @@
 ## downloading disko.nix
 ```bash
-curl https://raw.githubusercontent.com/vimjoyer/impermanent-setup/main/final/disko.nix -O /tmp/disko.nix
+curl https://raw.githubusercontent.com/vimjoyer/impermanent-setup/main/final/disko.nix -o /tmp/disko.nix
 ```
 
 ## disko formatting command
