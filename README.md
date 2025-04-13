@@ -1,6 +1,6 @@
 ## clone configuration repository
 ```bash
-nix run nixpkgs#git --command git clone https://github.com/ian-pge/NixOS.git /root/NixOS
+nix-shell -p git --run "git clone https://github.com/ian-pge/NixOS.git /root/NixOS"
 ```
 
 ## disko formatting command
