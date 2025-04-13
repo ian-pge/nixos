@@ -1,5 +1,7 @@
 ## downloading disko.nix
+```bash
 curl -o /tmp/disko.nix https://raw.githubusercontent.com/ian-pge/NixOS/main/disko.nix
+```
 
 ## disko formatting command
 replace `'"/dev/nvme0n1"'` with your drive
