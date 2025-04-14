@@ -58,9 +58,13 @@
     gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
   };
 
+  programs.ssh.enable = true;
+
   programs.git = {
     enable = true;
     userName  = "ian";
     userEmail = "ian.page38@gmail.com";
+    extraConfig = {
+      init.defaultBranch = "main";
   };
 }
