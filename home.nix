@@ -18,6 +18,7 @@
       "Documents"
       "Videos"
       ".ssh"
+      ".config/zed"
       ".config/dconf"
       ".local/share/keyrings"
       ".config/google-chrome"
