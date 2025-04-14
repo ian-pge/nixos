@@ -19,20 +19,18 @@
       "Videos"
       ".ssh"
       ".config/zed"
+      ".local/share/zed"
 
       # Gnome
       ".config/dconf"
       ".local/share/keyrings"
       ".config/google-chrome"
-      
+
       {
         directory = ".local/share/Steam";
         method = "symlink";
       }
-      {
-        directory = ".local/share/zed";
-        method = "symlink";
-      }
+
     ];
     files = [ 
       ".screenrc" 
