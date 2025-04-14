@@ -17,6 +17,8 @@
       "Pictures"
       "Documents"
       "Videos"
+      ".ssh"
+      ".config/dconf"
       ".local/share/keyrings"
       ".config/google-chrome"
       {
