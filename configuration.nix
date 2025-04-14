@@ -117,7 +117,7 @@
 
   # Packages
   environment.systemPackages = with pkgs; [
-    zed-editor-fhs
+    zed-editor
     git
     google-chrome
   ];
