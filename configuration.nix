@@ -63,12 +63,12 @@
   };
 
   programs.fuse.userAllowOther = true;
-  #home-manager = {
-    #extraSpecialArgs = {inherit inputs;};
-    #users = {
-      #"vimjoyer" = import ./home.nix;
-    #};
-  #};
+  home-manager = {
+    extraSpecialArgs = {inherit inputs;};
+    users = {
+      #"ian" = import ./home.nix;
+    };
+  };
 
   # Enable OpenGL
   hardware.graphics = {
