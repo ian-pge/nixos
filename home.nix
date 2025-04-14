@@ -17,12 +17,7 @@
       "Pictures"
       "Documents"
       "Videos"
-      "VirtualBox VMs"
-      ".gnupg"
-      ".ssh"
-      ".nixops"
       ".local/share/keyrings"
-      ".local/share/direnv"
       ".config/google-chrome"
       {
         directory = ".local/share/Steam";
@@ -59,5 +54,11 @@
 
     # Tells GTK 3 to prefer a dark theme variant
     gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
+  };
+
+  programs.git = {
+    enable = true;
+    userName  = "ian";
+    userEmail = "ian.page38@gmail.com";
   };
 }
