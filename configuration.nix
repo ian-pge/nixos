@@ -71,6 +71,7 @@
   programs.fuse.userAllowOther = true;
   home-manager = {
     extraSpecialArgs = {inherit inputs;};
+    backupFileExtension = "backup";
     users = {
       "ian" = import ./home.nix;
     };
