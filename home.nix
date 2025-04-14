@@ -22,7 +22,6 @@
 
       # Gnome
       ".config/dconf"
-      ".config/monitors.xml"
       ".local/share/keyrings"
 
       ".config/google-chrome"
@@ -31,7 +30,10 @@
         method = "symlink";
       }
     ];
-    files = [ ".screenrc" ];
+    files = [ 
+      ".screenrc" 
+      ".config/monitors.xml"
+    ];
     allowOther = true;
   };
 
