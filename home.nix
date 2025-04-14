@@ -23,6 +23,7 @@
       ".nixops"
       ".local/share/keyrings"
       ".local/share/direnv"
+      ".config/google-chrome"
       {
         directory = ".local/share/Steam";
         method = "symlink";
