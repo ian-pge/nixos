@@ -111,7 +111,7 @@
 
   # For adding the Zed editor (system-wide)
   environment.systemPackages = with pkgs; [
-    zed
+    zed-editor
   ];
 
   nixpkgs.config.allowUnfree = true;
