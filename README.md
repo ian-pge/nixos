@@ -21,5 +21,5 @@ sudo mv /tmp/nixos /mnt/persist/nixos
 
 ## installing nixos
 ```bash
-nixos-install --root /mnt --flake /mnt/etc/nixos#default
+nixos-install --root /mnt --flake /mnt/persist/nixos#default
 ```
