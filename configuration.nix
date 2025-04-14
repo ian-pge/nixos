@@ -120,7 +120,13 @@
   environment.systemPackages = with pkgs; [
     zed-editor
     clang-tools
-    python310Packages.python-lsp-server
+    (python3.withPackages (ps: with ps; [
+      python-lsp-server
+      python-lsp-jsonrpc
+      python-lsp-black
+      pyls-isort
+      pyls-flake8
+    ]))
     git
     google-chrome
   ];
