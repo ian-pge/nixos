@@ -33,29 +33,31 @@
     allowOther = true;
   };
 
-  # dconf settings for GNOME: configuring interface colors and theme.
+  # Enable dconf to manage GNOME settings
   dconf.settings = {
     "org/gnome/desktop/interface" = {
-      color-scheme = "prefer-dark";
-      gtk-theme = "Adwaita-dark";
+      color-scheme = "prefer-dark";  # Preferred color scheme
+      gtk-theme = "Adwaita-dark";    # Set GTK theme to Adwaita-dark
     };
   };
 
-  # GTK settings: enable GTK, set dark theme and proper icon/cursor themes.
+  # Configure GTK settings
   gtk = {
     enable = true;
     theme = {
       name = "Adwaita-dark";
-      package = pkgs.gnome.gnome-themes-extra;
+      package = pkgs.gnome-themes-extra;
     };
     iconTheme = {
       name = "Adwaita";
-      package = pkgs.gnome.adwaita-icon-theme;
+      package = pkgs.adwaita-icon-theme;
     };
     cursorTheme = {
       name = "Adwaita";
-      package = pkgs.gnome.adwaita-icon-theme;
+      package = pkgs.adwaita-icon-theme;
     };
+
+    # Tells GTK 3 to prefer a dark theme variant
     gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
   };
 }
