@@ -64,6 +64,10 @@
     ];
   };
 
+  systemd.tmpfiles.rules = [
+    "d /persist/home 0700 ian users - -"
+  ];
+
   programs.fuse.userAllowOther = true;
   home-manager = {
     extraSpecialArgs = {inherit inputs;};
