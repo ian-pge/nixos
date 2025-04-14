@@ -19,7 +19,7 @@
       "Videos"
       ".ssh"
       ".config/zed"
-      ".local/share/zed"
+      #".local/share/zed"
 
       # Gnome
       ".config/dconf"
