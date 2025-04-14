@@ -70,6 +70,14 @@
     #};
   #};
 
+  # For NVIDIA driver support
+  services.xserver.videoDrivers = [ "nvidia" ];
+
+  # For adding the Zed editor (system-wide)
+  environment.systemPackages = with pkgs; [
+    zed
+  ];
+
   nixpkgs.config.allowUnfree = true;
 
   services.xserver.enable = true;
