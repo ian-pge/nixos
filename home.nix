@@ -25,6 +25,7 @@
       ".local/share/keyrings"
 
       ".config/google-chrome"
+      ".local/share/zed/"
       {
         directory = ".local/share/Steam";
         method = "symlink";
