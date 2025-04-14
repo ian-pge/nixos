@@ -23,3 +23,8 @@ sudo mv /tmp/nixos /etc/nixos
 ```bash
 sudo nixos-install --root /mnt --flake /mnt/etc/nixos#default
 ```
+
+## updating nixos config
+```bash
+sudo nixos-rebuild switch --flake /etc/nixos#default
+```
