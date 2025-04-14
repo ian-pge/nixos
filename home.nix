@@ -19,8 +19,12 @@
       "Videos"
       ".ssh"
       ".config/zed"
+
+      # Gnome
       ".config/dconf"
+      ".config/monitors.xml"
       ".local/share/keyrings"
+
       ".config/google-chrome"
       {
         directory = ".local/share/Steam";
