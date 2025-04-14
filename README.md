@@ -16,7 +16,7 @@ sudo nixos-generate-config --no-filesystems --root /mnt
 
 ## move config
 ```bash
-sudo mv /tmp/nixos /mnt/etc/nixos
+sudo mv /tmp/nixos /mnt/persist/nixos
 ```
 
 ## installing nixos
