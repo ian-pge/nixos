@@ -113,6 +113,7 @@
   environment.systemPackages = with pkgs; [
     zed-editor 
     git
+    google-chrome
   ];
 
   nixpkgs.config.allowUnfree = true;
