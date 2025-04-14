@@ -109,9 +109,10 @@
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
 
-  # For adding the Zed editor (system-wide)
+  # Packages
   environment.systemPackages = with pkgs; [
-    zed-editor
+    zed-editor 
+    git
   ];
 
   nixpkgs.config.allowUnfree = true;
