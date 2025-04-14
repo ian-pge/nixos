@@ -119,6 +119,7 @@
   # Packages
   environment.systemPackages = with pkgs; [
     zed-editor-fhs
+    clang-tools
     git
     google-chrome
   ];
