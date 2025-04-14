@@ -118,8 +118,9 @@
 
   # Packages
   environment.systemPackages = with pkgs; [
-    zed-editor-fhs
+    zed-editor
     clang-tools
+    python310Packages.python-lsp-server
     git
     google-chrome
   ];
