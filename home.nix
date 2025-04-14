@@ -23,11 +23,14 @@
       # Gnome
       ".config/dconf"
       ".local/share/keyrings"
-
       ".config/google-chrome"
-      ".local/share/zed/"
+      
       {
         directory = ".local/share/Steam";
+        method = "symlink";
+      }
+      {
+        directory = ".local/share/zed";
         method = "symlink";
       }
     ];
