@@ -10,7 +10,7 @@
   home.stateVersion = "24.11";
 
   # Home persistence configuration: list all directories and files you want to persist.
-  home.persistence."/persist/home" = {
+  home.persistence."/persist/home/ian" = {
     directories = [
       "Downloads"
       "Music"
