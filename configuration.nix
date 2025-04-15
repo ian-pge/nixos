@@ -139,4 +139,12 @@
   services.xserver.desktopManager.gnome.enable = true;
   programs.dconf.enable = true;
 
+  services.gnome = {
+    enable = true;
+    wayland.enable = true;
+  };
+
+  # Optional: Explicitly enable Wayland support in GDM.
+  services.displayManager.gdm.wayland.enable = true;
+
 }
