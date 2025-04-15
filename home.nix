@@ -19,7 +19,10 @@
       "Videos"
       ".ssh"
       ".config/zed"
-      ".local/share/zed"
+      {
+        directory = ".local/share/zed";
+        method = "symlink";
+      }
 
       # Gnome
       ".config/dconf"
