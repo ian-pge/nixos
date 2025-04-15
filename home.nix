@@ -70,6 +70,12 @@
     gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
   };
 
+  wayland.windowManager.hyprland = {
+    enable = true;
+    # Additional Hyprland configurations can go here
+  };
+
+
   programs.ssh.enable = true;
 
   programs.git = {
