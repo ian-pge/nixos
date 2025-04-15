@@ -66,7 +66,7 @@
 
   systemd.tmpfiles.rules = [
     "d /persist/home 0777 root root -" 
-    "d /persist/home/ian 0700 ian users - -"
+    "d /persist/home/ian 0700 ian users -"
   ];
 
   programs.fuse.userAllowOther = true;
