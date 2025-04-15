@@ -123,6 +123,7 @@
     bambu-studio
     hyprland
     ly
+    kitty
     clang-tools
     (python3.withPackages (ps: with ps; [
       python-lsp-server
@@ -145,9 +146,6 @@
   ervices.displayManager.ly.enable = true;
 
   programs.hyprland.enable = true; # enable Hyprland
-  environment.systemPackages = [
-    pkgs.kitty # required for the default Hyprland config
-  ];
 
 
 }
