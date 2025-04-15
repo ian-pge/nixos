@@ -18,15 +18,16 @@
       "Documents"
       "Videos"
       ".ssh"
-      ".config/zed"
-      {
-        directory = ".local/share/zed";
-        method = "symlink";
-      }
+      #".config/zed"
+      #{
+        #directory = ".local/share/zed";
+        #method = "symlink";
+      #}
 
       # Gnome
       ".config/dconf"
       ".local/share/keyrings"
+
       ".config/google-chrome"
 
       {
@@ -36,10 +37,7 @@
 
     ];
     files = [
-      "test"
-      "hello"
       ".config/monitors.xml"
-      ".screenrc"
     ];
     allowOther = true;
   };
