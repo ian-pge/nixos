@@ -70,6 +70,8 @@
     gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
   };
 
+  programs.kitty.enable = true;
+
   wayland.windowManager.hyprland = {
     enable = true;
     # Additional Hyprland configurations can go here
