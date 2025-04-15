@@ -18,14 +18,8 @@
       "Documents"
       "Videos"
       ".ssh"
-      #{
-        #directory = ".config/zed";
-        #method = "symlink";
-      #}
-      #{
-        #directory = ".local/share/zed";
-        #method = "symlink";
-      #}
+      ".config/zed"
+      ".local/share/zed"
 
       # Gnome
       ".config/dconf"
