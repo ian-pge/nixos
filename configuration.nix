@@ -138,14 +138,14 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  #services.xserver.enable = true;
-  #services.xserver.displayManager.gdm.enable = true;
-  #services.xserver.desktopManager.gnome.enable = true;
-  #programs.dconf.enable = true;
+  services.xserver.enable = true;
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+  programs.dconf.enable = true;
 
-  services.displayManager.ly.enable = true;
+  #services.displayManager.ly.enable = true;
 
-  programs.hyprland.enable = true; # enable Hyprland
+  #programs.hyprland.enable = true; # enable Hyprland
 
 
 }
