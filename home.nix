@@ -18,7 +18,10 @@
       "Documents"
       "Videos"
       ".ssh"
-      ".config/zed"
+      {
+      directory = ".config/zed";
+      method = "symlink";
+      }
       {
         directory = ".local/share/zed";
         method = "symlink";
