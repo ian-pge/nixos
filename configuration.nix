@@ -140,7 +140,6 @@
   programs.dconf.enable = true;
 
   services.gnome = {
-    enable = true;
     wayland.enable = true;
   };
 
