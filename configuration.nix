@@ -65,7 +65,7 @@
   };
 
   systemd.tmpfiles.rules = [
-    "d /persist/home/ 1777 root root -" 
+    "d /persist/home 1777 root root -" 
     "d /persist/home/ian 0770 ian users - -"
   ];
 
