@@ -120,6 +120,7 @@
   # Packages
   environment.systemPackages = with pkgs; [
     zed-editor
+    bambu-studio
     clang-tools
     (python3.withPackages (ps: with ps; [
       python-lsp-server
