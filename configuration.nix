@@ -142,6 +142,13 @@
   #services.xserver.desktopManager.gnome.enable = true;
   #programs.dconf.enable = true;
 
-  services.ly.enable = true;
+  ervices.displayManager.ly.enable = true;
+
+  {
+    programs.hyprland.enable = true; # enable Hyprland
+    environment.systemPackages = [
+      pkgs.kitty # required for the default Hyprland config
+    ];
+  }
 
 }
