@@ -35,7 +35,8 @@
       }
 
     ];
-    files = [ 
+    files = [
+      "test"
       "hello"
       ".config/monitors.xml"
       ".screenrc"
