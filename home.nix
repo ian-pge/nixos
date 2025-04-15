@@ -36,7 +36,6 @@
 
     ];
     files = [ 
-      ".screenrc" 
       ".config/monitors.xml"
     ];
     allowOther = true;
