@@ -139,10 +139,6 @@
   services.xserver.desktopManager.gnome.enable = true;
   programs.dconf.enable = true;
 
-  services.xserver.displayManager.gdm.extraConfig = ''
-  WaylandEnable=true
-  '';
-
   services.gnome = {
     enable = true;
     wayland.enable = true;
