@@ -121,6 +121,8 @@
   environment.systemPackages = with pkgs; [
     zed-editor
     bambu-studio
+    hyprland
+    ly
     clang-tools
     (python3.withPackages (ps: with ps; [
       python-lsp-server
@@ -135,9 +137,12 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  services.xserver.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
-  programs.dconf.enable = true;
+  #services.xserver.enable = true;
+  #services.xserver.displayManager.gdm.enable = true;
+  #services.xserver.desktopManager.gnome.enable = true;
+  #programs.dconf.enable = true;
+
+  services.hyprland.enable = true;
+  services.ly.enable = true;
 
 }
