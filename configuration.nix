@@ -142,7 +142,6 @@
   #services.xserver.desktopManager.gnome.enable = true;
   #programs.dconf.enable = true;
 
-  services.hyprland.enable = true;
   services.ly.enable = true;
 
 }
