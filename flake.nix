@@ -27,7 +27,7 @@
         inputs.disko.nixosModules.default
         (import ./system/disko.nix { device = "/dev/nvme0n1"; })
 
-        ./system/configuration.nix
+        ./system/specialisation.nix
 
         inputs.home-manager.nixosModules.default
         inputs.impermanence.nixosModules.impermanence

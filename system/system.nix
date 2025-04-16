@@ -1,4 +1,4 @@
-{ config, pkgs, lib, inputs, ... }:
+{ pkgs, lib, ... }:
 
 {
   imports =
@@ -9,13 +9,11 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  services.openssh.enable = true;
-
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   system.stateVersion = "24.11";
 
-    users.users."ian" = {
+  users.users."ian" = {
     isNormalUser = true;
     initialPassword = "ianbage";
     extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
@@ -75,3 +73,27 @@
   hardware.graphics = {
     enable = true;
   };
+
+  services.openssh.enable = true;
+
+  # Packages
+  environment.systemPackages = with pkgs; [
+    zed-editor
+    bambu-studio
+    clang-tools
+    package-version-server
+    (python3.withPackages (ps: with ps; [
+      python-lsp-server
+      python-lsp-jsonrpc
+      python-lsp-black
+      pyls-isort
+      pyls-flake8
+    ]))
+    nil
+    nixd
+    git
+    google-chrome
+  ];
+
+  nixpkgs.config.allowUnfree = true;
+}
