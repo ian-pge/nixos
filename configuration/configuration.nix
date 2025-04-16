@@ -8,7 +8,7 @@
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.loader.systemd-boot.defaultEntry = "NixOS (hyprland)";
+  boot.loader.systemd-boot.sortKey = "02_default";
 
   services.openssh.enable = true;
 
@@ -144,6 +144,7 @@
 
   # Define specializations
   specialisation = {
+    boot.loader.systemd-boot.sortKey = "01_gnome";
     gnome = {
       inheritParentConfig = true;
       configuration = {
@@ -158,6 +159,7 @@
 
     hyprland = {
         inheritParentConfig = true;
+        boot.loader.systemd-boot.sortKey = "00_hyprland";
         configuration = {
           programs.hyprland.enable = true;
           xdg.portal = {
