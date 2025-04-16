@@ -9,9 +9,12 @@
     specialisation = {
         gnome = {
             inheritParentConfig = false;
-            configuration = {
-                imports =
-                [
+            configuration = { inputs, ... }: {
+                imports = [
+                    inputs.disko.nixosModules.default
+                    (import ./disko.nix { device = "/dev/nvme0n1"; })
+                    inputs.impermanence.nixosModules.impermanence
+                    inputs.home-manager.nixosModules.default
                     ./system.nix
                     ./system_gnome.nix
                 ];
