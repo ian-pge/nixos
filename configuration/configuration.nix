@@ -144,10 +144,10 @@
 
   # Define specializations
   specialisation = {
-    boot.loader.systemd-boot.sortKey = "01_gnome";
     gnome = {
       inheritParentConfig = true;
       configuration = {
+        boot.loader.systemd-boot.sortKey = "01_gnome";
         programs.dconf.enable = true;
         services.xserver = {
           enable = true;
@@ -159,8 +159,8 @@
 
     hyprland = {
         inheritParentConfig = true;
-        boot.loader.systemd-boot.sortKey = "00_hyprland";
         configuration = {
+          boot.loader.systemd-boot.sortKey = "00_hyprland";
           programs.hyprland.enable = true;
           xdg.portal = {
             enable = true;
