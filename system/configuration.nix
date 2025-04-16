@@ -8,7 +8,6 @@
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.loader.systemd-boot.sortKey = "02_default";
 
   services.openssh.enable = true;
 
@@ -88,33 +87,11 @@
   services.xserver.videoDrivers = ["nvidia"];
 
   hardware.nvidia = {
-
-    # Modesetting is required.
     modesetting.enable = true;
-
-    # Nvidia power management. Experimental, and can cause sleep/suspend to fail.
-    # Enable this if you have graphical corruption issues or application crashes after waking
-    # up from sleep. This fixes it by saving the entire VRAM memory to /tmp/ instead
-    # of just the bare essentials.
     powerManagement.enable = false;
-
-    # Fine-grained power management. Turns off GPU when not in use.
-    # Experimental and only works on modern Nvidia GPUs (Turing or newer).
     powerManagement.finegrained = false;
-
-    # Use the NVidia open source kernel module (not to be confused with the
-    # independent third-party "nouveau" open source driver).
-    # Support is limited to the Turing and later architectures. Full list of
-    # supported GPUs is at:
-    # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus
-    # Only available from driver 515.43.04+
     open = false;
-
-    # Enable the Nvidia settings menu,
-	# accessible via `nvidia-settings`.
     nvidiaSettings = true;
-
-    # Optionally, you may need to select the appropriate driver version for your specific GPU.
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
 
@@ -142,12 +119,22 @@
 
   nixpkgs.config.allowUnfree = true;
 
+  programs.hyprland.enable = true;
+    xdg.portal = {
+        enable = true;
+        extraPortals = [
+        pkgs.xdg-desktop-portal-gtk
+        pkgs.xdg-desktop-portal-hyprland
+        ];
+    };
+  # You might want a display manager for Hyprland
+  services.displayManager.ly.enable = true;
+
   # Define specializations
   specialisation = {
     gnome = {
       inheritParentConfig = true;
       configuration = {
-        boot.loader.systemd-boot.sortKey = lib.mkForce "01_gnome";
         programs.dconf.enable = true;
         services.xserver = {
           enable = true;
@@ -156,39 +143,8 @@
         };
       };
     };
-
-    hyprland = {
-        inheritParentConfig = true;
-        configuration = {
-          boot.loader.systemd-boot.sortKey = lib.mkForce "00_hyprland";
-          programs.hyprland.enable = true;
-          xdg.portal = {
-            enable = true;
-            extraPortals = [
-              pkgs.xdg-desktop-portal-gtk
-              pkgs.xdg-desktop-portal-hyprland
-            ];
-          };
-          # You might want a display manager for Hyprland
-          services.displayManager.ly.enable = true;
-        };
-      };
   };
 
-  # services.xserver.enable = true;
-  # services.xserver.displayManager.gdm.enable = true;
-  # services.xserver.desktopManager.gnome.enable = true;
-  # programs.dconf.enable = true;
 
-  #services.displayManager.ly.enable = true;
-
-  # programs.hyprland.enable = true; # enable Hyprland
-
-  # xdg.portal = {
-  # enable = true;
-  # extraPortals = [
-  #     pkgs.xdg-desktop-portal-gtk
-  #     pkgs.xdg-desktop-portal-hyprland
-  #   ];
 
 }
