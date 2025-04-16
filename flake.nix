@@ -1,6 +1,6 @@
 {
   description = "Nixos config flake";
-     
+
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -28,7 +28,7 @@
         (import ./disko.nix { device = "/dev/nvme0n1"; })
 
         ./configuration.nix
-              
+
         inputs.home-manager.nixosModules.default
         inputs.impermanence.nixosModules.impermanence
       ];
