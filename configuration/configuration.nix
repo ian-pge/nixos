@@ -8,7 +8,7 @@
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  # boot.loader.systemd-boot.defaultEntry = "NixOS - default (hyprland)";
+  boot.loader.systemd-boot.defaultEntry = "NixOS (hyprland)";
 
   services.openssh.enable = true;
 
