@@ -142,21 +142,19 @@
   nixpkgs.config.allowUnfree = true;
 
   # Define specializations
-    specialisation = {
-      gnome = {
-        inheritParentConfig = true;
-        configuration = {
-          programs.dconf.enable = true;
-          services.xserver = {
-            enable = true;
-            displayManager.gdm.enable = true;
-            desktopManager.gnome.enable = true;
-            services.xserver.enable = true;
-          };
-
+  specialisation = {
+    gnome = {
+      inheritParentConfig = true;
+      configuration = {
+        programs.dconf.enable = true;
+        services.xserver = {
+          enable = true;
+          displayManager.gdm.enable = true;
+          desktopManager.gnome.enable = true;
         };
       };
     };
+  };
 
   # services.xserver.enable = true;
   # services.xserver.displayManager.gdm.enable = true;
