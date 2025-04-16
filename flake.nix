@@ -25,9 +25,9 @@
       specialArgs = {inherit inputs;};
       modules = [
         inputs.disko.nixosModules.default
-        (import ./disko.nix { device = "/dev/nvme0n1"; })
+        (import ./configuration/disko.nix { device = "/dev/nvme0n1"; })
 
-        ./configuration.nix
+        ./configuration/configuration.nix
 
         inputs.home-manager.nixosModules.default
         inputs.impermanence.nixosModules.impermanence
