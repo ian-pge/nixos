@@ -141,23 +141,37 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  services.xserver.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
-  programs.dconf.enable = true;
+  # Define specializations
+    specialisation = {
+      gnome = {
+        inheritParentConfig = true;
+        configuration = {
+          programs.dconf.enable = true;
+          services.xserver = {
+            enable = true;
+            displayManager.gdm.enable = true;
+            desktopManager.gnome.enable = true;
+            services.xserver.enable = true;
+          };
+
+        };
+      };
+    };
+
+  # services.xserver.enable = true;
+  # services.xserver.displayManager.gdm.enable = true;
+  # services.xserver.desktopManager.gnome.enable = true;
+  # programs.dconf.enable = true;
 
   #services.displayManager.ly.enable = true;
 
-  programs.hyprland.enable = true; # enable Hyprland
+  # programs.hyprland.enable = true; # enable Hyprland
 
-  xdg.portal = {
-  enable = true;
-  extraPortals = [
-      pkgs.xdg-desktop-portal-gtk
-      pkgs.xdg-desktop-portal-hyprland
-    ];
-  };
-
-
+  # xdg.portal = {
+  # enable = true;
+  # extraPortals = [
+  #     pkgs.xdg-desktop-portal-gtk
+  #     pkgs.xdg-desktop-portal-hyprland
+  #   ];
 
 }
