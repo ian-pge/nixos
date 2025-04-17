@@ -27,15 +27,4 @@
         hyprland
         ly
     ];
-
-    programs.hyprland.enable = true;
-    xdg.portal = {
-        enable = true;
-        extraPortals = [
-        pkgs.xdg-desktop-portal-gtk
-        pkgs.xdg-desktop-portal-hyprland
-        ];
-    };
-    # You might want a display manager for Hyprland
-    services.displayManager.ly.enable = true;
 }
