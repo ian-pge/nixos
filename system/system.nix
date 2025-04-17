@@ -1,9 +1,13 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, inputs, ... }:
 
 {
   imports =
     [
       ./hardware-configuration.nix
+      inputs.disko.nixosModules.default
+      (import ./disko.nix { device = "/dev/nvme0n1"; })
+      inputs.impermanence.nixosModules.impermanence
+      inputs.home-manager.nixosModules.default
     ];
 
   boot.loader.systemd-boot.enable = true;
