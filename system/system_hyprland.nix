@@ -25,6 +25,7 @@
     # Packages
     environment.systemPackages = with pkgs; [
         hyprland
+        kitty
         ly
     ];
 }

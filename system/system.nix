@@ -4,8 +4,8 @@
   imports =
     [
       ./hardware-configuration.nix
-      inputs.disko.nixosModules.default
       (import ./disko.nix { device = "/dev/nvme0n1"; })
+      inputs.disko.nixosModules.default
       inputs.impermanence.nixosModules.impermanence
       inputs.home-manager.nixosModules.default
     ];
