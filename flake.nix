@@ -23,6 +23,9 @@
   {
     nixosConfigurations.default = nixpkgs.lib.nixosSystem {
       specialArgs = {inherit inputs;};
+      modules = [
+        ./system/specialisation.nix
+      ];
     };
   };
 }
