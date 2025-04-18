@@ -27,8 +27,8 @@
 
   programs.kitty.enable = true;
 
-  wayland.windowManager.hyprland = {
-    enable = true;
-    # Additional Hyprland configurations can go here
-  };
+  # wayland.windowManager.hyprland = {
+  #   enable = true;
+  #   # Additional Hyprland configurations can go here
+  # };
 }

@@ -93,6 +93,7 @@
     bambu-studio
     clang-tools
     package-version-server
+    kitty
     (python3.withPackages (ps: with ps; [
       python-lsp-server
       python-lsp-jsonrpc
