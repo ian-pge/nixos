@@ -79,6 +79,7 @@
         # networking tui
         impala
         bluetui
+        networkmanager-tui
 
         kitty
         ly
