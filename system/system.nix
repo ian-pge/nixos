@@ -20,7 +20,7 @@
   users.users."ian" = {
     isNormalUser = true;
     initialPassword = "ianbage";
-    extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "docker" ]; # Enable ‘sudo’ for the user.
   };
 
   boot.initrd.postDeviceCommands = lib.mkAfter ''
@@ -57,6 +57,7 @@
       "/var/lib/bluetooth"
       "/var/lib/nixos"
       "/var/lib/systemd/coredump"
+      "/var/lib/docker"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
@@ -80,9 +81,18 @@
 
   services.openssh.enable = true;
 
+  #same as underneeth but with brackets
+  virualisation = {
+    do = {
+      docker.enable = true;
+      docker.storageDriver = "btrfs";
+    };
+  };
+
   # Packages
   environment.systemPackages = with pkgs; [
     zed-editor
+    devpod
     bambu-studio
     clang-tools
     package-version-server
