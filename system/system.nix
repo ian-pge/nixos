@@ -68,6 +68,8 @@
 
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+    time.timeZone = "Europe/Paris";
+
     users.users."ian" = {
         isNormalUser = true;
         initialPassword = "ianbage";
