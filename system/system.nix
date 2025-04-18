@@ -82,10 +82,9 @@
 
   # Packages
   environment.systemPackages = with pkgs; [
-    # zed-editor
+    zed-editor
     bambu-studio
-    zed-editor.fhs
-    # clang-tools
+    clang-tools
     package-version-server
     (python3.withPackages (ps: with ps; [
       python-lsp-server
@@ -94,8 +93,10 @@
       pyls-isort
       pyls-flake8
     ]))
+    black
     nil
     nixd
+    alejandra
     git
     google-chrome
   ];
