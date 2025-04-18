@@ -198,8 +198,8 @@
             "$mainMod,D,togglespecialworkspace,Chat"
             "$mainMod SHIFT,D,movetoworkspace,special:Chat"
             # mouse‑drag
-            "$mainMod,mouse:272,movewindow"
-            "$mainMod,mouse:273,resizewindow"
+            # "$mainMod,mouse:272,movewindow"
+            # "$mainMod,mouse:273,resizewindow"
             # lock
             "$mainMod,ESCAPE,exec,hyprlock"
           ];
