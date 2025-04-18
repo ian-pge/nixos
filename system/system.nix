@@ -82,10 +82,8 @@
   services.openssh.enable = true;
 
   virtualisation.docker = {
-    do = {
       enable = true;
       storageDriver = "btrfs";
-    };
   };
 
   # Packages
