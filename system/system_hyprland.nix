@@ -54,7 +54,7 @@
     security.pam.services.login.enableGnomeKeyring = true;
     security.pam.services.hyprlock.enableGnomeKeyring = true;
 
-    networking.networkmanager.wifi.backend = "iwd";
+    networking.wireless.iwd.enable = true;
 
     programs.hyprland.enable = true;
     # xdg.portal = {
