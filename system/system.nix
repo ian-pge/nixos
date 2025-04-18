@@ -84,7 +84,8 @@
   environment.systemPackages = with pkgs; [
     zed-editor
     bambu-studio
-    clang-tools
+    zed-editor.fhs
+    # clang-tools
     package-version-server
     (python3.withPackages (ps: with ps; [
       python-lsp-server
