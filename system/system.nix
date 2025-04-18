@@ -50,6 +50,7 @@
             "/var/lib/nixos"
             "/var/lib/systemd/coredump"
             "/var/lib/docker"
+            "var/lib/iwd"
             "/etc/NetworkManager/system-connections"
             { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
         ];
