@@ -81,8 +81,7 @@
 
   services.openssh.enable = true;
 
-  #same as underneeth but with brackets
-  virualisation.docker = {
+  virtualisation.docker = {
     do = {
       enable = true;
       storageDriver = "btrfs";
