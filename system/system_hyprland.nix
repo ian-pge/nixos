@@ -76,6 +76,13 @@
 
         kitty
         ly
+        mako
+        swayosd
+        waybar
+        udiskie
+        rofi-wayland
+        yazi
+
 
 
 
