@@ -82,7 +82,7 @@
 
   # Packages
   environment.systemPackages = with pkgs; [
-    zed-editor
+    # zed-editor
     bambu-studio
     zed-editor.fhs
     # clang-tools
