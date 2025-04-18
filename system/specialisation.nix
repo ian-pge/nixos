@@ -31,14 +31,12 @@
                     ./system.nix
                     ./system_gnome.nix
                 ];
-                # programs.dconf.enable = true;
-                # services.xserver = {
-                #     enable = true;
-                #     displayManager.gdm.enable = true;
-                #     desktopManager.gnome.enable = true;
-                # };
-                services.desktopManager.cosmic.enable = true;  # Turn on the COSMIC session
-                services.displayManager.cosmic-greeter.enable = true;  # Use the COSMIC greeter
+                programs.dconf.enable = true;
+                services.xserver = {
+                    enable = true;
+                    displayManager.gdm.enable = true;
+                    desktopManager.gnome.enable = true;
+                };
             };
         };
     };
