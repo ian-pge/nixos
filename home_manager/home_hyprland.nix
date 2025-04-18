@@ -146,7 +146,7 @@
             sensitivity   = 0.8;
             touchpad.natural_scroll = false;
             # per‑device example
-            "device:epic-mouse-v1".sensitivity = -0.5;
+            # "device:epic-mouse-v1".sensitivity = -0.5;
           };
 
           gestures.workspace_swipe = true;
@@ -203,10 +203,10 @@
             # lock
             "$mainMod,ESCAPE,exec,hyprlock"
           ];
-          bindm = [
-            "$mainMod,mouse:272,movewindow"
-            "$mainMod,mouse:273,resizewindow"
-          ];
+          # bindm = [
+          #   "$mainMod,mouse:272,movewindow"
+          #   "$mainMod,mouse:273,resizewindow"
+          # ];
 
           ### WINDOW / LAYER RULES ###
           windowrulev2 = [
