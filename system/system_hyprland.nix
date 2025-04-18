@@ -9,22 +9,46 @@
         };
     };
 
-    hardware.nvidia = {
-        modesetting.enable = true;
-        powerManagement.enable = false;
-        powerManagement.finegrained = false;
-        open = false;
-        nvidiaSettings = true;
-        package = config.boot.kernelPackages.nvidiaPackages.stable;
+    hardware = {
+        # Enable OpenGL
+        graphics.enable = true;
+
+        bluetooth = {
+            enable = true;
+            powerOnBoot = true;
+        };
+
+        nvidia = {
+            modesetting.enable = true;
+            powerManagement.enable = false;
+            powerManagement.finegrained = false;
+            open = false;
+            nvidiaSettings = true;
+            package = config.boot.kernelPackages.nvidiaPackages.stable;
+            };
     };
 
     services = {
         displayManager.ly.enable = true;
+
+        pipewire = {
+            wireplumber.enable = true;
+            enable = true;
+            alsa = {
+                enable = true;
+                support32Bit = true;
+            };
+            pulse.enable = true;
+            jack.enable = true;
+        };
+
         xserver = {
             enable = true;
             videoDrivers = ["nvidia"];
         };
     };
+
+    networking.wireless.iwd.enable = true;
 
     programs.hyprland.enable = true;
     # xdg.portal = {
@@ -38,24 +62,18 @@
     # Packages
     environment.systemPackages = with pkgs; [
         # hyprland
-        hyprland
         hypridle
         hyprlock
         hyprpaper
         hyprpicker
         hyprshot
 
-        # internet
-        iwd
+        # networking tui
         impala
-
-        # bluetooth
-        bluez
         bluetui
 
         kitty
         ly
-        iwd
 
 
 

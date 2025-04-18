@@ -79,11 +79,6 @@
         dconf.enable = true;
     };
 
-    hardware = {
-        # Enable OpenGL
-        graphics.enable = true;
-    };
-
     services = {
         openssh.enable = true;
     };
