@@ -1,17 +1,13 @@
-{ config, pkgs, inputs, ... }:
+{ config, inputs, ... }:
 
 {
-    programs.fuse.userAllowOther = true;
     home-manager = {
         extraSpecialArgs = {inherit inputs;};
         backupFileExtension = "backup";
         users = {
-        "ian" = import ../home_manager/home_gnome.nix;
+            "ian" = import ../home_manager/home_gnome.nix;
         };
     };
-
-    # Load nvidia driver for Xorg and Wayland
-    services.xserver.videoDrivers = ["nvidia"];
 
     hardware.nvidia = {
         modesetting.enable = true;
@@ -22,8 +18,12 @@
         package = config.boot.kernelPackages.nvidiaPackages.stable;
     };
 
-    # Packages
-    environment.systemPackages = with pkgs; [
-        kitty
-    ];
+    services = {
+        xserver = {
+            enable = true;
+            videoDrivers = ["nvidia"];
+            displayManager.gdm.enable = true;
+            desktopManager.gnome.enable = true;
+        };
+    };
 }

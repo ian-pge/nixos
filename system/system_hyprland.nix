@@ -1,17 +1,13 @@
 { config, pkgs, inputs, ... }:
 
 {
-    programs.fuse.userAllowOther = true;
     home-manager = {
         extraSpecialArgs = {inherit inputs;};
         backupFileExtension = "backup";
         users = {
-        "ian" = import ../home_manager/home_hyprland.nix;
+            "ian" = import ../home_manager/home_hyprland.nix;
         };
     };
-
-    # Load nvidia driver for Xorg and Wayland
-    services.xserver.videoDrivers = ["nvidia"];
 
     hardware.nvidia = {
         modesetting.enable = true;
@@ -22,10 +18,46 @@
         package = config.boot.kernelPackages.nvidiaPackages.stable;
     };
 
+    services = {
+        displayManager.ly.enable = true;
+        xserver = {
+            enable = true;
+            videoDrivers = ["nvidia"];
+        };
+    };
+
+    programs.hyprland.enable = true;
+    # xdg.portal = {
+        # enable = true;
+        # extraPortals = [
+        # pkgs.xdg-desktop-portal-gtk
+        # pkgs.xdg-desktop-portal-hyprland
+        # ];
+    # };
+
     # Packages
     environment.systemPackages = with pkgs; [
+        # hyprland
         hyprland
+        hypridle
+        hyprlock
+        hyprpaper
+        hyprpicker
+        hyprshot
+
+        # internet
+        iwd
+        impala
+
+        # bluetooth
+        bluez
+        bluetui
+
         kitty
         ly
+        iwd
+
+
+
     ];
 }
