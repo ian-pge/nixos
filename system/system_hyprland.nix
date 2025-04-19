@@ -31,7 +31,7 @@
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
     services = {
-        # displayManager.ly.enable = true;
+        displayManager.ly.enable = true;
 
         pipewire = {
             wireplumber.enable = true;
@@ -50,7 +50,7 @@
         };
     };
 
-    services.displayManager.sddm.wayland.enable = true;
+    # services.displayManager.sddm.wayland.enable = true;
 
     services.gnome.gnome-keyring.enable = true;
     security.pam.services.login.enableGnomeKeyring = true;
