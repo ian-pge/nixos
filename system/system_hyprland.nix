@@ -89,11 +89,6 @@
 
         uwsm = {
             enable = true;          # ← THIS is what actually writes the .desktop file
-            waylandCompositors.hyprland = {
-                binPath    = "${pkgs.hyprland}/bin/Hyprland";
-                prettyName = "Hyprland";
-                comment    = "Hyprland compositor managed by UWSM";
-            };
         };
     };
 
