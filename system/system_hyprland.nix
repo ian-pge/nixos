@@ -67,9 +67,10 @@
 
 
         uwsm = {
+            enable = true;
             waylandCompositors = {
               hyprland = {
-                prettyName = "Hyprland (UWSM)";
+                prettyName = "Hyprland";
                 comment = "Hyprland compositor managed by UWSM";
                 binPath = "${pkgs.hyprland}/bin/Hyprland";
               };
