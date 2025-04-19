@@ -98,7 +98,7 @@
         settings = {
           initial_session = {
             # fallback if tuigreet fails (TTY autologin)
-            command = "${pkgs.greety}/bin/agreety --cmd ${pkgs.bash}/bin/bash";
+            command = "${pkgs.greetd}/bin/greetd --cmd ${pkgs.bash}/bin/bash";
             user    = "root";
           };
 
