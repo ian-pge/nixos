@@ -43,8 +43,8 @@
                     command = ''
                         ${pkgs.greetd.tuigreet}/bin/tuigreet \
                             --time --remember --remember-session \
-                            --sessions /run/current-system/sw/share/wayland-sessions \
-                            --cmd "${pkgs.uwsm}/bin/uwsm start -F -- ${pkgs.hyprland}/bin/Hyprland"
+                            --sessions ${config.system.build.desktops}/share/wayland-sessions \
+                            --cmd "uwsm start -F -- Hyprland"
                     '';
                 };
             };
@@ -84,11 +84,17 @@
             enable = true;
             clean.enable = true;
             clean.extraArgs = "--keep-since 4d --keep 3";
-            flake = "/etc/nixos/";
+            flake = "/etc/nixos#default";
         };
 
-        uwsm = {
-            enable = true;          # ← THIS is what actually writes the .desktop file
+        uwsm.enable = true;
+
+        uwsm.waylandCompositors = {
+            hyprland = {
+                prettyName = "Hyprland";
+                comment = "Hyprland compositor managed by UWSM";
+                binPath = "/run/current-system/sw/bin/Hyprland";
+            };
         };
     };
 
@@ -113,9 +119,6 @@
         udiskie
         rofi-wayland
         yazi
-
-
-
 
     ];
 }
