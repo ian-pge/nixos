@@ -56,7 +56,14 @@
 
     networking.wireless.iwd.enable = true;
 
-    programs.hyprland.enable = true;
+    programs = {
+        hyprland = {
+            enable = true;
+            withUWSM = true;
+            xwayland.enable = true;
+        };
+    };
+
     # xdg.portal = {
         # enable = true;
         # extraPortals = [

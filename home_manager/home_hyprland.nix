@@ -37,6 +37,7 @@
 
   wayland.windowManager.hyprland = {
     enable = true;
+    systemd.enable = false;
     # Additional Hyprland configurations can go here
     #
     settings = {
