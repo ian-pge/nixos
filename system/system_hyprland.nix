@@ -31,24 +31,7 @@
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
     services = {
-        # displayManager.ly.enable = true;
-        greetd = {
-            enable = true;               # start greetd on boot
-            vt     = 1;                  # use first virtual terminal (DMs default)
-            settings = {
-                # tuigreet will show a menu of *all* desktop/wayland sessions
-                # and remember the last one the user picked
-                default_session = {
-                    user    = "greeter";
-                    command = ''
-                        ${pkgs.greetd.tuigreet}/bin/tuigreet \
-                        --time --remember --remember-session \
-                        --sessions ${config.system.build.desktops}/share/wayland-sessions \
-                        --cmd "uwsm start -F -- Hyprland"
-                    '';
-                };
-            };
-        };
+        displayManager.ly.enable = true;
 
         pipewire = {
             wireplumber.enable = true;
