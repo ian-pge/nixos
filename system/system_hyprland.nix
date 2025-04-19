@@ -68,7 +68,6 @@
 
         uwsm = {
             enable = true;
-            };
           };
 
         nh = {
