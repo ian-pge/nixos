@@ -47,10 +47,10 @@
         xserver = {
             enable = true;
             videoDrivers = ["nvidia"];
-            displayManager.gdm.enable = true;
         };
     };
 
+    services.displayManager.sddm.wayland.enable = true;
 
     services.gnome.gnome-keyring.enable = true;
     security.pam.services.login.enableGnomeKeyring = true;
