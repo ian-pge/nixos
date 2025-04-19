@@ -39,12 +39,12 @@
                 # tuigreet will show a menu of *all* desktop/wayland sessions
                 # and remember the last one the user picked
                 default_session = {
-                    user    = "greeter";     # greetd auto‑creates this user
+                    user    = "greeter";
                     command = ''
                         ${pkgs.greetd.tuigreet}/bin/tuigreet \
-                            --time --remember --remember-session \
-                            --sessions ${config.system.build.desktops}/share/wayland-sessions \
-                            --cmd "uwsm start -F -- Hyprland"
+                        --time --remember --remember-session \
+                        --sessions ${config.system.build.desktops}/share/wayland-sessions \
+                        --cmd "uwsm start -F -- Hyprland"
                     '';
                 };
             };
@@ -73,12 +73,16 @@
 
     networking.wireless.iwd.enable = true;
 
+    services.xserver.displayManager.sessionPackages = [ pkgs.hyprland ];
+
     programs = {
         hyprland = {
             enable = true;
             withUWSM = true;
             xwayland.enable = true;
         };
+
+        uwsm.enable = true;
 
         nh = {
             enable = true;
