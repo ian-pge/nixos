@@ -34,7 +34,6 @@
   };
 
   programs.kitty.enable = true;
-  programs.uwsm.enable = true;
 
   wayland.windowManager.hyprland = {
     enable = true;
