@@ -51,6 +51,8 @@
         };
     };
 
+    services.displayManager.gdm.wayland.enable = true;
+
     services.gnome.gnome-keyring.enable = true;
     security.pam.services.login.enableGnomeKeyring = true;
     security.pam.services.hyprlock.enableGnomeKeyring = true;
@@ -63,9 +65,18 @@
             withUWSM = true;
             xwayland.enable = true;
         };
+
+
         uwsm = {
             enable = true;
-        };
+            waylandCompositors = {
+              hyprland = {
+                prettyName = "Hyprland";
+                comment = "Hyprland compositor managed by UWSM";
+                binPath = "/run/current-system/sw/bin/Hyprland";
+              };
+            };
+          };
 
         nh = {
             enable = true;
