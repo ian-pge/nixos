@@ -67,7 +67,6 @@
 
 
         uwsm = {
-            enable = true;
             waylandCompositors = {
               hyprland = {
                 prettyName = "Hyprland (UWSM)";
