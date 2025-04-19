@@ -86,16 +86,6 @@
             clean.extraArgs = "--keep-since 4d --keep 3";
             flake = "/etc/nixos#default";
         };
-
-        uwsm.enable = true;
-
-        uwsm.waylandCompositors = {
-            hyprland = {
-                prettyName = "Hyprland";
-                comment = "Hyprland compositor managed by UWSM";
-                binPath = "/run/current-system/sw/bin/Hyprland";
-            };
-        };
     };
 
     # Packages
