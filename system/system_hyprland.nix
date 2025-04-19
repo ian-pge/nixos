@@ -32,7 +32,7 @@
 
     services = {
         # displayManager.ly.enable = true;
-        services.greetd = {
+        greetd = {
             enable = true;               # start greetd on boot
             vt     = 1;                  # use first virtual terminal (DMs default)
             settings = {
