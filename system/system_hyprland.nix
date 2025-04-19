@@ -31,7 +31,7 @@
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
     services = {
-        displayManager.ly.enable = true;
+        # displayManager.ly.enable = true;
 
         pipewire = {
             wireplumber.enable = true;
@@ -47,6 +47,7 @@
         xserver = {
             enable = true;
             videoDrivers = ["nvidia"];
+            displayManager.gdm.enable = true;
         };
     };
 
