@@ -96,11 +96,6 @@
       services.greetd = {
         enable = true;
         settings = {
-          initial_session = {
-            # fallback if tuigreet fails (TTY autologin)
-            command = "${pkgs.greetd}/bin/greetd --cmd ${pkgs.bash}/bin/bash";
-            user    = "root";
-          };
 
           default_session = {
             user    = "greeter";   # greetd’s dedicated user
