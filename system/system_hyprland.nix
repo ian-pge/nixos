@@ -63,8 +63,14 @@
             withUWSM = true;
             xwayland.enable = true;
         };
-
-        uwsm.enable = true;
+        uwsm = {
+            enable = true;
+            waylandCompositors.hyprland = {
+              prettyName = "Hyprland (UWSM)";          # label in GDM menu
+              comment    = "Hyprland compositor managed by UWSM";
+              binPath    = "${pkgs.hyprland}/bin/Hyprland";
+            };
+        };
 
         nh = {
             enable = true;
