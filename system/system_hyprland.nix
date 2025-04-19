@@ -47,10 +47,11 @@
         xserver = {
             enable = true;
             videoDrivers = ["nvidia"];
+            displayManager.gdm.enable = true;
         };
     };
 
-    # services.displayManager.sddm.wayland.enable = true;
+    services.xserver.displayManager.gdm.wayland = true;
 
     services.gnome.gnome-keyring.enable = true;
     security.pam.services.login.enableGnomeKeyring = true;
@@ -77,48 +78,6 @@
             flake = "/etc/nixos";
         };
     };
-
-
-
-
-
-
-
-
-    ## greetd + tuigreet
-      services.greetd = {
-        enable = true;
-        settings = {
-
-          default_session = {
-            user    = "greeter";   # greetd’s dedicated user
-            command = ''
-              ${pkgs.greetd.tuigreet}/bin/tuigreet                       \
-                --time --remember --user-menu                            \
-                --cmd "uwsm start -- hyprland.desktop"               \
-                --sessions /run/current-system/sw/share/wayland-sessions \
-                --sessions /etc/profiles/per-user/%u/share/wayland-sessions
-            '';
-          };
-        };
-    };
-
-    # greeter user – minimal shell, no password
-    users.users.greeter = {
-        isSystemUser = true;
-        group = "greeter";
-        home  = "/var/lib/greeter";
-    };
-    users.groups.greeter = { };
-
-
-
-
-
-
-
-
-
 
     # Packages
     environment.systemPackages = with pkgs; [
