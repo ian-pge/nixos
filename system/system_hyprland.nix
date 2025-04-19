@@ -51,7 +51,7 @@
         };
     };
 
-    services.xserver.displayManager.gdm.wayland = true;
+    # services.xserver.displayManager.gdm.wayland = true;
 
     services.gnome.gnome-keyring.enable = true;
     security.pam.services.login.enableGnomeKeyring = true;
