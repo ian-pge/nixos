@@ -41,10 +41,10 @@
                 default_session = {
                     user    = "greeter";     # greetd auto‑creates this user
                     command = ''
-                    ${pkgs.greetd.tuigreet}/bin/tuigreet          \
-                        --time --remember --remember-session        \
-                        --sessions ${pkgs.writeText "sessions-dir" "/run/current-system/sw/share"} \
-                        --cmd "${pkgs.uwsm}/bin/uwsm start -F -- ${pkgs.hyprland}/bin/Hyprland"
+                        ${pkgs.greetd.tuigreet}/bin/tuigreet \
+                            --time --remember --remember-session \
+                            --sessions /run/current-system/sw/share/wayland-sessions \
+                            --cmd "${pkgs.uwsm}/bin/uwsm start -F -- ${pkgs.hyprland}/bin/Hyprland"
                     '';
                 };
             };
