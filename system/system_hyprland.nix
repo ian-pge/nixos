@@ -120,7 +120,6 @@
         isSystemUser = true;
         group = "greeter";
         home  = "/var/lib/greeter";
-        shell = pkgs.nologin;
     };
     users.groups.greeter = { };
 
