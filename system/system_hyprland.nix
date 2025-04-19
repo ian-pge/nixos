@@ -64,14 +64,6 @@
         };
     };
 
-    # xdg.portal = {
-        # enable = true;
-        # extraPortals = [
-        # pkgs.xdg-desktop-portal-gtk
-        # pkgs.xdg-desktop-portal-hyprland
-        # ];
-    # };
-
     # Packages
     environment.systemPackages = with pkgs; [
         # hyprland
