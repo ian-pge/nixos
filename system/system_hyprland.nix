@@ -73,7 +73,7 @@
 
     networking.wireless.iwd.enable = true;
 
-    services.xserver.displayManager.sessionPackages = [ pkgs.hyprland ];
+    services.displayManager.sessionPackages = [ pkgs.hyprland ];
 
     programs = {
         hyprland = {
