@@ -31,7 +31,7 @@
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
     services = {
-        displayManager.ly.enable = true;
+        # displayManager.ly.enable = true;
 
         pipewire = {
             wireplumber.enable = true;
@@ -70,9 +70,9 @@
             enable = true;
             waylandCompositors = {
               hyprland = {
-                prettyName = "Hyprland";
+                prettyName = "Hyprland (UWSM)";
                 comment = "Hyprland compositor managed by UWSM";
-                binPath = "/run/current-system/sw/bin/Hyprland";
+                binPath = "${pkgs.hyprland}/bin/Hyprland";
               };
             };
           };
@@ -84,6 +84,53 @@
             flake = "/etc/nixos";
         };
     };
+
+
+
+
+
+
+
+
+    ## greetd + tuigreet
+      services.greetd = {
+        enable = true;
+        settings = {
+          initial_session = {
+            # fallback if tuigreet fails (TTY autologin)
+            command = "${pkgs.agreety}/bin/agreety --cmd ${pkgs.bash}/bin/bash";
+            user    = "root";
+          };
+
+          default_session = {
+            user    = "greeter";   # greetd’s dedicated user
+            command = ''
+              ${pkgs.greetd.tuigreet}/bin/tuigreet                       \
+                --time --remember --user-menu                            \
+                --cmd "uwsm start -- hyprland.desktop"               \
+                --sessions /run/current-system/sw/share/wayland-sessions \
+                --sessions /etc/profiles/per-user/%u/share/wayland-sessions
+            '';
+          };
+        };
+
+    # greeter user – minimal shell, no password
+    users.users.greeter = {
+        isSystemUser = true;
+        group = "greeter";
+        home  = "/var/lib/greeter";
+        shell = pkgs.nologin;
+    };
+    users.groups.greeter = { };
+
+
+
+
+
+
+
+
+
 
     # Packages
     environment.systemPackages = with pkgs; [
