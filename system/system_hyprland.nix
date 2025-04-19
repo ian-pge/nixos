@@ -113,6 +113,7 @@
             '';
           };
         };
+    };
 
     # greeter user – minimal shell, no password
     users.users.greeter = {
