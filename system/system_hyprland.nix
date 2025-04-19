@@ -79,6 +79,22 @@
             withUWSM = true;
             xwayland.enable = true;
         };
+
+        nh = {
+            enable = true;
+            clean.enable = true;
+            clean.extraArgs = "--keep-since 4d --keep 3";
+            flake = "/etc/nixos/";
+        };
+
+        uwsm = {
+            enable = true;          # ← THIS is what actually writes the .desktop file
+            waylandCompositors.hyprland = {
+                binPath    = "${pkgs.hyprland}/bin/Hyprland";
+                prettyName = "Hyprland";
+                comment    = "Hyprland compositor managed by UWSM";
+            };
+        };
     };
 
     # Packages
@@ -93,8 +109,6 @@
         # networking tui
         impala
         bluetui
-
-        nh
 
         kitty
         ly
