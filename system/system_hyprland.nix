@@ -83,7 +83,7 @@
             # tuigreet binary from nixpkgs
             command = "${pkgs.greetd.tuigreet}/bin/tuigreet \
               --time --asterisks \
-              --theme greet=lightmagenta;prompt=lightcyan;input=white;error=lightred;border=magenta;time=lightyellow \
+              --theme border=magenta;text=cyan;prompt=green;time=yellow;action=blue;container=black;input=red \
               --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
               --cmd Hyprland";          # start Hyprland after auth
             user = "greeter";           # unprivileged greeter user
