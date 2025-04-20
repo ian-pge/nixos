@@ -79,11 +79,20 @@
         };
     };
 
-    services.displayManager = {
-        enable         = true;
-        execCmd        = "${pkgs.lemurs}/bin/lemurs --no-log";
-        defaultSession = "Hyprland";
-    };
+    services.greetd = {
+        enable = true;                  # start greetd daemon
+        vt     = 1;                     # run on tty1
+        settings = {
+          default_session = {
+            # tuigreet binary from nixpkgs
+            command = "${pkgs.tuigreet}/bin/tuigreet \
+              --time --asterisks \
+              --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
+              --cmd Hyprland";          # start Hyprland after auth
+            user = "greeter";           # unprivileged greeter user
+          };
+        };
+      };
 
 
     # Packages
@@ -106,7 +115,8 @@
         udiskie
         rofi-wayland
         yazi
-        lemurs
+        tuigreet
+        greetd
 
     ];
 }
