@@ -83,7 +83,7 @@
             # tuigreet binary from nixpkgs
             command = "
                 ${pkgs.greetd.tuigreet}/bin/tuigreet \
-                --time --asterisks \
+                --time \
                 --width 40 \
                 --theme 'border=magenta;text=cyan;prompt=green;time=red;action=blue;button=yellow;container=black;input=red' \
                 --remember \
