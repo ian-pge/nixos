@@ -85,7 +85,6 @@
                 ${pkgs.greetd.tuigreet}/bin/tuigreet \
                 --time \
                 --width 40 \
-                --theme 'border=magenta;text=cyan;prompt=green;time=red;action=blue;button=yellow;container=black;input=red' \
                 --remember \
                 --asterisks \
                 --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
