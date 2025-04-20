@@ -90,7 +90,7 @@
                 --asterisks \
                 --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
                 --cmd Hyprland";          # start Hyprland after auth
-            user = "greetd";           # unprivileged greeter user
+            user = "greeter";           # unprivileged greeter user
           };
         };
       };
