@@ -59,7 +59,7 @@
           "exec-once" = [
             "hyprpaper"
             "uwsm finalize"
-            "systemctl --user start hyprpolkitagent"
+            # "systemctl --user start hyprpolkitagent"
             "mako"
             "swayosd-server"
             "udiskie &"
@@ -81,7 +81,7 @@
           ### ENVIRONMENT ###
           env = [
             "EDITOR,zeditor"
-            "XDG_CURRENT_DESKTOP,Hyprland"
+            # "XDG_CURRENT_DESKTOP,Hyprland"
             "TERMINAL,kitty"
             "BROWSER,zen-browser"
             "GTK_USE_PORTAL,1"
