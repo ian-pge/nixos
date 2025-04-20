@@ -31,7 +31,6 @@
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
     services = {
-        # displayManager.ly.enable = true;
 
         pipewire = {
             wireplumber.enable = true;
@@ -47,11 +46,8 @@
         xserver = {
             enable = false;
             videoDrivers = ["nvidia"];
-            # displayManager.gdm.enable = true;
         };
     };
-
-    # services.xserver.displayManager.gdm.wayland = true;
 
     services.gnome.gnome-keyring.enable = true;
     security.pam.services.login.enableGnomeKeyring = true;
@@ -87,6 +83,7 @@
             # tuigreet binary from nixpkgs
             command = "${pkgs.greetd.tuigreet}/bin/tuigreet \
               --time --asterisks \
+              --theme greet=lightmagenta;prompt=lightcyan;input=white;error=lightred;border=magenta;time=lightyellow \
               --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
               --cmd Hyprland";          # start Hyprland after auth
             user = "greeter";           # unprivileged greeter user
