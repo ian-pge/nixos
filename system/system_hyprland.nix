@@ -45,9 +45,9 @@
         };
 
         xserver = {
-            enable = true;
+            enable = false;
             videoDrivers = ["nvidia"];
-            displayManager.gdm.enable = true;
+            # displayManager.gdm.enable = true;
         };
     };
 
@@ -79,6 +79,13 @@
         };
     };
 
+    services.displayManager = {
+        enable         = true;
+        execCmd        = "${pkgs.lemurs}/bin/lemurs --no-log";
+        defaultSession = "Hyprland";
+    };
+
+
     # Packages
     environment.systemPackages = with pkgs; [
         # hyprland
@@ -93,13 +100,13 @@
         bluetui
 
         kitty
-        ly
         mako
         swayosd
         waybar
         udiskie
         rofi-wayland
         yazi
+        lemurs
 
     ];
 }
