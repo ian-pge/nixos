@@ -116,7 +116,7 @@
         rofi-wayland
         yazi
         greetd.tuigreet
-        greetd
+        greetd.greetd
 
     ];
 }
