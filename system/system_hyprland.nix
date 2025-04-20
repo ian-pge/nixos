@@ -85,7 +85,7 @@
         settings = {
           default_session = {
             # tuigreet binary from nixpkgs
-            command = "${pkgs.tuigreet}/bin/tuigreet \
+            command = "${pkgs.greetd.tuigreet}/bin/tuigreet \
               --time --asterisks \
               --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
               --cmd Hyprland";          # start Hyprland after auth
@@ -115,7 +115,7 @@
         udiskie
         rofi-wayland
         yazi
-        tuigreet
+        greetd.tuigreet
         greetd
 
     ];
