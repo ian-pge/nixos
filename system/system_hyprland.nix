@@ -81,14 +81,12 @@
         settings = {
           default_session = {
             # tuigreet binary from nixpkgs
-            command = "
-                ${pkgs.greetd.tuigreet}/bin/tuigreet \
-                --time \
-                --width 40 \
-                --remember \
-                --asterisks \
-                --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
-                --cmd Hyprland";          # start Hyprland after auth
+            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd Hyprland";
+                # --width 40 \
+                # --remember \
+                # --asterisks \
+                # --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
+                # --cmd Hyprland;          # start Hyprland after auth
             user = "greeter";           # unprivileged greeter user
           };
         };
