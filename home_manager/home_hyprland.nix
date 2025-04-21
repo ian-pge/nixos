@@ -53,6 +53,7 @@
 
           ### VARIABLES ###
           "$terminal"     = "kitty";
+          "$browser"      = "google-chrome-stable";
           "$fileManager"  = "kitty -e yazi";
           "$menu"         = "pgrep -x rofi >/dev/null 2>&1 || .config/rofi/launchers/type-4/launcher.sh";
           "$editor"       = "zeditor";
@@ -178,7 +179,7 @@
             "$mainMod,F,exec,$fileManager"
             "$mainMod,A,exec,$menu"
             "$mainMod,Z,togglesplit"
-            "$mainMod,G,exec,zen-browser"
+            "$mainMod,G,exec,browser"
             "$mainMod,H,movefocus,l" "$mainMod,L,movefocus,r"
             "$mainMod,K,movefocus,u" "$mainMod,J,movefocus,d"
             "$mainMod SHIFT,H,movewindow,l" "$mainMod SHIFT,L,movewindow,r"
