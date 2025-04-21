@@ -115,8 +115,7 @@
         yazi
         greetd.tuigreet
         greetd.greetd
-        # acpi
-        # acpid
+        playerctl
         vlc
         htop
         nvtopPackages.full
