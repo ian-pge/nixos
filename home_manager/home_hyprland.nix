@@ -85,7 +85,7 @@
             "EDITOR,zeditor"
             # "XDG_CURRENT_DESKTOP,Hyprland"
             "TERMINAL,kitty"
-            "BROWSER,zen-browser"
+            "BROWSER,google-chrome-stable"
             "GTK_USE_PORTAL,1"
             "ELECTRON_OZONE_PLATFORM_HINT,wayland"
             # NVIDIA tweaks
@@ -162,8 +162,8 @@
           binde = [
             ",XF86AudioRaiseVolume,exec,swayosd-client --output-volume=raise"
             ",XF86AudioLowerVolume,exec,swayosd-client --output-volume=lower"
-            ",XF86AudioRaiseVolume,exec,swayosd-client --output-volume=raise"
-            ",XF86AudioLowerVolume,exec,swayosd-client --output-volume=lower"
+            ",XF86MonBrightnessUp,exec,swayosd-client --brightness=raise"
+            ",XF86MonBrightnessDown,exec,swayosd-client --brightness=lower"
           ];
           bind = [
             # ",XF86AudioMute,exec,swayosd-client --output-volume mute-toggle"
