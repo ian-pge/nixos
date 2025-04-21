@@ -55,6 +55,8 @@
 
     networking.wireless.iwd.enable = true;
 
+    fonts.packages = with pkgs; [ nerdfonts ];
+
     programs = {
         hyprland = {
             enable = true;
@@ -106,6 +108,9 @@
         yazi
         greetd.tuigreet
         greetd.greetd
+        acpi
+        acpid
+        vlc
 
     ];
 }

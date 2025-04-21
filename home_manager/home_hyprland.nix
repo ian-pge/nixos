@@ -229,10 +229,207 @@
         };
     };
 
-      # optional, but keeps $EDITOR & friends for shells spawned outside Hyprland
-      home.sessionVariables = {
-        EDITOR               = "zeditor";
-        XDG_CURRENT_DESKTOP  = "Hyprland";
-        XDG_SESSION_TYPE     = "wayland";
-      };
+
+
+
+
+    programs.waybar = {
+        enable = true;
+
+        ## Main bar configuration ─ straight conversion of your JSON
+        settings = {
+        mainBar = {
+            layer           = "top";
+            "output"        = "eDP-1";
+
+            "modules-left"  = [
+            "custom/launcher" "cpu" "memory"
+            "custom/gpu" "disk" "custom/pacman"
+            ];
+
+            "modules-center" = [ "hyprland/workspaces" ];
+
+            "modules-right"  = [
+            "bluetooth" "network" "upower" "pulseaudio"
+            "backlight" "clock#second" "clock"
+            ];
+
+            ## ───── Hyprland workspaces ─────
+            "hyprland/workspaces" = {
+            "active-only"         = false;
+            "all-outputs"         = true;
+            "show-special"        = true;
+            "special-visible-only"= true;
+            format                = "{icon}";
+            "format-icons" = {
+                "1" = "1"; "2" = "2"; "3" = "3"; "4" = "4"; "5" = "5";
+                "special:llm" = "S1";
+                "special:multimedia" = "S2";
+            };
+            };
+
+            ## ───── Clocks ─────
+            clock = {
+            format   = " {:%H:%M}";
+            timezone = "Europe/Paris";
+            tooltip  = false;
+            };
+            "clock#second" = {
+            format  = " {:%b %d %Y}";
+            tooltip = false;
+            };
+
+            ## ───── System modules ─────
+            cpu = {
+            interval = 5;
+            format   = " {usage}%";
+            "on-click" = "kitty htop";
+            };
+
+            memory = {
+            interval = 5;
+            format   = "  {}%";
+            "on-click" = "kitty htop";
+            };
+
+            "custom/gpu" = {
+            format        = "{icon} {0}";
+            exec          = "gpu-usage-waybar";
+            "return-type" = "json";
+            "format-icons"= "";
+            "on-click"    = "kitty nvtop";
+            };
+
+            backlight = {
+            format        = "{icon} {percent}%";
+            "format-icons"= [ "󱩎" "󱩏" "󱩐" "󱩑" "󱩒"
+                                "󱩓" "󱩔" "󱩕" "󱩖" "󰛨" ];
+            tooltip = false;
+            };
+
+            pulseaudio = {
+            format        = "{icon} {volume}%";
+            "format-muted"= "󰖁";
+            "format-icons".default = [ "󰕿" "󰖀" "󰕾" ];
+            "on-click"    = "kitty pulsemixer";
+            };
+
+            network = {
+            "format-wifi"       = "{icon} {essid}";
+            "format-icons"      = [ "󰤟" "󰤢" "󰤥" "󰤨" ];
+            "format-ethernet"   = "󰈀 {ifname}";
+            "format-disconnected" = "󰤭 Disconnected";
+            "format-disabled"     = "󰤭 Off";
+            "format-disabled-if-down" = true;
+            tooltip-format          = "{ifname} via {gwaddr}";
+            "on-click"              = "kitty impala";
+            };
+
+            "custom/launcher" = {
+            format   = "";
+            "on-click"= "pgrep -x rofi >/dev/null 2>&1 || .config/rofi/launchers/type-4/launcher.sh";
+            tooltip  = false;
+            };
+
+            "custom/pacman" = {
+            format        = "{icon} {0}";
+            "return-type" = "json";
+            "format-icons" = {
+                "pending-updates" = " ";
+                "updated"         = "";
+            };
+            "exec-if"   = "which waybar-updates";
+            exec        = "waybar-updates";
+            "on-click"  = "kitty yay -Syu";
+            };
+
+            bluetooth = {
+            format                     = "󰂲 Disconnected";
+            "format-connected"         = "󰂯 {device_alias}";
+            tooltip-format             = "{controller_alias}\t{controller_address}";
+            "tooltip-format-connected" = "{controller_alias}\t{controller_address}\n\n{device_enumerate}";
+            "tooltip-format-enumerate-connected" = "{device_alias}\t{device_address}";
+            "format-off"               = "󰂲 Off";
+            "on-click"                 = "kitty bluetui";
+            };
+
+            upower = {
+            "icon-size"    = 20;
+            format         = " {percentage}";
+            "hide-if-empty"= true;
+            tooltip        = true;
+            "tooltip-spacing" = 20;
+            "on-click"     = "kitty sudo powertop";
+            };
+
+            disk = {
+            interval  = 30;
+            format    = " {percentage_used}%";
+            path      = "/";
+            "on-click"= "kitty sudo ncdu -x /";
+            };
+        };
+        };
+
+        ## CSS theme – pasted directly
+        style = ''
+        @define-color rosewater #f4dbd6;
+        @define-color flamingo  #f0c6c6;
+        @define-color pink      #f5bde6;
+        @define-color mauve     #c6a0f6;
+        @define-color red       #ed8796;
+        @define-color maroon    #ee99a0;
+        @define-color peach     #f5a97f;
+        @define-color yellow    #eed49f;
+        @define-color green     #a6da95;
+        @define-color teal      #8bd5ca;
+        @define-color sky       #91d7e3;
+        @define-color sapphire  #7dc4e4;
+        @define-color blue      #8aadf4;
+        @define-color lavender  #b7bdf8;
+        @define-color text      #cad3f5;
+        @define-color base      #24273a;
+        @define-color crust     #181926;
+        @define-color mantle    #1e2030;
+
+        * {
+            font-family: "Ubuntu Nerd Font";
+            font-size: 19px;
+        }
+
+        window#waybar {
+            background-color: @crust;
+            color: #ffffff;
+        }
+
+        #clock, #cpu, #memory, #backlight, #custom-gpu,
+        #pulseaudio, #network, #bluetooth, #custom-pacman,
+        #upower, #disk, #workspaces, #custom-launcher {
+            color: #e5e5e5;
+            background-color: @base;
+            border-radius: 8px;
+            padding: 2px 10px;
+            margin: 8.5px 4px;
+            font-size: 18.5px;
+        }
+
+        #cpu            { color: @pink;      }
+        #memory         { color: @green;     }
+        #custom-gpu     { color: @mauve;     }
+        #backlight      { color: @yellow;    }
+        #network        { color: @maroon;    }
+        #pulseaudio     { color: @lavender;  }
+        #clock          { color: @red;       }
+        #clock.second   { color: @teal;      }
+        #custom-launcher{ color: @sapphire;  }
+        #bluetooth      { color: @blue;      }
+        #upower         { color: @rosewater; }
+        #disk           { color: @peach;     }
+        #custom-pacman  { color: @flamingo;  }
+
+        #workspaces button       { color: @text; background: none; border: none; }
+        #workspaces button:hover { background: none; }
+        #workspaces button.active{ color: #33ccff; }
+        '';
+    };
 }
