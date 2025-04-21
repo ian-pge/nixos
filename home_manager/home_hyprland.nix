@@ -170,6 +170,7 @@
             # ",XF86AudioPlay,exec,playerctl play-pause"
             # ",XF86AudioNext,exec,playerctl next"
             # ",XF86AudioPrev,exec,playerctl previous"
+            "XF86AudioMute,exec,swayosd-client --output-volume=mute-toggle"
             ",PRINT,exec,hyprshot -m region -o ~/Screenshots"
             "$mainMod,RETURN,exec,$terminal"
             "$mainMod,W,killactive"
