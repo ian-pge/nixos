@@ -162,6 +162,8 @@
           binde = [
             ",XF86AudioRaiseVolume,exec,swayosd-client --output-volume=raise"
             ",XF86AudioLowerVolume,exec,swayosd-client --output-volume=lower"
+            ",XF86AudioRaiseVolume,exec,swayosd-client --output-volume=raise"
+            ",XF86AudioLowerVolume,exec,swayosd-client --output-volume=lower"
           ];
           bind = [
             ",XF86AudioMute,exec,swayosd-client --output-volume mute-toggle"
