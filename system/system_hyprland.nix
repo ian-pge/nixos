@@ -81,7 +81,7 @@
         settings = {
           default_session = {
             # tuigreet binary from nixpkgs
-            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --width 40";
+            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --theme border=magenta;text=cyan;prompt=green;time=red;action=blue;button=yellow;container=black;input=red";
                 # --width 40 \
                 # --remember \
                 # --asterisks \
