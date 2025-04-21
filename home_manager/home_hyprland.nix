@@ -244,7 +244,7 @@
 
             "modules-left"  = [
             "custom/launcher" "cpu" "memory"
-            "custom/gpu" "disk" "custom/pacman"
+            "custom/gpu" "disk" "custom/nixos"
             ];
 
             "modules-center" = [ "hyprland/workspaces" ];
@@ -326,22 +326,25 @@
             };
 
             "custom/launcher" = {
-            format   = "";
+            format   = "";
             "on-click"= "pgrep -x rofi >/dev/null 2>&1 || .config/rofi/launchers/type-4/launcher.sh";
             tooltip  = false;
             };
 
-            "custom/pacman" = {
-            format        = "{icon} {0}";
-            "return-type" = "json";
-            "format-icons" = {
-                "pending-updates" = " ";
-                "updated"         = "";
+
+            "custom/nixos"= {
+                "exec"= "$HOME/bin/update-checker";
+                "on-click"= "$HOME/bin/update-checker && notify-send 'The system has been updated'";
+                "interval"= 3600;
+                "tooltip"= true;
+                "return-type"= "json";
+                "format"= "{} {icon}";
+                "format-icons"= {
+                    "has-updates"= "";
+                    "updated"= "";
+                };
             };
-            "exec-if"   = "which waybar-updates";
-            exec        = "waybar-updates";
-            "on-click"  = "kitty yay -Syu";
-            };
+
 
             bluetooth = {
             format                     = "󰂲 Disconnected";
@@ -403,7 +406,7 @@
         }
 
         #clock, #cpu, #memory, #backlight, #custom-gpu,
-        #pulseaudio, #network, #bluetooth, #custom-pacman,
+        #pulseaudio, #network, #bluetooth, #custom-nixos,
         #upower, #disk, #workspaces, #custom-launcher {
             color: #e5e5e5;
             background-color: @base;
@@ -425,7 +428,7 @@
         #bluetooth      { color: @blue;      }
         #upower         { color: @rosewater; }
         #disk           { color: @peach;     }
-        #custom-pacman  { color: @flamingo;  }
+        #custom-nixos  { color: @flamingo;  }
 
         #workspaces button       { color: @text; background: none; border: none; }
         #workspaces button:hover { background: none; }
