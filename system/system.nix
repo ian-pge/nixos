@@ -129,6 +129,8 @@
         nil
         nixd
         alejandra
+        nvd
+        nix-nix-output-monitor
     ];
 
 }

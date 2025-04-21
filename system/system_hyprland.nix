@@ -89,6 +89,8 @@
         };
       };
 
+      services.udisks2.enable = true;
+
 
     # Packages
     environment.systemPackages = with pkgs; [
@@ -98,6 +100,7 @@
         hyprpaper
         hyprpicker
         hyprshot
+        hyprpolkitagent
 
         # networking tui
         impala
@@ -115,6 +118,8 @@
         acpi
         acpid
         vlc
+        htop
+        nvtopPackages.full
 
     ];
 }

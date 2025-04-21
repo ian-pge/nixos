@@ -61,7 +61,7 @@
           "exec-once" = [
             "hyprpaper"
             "uwsm finalize"
-            # "systemctl --user start hyprpolkitagent"
+            "systemctl --user start hyprpolkitagent"
             "mako"
             "swayosd-server"
             "udiskie &"
@@ -243,8 +243,8 @@
             "output"        = "eDP-1";
 
             "modules-left"  = [
-            "custom/launcher" "cpu" "memory"
-            "custom/gpu" "disk" "custom/nixos"
+            "custom/launcher"  "disk" "cpu" "memory"
+            "custom/gpu" "custom/nixos"
             ];
 
             "modules-center" = [ "hyprland/workspaces" ];
