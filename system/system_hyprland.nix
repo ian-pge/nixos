@@ -81,10 +81,10 @@
         settings = {
           default_session = {
             # tuigreet binary from nixpkgs
-            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --asterisks --theme 'border=magenta;text=cyan;prompt=green;time=red;action=blue;button=yellow;container=black;input=red'";
+            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --width 40 --time --asterisks --theme 'border=magenta;prompt=green;time=yellow;button=yellow;container=black;input=cyan'";
 
 
-                # --width 40 \
+                #  \
                 # --remember \
                 # --asterisks \
                 # --sessions /run/current-system/sw/share/wayland-sessions:/run/current-system/sw/share/xsessions \
