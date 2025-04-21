@@ -76,7 +76,7 @@
                 "--width" "40"
                 "--time"
                 "--asterisks"
-                "--theme" "'border=magenta;prompt=green;time=yellow;button=yellow;container=black;input=cyan'"
+                "--theme" "'border=magenta;prompt=green;time=yellow;container=black;input=cyan'"
               ];
             user = "greeter"; # unprivileged greeter user
           };
