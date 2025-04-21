@@ -36,14 +36,14 @@
   programs.kitty.enable = true;
 
   # Pick a standard XCursor theme; vanilla‑dmz ships the classic arrow
-    home.pointerCursor = {
-      package   = pkgs.vanilla-dmz;       # DMZ‑White arrows
-      name      = "Vanilla-DMZ";          # the theme’s folder name
-      size      = 24;                     # cursor size in px
-      x11.enable     = true;              # write ~/.icons & X11 configs
-      hyprcursor.enable = true;           # set HYPRCURSOR_* env vars
-      gtk.enable    = true;               # also configure GTK apps
-    };
+    # home.pointerCursor = {
+    #   package   = pkgs.vanilla-dmz;       # DMZ‑White arrows
+    #   name      = "Vanilla-DMZ";          # the theme’s folder name
+    #   size      = 24;                     # cursor size in px
+    #   x11.enable     = true;              # write ~/.icons & X11 configs
+    #   hyprcursor.enable = true;           # set HYPRCURSOR_* env vars
+    #   gtk.enable    = true;               # also configure GTK apps
+    # };
 
   wayland.windowManager.hyprland = {
     enable = true;
@@ -95,6 +95,8 @@
 
           ### ENVIRONMENT ###
           env = [
+            "HYPRCURSOR_THEME,Bibata-Modern-Classic"
+            "HYPRCURSOR_SIZE,24"
             "EDITOR,zeditor"
             "TERMINAL,kitty"
             "BROWSER,google-chrome-stable"
