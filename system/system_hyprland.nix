@@ -1,4 +1,4 @@
-{ config, pkgs, inputs, ... }:
+{ config, pkgs, inputs, lib, ... }:
 
 {
     home-manager = {
@@ -81,9 +81,15 @@
         settings = {
           default_session = {
             # tuigreet binary from nixpkgs
-            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --remember -width 40\
-            --time\
-            --asterisks --theme 'border=magenta;prompt=green;time=yellow;button=yellow;container=black;input=cyan'";
+            command =
+            lib.concatStringsSep " " [
+                "${pkgs.greetd.tuigreet}/bin/tuigreet"
+                "--remember"
+                "--width" "40"
+                "--time"
+                "--asterisks"
+                "--theme" "border=magenta;prompt=green;time=yellow;button=yellow;container=black;input=cyan"
+              ];
             user = "greeter";           # unprivileged greeter user
           };
         };
