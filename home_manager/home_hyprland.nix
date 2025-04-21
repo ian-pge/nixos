@@ -166,10 +166,10 @@
             ",XF86AudioLowerVolume,exec,swayosd-client --output-volume=lower"
           ];
           bind = [
-            ",XF86AudioMute,exec,swayosd-client --output-volume mute-toggle"
-            ",XF86AudioPlay,exec,playerctl play-pause"
-            ",XF86AudioNext,exec,playerctl next"
-            ",XF86AudioPrev,exec,playerctl previous"
+            # ",XF86AudioMute,exec,swayosd-client --output-volume mute-toggle"
+            # ",XF86AudioPlay,exec,playerctl play-pause"
+            # ",XF86AudioNext,exec,playerctl next"
+            # ",XF86AudioPrev,exec,playerctl previous"
             ",PRINT,exec,hyprshot -m region -o ~/Screenshots"
             "$mainMod,RETURN,exec,$terminal"
             "$mainMod,W,killactive"
