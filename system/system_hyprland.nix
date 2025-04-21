@@ -101,6 +101,7 @@
         hyprpicker
         hyprshot
         hyprpolkitagent
+        hyprcursor
 
         # networking tui
         impala

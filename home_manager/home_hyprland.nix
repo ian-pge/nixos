@@ -35,6 +35,16 @@
 
   programs.kitty.enable = true;
 
+  # Pick a standard XCursor theme; vanilla‑dmz ships the classic arrow
+    home.pointerCursor = {
+      package   = pkgs.vanilla-dmz;       # DMZ‑White arrows
+      name      = "Vanilla-DMZ";          # the theme’s folder name
+      size      = 24;                     # cursor size in px
+      x11.enable     = true;              # write ~/.icons & X11 configs
+      hyprcursor.enable = true;           # set HYPRCURSOR_* env vars
+      gtk.enable    = true;               # also configure GTK apps
+    };
+
   wayland.windowManager.hyprland = {
     enable = true;
     systemd.enable = false;
@@ -76,15 +86,16 @@
             "1, monitor:eDP-1"
             "2, monitor:eDP-1"
             "3, monitor:eDP-1"
-            "4, monitor:HDMI-A-1"
+            "4, monitor:eDP-1"
             "5, monitor:HDMI-A-1"
             "6, monitor:HDMI-A-1"
+            "7, monitor:HDMI-A-1"
+            "8, monitor:HDMI-A-1"
           ];
 
           ### ENVIRONMENT ###
           env = [
             "EDITOR,zeditor"
-            # "XDG_CURRENT_DESKTOP,Hyprland"
             "TERMINAL,kitty"
             "BROWSER,google-chrome-stable"
             "GTK_USE_PORTAL,1"
