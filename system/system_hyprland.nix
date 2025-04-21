@@ -81,7 +81,7 @@
         settings = {
           default_session = {
             # tuigreet binary from nixpkgs
-            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd Hyprland";
+            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --width 40";
                 # --width 40 \
                 # --remember \
                 # --asterisks \
