@@ -130,7 +130,7 @@
         nixd
         alejandra
         nvd
-        nix-nix-output-monitor
+        nix-output-monitor
     ];
 
 }
