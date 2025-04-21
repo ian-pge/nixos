@@ -61,18 +61,6 @@
             withUWSM = true;
             xwayland.enable = true;
         };
-
-
-        # uwsm = {
-        #     enable = true;
-        #   };
-
-        nh = {
-            enable = true;
-            clean.enable = true;
-            clean.extraArgs = "--keep-since 4d --keep 3";
-            flake = "/etc/nixos";
-        };
     };
 
     services.greetd = {
@@ -88,9 +76,9 @@
                 "--width" "40"
                 "--time"
                 "--asterisks"
-                "--theme" "border=magenta;prompt=green;time=yellow;button=yellow;container=black;input=cyan"
+                "--theme" "'border=magenta;prompt=green;time=yellow;button=yellow;container=black;input=cyan'"
               ];
-            user = "greeter";           # unprivileged greeter user
+            user = "greeter"; # unprivileged greeter user
           };
         };
       };
