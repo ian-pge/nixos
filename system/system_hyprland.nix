@@ -55,7 +55,11 @@
 
     networking.wireless.iwd.enable = true;
 
-    fonts.packages = with pkgs; [ nerdfonts ];
+    fonts.packages = with pkgs; [
+        nerd-fonts.ubuntu
+        nerd-fonts.ubuntu-mono
+        nerd-fonts.ubuntu-sans
+    ];
 
     programs = {
         hyprland = {
