@@ -27,7 +27,7 @@ in
     # Replace fakeSha256 with the actual vendor hash.
     # Building will likely fail without the correct hash. Check the build logs.
     # vendorHash = final.lib.fakeSha256;
-    vendorHash = "sha256-fLUJeEwNDyzMYUEYVQL9XGQv/VAxjH4IZ1SJa6jx4Mw="; # Replace this placeholder
+    vendorHash = null; # Replace this placeholder
 
     # Append to existing ldflags instead of replacing, if any exist
     ldflags = (oldAttrs.ldflags or []) ++ [
