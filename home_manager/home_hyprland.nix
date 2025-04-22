@@ -105,6 +105,7 @@
 
           ### ENVIRONMENT ###
           env = [
+            "ZVM_INIT_MODE,sourcing"
             "HYPRCURSOR_THEME,catppuccin-macchiato-dark-cursors"
             "HYPRCURSOR_SIZE,24"
             "XCURSOR_THEME,catppuccin-macchiato-dark-cursors"
@@ -271,7 +272,7 @@
         LANG = "en_US.UTF-8";
         };
         enable = true;
-        completionInit = "autoload -Uz compinit && compinit";
+        enableCompletion = true;
         plugins = [
               { name = "zsh-vi-mode";
                 src  = pkgs.zsh-vi-mode;                           # ships in nixpkgs
