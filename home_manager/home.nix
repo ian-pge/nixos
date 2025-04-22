@@ -16,6 +16,8 @@
       "Pictures"
       "Documents"
       "Videos"
+      "PhD"
+      "Perso"
       ".ssh"
       ".config/zed"
       {

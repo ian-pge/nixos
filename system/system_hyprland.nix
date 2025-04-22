@@ -122,6 +122,7 @@
         nvtopPackages.full
         adwaita-icon-theme
         catppuccin-cursors.macchiatoDark
+        oh-my-posh
 
     ];
 }
