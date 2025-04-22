@@ -1,29 +1,43 @@
-# overlays/devpod.nix
+# ./overlays/devpod.nix
+# Correct structure: Takes final and prev as arguments directly
 final: prev:
 let
-  # pick whatever tag you like; 0.6.x is the current stable line
-  version = "0.6.15";
-in {
-  devpod = prev.devpod.overrideAttrs (old: rec {
-    inherit version;
-    src = prev.fetchFromGitHub {
+  # Define the desired version within the overlay's scope
+  devpodVersion = "0.6.15";
+in
+{
+  # Override the devpod package
+  devpod = prev.devpod.overrideAttrs (oldAttrs: {
+    version = devpodVersion; # Use the defined version variable
+    src = final.fetchFromGitHub {
       owner = "loft-sh";
       repo  = "devpod";
-      rev   = "v${version}";
-      # first run with lib.fakeSha256, copy the hash from the
-      # build error and replace it here.
-      sha256 = prev.lib.fakeSha256;
+      rev = "v${devpodVersion}"; # Use the defined version variable
+
+      # !!! IMPORTANT !!!
+      # Replace fakeSha256 with the actual hash.
+      # You can get this by building once with fakeSha256,
+      # Nix will error and tell you the expected hash.
+      # sha256 = final.lib.fakeSha256;
+      sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Replace this placeholder
+
     };
 
-    # `buildGoModule` now vendor‑hashes the Go modules
-    vendorHash = prev.lib.fakeSha256;
+    # !!! IMPORTANT !!!
+    # Replace fakeSha256 with the actual vendor hash.
+    # Building will likely fail without the correct hash. Check the build logs.
+    # vendorHash = final.lib.fakeSha256;
+    vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Replace this placeholder
 
-    # keep upstream’s hard‑coded linker flag in sync
-    ldflags = [
-      "-X github.com/loft-sh/devpod/pkg/version.version=v${version}"
+    # Append to existing ldflags instead of replacing, if any exist
+    ldflags = (oldAttrs.ldflags or []) ++ [
+      "-X github.com/loft-sh/devpod/pkg/version.version=v${devpodVersion}" # Use the defined version variable
     ];
-  });
 
-  # Optional: if you also want the Desktop app, repeat the pattern
-  # for `devpod-desktop` or just remove it from `environment.systemPackages`.
+    # It's often good practice to preserve passthru and meta attributes
+    passthru = oldAttrs.passthru or {};
+    meta = oldAttrs.meta // {
+      # Optionally update maintainers or description if desired
+    };
+  });
 }
