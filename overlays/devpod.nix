@@ -1,30 +1,29 @@
 # overlays/devpod.nix
-{ lib, fetchFromGitHub, ...}:
-
-self: super: {
-  devpod = super.buildGoModule rec {
-    pname = "devpod";
-    version = "0.6.15";
-
-    # Pull the exact v0.6.15 tag
-    src = fetchFromGitHub {
+final: prev:
+let
+  # pick whatever tag you like; 0.6.x is the current stable line
+  version = "0.6.15";
+in {
+  devpod = prev.devpod.overrideAttrs (old: rec {
+    inherit version;
+    src = prev.fetchFromGitHub {
       owner = "loft-sh";
       repo  = "devpod";
       rev   = "v${version}";
-      sha256 = lib.fetchTarball { url = "https://example.com/fake"; };
+      # first run with lib.fakeSha256, copy the hash from the
+      # build error and replace it here.
+      sha256 = "0000000000000000000000000000000000000000000000000000";
     };
 
-    # vendored Go modules—same deal with the hash
-    vendorSha256 = lib.fetchTarball { url = "https://example.com/fake"; };
+    # `buildGoModule` now vendor‑hashes the Go modules
+    vendorHash = "0000000000000000000000000000000000000000000000000000";
 
-    # ensure both CLI and any subpackages build
-    subPackages = [ "." ];
+    # keep upstream’s hard‑coded linker flag in sync
+    ldflags = [
+      "-X github.com/loft-sh/devpod/pkg/version.version=v${version}"
+    ];
+  });
 
-    meta = with super.lib; {
-      description = "Client‑only dev environments (open‑source Codespaces)";
-      homepage    = "https://devpod.sh";
-      license     = licenses.mpl20;
-      maintainers = with maintainers; [ maxbrunet ];
-    };
-  };
+  # Optional: if you also want the Desktop app, repeat the pattern
+  # for `devpod-desktop` or just remove it from `environment.systemPackages`.
 }
