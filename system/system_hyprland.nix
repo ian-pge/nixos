@@ -114,7 +114,7 @@
         zsh-fast-syntax-highlighting
         zsh-autosuggestions
         zsh-completions
-        zsh-bat
+        bat
         zsh-vi-mode
         zsh-history
         zsh-fzf-tab

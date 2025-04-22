@@ -260,6 +260,10 @@
       enableZshIntegration = true;
     };
 
+    programs.bat = {
+      enable = true;
+    };
+
     # Activate Home Manager's ZSH integration
     programs.zsh = {
         sessionVariables = {
@@ -281,10 +285,7 @@
               "source ${pkgs.zsh-history}/share/zsh-history/zsh-history.plugin.zsh"
 
               # 7. fzf-tab integration
-              "source ${pkgs.zsh-fzf-tab}/share/fzf-tab/init.zsh"     # :contentReference[oaicite:10]{index=10}
-
-              # 8. zsh-bat plugin
-              "source ${pkgs.zsh-bat}/share/zsh/site-functions/zsh-bat.plugin.zsh"
+              "source ${pkgs.zsh-fzf-tab}/share/fzf-tab/init.zsh"
             ];
         shellAliases = {
         };
