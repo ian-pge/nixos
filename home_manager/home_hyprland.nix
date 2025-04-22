@@ -42,7 +42,7 @@
     };
     shellIntegration = {
         enableZshIntegration = true;
-        mode = "no-cursor";
+        # mode = "no-cursor";
     };
     settings = {
           window_padding_width = "5 5";
