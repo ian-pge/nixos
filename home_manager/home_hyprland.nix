@@ -95,9 +95,9 @@
 
           ### ENVIRONMENT ###
           env = [
-            "HYPRCURSOR_THEME,Adwaita"
+            "HYPRCURSOR_THEME,macchiatoDark"
             "HYPRCURSOR_SIZE,24"
-            "XCURSOR_THEME,Adwaita"
+            "XCURSOR_THEME,macchiatoDark"
             "XCURSOR_SIZE,24"
             "EDITOR,zeditor"
             "TERMINAL,kitty"

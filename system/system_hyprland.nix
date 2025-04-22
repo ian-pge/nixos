@@ -121,6 +121,7 @@
         htop
         nvtopPackages.full
         adwaita-icon-theme
+        catppuccin-cursors.macchiatoDark
 
     ];
 }
