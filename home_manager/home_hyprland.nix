@@ -254,9 +254,7 @@
     programs.oh-my-posh = {
         enable = true;
         enableZshIntegration = true;
-        settings = builtins.fromJSON (builtins.readFile ./zsh_theme.json);
-        # Your custom theme as a Nix attribute set; keys in quotes
-          myOhMyPoshTheme = {
+        settings =  {
             "palette" = {
               "blue"      = "#8AADF4";
               "closer"    = "p:os";
