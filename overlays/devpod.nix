@@ -12,11 +12,11 @@ in {
       rev   = "v${version}";
       # first run with lib.fakeSha256, copy the hash from the
       # build error and replace it here.
-      sha256 = "0000000000000000000000000000000000000000000000000000";
+      sha256 = prev.lib.fakeSha256;
     };
 
     # `buildGoModule` now vendor‑hashes the Go modules
-    vendorHash = "0000000000000000000000000000000000000000000000000000";
+    vendorHash = prev.lib.fakeSha256;
 
     # keep upstream’s hard‑coded linker flag in sync
     ldflags = [
