@@ -272,19 +272,14 @@
         enable = true;
         completionInit = "autoload -Uz compinit && compinit";
         initExtra = lib.concatStringsSep "\n" [
-              # 1. Syntax highlighting
               "source ${pkgs.zsh-fast-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 
-              # 2. Autosuggestions
               "source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
-              # 3. Completions
               "source ${pkgs.zsh-completions}/share/zsh-completions/zsh-completions.plugin.zsh"
 
-              # 4. Enhanced history
               "source ${pkgs.zsh-history}/share/zsh-history/zsh-history.plugin.zsh"
 
-              # 7. fzf-tab integration
               "source ${pkgs.zsh-fzf-tab}/share/fzf-tab/init.zsh"
             ];
         shellAliases = {
