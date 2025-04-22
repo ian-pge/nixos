@@ -37,8 +37,11 @@
     enable = true;
     themeFile = "Catppuccin-Macchiato";
     font = {
-          name    = "UbuntuMono Nerd Font Mono";
+          name    = "UbuntuMono Nerd Font";
           size    = 12;
+    };
+    shellIntegration = {
+        enableZshIntegration = true;
     };
     settings = {
           cursor_blinking       = true;              #
