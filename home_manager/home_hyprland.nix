@@ -271,13 +271,32 @@
         LANG = "en_US.UTF-8";
         };
         enable = true;
+        enableCompletion = true;
+        defaultKeymap    = "vicmd";
         completionInit = "autoload -Uz compinit && compinit";
-        initExtra = lib.concatStringsSep "\n" [
-              "source ${pkgs.zsh-fast-syntax-highlighting}/share/zsh/site-functions/fast-syntax-highlighting.plugin.zsh"
-              "source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-              "source ${pkgs.zsh-history}/share/zsh/init.zsh"
-              "source ${pkgs.zsh-fzf-tab}/share/fzf-tab/fzf-tab.plugin.zsh"
-              "source ${pkgs.zsh-vi-mode}/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
+        plugins = [
+              # zsh-vi-mode from nixpkgs
+              {
+                name = "zsh-vi-mode";
+                src  = pkgs.zsh-vi-mode;
+                file = "zsh-vi-mode.plugin.zsh";
+              }
+
+              # fast syntax highlighting
+              {
+                name = "zsh-fast-syntax-highlighting";
+                src  = pkgs.zsh-fast-syntax-highlighting;
+                file = "fast-syntax-highlighting.plugin.zsh";
+              }
+
+              # autosuggestions
+              {
+                name = "zsh-autosuggestions";
+                src  = pkgs.zsh-autosuggestions;
+                file = "zsh-autosuggestions.zsh";
+              }
+
+              # and so on for your other plugins...
             ];
         shellAliases = {
         };
