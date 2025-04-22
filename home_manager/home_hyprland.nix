@@ -263,8 +263,10 @@
         LANG = "en_US.UTF-8";
         };
         enable = true;
+        fastSyntaxHighlighting.enable = true;
         autosuggestion.enable = true;
-        syntaxHighlighting.enable = true;
+        autocomplete.enable = true;
+        # syntaxHighlighting.enable = true;
         completionInit = "autoload -Uz compinit && compinit";
         shellAliases = {
         };
