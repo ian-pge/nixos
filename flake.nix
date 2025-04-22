@@ -19,14 +19,26 @@
     };
   };
 
-  outputs = {nixpkgs, ...} @ inputs:
-  {
-    nixosConfigurations."nixos" = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      specialArgs = {inherit inputs;};
-      modules = [
-        ./system/specialisation.nix
-      ];
-    };
-  };
+  outputs = { self, nixpkgs, ... }@inputs:
+      let
+        system = "x86_64-linux";
+
+        # 1) bring in our overlay
+        overlays = [ (import ./overlays/devpod.nix) ];
+
+        # 2) re‑import nixpkgs with overlays
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = overlays;
+        };
+      in
+      {
+        nixosConfigurations.nixos = pkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = { inherit inputs pkgs; };
+          modules = [
+            ./system/specialisation.nix
+          ];
+        };
+      };
 }
