@@ -110,6 +110,17 @@
         impala
         bluetui
 
+        # zsh plugins
+        zsh-fast-syntax-highlighting
+        zsh-autosuggestions
+        zsh-completions
+        zsh-bat
+        zsh-vi-mode
+        zsh-history
+        zsh-fzf-tab
+        fzf
+
+
         kitty
         mako
         swayosd
