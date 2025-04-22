@@ -274,9 +274,8 @@
         initExtra = lib.concatStringsSep "\n" [
               "source ${pkgs.zsh-fast-syntax-highlighting}/share/zsh/site-functions/fast-syntax-highlighting.plugin.zsh"
               "source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-              "source ${pkgs.zsh-completions}/share/zsh/site-functions/zsh-completions.plugin.zsh"
               "source ${pkgs.zsh-history}/share/zsh/init.zsh"
-              "source ${pkgs.zsh-fzf-tab}/share/zsh/zsh-fzf-tab/init.zsh"
+              "source ${pkgs.zsh-fzf-tab}/share/fzf-tab/fzf-tab.plugin.zsh"
             ];
         shellAliases = {
         };

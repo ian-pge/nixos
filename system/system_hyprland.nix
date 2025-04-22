@@ -113,7 +113,6 @@
         # zsh plugins
         zsh-fast-syntax-highlighting
         zsh-autosuggestions
-        zsh-completions
         bat
         zsh-vi-mode
         zsh-history
