@@ -95,8 +95,10 @@
 
           ### ENVIRONMENT ###
           env = [
-            "HYPRCURSOR_THEME,Bibata-Modern-Classic"
+            "HYPRCURSOR_THEME,Adwaita"
             "HYPRCURSOR_SIZE,24"
+            "XCURSOR_THEME,Adwaita"
+            "XCURSOR_SIZE,24"
             "EDITOR,zeditor"
             "TERMINAL,kitty"
             "BROWSER,google-chrome-stable"
@@ -164,8 +166,6 @@
             follow_mouse  = 1;
             sensitivity   = 0.8;
             touchpad.natural_scroll = false;
-            # per‑device example
-            # "device:epic-mouse-v1".sensitivity = -0.5;
           };
 
           gestures.workspace_swipe = true;
