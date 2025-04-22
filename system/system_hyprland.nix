@@ -120,6 +120,7 @@
         vlc
         htop
         nvtopPackages.full
+        gnome.adwaita-icon-theme
 
     ];
 }
