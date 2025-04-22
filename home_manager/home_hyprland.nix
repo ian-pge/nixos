@@ -272,16 +272,28 @@
         };
         enable = true;
         completionInit = "autoload -Uz compinit && compinit";
-        initExtra = lib.concatStringsSep "\n" [
-            "source ${pkgs.zsh-vi-mode}/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
-            "source ${pkgs.zsh-fast-syntax-highlighting}/share/zsh/site-functions/fast-syntax-highlighting.plugin.zsh"
-            "source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-            "source ${pkgs.zsh-history}/share/zsh/init.zsh"
-            "source ${pkgs.zsh-fzf-tab}/share/fzf-tab/fzf-tab.plugin.zsh"
-
+        plugins = [
+              { name = "zsh-vi-mode";
+                src  = pkgs.zsh-vi-mode;                           # ships in nixpkgs
+                file = "share/zsh-vi-mode/zsh-vi-mode.plugin.zsh";
+              }
+              { name = "fast-syntax-highlighting";
+                src  = pkgs.zsh-fast-syntax-highlighting;
+                file = "share/zsh/site-functions/fast-syntax-highlighting.plugin.zsh";
+              }
+              { name = "zsh-autosuggestions";
+                src  = pkgs.zsh-autosuggestions;
+                file = "share/zsh-autosuggestions/zsh-autosuggestions.zsh";
+              }
+              { name = "zsh-history";                # package lives under pkgs
+                src  = pkgs.zsh-history;
+                file = "share/zsh/init.zsh";
+              }
+              { name = "fzf-tab";
+                src  = pkgs.zsh-fzf-tab;
+                file = "share/fzf-tab/fzf-tab.plugin.zsh";
+              }
             ];
-        shellAliases = {
-        };
     };
 
     programs.oh-my-posh = {
