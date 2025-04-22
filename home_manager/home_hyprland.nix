@@ -45,6 +45,7 @@
         mode = "no-cursor";
     };
     settings = {
+          window_padding_width = "10 10";
           cursor_blinking       = true;              #
           # cursor_blink_interval = 0.5;               #
           cursor_shape          = "block";           #
