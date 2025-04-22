@@ -265,7 +265,6 @@
         enable = true;
         fastSyntaxHighlighting.enable = true;
         autosuggestion.enable = true;
-        autocompletion.enable = true;
         # syntaxHighlighting.enable = true;
         completionInit = "autoload -Uz compinit && compinit";
         shellAliases = {
