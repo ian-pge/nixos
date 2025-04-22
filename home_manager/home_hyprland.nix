@@ -42,6 +42,7 @@
     };
     shellIntegration = {
         enableZshIntegration = true;
+        mode = "no-cursor";
     };
     settings = {
           cursor_blinking       = true;              #
