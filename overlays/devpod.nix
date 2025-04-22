@@ -19,7 +19,7 @@ in
       # You can get this by building once with fakeSha256,
       # Nix will error and tell you the expected hash.
       # sha256 = final.lib.fakeSha256;
-      sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Replace this placeholder
+      sha256 = "sha256-fLUJeEwNDyzMYUEYVQL9XGQv/VAxjH4IZ1SJa6jx4Mw="; # Replace this placeholder
 
     };
 
@@ -27,7 +27,7 @@ in
     # Replace fakeSha256 with the actual vendor hash.
     # Building will likely fail without the correct hash. Check the build logs.
     # vendorHash = final.lib.fakeSha256;
-    vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Replace this placeholder
+    vendorHash = "sha256-fLUJeEwNDyzMYUEYVQL9XGQv/VAxjH4IZ1SJa6jx4Mw="; # Replace this placeholder
 
     # Append to existing ldflags instead of replacing, if any exist
     ldflags = (oldAttrs.ldflags or []) ++ [
