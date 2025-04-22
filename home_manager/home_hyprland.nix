@@ -25,8 +25,8 @@
       package = pkgs.adwaita-icon-theme;
     };
     cursorTheme = {
-      name = "Adwaita";
-      package = pkgs.adwaita-icon-theme;
+      name = "catppuccin-macchiato-dark-cursors";
+      package = pkgs.catppuccin-cursors.macchiatoDark;
     };
 
     # Tells GTK 3 to prefer a dark theme variant
