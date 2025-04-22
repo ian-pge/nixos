@@ -91,6 +91,9 @@
 
       services.udisks2.enable = true;
 
+      programs.zsh.enable = true;
+      users.defaultUserShell = pkgs.zsh;
+
 
     # Packages
     environment.systemPackages = with pkgs; [
