@@ -95,9 +95,9 @@
 
           ### ENVIRONMENT ###
           env = [
-            "HYPRCURSOR_THEME,macchiatoDark"
+            "HYPRCURSOR_THEME,catppuccin-macchiato-dark-cursors"
             "HYPRCURSOR_SIZE,24"
-            "XCURSOR_THEME,macchiatoDark"
+            "XCURSOR_THEME,catppuccin-macchiato-dark-cursors"
             "XCURSOR_SIZE,24"
             "EDITOR,zeditor"
             "TERMINAL,kitty"
