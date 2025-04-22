@@ -45,7 +45,7 @@
         mode = "no-cursor";
     };
     settings = {
-          window_padding_width = "10 10";
+          window_padding_width = "5 5";
           cursor_blinking       = true;              #
           # cursor_blink_interval = 0.5;               #
           cursor_shape          = "block";           #
@@ -277,6 +277,7 @@
               "source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
               "source ${pkgs.zsh-history}/share/zsh/init.zsh"
               "source ${pkgs.zsh-fzf-tab}/share/fzf-tab/fzf-tab.plugin.zsh"
+              "source ${pkgs.zsh-vi-mode}/share/zsh/site-functions/zsh-vi-mode.zsh"
             ];
         shellAliases = {
         };

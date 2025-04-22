@@ -118,6 +118,7 @@
         zsh-history
         zsh-fzf-tab
         fzf
+        zsh-vi-mode
 
 
         kitty
