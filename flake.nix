@@ -33,11 +33,8 @@
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; };
-
-        # ←‑‑‑ inject the overlay here
-        nixpkgs.overlays = [ overlays.devpod ];
-
         modules = [
+          ({ ... }: { nixpkgs.overlays = [ overlays.devpod ]; })
           ./system/specialisation.nix
         ];
       };
