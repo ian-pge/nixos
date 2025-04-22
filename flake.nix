@@ -20,25 +20,26 @@
   };
 
   outputs = { self, nixpkgs, ... }@inputs:
-      let
-        system = "x86_64-linux";
-
-        # 1) bring in our overlay
-        overlays = [ (import ./overlays/devpod.nix) ];
-
-        # 2) re‑import nixpkgs with overlays
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = overlays;
-        };
-      in
-      {
-        nixosConfigurations.nixos = pkgs.lib.nixosSystem {
-          inherit system;
-          specialArgs = { inherit inputs pkgs; };
-          modules = [
-            ./system/specialisation.nix
-          ];
-        };
+    let
+      # Expose the overlay so it can be reused elsewhere
+      overlays = {
+        devpod = import ./overlays/devpod.nix;
       };
+    in
+    {
+      # Make overlay usable from outside the flake (optional)
+      inherit overlays;
+
+      nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit inputs; };
+
+        # ←‑‑‑ inject the overlay here
+        nixpkgs.overlays = [ overlays.devpod ];
+
+        modules = [
+          ./system/specialisation.nix
+        ];
+      };
+    };
 }
