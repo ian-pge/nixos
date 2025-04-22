@@ -35,16 +35,6 @@
 
   programs.kitty.enable = true;
 
-  # Pick a standard XCursor theme; vanilla‑dmz ships the classic arrow
-    # home.pointerCursor = {
-    #   package   = pkgs.vanilla-dmz;       # DMZ‑White arrows
-    #   name      = "Vanilla-DMZ";          # the theme’s folder name
-    #   size      = 24;                     # cursor size in px
-    #   x11.enable     = true;              # write ~/.icons & X11 configs
-    #   hyprcursor.enable = true;           # set HYPRCURSOR_* env vars
-    #   gtk.enable    = true;               # also configure GTK apps
-    # };
-
   wayland.windowManager.hyprland = {
     enable = true;
     systemd.enable = false;
@@ -118,9 +108,9 @@
           general = {
             gaps_in           = 5;
             gaps_out          = 10;
-            border_size       = 2;
+            border_size       = 3;
             "col.active_border"   = "rgba(33ccffee)";
-            "col.inactive_border" = "rgba(33ccffee)";
+            "col.inactive_border" = "rgba(888888aa)";
             resize_on_border  = true;
             allow_tearing     = false;
             layout            = "dwindle";
@@ -224,10 +214,10 @@
             # lock
             "$mainMod,ESCAPE,exec,hyprlock"
           ];
-          # bindm = [
-          #   "$mainMod,mouse:272,movewindow"
-          #   "$mainMod,mouse:273,resizewindow"
-          # ];
+          bindm = [
+            "$mainMod,mouse:272,movewindow"
+            "$mainMod,mouse:273,resizewindow"
+          ];
 
           ### WINDOW / LAYER RULES ###
           windowrulev2 = [
