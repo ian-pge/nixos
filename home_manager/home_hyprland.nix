@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 
 {
   imports = [
@@ -38,7 +38,7 @@
         settings = {
           ipc      = "on";                # enable fast IPC mode for live changes
           # preload  = [ "/home/you/Pictures/wall.png" ];   # images to load at startup
-          wallpaper = [ "/etc/nixos/material/wallpaper.png" ]; # apply to all monitors
+          wallpaper = [ ",/etc/nixos/material/wallpaper.png" ]; # apply to all monitors
         };
       };
 
