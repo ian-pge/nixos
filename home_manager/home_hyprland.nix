@@ -33,7 +33,11 @@
     gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
   };
 
-  programs.kitty.enable = true;
+  programs.kitty = {
+    enable = true;
+    themeFile = "Catppuccin-Macchiato";
+
+  };
 
   wayland.windowManager.hyprland = {
     enable = true;
@@ -566,4 +570,5 @@
         #workspaces button.active{ color: #33ccff; }
         '';
     };
+
 }
