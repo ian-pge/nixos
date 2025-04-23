@@ -103,7 +103,11 @@
         openssh.enable = true;
     };
 
-    hardware.nvidia-container-toolkit.enable = true;
+    # hardware.nvidia-container-toolkit.enable = true;
+    hardware.nvidia-container-toolkit = {
+        enable = true;
+        package = pkgs.nvidia-container-toolkit;   # default ≥ 1.15
+      };
 
     virtualisation.docker = {
         enable = true;
