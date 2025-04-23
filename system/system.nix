@@ -108,7 +108,7 @@
     virtualisation.docker = {
         enable = true;
         storageDriver = "btrfs";
-        enableNvidia = true;
+        # enableNvidia = true;
     };
 
     environment.etc."nvidia-container-runtime/config.toml".text = ''
