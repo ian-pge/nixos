@@ -120,6 +120,7 @@
         [nvidia-container-runtime]
         mode = "legacy"          # disables CDI generation
       '';
+    hardware.graphics.enable32Bit = true;
 
     nixpkgs.config.allowUnfree = true;
 
