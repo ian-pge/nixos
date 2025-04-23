@@ -103,24 +103,12 @@
         openssh.enable = true;
     };
 
-    # hardware.nvidia-container-toolkit.enable = true;
-    hardware.nvidia-container-toolkit = {
-        enable = true;
-        package = pkgs.nvidia-container-toolkit;   # default ≥ 1.15
-      };
+    hardware.nvidia-container-toolkit.enable = true;
 
     virtualisation.docker = {
         enable = true;
-        enableNvidia = true;
         storageDriver = "btrfs";
-        # enableNvidia = true;
     };
-
-    environment.etc."nvidia-container-runtime/config.toml".text = ''
-        [nvidia-container-runtime]
-        mode = "legacy"          # disables CDI generation
-      '';
-    hardware.graphics.enable32Bit = true;
 
     nixpkgs.config.allowUnfree = true;
 
