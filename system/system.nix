@@ -81,7 +81,7 @@
     users.users."ian" = {
         isNormalUser = true;
         initialPassword = "ianbage";
-        extraGroups = [ "wheel" "docker" ]; # Enable ‘sudo’ for the user.
+        extraGroups = [ "wheel" "docker" "video" ]; # Enable ‘sudo’ for the user.
     };
 
     programs = {
@@ -94,6 +94,10 @@
             flake = "/etc/nixos";
         };
     };
+
+    services.udev.extraRules = ''
+        ${builtins.readFile ./material/99-slabs.rules}
+      '';
 
     services = {
         openssh.enable = true;
