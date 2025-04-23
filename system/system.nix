@@ -108,6 +108,11 @@
     virtualisation.docker = {
         enable = true;
         storageDriver = "btrfs";
+        enableNvidia = true;
+        environment.etc."nvidia-container-runtime/config.toml".text = ''
+            [nvidia-container-runtime]
+            mode = "legacy"          # disables CDI generation
+          '';
     };
 
     nixpkgs.config.allowUnfree = true;
