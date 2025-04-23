@@ -96,7 +96,7 @@
     };
 
     services.udev.extraRules = ''
-        ${builtins.readFile ./material/99-slabs.rules}
+        ${builtins.readFile ../material/99-slabs.rules}
       '';
 
     services = {
