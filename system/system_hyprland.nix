@@ -121,7 +121,6 @@
         zsh-autosuggestions
         bat
         zsh-vi-mode
-        zsh-history
         zsh-fzf-tab
         fzf
         zsh-vi-mode

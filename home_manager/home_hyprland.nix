@@ -295,10 +295,6 @@
                 src  = pkgs.zsh-autosuggestions;
                 file = "share/zsh-autosuggestions/zsh-autosuggestions.zsh";
               }
-              # { name = "zsh-history";
-              #   src  = pkgs.zsh-history;
-              #   file = "share/zsh/init.zsh";
-              # }
               { name = "fzf-tab";
                 src  = pkgs.zsh-fzf-tab;
                 file = "share/fzf-tab/fzf-tab.plugin.zsh";
