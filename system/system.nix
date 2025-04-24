@@ -56,7 +56,6 @@
             "/var/lib/nixos"
             "/var/lib/systemd/coredump"
             "/var/lib/docker"
-            "/var/lib/iwd"
             "/var/cache/tuigreet"
             "/etc/NetworkManager/system-connections"
             { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
@@ -84,6 +83,8 @@
         extraGroups = [ "wheel" "docker" "video" ]; # Enable ‘sudo’ for the user.
     };
 
+    hardware.keyboard.qmk.enable = true;
+
     programs = {
         fuse.userAllowOther = true;
         dconf.enable = true;
@@ -98,6 +99,8 @@
     services.udev.extraRules = ''
         ${builtins.readFile ../material/99-slabs.rules}
       '';
+
+    services.udev.packages = [ pkgs.via ];
 
     services = {
         openssh.enable = true;
@@ -137,6 +140,7 @@
         alejandra
         nvd
         nix-output-monitor
+        via
     ];
 
 }
