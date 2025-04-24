@@ -20,6 +20,7 @@
       "Perso"
       ".ssh"
       ".config/zed"
+      ".config/history"
       {
         directory = ".local/share/zed";
         method = "symlink";
@@ -40,7 +41,6 @@
     ];
     files = [
       ".config/monitors.xml"
-      ".config/history/.backup"
     ];
     allowOther = true;
   };
