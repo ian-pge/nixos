@@ -30,6 +30,10 @@
 
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
+    sound.enable = false;
+    hardware.pulseaudio.enable = false;
+    security.rtkit.enable = true;
+
     services = {
 
         pipewire = {
@@ -50,7 +54,8 @@
     };
 
     services.gnome.gnome-keyring.enable = true;
-    security.pam.services.login.enableGnomeKeyring = true;
+
+    security.pam.services.greetd.enableGnomeKeyring = true;
     security.pam.services.hyprlock.enableGnomeKeyring = true;
 
     # networking.wireless.iwd.enable = true;

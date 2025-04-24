@@ -28,6 +28,7 @@
       # Gnome
       ".config/dconf"
       ".local/share/keyrings"
+      ".devpod"
 
       ".config/google-chrome"
 
