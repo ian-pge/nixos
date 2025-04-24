@@ -30,9 +30,6 @@
 
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
-    hardware.pulseaudio.enable = false;
-    security.rtkit.enable = true;
-
     services = {
 
         pipewire = {
