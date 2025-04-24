@@ -58,7 +58,7 @@
           cursor_blinking       = true;              #
           # cursor_blink_interval = 0.5;               #
           cursor_shape          = "block";           #
-          cursor_trail          = 100;               #
+          # cursor_trail          = 100;               #
   };
 
 

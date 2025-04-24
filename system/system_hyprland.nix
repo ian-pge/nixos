@@ -53,7 +53,15 @@
     security.pam.services.login.enableGnomeKeyring = true;
     security.pam.services.hyprlock.enableGnomeKeyring = true;
 
-    networking.wireless.iwd.enable = true;
+    # networking.wireless.iwd.enable = true;
+
+    networking = {
+      useDHCP = false;             # NM will do DHCP itself
+      networkmanager = {
+        enable = true;
+        wifi.backend = "iwd";      # make NM talk to iwd instead of wpa_supplicant
+      };
+    };
 
     fonts.packages = with pkgs; [
         nerd-fonts.ubuntu
