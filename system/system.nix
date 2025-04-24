@@ -80,7 +80,7 @@
     users.users."ian" = {
         isNormalUser = true;
         initialPassword = "ianbage";
-        extraGroups = [ "wheel" "docker" "video" ]; # Enable ‘sudo’ for the user.
+        extraGroups = [ "wheel" "docker" "video" "networkmanager"]; # Enable ‘sudo’ for the user.
     };
 
     hardware.keyboard.qmk.enable = true;

@@ -53,6 +53,7 @@
 
     security.pam.services.greetd.enableGnomeKeyring = true;
     security.pam.services.hyprlock.enableGnomeKeyring = true;
+    security.pam.services.login.enableGnomeKeyring = true;
 
     # networking.wireless.iwd.enable = true;
 
