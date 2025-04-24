@@ -56,10 +56,6 @@
     security.pam.services.login.enableGnomeKeyring = true;
 
     networking = {
-      # wireless.iwd.settings = {
-      #   IPv6 = { Enabled = true; };
-      #   Settings = { AutoConnect = true; };
-      # };
       useDHCP = false;             # NM will do DHCP itself
       networkmanager = {
         enable = true;
@@ -118,8 +114,6 @@
         hyprpolkitagent
         hyprcursor
 
-        # networking tui
-        # impala
         bluetui
 
         # zsh plugins
