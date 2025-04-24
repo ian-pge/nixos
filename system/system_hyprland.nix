@@ -143,6 +143,7 @@
         catppuccin-cursors.macchiatoDark
         oh-my-posh
         nautilus
+        nmap
 
     ];
 }
