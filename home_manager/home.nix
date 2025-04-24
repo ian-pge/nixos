@@ -40,6 +40,7 @@
     ];
     files = [
       ".config/monitors.xml"
+      ".config/history/.backup"
     ];
     allowOther = true;
   };

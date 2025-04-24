@@ -55,9 +55,8 @@
     security.pam.services.hyprlock.enableGnomeKeyring = true;
     security.pam.services.login.enableGnomeKeyring = true;
 
-    # networking.wireless.iwd.enable = true;
-
     networking = {
+      wireless.iwd.enable = true;
       useDHCP = false;             # NM will do DHCP itself
       networkmanager = {
         enable = true;
