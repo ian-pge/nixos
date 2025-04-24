@@ -30,7 +30,6 @@
 
     boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
-    sound.enable = false;
     hardware.pulseaudio.enable = false;
     security.rtkit.enable = true;
 
