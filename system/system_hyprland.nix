@@ -119,7 +119,7 @@
         hyprcursor
 
         # networking tui
-        impala
+        # impala
         bluetui
 
         # zsh plugins
