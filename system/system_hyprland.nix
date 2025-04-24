@@ -28,7 +28,7 @@
             };
     };
 
-    # boot.kernelParams = [ "nvidia-drm.modeset=1" ];
+    boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
     services = {
 

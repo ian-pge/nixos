@@ -15,11 +15,11 @@
         efi.canTouchEfiVariables = true;
     };
 
-    boot = {
-        kernelParams = [ "snd_intel_dspcfg.dsp_driver=1" ];
+    # boot = {
+        # kernelParams = [ "snd_intel_dspcfg.dsp_driver=1" ];
         # optionally also
         # kernelPackages = pkgs.linuxPackages_6_8;
-    };
+    # };
 
     boot.initrd.postDeviceCommands = lib.mkAfter ''
         mkdir /btrfs_tmp
