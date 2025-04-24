@@ -56,14 +56,14 @@
     security.pam.services.login.enableGnomeKeyring = true;
 
     networking = {
-      wireless.iwd.settings = {
-        IPv6 = { Enabled = true; };
-        Settings = { AutoConnect = true; };
-      };
+      # wireless.iwd.settings = {
+      #   IPv6 = { Enabled = true; };
+      #   Settings = { AutoConnect = true; };
+      # };
       useDHCP = false;             # NM will do DHCP itself
       networkmanager = {
         enable = true;
-        wifi.backend = "iwd";      # make NM talk to iwd instead of wpa_supplicant
+        # wifi.backend = "iwd";      # make NM talk to iwd instead of wpa_supplicant
       };
     };
 
