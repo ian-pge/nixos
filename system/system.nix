@@ -56,6 +56,8 @@
             "/var/lib/nixos"
             "/var/lib/systemd/coredump"
             "/var/lib/docker"
+            "/var/lib/NetworkManager"
+            "/var/lib/iwd"
             "/var/cache/tuigreet"
             "/etc/NetworkManager/system-connections"
             { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }

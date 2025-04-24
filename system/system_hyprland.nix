@@ -56,7 +56,10 @@
     security.pam.services.login.enableGnomeKeyring = true;
 
     networking = {
-      wireless.iwd.enable = true;
+      wireless.iwd.settings = {
+        IPv6 = { Enabled = true; };
+        Settings = { AutoConnect = true; };
+      };
       useDHCP = false;             # NM will do DHCP itself
       networkmanager = {
         enable = true;
