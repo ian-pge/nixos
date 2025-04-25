@@ -144,6 +144,8 @@
         oh-my-posh
         nautilus
         nmap
+        obs-obs-studio
+        peek
 
     ];
 }
