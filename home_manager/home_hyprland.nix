@@ -234,6 +234,8 @@
             "$mainMod SHIFT,4,movetoworkspace,4"
             "$mainMod SHIFT,5,movetoworkspace,5"
             "$mainMod SHIFT,6,movetoworkspace,6"
+            "$mainMod SHIFT,7,movetoworkspace,7"
+            "$mainMod SHIFT,8,movetoworkspace,8"
             # scratchpads
             "$mainMod,S,togglespecialworkspace,LLM"
             "$mainMod SHIFT,S,movetoworkspace,special:LLM"
