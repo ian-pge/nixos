@@ -227,6 +227,7 @@
             # workspaces 1‑6 (focus)
             "$mainMod,1,workspace,1" "$mainMod,2,workspace,2" "$mainMod,3,workspace,3"
             "$mainMod,4,workspace,4" "$mainMod,5,workspace,5" "$mainMod,6,workspace,6"
+            "$mainMod,7,workspace,7" "$mainMod,8,workspace,8"
             # move to workspace
             "$mainMod SHIFT,1,movetoworkspace,1"
             "$mainMod SHIFT,2,movetoworkspace,2"
