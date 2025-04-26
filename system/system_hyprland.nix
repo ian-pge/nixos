@@ -116,14 +116,6 @@
 
         bluetui
 
-        # zsh plugins
-        zsh-fast-syntax-highlighting
-        zsh-autosuggestions
-        bat
-        zsh-vi-mode
-        zsh-fzf-tab
-        fzf
-        zsh-vi-mode
 
 
         kitty
