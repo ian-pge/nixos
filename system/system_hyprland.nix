@@ -1,10 +1,10 @@
 { config, pkgs, inputs, lib, ... }:
 
 {
-    # imports =
-    #   [
-    #       inputs.stylix.nixosModules
-    #   ];
+    imports =
+      [
+          inputs.stylix.nixosModules.stylix
+      ];
 
     home-manager = {
         extraSpecialArgs = {inherit inputs;};
