@@ -18,14 +18,14 @@ in
       # You can get this by building once with fakeSha256,
       # Nix will error and tell you the expected hash.
       # sha256 = final.lib.fakeSha256;
-      sha256 = "sha256-fLUJeEwNDyzMYUEYVQL9XGQv/VAxjH4IZ1SJ00000000"; # Replace this placeholder
+      sha256 = "000000000000000000000000000000000000000000000000000"; # Replace this placeholder
 
     };
 
     # !!! IMPORTANT !!!
     # Replace fakeSha256 with the actual vendor hash.
     # Building will likely fail without the correct hash. Check the build logs.
-    vendorHash = "sha256-fLUJeEwNDyzMYUEYVQL9XGQv/VAxjH4IZ1SJ00000000"; # Replace this placeholder
+    vendorHash = "000000000000000000000000000000000000000000000000000"; # Replace this placeholder
     # vendorHash = null; # Replace this placeholder
 
     # Append to existing ldflags instead of replacing, if any exist
