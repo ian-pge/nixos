@@ -45,7 +45,7 @@
 
   stylix.targets.kitty.enable = true;
   stylix.targets.helix.enable = true;
-  stylix.targets.chromium.enable = true;
+  stylix.targets.gtk.enable = true;
 
   programs.kitty = {
     enable = true;
