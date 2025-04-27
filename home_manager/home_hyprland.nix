@@ -593,7 +593,7 @@
         @define-color mantle    #1e2030;
 
         * {
-            font-family: "Roboto Mono Nerd Font";
+            font-family: "Ubuntu Sans Nerd Font";
             font-size: 19px;
         }
 
