@@ -1,6 +1,11 @@
 { config, pkgs, inputs, lib, ... }:
 
 {
+    imports =
+      [
+          inputs.stylix.nixosModules.default
+      ];
+
     home-manager = {
         extraSpecialArgs = {inherit inputs;};
         backupFileExtension = "backup";
@@ -99,8 +104,8 @@
 
     services.udisks2.enable = true;
 
-    programs.stylix.enable = true;
-    programs.stylix.base16Scheme = "${pkgs.base16-schemes}/share/themes/catppuccin-macchiato.yaml";
+    stylix.enable = true;
+    stylix.base16Scheme = "${pkgs.base16-schemes}/share/themes/catppuccin-macchiato.yaml";
 
     programs.zsh.enable = true;
     users.defaultUserShell = pkgs.zsh;
