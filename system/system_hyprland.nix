@@ -107,7 +107,7 @@
     stylix.autoEnable = false;
 
     stylix.fonts.monospace = {
-        name    = "Fira Code Nerd Font";
+        name    = "FiraCode Nerd Font";
         package = pkgs.nerd-fonts.fira-code;
       };
 
