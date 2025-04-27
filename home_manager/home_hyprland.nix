@@ -293,6 +293,7 @@
               {
                 name = "zsh-system-clipboard";
                 src  = pkgs.zsh-system-clipboard;
+                file = "share/zsh-system-clipboard/zsh-system-clipboard.plugin.zsh";
               }
               { name = "fast-syntax-highlighting";
                 src  = pkgs.zsh-fast-syntax-highlighting;
