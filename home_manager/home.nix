@@ -57,6 +57,6 @@
 
   programs.helix = {
       enable = true;
-      themes = "catppuccin-macchiato";
+      themes = "catppuccin_macchiato";
     };
 }
