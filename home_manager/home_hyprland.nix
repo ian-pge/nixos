@@ -61,12 +61,12 @@
           # cursor_trail          = 100;               #
   };
 
-  programs.helix = {
-        enable = true;
-        themes = "catppuccin_macchiato";
-      };
 
   };
+  programs.helix = {
+          enable = true;
+          themes = "catppuccin_macchiato";
+        };
 
   wayland.windowManager.hyprland = {
     enable = true;
