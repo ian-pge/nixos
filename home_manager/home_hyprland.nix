@@ -57,6 +57,7 @@
         # shell-integration-features = "no-cursor";
         confirm-close-surface = false;
         resize-overlay = "never";
+        adjust-cursor-thickness = "200%";
       };
   };
 
