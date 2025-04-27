@@ -50,10 +50,9 @@
     enable = true;
     enableZshIntegration = true;
     settings = {
-        cursor-style = "block";
         cursor-style-blink = true;
-        window-padding-x = 5;
-        window-padding-y = 5;
+        window-padding-x = 10;
+        window-padding-y = 10;
         confirm-close-surface = false;
         resize-overlay = "never";
       };
