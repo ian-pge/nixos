@@ -523,7 +523,7 @@
             };
 
             "custom/launcher" = {
-            format   = "";
+            format   = " ";
             "on-click"= "pgrep -x rofi >/dev/null 2>&1 || .config/rofi/launchers/type-4/launcher.sh";
             tooltip  = false;
             };
@@ -595,6 +595,7 @@
         * {
             font-family: "Hack Nerd Font";
             font-size: 19px;
+            font-weight: bold;
         }
 
         window#waybar {
