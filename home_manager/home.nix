@@ -57,10 +57,6 @@
 
   programs.helix = {
       enable = true;
-      config = {
-        ui = {
-          theme = "catppuccin-macchiato";
-        };
-      };
+      theme = "catppuccin-macchiato";
     };
 }
