@@ -281,12 +281,12 @@
     programs.zsh = {
         sessionVariables = {
         LANG = "en_US.UTF-8";
+        ZSH_SYSTEM_CLIPBOARD_METHOD = "wlc";
         };
         enable = true;
         enableCompletion = true;
         initContent = ''
             bindkey -v
-        export ZSH_SYSTEM_CLIPBOARD_METHOD="wl-copy"
         '';
         plugins = [
               # { name = "zsh-vi-mode";
