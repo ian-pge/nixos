@@ -61,15 +61,6 @@
         ui = {
           theme = "catppuccin-macchiato";
         };
-        language = {
-          python = { lsp = "pyright"; };
-          rust   = { lsp = "rust-analyzer"; };
-          nix    = { lsp = "rnix-lsp"; };
-          bash   = { lsp = "bash-language-server"; };
-          c      = { lsp = "clangd"; };
-          cpp    = { lsp = "clangd"; };
-          yaml   = { lsp = "yaml-language-server"; };
-        };
       };
     };
 }
