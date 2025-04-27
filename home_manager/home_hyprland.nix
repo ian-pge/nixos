@@ -51,6 +51,7 @@
     enableZshIntegration = true;
     settings = {
         cursor-style-blink = true;
+        cursor-style = "block";
         window-padding-x = 7;
         window-padding-y = 7;
         # shell-integration-features = "no-cursor";
@@ -283,6 +284,7 @@
         };
         enable = true;
         enableCompletion = true;
+        enableViMode = true;
         plugins = [
               # { name = "zsh-vi-mode";
               #   src  = pkgs.zsh-vi-mode;
@@ -301,6 +303,7 @@
                 file = "share/fzf-tab/fzf-tab.plugin.zsh";
               }
             ];
+
     };
 
     programs.oh-my-posh = {
