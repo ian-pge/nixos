@@ -42,6 +42,9 @@
         };
       };
 
+
+  stylix.targets.kitty.enable = true;
+  stylix.targets.helix.enable = true;
   programs.kitty = {
     enable = true;
     # themeFile = "Catppuccin-Macchiato";
