@@ -285,9 +285,6 @@
         };
         enable = true;
         enableCompletion = true;
-        initContent = ''
-            bindkey -v
-        '';
         plugins = [
               # { name = "zsh-vi-mode";
               #   src  = pkgs.zsh-vi-mode;
@@ -296,7 +293,7 @@
               {
                 name = "zsh-system-clipboard";
                 src  = pkgs.zsh-system-clipboard;
-                file = "share/zsh-system-clipboard/zsh-system-clipboard.plugin.zsh";
+                file = "share/zsh/zsh-system-clipboard/zsh-system-clipboard.zsh";
               }
               { name = "fast-syntax-highlighting";
                 src  = pkgs.zsh-fast-syntax-highlighting;
@@ -311,6 +308,9 @@
                 file = "share/fzf-tab/fzf-tab.plugin.zsh";
               }
             ];
+        initContent = ''
+            bindkey -v
+        '';
 
     };
 
