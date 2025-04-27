@@ -19,12 +19,12 @@
       "PhD"
       "Perso"
       ".ssh"
-      # ".config/zed"
+      ".config/zed"
       ".config/history"
-      # {
-      #   directory = ".local/share/zed";
-      #   method = "symlink";
-      # }
+      {
+         directory = ".local/share/zed";
+         method = "symlink";
+      }
 
       # Gnome
       ".config/dconf"
