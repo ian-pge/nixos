@@ -65,7 +65,7 @@
   };
   programs.helix = {
           enable = true;
-          theme = "catppuccin_macchiato";
+          theme = "catppuccin_Macchiato";
         };
 
   wayland.windowManager.hyprland = {
