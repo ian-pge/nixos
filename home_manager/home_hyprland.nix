@@ -284,7 +284,10 @@
         };
         enable = true;
         enableCompletion = true;
-        initContent = "bindkey -v";
+        initContent = ''
+            bindkey -v
+            export ZSH_SYSTEM_CLIPBOARD_METHOD="wlc"
+        '';
         plugins = [
               # { name = "zsh-vi-mode";
               #   src  = pkgs.zsh-vi-mode;
@@ -293,7 +296,6 @@
               {
                 name = "zsh-system-clipboard";
                 src  = pkgs.zsh-system-clipboard;
-                file = "share/zsh-system-clipboard/zsh-system-clipboard.plugin.zsh";
               }
               { name = "fast-syntax-highlighting";
                 src  = pkgs.zsh-fast-syntax-highlighting;

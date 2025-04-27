@@ -128,6 +128,7 @@
         hyprcursor
 
         bluetui
+        wl-clipboard
 
         mako
         swayosd
