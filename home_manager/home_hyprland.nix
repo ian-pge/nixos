@@ -284,7 +284,6 @@
         };
         enable = true;
         enableCompletion = true;
-        enableViMode = true;
         plugins = [
               # { name = "zsh-vi-mode";
               #   src  = pkgs.zsh-vi-mode;
@@ -303,6 +302,9 @@
                 file = "share/fzf-tab/fzf-tab.plugin.zsh";
               }
             ];
+        initExtra = ''
+          bindkey -v
+          '';
 
     };
 
