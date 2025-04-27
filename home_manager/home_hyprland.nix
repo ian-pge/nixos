@@ -44,11 +44,11 @@
 
   programs.kitty = {
     enable = true;
-    themeFile = "Catppuccin-Macchiato";
-    font = {
-          name    = "UbuntuMono Nerd Font";
-          size    = 12;
-    };
+    # themeFile = "Catppuccin-Macchiato";
+    # font = {
+    #       name    = "UbuntuMono Nerd Font";
+    #       size    = 12;
+    # };
     shellIntegration = {
         enableZshIntegration = true;
         # mode = "no-cursor";
@@ -66,9 +66,9 @@
   };
   programs.helix = {
           enable = true;
-          settings = {
-            theme = "catppuccin_macchiato";
-          };
+          # settings = {
+          #   theme = "catppuccin_macchiato";
+          # };
         };
 
   wayland.windowManager.hyprland = {

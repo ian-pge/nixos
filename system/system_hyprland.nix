@@ -106,6 +106,13 @@
 
     stylix.enable = true;
     stylix.base16Scheme = "${pkgs.base16-schemes}/share/themes/catppuccin-macchiato.yaml";
+    stylix.autoEnable = false;
+    stylix.targets.kitty.enable = true;
+    stylix.targets.helix.enable = true;
+    stylix.fonts.monospace = {
+        name    = "UbuntuMono Nerd Font";        # the font‐family string :contentReference[oaicite:3]{index=3}
+        package = pkgs.nerd-fonts.ubuntu-mono;   # the patched Nerd Font derivation :contentReference[oaicite:4]{index=4}
+      };
 
     programs.zsh.enable = true;
     users.defaultUserShell = pkgs.zsh;
