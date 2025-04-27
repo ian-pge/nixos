@@ -55,8 +55,5 @@
     };
   };
 
-  programs.helix = {
-      enable = true;
-      themes = "catppuccin_macchiato";
-    };
+
 }

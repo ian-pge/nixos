@@ -61,6 +61,10 @@
           # cursor_trail          = 100;               #
   };
 
+  programs.helix = {
+        enable = true;
+        themes = "catppuccin_macchiato";
+      };
 
   };
 
