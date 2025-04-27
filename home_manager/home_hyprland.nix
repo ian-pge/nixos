@@ -594,7 +594,7 @@
 
         * {
             font-family: "Hack Nerd Font";
-            font-size: 25px;
+            font-size: 19px;
         }
 
         window#waybar {
@@ -610,7 +610,8 @@
             border-radius: 8px;
             padding: 2px 10px;
             margin: 8.5px 4px;
-            font-size: 18.5px;
+            font-size: 19px;
+            font-weight: bold;
         }
 
         #cpu            { color: @pink;      }
