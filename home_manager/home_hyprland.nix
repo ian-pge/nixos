@@ -45,6 +45,8 @@
 
   stylix.targets.kitty.enable = true;
   stylix.targets.helix.enable = true;
+  stylix.targets.chromium.enable = true;
+
   programs.kitty = {
     enable = true;
     # themeFile = "Catppuccin-Macchiato";
