@@ -594,7 +594,7 @@
 
         * {
             font-family: "Hack Nerd Font";
-            font-size: 19px;
+            font-size: 25px;
         }
 
         window#waybar {
