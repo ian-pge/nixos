@@ -593,7 +593,7 @@
         @define-color mantle    #1e2030;
 
         * {
-            font-family: "Ubuntu Sans Nerd Font";
+            font-family: "Ubuntu Nerd Font";
             font-size: 19px;
         }
 
@@ -611,7 +611,6 @@
             padding: 2px 10px;
             margin: 8.5px 4px;
             font-size: 19px;
-            style: "font-weight: bold;";
         }
 
         #cpu            { color: @pink;      }

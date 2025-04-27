@@ -70,7 +70,7 @@
 
     fonts.packages = with pkgs; [
       nerd-fonts.hack
-      nerd-fonts.ubuntu-sans
+      nerd-fonts.ubuntu
     ];
 
     programs = {
