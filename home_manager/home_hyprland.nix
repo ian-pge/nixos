@@ -91,9 +91,9 @@
           ];
 
           ### VARIABLES ###
-          "$terminal"     = "kitty";
+          "$terminal"     = "ghostty";
           "$browser"      = "google-chrome-stable";
-          "$fileManager"  = "kitty -e yazi";
+          "$fileManager"  = "ghostty -e yazi";
           "$menu"         = "pgrep -x rofi >/dev/null 2>&1 || .config/rofi/launchers/type-4/launcher.sh";
           "$editor"       = "zeditor";
 
@@ -130,7 +130,7 @@
             "XCURSOR_THEME,catppuccin-macchiato-dark-cursors"
             "XCURSOR_SIZE,24"
             "EDITOR,zeditor"
-            "TERMINAL,kitty"
+            "TERMINAL,ghostty"
             "BROWSER,google-chrome-stable"
             "GTK_USE_PORTAL,1"
             "ELECTRON_OZONE_PLATFORM_HINT,wayland"
@@ -478,13 +478,13 @@
             cpu = {
             interval = 5;
             format   = " {usage}%";
-            "on-click" = "kitty htop";
+            "on-click" = "ghostty htop";
             };
 
             memory = {
             interval = 5;
             format   = "  {}%";
-            "on-click" = "kitty htop";
+            "on-click" = "ghostty htop";
             };
 
             "custom/gpu" = {
@@ -492,7 +492,7 @@
             exec          = "gpu-usage-waybar";
             "return-type" = "json";
             "format-icons"= "";
-            "on-click"    = "kitty nvtop";
+            "on-click"    = "ghostty nvtop";
             };
 
             backlight = {
@@ -506,7 +506,7 @@
             format        = "{icon} {volume}%";
             "format-muted"= "󰖁";
             "format-icons".default = [ "󰕿" "󰖀" "󰕾" ];
-            "on-click"    = "kitty pulsemixer";
+            "on-click"    = "ghostty pulsemixer";
             };
 
             network = {
@@ -517,7 +517,7 @@
             "format-disabled"     = "󰤭 Off";
             "format-disabled-if-down" = true;
             tooltip-format          = "{ifname} via {gwaddr}";
-            "on-click"              = "kitty impala";
+            "on-click"              = "ghostty impala";
             };
 
             "custom/launcher" = {
@@ -548,7 +548,7 @@
             "tooltip-format-connected" = "{controller_alias}\t{controller_address}\n\n{device_enumerate}";
             "tooltip-format-enumerate-connected" = "{device_alias}\t{device_address}";
             "format-off"               = "󰂲 Off";
-            "on-click"                 = "kitty bluetui";
+            "on-click"                 = "ghostty bluetui";
             };
 
             upower = {
@@ -557,14 +557,14 @@
             "hide-if-empty"= true;
             tooltip        = true;
             "tooltip-spacing" = 20;
-            "on-click"     = "kitty sudo powertop";
+            "on-click"     = "ghostty sudo powertop";
             };
 
             disk = {
             interval  = 30;
             format    = " {percentage_used}%";
             path      = "/";
-            "on-click"= "kitty sudo ncdu -x /";
+            "on-click"= "ghostty sudo ncdu -x /";
             };
         };
         };
