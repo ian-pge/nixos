@@ -124,7 +124,6 @@
         bambu-studio
         clang-tools
         package-version-server
-        kitty
         git
         google-chrome
         blender

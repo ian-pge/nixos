@@ -129,9 +129,6 @@
 
         bluetui
 
-
-
-        kitty
         mako
         swayosd
         waybar
