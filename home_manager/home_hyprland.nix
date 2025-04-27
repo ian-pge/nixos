@@ -286,7 +286,7 @@
         enableCompletion = true;
         initContent = ''
             bindkey -v
-            export ZSH_SYSTEM_CLIPBOARD_METHOD="wlc"
+        export ZSH_SYSTEM_CLIPBOARD_METHOD="wl-copy"
         '';
         plugins = [
               # { name = "zsh-vi-mode";
