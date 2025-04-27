@@ -1,4 +1,3 @@
-# ./overlays/devpod.nix
 # Correct structure: Takes final and prev as arguments directly
 final: prev:
 let
