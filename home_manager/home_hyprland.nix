@@ -611,6 +611,7 @@
             padding: 2px 10px;
             margin: 8.5px 4px;
             font-size: 19px;
+            style: "font-weight: bold;";
         }
 
         #cpu            { color: @pink;      }
