@@ -49,29 +49,14 @@
   programs.ghostty = {
     enable = true;
     enableZshIntegration = true;
+    settings = {
+      window_padding_width = "5 5";
+      cursor_blinking       = true;
+      confirm_os_window_close = 0;
+    };
   };
 
-  # programs.kitty = {
-  #   enable = true;
-  #   # themeFile = "Catppuccin-Macchiato";
-  #   # font = {
-  #   #       name    = "UbuntuMono Nerd Font";
-  #   #       size    = 12;
-  #   # };
-  #   shellIntegration = {
-  #       enableZshIntegration = true;
-  #       # mode = "no-cursor";
-  #   };
-  #   settings = {
-  #         window_padding_width = "5 5";
-  #         cursor_blinking       = true;              #
-  #         # cursor_blink_interval = 0.5;               #
-  #         cursor_shape          = "block";           #
-  #         # cursor_trail          = 100;               #
-  #         confirm_os_window_close = 0;
-  # };
 
-  # };
 
 
   wayland.windowManager.hyprland = {
