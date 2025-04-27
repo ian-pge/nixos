@@ -50,10 +50,10 @@
     enable = true;
     enableZshIntegration = true;
     settings = {
-      window_padding_width = "5 5";
-      cursor_blinking       = true;
-      confirm_os_window_close = 0;
-    };
+        cursor-style-blink = true;
+        window-padding = "5 5";
+        confirm-close-surface = false;
+      };
   };
 
 
