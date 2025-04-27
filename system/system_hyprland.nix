@@ -69,8 +69,8 @@
     };
 
     fonts.packages = with pkgs; [
-      nerd-fonts.fira-code
-      nerd-fonts.jetbrains-mono
+      nerd-fonts.hack
+      nerd-fonts.roboto-mono
     ];
 
     programs = {
@@ -108,8 +108,8 @@
     stylix.autoEnable = false;
 
     stylix.fonts.monospace = {
-        name    = "FiraCode Nerd Font";
-        package = pkgs.nerd-fonts.fira-code;
+        name    = "Hack Nerd Font";
+        package = pkgs.nerd-fonts.hack;
       };
 
     programs.zsh.enable = true;

@@ -593,7 +593,7 @@
         @define-color mantle    #1e2030;
 
         * {
-            font-family: "JetBrains Mono Nerd Font";
+            font-family: "Hack Nerd Font";
             font-size: 19px;
         }
 
