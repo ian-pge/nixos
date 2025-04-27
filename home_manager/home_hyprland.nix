@@ -59,6 +59,7 @@
           # cursor_blink_interval = 0.5;               #
           cursor_shape          = "block";           #
           # cursor_trail          = 100;               #
+          confirm_os_window_close = 0;
   };
 
 
