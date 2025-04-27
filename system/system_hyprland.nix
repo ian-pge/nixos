@@ -99,6 +99,9 @@
 
       services.udisks2.enable = true;
 
+      stylix.enable = true;
+      stylix.base16Scheme = "${pkgs.base16-schemes}/share/themes/catppuccin-macchiato.yaml";
+
       programs.zsh.enable = true;
       users.defaultUserShell = pkgs.zsh;
 
