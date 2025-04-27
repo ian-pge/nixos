@@ -284,7 +284,7 @@
         };
         enable = true;
         enableCompletion = true;
-        programs.zsh.initContent = "bindkey -v";
+        initContent = "bindkey -v";
         plugins = [
               # { name = "zsh-vi-mode";
               #   src  = pkgs.zsh-vi-mode;
