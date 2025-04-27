@@ -94,7 +94,7 @@
             enable = true;
             clean.enable = true;
             clean.extraArgs = "--keep-since 4d --keep 3";
-            nh_flake = "/etc/nixos";
+            flake = "/etc/nixos";
         };
     };
 
