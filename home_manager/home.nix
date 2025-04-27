@@ -19,9 +19,8 @@
       "PhD"
       "Perso"
       ".ssh"
-      ".config/zed"
+      # ".config/zed"
       ".config/history"
-      ".local/share/zed"
       # {
       #   directory = ".local/share/zed";
       #   method = "symlink";
