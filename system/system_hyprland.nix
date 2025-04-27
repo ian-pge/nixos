@@ -69,9 +69,7 @@
     };
 
     fonts.packages = with pkgs; [
-        nerd-fonts.ubuntu
-        nerd-fonts.ubuntu-mono
-        nerd-fonts.ubuntu-sans
+      nerd-fonts.hack
     ];
 
     programs = {
@@ -109,8 +107,8 @@
     stylix.autoEnable = false;
 
     stylix.fonts.monospace = {
-        name    = "UbuntuMono Nerd Font";        # the font‐family string :contentReference[oaicite:3]{index=3}
-        package = pkgs.nerd-fonts.ubuntu-mono;   # the patched Nerd Font derivation :contentReference[oaicite:4]{index=4}
+        name    = "Hack Nerd Font";
+        package = pkgs.nerd-fonts.hack;
       };
 
     programs.zsh.enable = true;
