@@ -128,6 +128,8 @@
         git
         google-chrome
         blender
+        davinci-resolve
+        steam
 
         (python3.withPackages (ps: with ps; [
             python-lsp-server
