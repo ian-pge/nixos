@@ -290,6 +290,10 @@
               #   src  = pkgs.zsh-vi-mode;
               #   file = "share/zsh-vi-mode/zsh-vi-mode.plugin.zsh";
               # }
+              {
+                name = "zsh-system-clipboard";
+                src  = pkgs.zsh-system-clipboard;
+              }
               { name = "fast-syntax-highlighting";
                 src  = pkgs.zsh-fast-syntax-highlighting;
                 file = "share/zsh/site-functions/fast-syntax-highlighting.plugin.zsh";
