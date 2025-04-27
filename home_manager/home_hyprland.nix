@@ -284,10 +284,10 @@
         enable = true;
         enableCompletion = true;
         plugins = [
-              { name = "zsh-vi-mode";
-                src  = pkgs.zsh-vi-mode;
-                file = "share/zsh-vi-mode/zsh-vi-mode.plugin.zsh";
-              }
+              # { name = "zsh-vi-mode";
+              #   src  = pkgs.zsh-vi-mode;
+              #   file = "share/zsh-vi-mode/zsh-vi-mode.plugin.zsh";
+              # }
               { name = "fast-syntax-highlighting";
                 src  = pkgs.zsh-fast-syntax-highlighting;
                 file = "share/zsh/site-functions/fast-syntax-highlighting.plugin.zsh";
