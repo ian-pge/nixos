@@ -282,6 +282,7 @@
         sessionVariables = {
         LANG = "en_US.UTF-8";
         ZSH_SYSTEM_CLIPBOARD_METHOD = "wlc";
+        ZSH_SYSTEM_CLIPBOARD_USE_WL_CLIPBOARD = "true";
         };
         enable = true;
         enableCompletion = true;
