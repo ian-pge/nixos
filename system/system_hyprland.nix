@@ -3,7 +3,7 @@
 {
     imports =
       [
-          inputs.stylix.nixosModules.default
+          inputs.stylix.nixosModules
       ];
 
     home-manager = {
