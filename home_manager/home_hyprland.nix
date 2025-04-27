@@ -345,7 +345,7 @@
                 "newline"   = true;
                 "segments" = [
                   {
-                    "template"   = "{{.Icon}}  ";
+                    "template"   = "{{.Icon}} ";
                     "foreground" = "p:sky";
                     "type"       = "os";
                     "style"      = "plain";
