@@ -66,7 +66,7 @@
   programs.helix = {
           enable = true;
           settings = {
-            theme = "catppuccin_Macchiato";
+            theme = "catppuccin_macchiato";
           };
         };
 
