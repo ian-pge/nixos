@@ -21,10 +21,11 @@
       ".ssh"
       ".config/zed"
       ".config/history"
-      {
-        directory = ".local/share/zed";
-        method = "symlink";
-      }
+      ".local/share/zed"
+      # {
+      #   directory = ".local/share/zed";
+      #   method = "symlink";
+      # }
 
       # Gnome
       ".config/dconf"
