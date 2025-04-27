@@ -43,38 +43,36 @@
       };
 
 
-  stylix.targets.kitty.enable = true;
-  stylix.targets.helix.enable = true;
+  stylix.targets.ghostty.enable = true;
   stylix.targets.gtk.enable = true;
 
-  programs.kitty = {
+  programs.ghostty = {
     enable = true;
-    # themeFile = "Catppuccin-Macchiato";
-    # font = {
-    #       name    = "UbuntuMono Nerd Font";
-    #       size    = 12;
-    # };
-    shellIntegration = {
-        enableZshIntegration = true;
-        # mode = "no-cursor";
-    };
-    settings = {
-          window_padding_width = "5 5";
-          cursor_blinking       = true;              #
-          # cursor_blink_interval = 0.5;               #
-          cursor_shape          = "block";           #
-          # cursor_trail          = 100;               #
-          confirm_os_window_close = 0;
+    enableZshIntegration = true;
   };
 
+  # programs.kitty = {
+  #   enable = true;
+  #   # themeFile = "Catppuccin-Macchiato";
+  #   # font = {
+  #   #       name    = "UbuntuMono Nerd Font";
+  #   #       size    = 12;
+  #   # };
+  #   shellIntegration = {
+  #       enableZshIntegration = true;
+  #       # mode = "no-cursor";
+  #   };
+  #   settings = {
+  #         window_padding_width = "5 5";
+  #         cursor_blinking       = true;              #
+  #         # cursor_blink_interval = 0.5;               #
+  #         cursor_shape          = "block";           #
+  #         # cursor_trail          = 100;               #
+  #         confirm_os_window_close = 0;
+  # };
 
-  };
-  programs.helix = {
-          enable = true;
-          # settings = {
-          #   theme = "catppuccin_macchiato";
-          # };
-        };
+  # };
+
 
   wayland.windowManager.hyprland = {
     enable = true;
