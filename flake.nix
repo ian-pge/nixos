@@ -24,7 +24,6 @@
       # Expose the overlay so it can be reused elsewhere
       overlays = {
         devpod = import ./overlays/devpod.nix;
-        zed = import ./overlays/zed.nix;
       };
     in
     {
@@ -35,7 +34,7 @@
         system = "x86_64-linux";
         specialArgs = { inherit inputs; };
         modules = [
-          ({ ... }: { nixpkgs.overlays = [ overlays.devpod overlays.zed ]; })
+          ({ ... }: { nixpkgs.overlays = [ overlays.devpod ]; })
           ./system/specialisation.nix
         ];
       };
