@@ -51,8 +51,9 @@
     enableZshIntegration = true;
     settings = {
         cursor-style-blink = true;
-        window-padding-x = 10;
-        window-padding-y = 10;
+        window-padding-x = 7;
+        window-padding-y = 7;
+        shell-integration-features = "no-cursor";
         confirm-close-surface = false;
         resize-overlay = "never";
       };
