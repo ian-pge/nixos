@@ -593,9 +593,8 @@
         @define-color mantle    #1e2030;
 
         * {
-            font-family: "Hack Nerd Font";
+            font-family: "Roboto Mono Nerd Font";
             font-size: 19px;
-            font-weight: bold;
         }
 
         window#waybar {
@@ -612,7 +611,6 @@
             padding: 2px 10px;
             margin: 8.5px 4px;
             font-size: 19px;
-            font-weight: bold;
         }
 
         #cpu            { color: @pink;      }
