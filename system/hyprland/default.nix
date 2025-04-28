@@ -14,5 +14,6 @@
     ./hyprland.nix
     ./fonts.nix
     ./stylix.nix
+    ./nautilus.nix
   ];
 }

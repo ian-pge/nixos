@@ -10,7 +10,7 @@
     nvtopPackages.full
     adwaita-icon-theme
     catppuccin-cursors.macchiatoDark
-    nautilus
+    # nautilus
     nmap
   ];
 
