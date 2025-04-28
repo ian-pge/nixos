@@ -29,6 +29,7 @@
     overlays = {
       devpod = import ./overlays/devpod.nix;
       bambustudio = import ./overlays/bambustudio.nix;
+      xdg = import ./overlays/xdg.nix;
     };
   in {
     # Make overlay usable from outside the flake (optional)
@@ -38,7 +39,7 @@
       system = "x86_64-linux";
       specialArgs = {inherit inputs;};
       modules = [
-        ({...}: {nixpkgs.overlays = [overlays.devpod overlays.bambustudio];})
+        ({...}: {nixpkgs.overlays = [overlays.devpod overlays.bambustudio overlays.xdg];})
         ./system/specialisation.nix
       ];
     };
