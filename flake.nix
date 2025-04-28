@@ -19,29 +19,32 @@
     };
 
     stylix = {
-        url = "github:danth/stylix";
-        inputs.nixpkgs.follows = "nixpkgs";
+      url = "github:danth/stylix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, ... }@inputs:
-    let
-      # Expose the overlay so it can be reused elsewhere
-      overlays = {
-        devpod = import ./overlays/devpod.nix;
-      };
-    in
-    {
-      # Make overlay usable from outside the flake (optional)
-      inherit overlays;
-
-      nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = { inherit inputs; };
-        modules = [
-          ({ ... }: { nixpkgs.overlays = [ overlays.devpod ]; })
-          ./system/specialisation.nix
-        ];
-      };
+  outputs = {
+    self,
+    nixpkgs,
+    ...
+  } @ inputs: let
+    # Expose the overlay so it can be reused elsewhere
+    overlays = {
+      devpod = import ./overlays/devpod.nix;
+      bambustudio = import ./overlays/bambustudio.nix;
     };
+  in {
+    # Make overlay usable from outside the flake (optional)
+    inherit overlays;
+
+    nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = {inherit inputs;};
+      modules = [
+        ({...}: {nixpkgs.overlays = [overlays.devpod overlays.bambustudio];})
+        ./system/specialisation.nix
+      ];
+    };
+  };
 }
