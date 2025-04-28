@@ -56,21 +56,21 @@
     };
   };
   # Packages
-  # home.packages = with pkgs; [
-  #   (python3.withPackages (ps:
-  #     with ps; [
-  #       python-lsp-server
-  #       python-lsp-jsonrpc
-  #       python-lsp-black
-  #       pyls-isort
-  #       pyls-flake8
-  #     ]))
-  #   black
-  #   clang-tools
-  #   package-version-server
-  #   nil
-  #   nixd
-  #   nixpkgs-fmt
-  #   alejandra
-  # ];
+  home.packages = with pkgs; [
+    (python3.withPackages (ps:
+      with ps; [
+        python-lsp-server
+        python-lsp-jsonrpc
+        python-lsp-black
+        pyls-isort
+        pyls-flake8
+      ]))
+    black
+    clang-tools
+    package-version-server
+    nil
+    nixd
+    nixpkgs-fmt
+    alejandra
+  ];
 }
