@@ -18,7 +18,7 @@
     [filechooser]
     cmd=${pkgs.xdg-desktop-portal-termfilechooser}/share/xdg-desktop-portal-termfilechooser/yazi-wrapper.sh
     default_dir=$HOME
-    env=TERMCMD=ghostty --app-id=file_chooser -e
+    env=TERMCMD=ghostty
     open_mode=suggested
     save_mode=last
   '';
