@@ -1,6 +1,8 @@
-{ inputs, ... }:
-
 {
+  inputs,
+  pkgs,
+  ...
+}: {
   imports = [
     inputs.impermanence.nixosModules.home-manager.impermanence
   ];
@@ -22,8 +24,8 @@
       ".config/zed"
       ".config/history"
       {
-         directory = ".local/share/zed";
-         method = "symlink";
+        directory = ".local/share/zed";
+        method = "symlink";
       }
 
       # Gnome
@@ -37,7 +39,6 @@
         directory = ".local/share/Steam";
         method = "symlink";
       }
-
     ];
     files = [
       ".config/monitors.xml"
@@ -47,13 +48,29 @@
 
   programs.git = {
     enable = true;
-    userName  = "ian";
+    userName = "ian";
     userEmail = "ian.page38@gmail.com";
     extraConfig = {
       init.defaultBranch = "main";
       safe.directory = "/etc/nixos";
     };
   };
-
-
+  # Packages
+  environment.systemPackages = with pkgs; [
+    (python3.withPackages (ps:
+      with ps; [
+        python-lsp-server
+        python-lsp-jsonrpc
+        python-lsp-black
+        pyls-isort
+        pyls-flake8
+      ]))
+    black
+    clang-tools
+    package-version-server
+    nil
+    nixd
+    nixpkgs-fmt
+    alejandra
+  ];
 }
