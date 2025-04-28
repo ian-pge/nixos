@@ -7,6 +7,8 @@
     };
   };
 
+  services.gvfs.enable = true;
+
   # Configure GTK settings
   gtk = {
     enable = true;
