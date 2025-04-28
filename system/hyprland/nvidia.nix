@@ -13,9 +13,4 @@
   };
 
   boot.kernelParams = ["nvidia-drm.modeset=1"];
-
-  xserver = {
-    enable = false;
-    videoDrivers = ["nvidia"];
-  };
 }
