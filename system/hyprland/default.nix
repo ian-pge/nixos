@@ -6,8 +6,8 @@
   imports = [
     inputs.stylix.nixosModules.stylix
 
-    ./home_manager
-    ./nvidia
+    ./home_manager.nix
+    ./nvidia.nix
     ./bluetooth.nix
     ./keyring.nix
     ./udisks2.nix
