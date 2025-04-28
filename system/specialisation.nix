@@ -1,7 +1,7 @@
 {
   imports = [
-    ./system.nix
-    ./system_hyprland.nix
+    ./shared/system.nix
+    ./hyprland/system_hyprland.nix
   ];
 
   # Define specializations
@@ -10,8 +10,8 @@
       inheritParentConfig = false;
       configuration = {
         imports = [
-          ./system.nix
-          ./system_gnome.nix
+          ./shared/system.nix
+          ./gnome/system_gnome.nix
         ];
       };
     };
