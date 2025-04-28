@@ -4,7 +4,7 @@
 
     ./home_manager.nix
     ./persistance.nix
-    ./git
-    ./additional_packages
+    ./git.nix
+    ./additional_packages.nix
   ];
 }
