@@ -1,6 +1,6 @@
 {
   imports = [
-    ./shared/system.nix
+    ./shared/system_shared.nix
     ./hyprland/system_hyprland.nix
   ];
 
@@ -10,7 +10,7 @@
       inheritParentConfig = false;
       configuration = {
         imports = [
-          ./shared/system.nix
+          ./shared/system_shared.nix
           ./gnome/system_gnome.nix
         ];
       };
