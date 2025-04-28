@@ -7,15 +7,14 @@
     inputs.home-manager.nixosModules.default
 
     ./hardware-configuration.nix
-
-    ./config/boot.nix
-    ./config/persistance.nix
-    ./config/nixos_config.nix
-    ./config/docker.nix
-    ./config/qmk_keyboard.nix
-    ./config/steam.nix
-    ./config/nh.nix
-    ./config/ssh.nix
-    ./config/stereolabs.nix
+    ./boot.nix
+    ./persistance.nix
+    ./nixos_config.nix
+    ./docker.nix
+    ./qmk_keyboard.nix
+    ./steam.nix
+    ./nh.nix
+    ./ssh.nix
+    ./stereolabs.nix
   ];
 }
