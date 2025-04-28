@@ -22,6 +22,7 @@
     nmap
   ];
 
+
   services.mako.enable = true;
   services.swayosd.enable = true;
   services.udiskie.enable = true;
@@ -33,25 +34,7 @@
   programs.htop.enable = true;
   programs.obs-studio.enable = true;
 
-  # Configure GTK settings
-  gtk = {
-    enable = true;
-    theme = {
-      name = "Adwaita-dark";
-      package = pkgs.gnome-themes-extra;
-    };
-    iconTheme = {
-      name = "Adwaita";
-      package = pkgs.adwaita-icon-theme;
-    };
-    cursorTheme = {
-      name = "catppuccin-macchiato-dark-cursors";
-      package = pkgs.catppuccin-cursors.macchiatoDark;
-    };
 
-    # Tells GTK 3 to prefer a dark theme variant
-    gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
-  };
 
   services.hyprpaper = {
     enable = true; # turn on the hyprpaper service
