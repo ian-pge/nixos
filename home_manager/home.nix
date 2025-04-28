@@ -23,6 +23,7 @@
       ".ssh"
       ".config/zed"
       ".config/history"
+      ".zotero"
       {
         directory = ".local/share/zed";
         method = "symlink";
