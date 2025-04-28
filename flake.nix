@@ -24,11 +24,7 @@
     };
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    ...
-  } @ inputs: let
+  outputs = {nixpkgs, ...} @ inputs: let
     # Expose the overlay so it can be reused elsewhere
     overlays = {
       devpod = import ./overlays/devpod.nix;
