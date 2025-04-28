@@ -11,7 +11,7 @@
   boot.kernelParams = ["nvidia-drm.modeset=1"];
 
   # Enable OpenGL
-  graphics.enable = true;
+  hardware.opengl.enable = true;
 
   xserver = {
     enable = false;
