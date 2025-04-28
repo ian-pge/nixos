@@ -80,7 +80,7 @@
   security.pam.services = {
     greetd.enableGnomeKeyring = true;
     hyprlock.enableGnomeKeyring = true;
-    enableGnomeKeyring = true;
+    gnome.enableGnomeKeyring = true;
   };
 
   networking = {
