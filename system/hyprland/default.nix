@@ -15,7 +15,7 @@
     ./greetd.nix
     ./network_manager.nix
     ./zsh.nix
-    ./hyprland/zsh.nix
+    ./hyprland.nix
     ./fonts.nix
     ./stylix.nix
   ];
