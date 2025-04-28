@@ -4,7 +4,7 @@
     extraSpecialArgs = {inherit inputs;};
     backupFileExtension = "backup";
     users = {
-      "ian" = import ../../home_manager/home_gnome.nix;
+      "ian" = import ../../home_manager/gnome;
     };
   };
 }

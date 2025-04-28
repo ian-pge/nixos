@@ -1,6 +1,6 @@
 {pkgs, ...}: {
   imports = [
-    ./home.nix
+    ../shared
   ];
 
   home.packages = with pkgs; [
