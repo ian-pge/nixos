@@ -23,4 +23,22 @@
       };
     };
   };
+
+  xdg.portal = {
+    enable = true;
+    # Hyprland’s compositor portal for screenshots, etc.
+    extraPortals = [
+      pkgs.xdg-desktop-portal-hyprland
+      pkgs.xdg-desktop-portal-gtk # keep gtk for colour picker etc.
+      pkgs.xdg-desktop-portal-termfilechooser
+    ];
+
+    # Make termfilechooser the FileChooser backend
+    config = {
+      Hyprland = {
+        default = ["hyprland" "gtk"]; # fallback order
+        "org.freedesktop.impl.portal.FileChooser" = ["termfilechooser"];
+      };
+    };
+  };
 }
