@@ -92,11 +92,14 @@
         };
     };
 
-    services.udev.extraRules = ''
-        ${builtins.readFile ../material/99-slabs.rules}
-      '';
-
-    services.udev.packages = [ pkgs.via ];
+    services.udev = {
+        packages = [
+          pkgs.via
+        ];
+        extraRules = ''
+            ${builtins.readFile ../material/99-slabs.rules}
+        '';
+    };
 
     services = {
         openssh.enable = true;
@@ -134,6 +137,7 @@
         black
         nil
         nixd
+        nixpkgs-fmt
         alejandra
         nvd
         nix-output-monitor
