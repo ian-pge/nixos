@@ -19,6 +19,7 @@
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
+  programs.dconf.enable = true;
 
   services = {
     xserver = {

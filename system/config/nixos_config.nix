@@ -10,6 +10,6 @@
   users.users."ian" = {
     isNormalUser = true;
     initialPassword = "ianbage";
-    extraGroups = ["wheel" "docker" "video" "networkmanager"]; # Enable ‘sudo’ for the user.
+    extraGroups = ["wheel"]; # Enable ‘sudo’ for the user.
   };
 }

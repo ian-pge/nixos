@@ -63,5 +63,15 @@
     nixpkgs-fmt
     alejandra
     oh-my-posh
+
+    zed-editor
+    devpod
+    bambu-studio
+    google-chrome
+    blender
+    davinci-resolve
+    nvd
+    nix-output-monitor
+    zotero
   ];
 }

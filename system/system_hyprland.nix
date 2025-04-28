@@ -91,11 +91,15 @@
     };
   };
 
+  users.users."ian" = {
+    extraGroups = ["networkmanager"]; # Enable ‘sudo’ for the user.
+  };
+
   fonts.packages = with pkgs; [
     nerd-fonts.hack
     nerd-fonts.ubuntu
   ];
-
+  programs.dconf.enable = true;
   programs = {
     zsh.enable = true;
     hyprland = {
