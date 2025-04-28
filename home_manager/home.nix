@@ -62,7 +62,6 @@
     nixd
     nixpkgs-fmt
     alejandra
-    oh-my-posh
 
     zed-editor
     devpod

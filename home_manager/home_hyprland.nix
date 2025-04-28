@@ -3,6 +3,25 @@
     ./home.nix
   ];
 
+  home.packages = with pkgs; [
+    oh-my-posh
+
+    # hyprland
+    hyprpicker
+    hyprshot
+    # other
+    bluetui
+    wl-clipboard
+
+    rofi-wayland
+    vlc
+    nvtopPackages.full
+    adwaita-icon-theme
+    catppuccin-cursors.macchiatoDark
+    nautilus
+    nmap
+  ];
+
   # Enable dconf to manage GNOME settings
   dconf.settings = {
     "org/gnome/desktop/interface" = {
@@ -10,6 +29,17 @@
       gtk-theme = "Adwaita-dark"; # Set GTK theme to Adwaita-dark
     };
   };
+
+  services.mako.enable = true;
+  services.swayosd.enable = true;
+  services.udiskie.enable = true;
+  programs.yazi.enable = true;
+  services.playerctld.enable = true;
+  services.hypridle.enable = true;
+  programs.hyprlock.enable = true;
+  services.hyprpolkitagent.package = true;
+  programs.htop.enable = true;
+  programs.obs-studio.enable = true;
 
   # Configure GTK settings
   gtk = {

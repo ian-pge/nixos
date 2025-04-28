@@ -1,8 +1,4 @@
-{
-  pkgs,
-  inputs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     inputs.stylix.nixosModules.stylix
 
@@ -18,35 +14,5 @@
     ./hyprland.nix
     ./fonts.nix
     ./stylix.nix
-  ];
-
-  environment.systemPackages = with pkgs; [
-    # hyprland
-    hypridle
-    hyprlock
-    hyprpaper
-    hyprpicker
-    hyprshot
-    hyprpolkitagent
-    hyprcursor
-
-    # other
-    bluetui
-    wl-clipboard
-    mako
-    swayosd
-    waybar
-    udiskie
-    rofi-wayland
-    yazi
-    playerctl
-    vlc
-    htop
-    nvtopPackages.full
-    adwaita-icon-theme
-    catppuccin-cursors.macchiatoDark
-    nautilus
-    nmap
-    obs-studio
   ];
 }
