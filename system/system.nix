@@ -128,7 +128,6 @@
     zed-editor
     devpod
     bambu-studio
-    mesa
     google-chrome
     blender
     davinci-resolve
