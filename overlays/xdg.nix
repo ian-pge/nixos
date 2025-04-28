@@ -11,7 +11,7 @@ in {
       rev = "v${newVersion}";
       # First build with lib.fakeSha256, copy the hash Nix prints,
       # then replace the line below.
-      hash = "12yy7f65zc2skxa7vf25da8653p94gll4jmjx4rj0wvb48yl2qd3";
+      hash = "sha256-12yy7f65zc2skxa7vf25da8653p94gll4jmjx4rj0wvb48yl2qd3";
     };
 
     # Meson / C project – nothing else to change.
