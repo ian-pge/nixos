@@ -127,24 +127,21 @@
     hyprpolkitagent
     hyprcursor
 
+    # other
     bluetui
     wl-clipboard
-
     mako
     swayosd
     waybar
     udiskie
     rofi-wayland
     yazi
-    greetd.tuigreet
-    greetd.greetd
     playerctl
     vlc
     htop
     nvtopPackages.full
     adwaita-icon-theme
     catppuccin-cursors.macchiatoDark
-    oh-my-posh
     nautilus
     nmap
     obs-studio

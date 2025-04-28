@@ -105,6 +105,12 @@
       clean.extraArgs = "--keep-since 4d --keep 3";
       flake = "/etc/nixos";
     };
+    steam = {
+      enable = true;
+      remotePlay.openFirewall = true; # Open ports in the firewall for Steam Remote Play
+      dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
+      localNetworkGameTransfers.openFirewall = true; # Open ports in the firewall for Steam Local Network Game Transfers
+    };
   };
 
   services = {
@@ -131,7 +137,6 @@
     google-chrome
     blender
     davinci-resolve
-    steam
     nvd
     nix-output-monitor
     via

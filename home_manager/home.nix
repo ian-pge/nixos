@@ -20,22 +20,20 @@
       "Videos"
       "PhD"
       "Perso"
+
       ".ssh"
+      ".devpod"
+      ".config/google-chrome"
       ".config/zed"
-      ".config/history"
-      ".zotero"
       {
         directory = ".local/share/zed";
         method = "symlink";
       }
-
+      ".config/history"
+      ".zotero"
       # Gnome
       ".config/dconf"
       ".local/share/keyrings"
-      ".devpod"
-
-      ".config/google-chrome"
-
       {
         directory = ".local/share/Steam";
         method = "symlink";
@@ -56,7 +54,7 @@
       safe.directory = "/etc/nixos";
     };
   };
-  # Packages
+
   home.packages = with pkgs; [
     clang-tools
     package-version-server
@@ -64,5 +62,6 @@
     nixd
     nixpkgs-fmt
     alejandra
+    oh-my-posh
   ];
 }
