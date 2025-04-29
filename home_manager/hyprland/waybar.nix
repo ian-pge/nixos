@@ -187,7 +187,7 @@
       @define-color subtext0  #a5adcb;
       @define-color overlay2  #939ab7;
       @define-color overlay1  #8087a2;
-      @define-color overlay2  #6e738d;
+      @define-color overlay0  #6e738d;
       @define-color surface2  #5b6078;
       @define-color surface1  #494d64;
       @define-color surface0  #363a4f;
