@@ -6,7 +6,6 @@
         dpi-aware = "no";
         font = "Ubuntu Nerd Font:size=20";
         layer = "overlay";
-        icon-theme = "Adwaita";
         image-size-ratio = "1";
       };
       colors = {
