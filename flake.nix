@@ -29,7 +29,7 @@
     overlays = {
       devpod = import ./overlays/devpod.nix;
       bambustudio = import ./overlays/bambustudio.nix;
-      xdg = import ./overlays/xdg_desktop_portal.nix;
+      xdg = import ./overlays/xdg_termfilechooser.nix;
     };
   in {
     # Make overlay usable from outside the flake (optional)

@@ -1,9 +1,4 @@
-{
-  inputs,
-  lib,
-  pkgs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     inputs.stylix.nixosModules.stylix
 
@@ -20,14 +15,6 @@
     ./fonts.nix
     ./stylix.nix
     ./nautilus.nix
+    ./xdg_termfilechooser.nix
   ];
-  xdg.portal = {
-    enable = true;
-    extraPortals = with pkgs; [
-      xdg-desktop-portal-termfilechooser
-    ];
-    config.common = {
-      "org.freedesktop.impl.portal.FileChooser" = ["termfilechooser"];
-    };
-  };
 }
