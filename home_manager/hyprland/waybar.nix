@@ -190,10 +190,7 @@
           font-size: 19px;
       }
 
-      window#waybar {
-          background-color: @crust;
-          color: #ffffff;
-      }
+
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,
       #pulseaudio, #network, #bluetooth, #custom-nixos,
