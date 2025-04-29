@@ -3,6 +3,7 @@
     enable = true;
     systemd.enable = false;
     systemd.variables = ["--all"];
+    portalPackage = null;
 
     settings = {
       ### MONITORS ###
