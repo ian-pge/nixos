@@ -191,7 +191,7 @@
       }
 
       window#waybar {
-          background: transparent;
+          background: none;
           color: #ffffff;
       }
 
