@@ -20,10 +20,10 @@
         selection-text = "cad3f5ff";
         selection-match = "8aadf4ff";
         counter = "8087a2ff";
-        border = "cad3f5ff";
+        border = "ff3333ff";
       };
       border = {
-        width = "5";
+        width = "10";
         radius = "10";
       };
     };
