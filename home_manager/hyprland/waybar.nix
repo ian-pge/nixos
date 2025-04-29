@@ -199,7 +199,6 @@
 
       window#waybar {
           background: none;
-          margin-top: 20px;
       }
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,

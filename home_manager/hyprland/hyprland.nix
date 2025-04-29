@@ -70,7 +70,7 @@
 
       ### GENERAL LOOK‑AND‑FEEL ###
       general = {
-        gaps_in = 5;
+        gaps_in = 10;
         gaps_out = 10;
         border_size = 3;
         "col.active_border" = "rgba(33ccffee)";
