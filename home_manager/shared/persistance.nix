@@ -12,6 +12,7 @@
       ".ssh"
       ".devpod"
       ".config/google-chrome"
+      ".local/share/applications"
       ".config/zed"
       {
         directory = ".local/share/zed";
