@@ -3,7 +3,7 @@
     enable = true;
     settings = {
       main = {
-        "dpi-aware" = "no";
+        "dpi-aware" = "auto";
         layer = "overlay";
       };
     };
