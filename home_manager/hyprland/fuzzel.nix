@@ -10,7 +10,7 @@
         image-size-ratio = "1";
       };
       colors = {
-        background = "181926ff";
+        background = "24273aff";
         text = "cad3f5ff";
         prompt = "b8c0e0ff";
         placeholder = "8087a2ff";
@@ -23,7 +23,7 @@
         border = "00000000";
       };
       border = {
-        width = "1000";
+        width = "50";
         radius = "10";
       };
     };
