@@ -24,11 +24,9 @@
   xdg.portal = {
     enable = lib.mkForce true;
     extraPortals = with pkgs; [
-      xdg-desktop-portal-hyprland
       xdg-desktop-portal-termfilechooser
     ];
     config.common = {
-      default = ["termfilechooser" "hyprland"];
       "org.freedesktop.impl.portal.FileChooser" = ["termfilechooser"];
     };
   };
