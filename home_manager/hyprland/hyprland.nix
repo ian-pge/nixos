@@ -23,15 +23,8 @@
 
       ### AUTOSTART ###
       "exec-once" = [
-        "hyprpaper"
         "uwsm finalize"
-        "systemctl --user start hyprpolkitagent"
-        "mako"
-        "swayosd-server"
-        "udiskie &"
         "xhost +local:"
-        "hypridle"
-        "waybar"
       ];
 
       ### STATIC WORKSPACES ###
