@@ -1,6 +1,7 @@
 {
   programs.waybar = {
     enable = true;
+    systemd.enable = true;
 
     ## Main bar configuration ─ straight conversion of your JSON
     settings = {

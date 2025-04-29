@@ -1,8 +1,4 @@
-{
-  inputs,
-  pkgs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     inputs.stylix.nixosModules.stylix
 
@@ -20,21 +16,4 @@
     ./stylix.nix
     ./nautilus.nix
   ];
-
-  environment.systemPackages = with pkgs; [
-    xdg-desktop-portal-termfilechooser
-  ];
-  xdg.portal = {
-    enable = true;
-    extraPortals = with pkgs; [
-      xdg-desktop-portal-hyprland
-      xdg-desktop-portal-termfilechooser
-    ];
-    config.common = {
-      default = ["hyprland"];
-      "org.freedesktop.impl.portal.FileChooser" = ["termfilechooser"];
-    };
-  };
-  # ---- make the portal launch Ghostty ----
-  environment.variables.TERMCMD = "${pkgs.ghostty}/bin/ghostty --app-id file_chooser";
 }

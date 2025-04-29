@@ -13,6 +13,20 @@
     ./waybar.nix
   ];
 
+  xdg.portal = {
+    enable = true;
+    extraPortals = with pkgs; [
+      xdg-desktop-portal-hyprland
+      xdg-desktop-portal-termfilechooser
+    ];
+    config.common = {
+      default = ["hyprland"];
+      "org.freedesktop.impl.portal.FileChooser" = ["termfilechooser"];
+    };
+  };
+  # ---- make the portal launch Ghostty ----
+  # environment.variables.TERMCMD = "${pkgs.ghostty}/bin/ghostty --app-id file_chooser";
+
   # ---- ship the wrapper & config declaratively ----
   xdg.configFile."xdg-desktop-portal-termfilechooser/config".text = ''
     [filechooser]
