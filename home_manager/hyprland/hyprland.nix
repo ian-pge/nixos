@@ -196,7 +196,7 @@
         "tile,class:Google-chrome"
       ];
       layerrule = [
-        "blur,rofi"
+        "blur,fuzzel"
         "blur,logout_dialog"
       ];
     };
