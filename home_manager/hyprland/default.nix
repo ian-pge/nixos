@@ -13,13 +13,16 @@
     ./waybar.nix
   ];
 
+  home.sessionVariables.GTK_USE_PORTAL = "1";
+
   xdg.portal = {
     enable = true;
     extraPortals = with pkgs; [
+      xdg-desktop-portal-hyprland
       xdg-desktop-portal-termfilechooser
     ];
     config.common = {
-      default = ["hyprland"];
+      default = ["termfilechooser" "hyprland"];
       "org.freedesktop.impl.portal.FileChooser" = ["termfilechooser"];
     };
   };
