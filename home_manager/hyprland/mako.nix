@@ -8,7 +8,8 @@
     backgroundColor = "#181926";
     textColor = "#eed49f";
     borderColor = "#ffcc33";
-    borderRadius = 8;
+    borderRadius = 10;
+    borderSize = 3;
 
     # Timeout in milliseconds (0 = no timeout)
     defaultTimeout = 5000;
