@@ -4,6 +4,7 @@
     settings = {
       main = {
         dpi-aware = "no";
+        use-bold = "yes";
         layer = "overlay";
       };
     };
