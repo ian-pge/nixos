@@ -2,7 +2,7 @@
   programs.rofi = {
     enable = true;
     package = pkgs.rofi-wayland;
-    theme = /rofi/config.rasi;
+    theme = /home/ian/rofi/config.rasi;
     extraConfig = {
       modi = "drun,window";
       show-icons = true;
