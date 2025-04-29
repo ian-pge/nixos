@@ -3,8 +3,9 @@
     enable = true;
     settings = {
       main = {
-        dpi-aware = "no";
+        dpi-aware = "yes";
         layer = "overlay";
+        list-executables-in-path = "yes";
       };
     };
   };
