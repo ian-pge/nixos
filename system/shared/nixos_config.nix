@@ -7,8 +7,6 @@
 
   time.timeZone = "Europe/Paris";
 
-  i18n.defaultLocale = "en_US.UTF-8";
-
   users.users."ian" = {
     isNormalUser = true;
     initialPassword = "ianbage";
