@@ -10,7 +10,7 @@
         image-size-ratio = "1";
       };
       colors = {
-        background = "#181926";
+        background = "181926ff";
         text = "cad3f5ff";
         prompt = "b8c0e0ff";
         placeholder = "8087a2ff";
@@ -20,7 +20,7 @@
         selection-text = "cad3f5ff";
         selection-match = "8aadf4ff";
         counter = "8087a2ff";
-        border = "#ff3366";
+        border = "ff3366ff";
       };
     };
   };
