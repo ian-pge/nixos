@@ -18,13 +18,13 @@
         match = "8aadf4ff";
         selection = "5b6078ff";
         selection-text = "cad3f5ff";
-        selection-match = "8aadf4ff";
+        selection-match = "eed49fff";
         counter = "8087a2ff";
         border = "ff3333ff";
       };
       border = {
         width = "10";
-        radius = "10";
+        radius = "3";
       };
     };
   };
