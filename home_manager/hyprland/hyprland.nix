@@ -15,7 +15,7 @@
       "$terminal" = "ghostty";
       "$browser" = "google-chrome-stable";
       "$fileManager" = "ghostty -e yazi";
-      "$menu" = "pgrep -x rofi >/dev/null 2>&1 || .config/rofi/launchers/type-4/launcher.sh";
+      "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
 
       ### AUTOSTART ###
