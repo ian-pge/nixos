@@ -17,6 +17,6 @@
     output = "eDP-1";
 
     # Pango‐markup format string: title in blue bold, then body
-    format = "<span color=\"#eed49f\"><b>%s</b></span>\n%b";
+    format = "<span color=\"#33ccff\"><b>%s</b></span>\\n%b";
   };
 }
