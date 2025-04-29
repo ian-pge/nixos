@@ -23,8 +23,8 @@
         border = "cad3f5ff";
       };
       border = {
-        width = "50";
-        radius = "100";
+        width = "5";
+        radius = "10";
       };
     };
   };
