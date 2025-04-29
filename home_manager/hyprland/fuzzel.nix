@@ -2,9 +2,8 @@
   programs.fuzzel = {
     enable = true;
     settings = {
-      output = "DP-1";
       main = {
-        dpi-aware = "yes";
+        dpi-aware = "no";
         layer = "overlay";
       };
     };
