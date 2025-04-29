@@ -12,7 +12,7 @@
         icon-theme = "Adwaita";
       };
       colors = {
-        background = "000000aa";
+        background = lib.mkForce "000000aa";
       };
     };
   };
