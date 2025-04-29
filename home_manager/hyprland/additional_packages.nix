@@ -5,7 +5,6 @@
     hyprshot
     bluetui
     wl-clipboard
-    rofi-wayland
     vlc
     nvtopPackages.full
     adwaita-icon-theme
