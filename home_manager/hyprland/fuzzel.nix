@@ -20,7 +20,7 @@
         selection-text = "cad3f5ff";
         selection-match = "8aadf4ff";
         counter = "8087a2ff";
-        border = "00000000";
+        border = "cad3f5ff";
       };
       border = {
         width = "50";
