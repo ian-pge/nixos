@@ -10,6 +10,8 @@
         exit-on-keyboard-focus-loss = "no";
         layer = "overlay";
         icon-theme = "Adwaita";
+        horizontal-pad = "4000";
+        vertical-pad = "4000";
       };
       colors = {
         background = lib.mkForce "000000aa";
