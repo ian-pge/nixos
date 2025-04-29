@@ -3,10 +3,7 @@
     enable = true;
     systemd.enable = false;
     systemd.variables = ["--all"];
-    portalPackage = null;
-    package = null;
-    # Additional Hyprland configurations can go here
-    #
+
     settings = {
       ### MONITORS ###
       monitor = [
