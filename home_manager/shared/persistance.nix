@@ -13,6 +13,7 @@
       ".devpod"
       ".config/google-chrome"
       ".local/share/applications"
+      ".local/share/icons"
       ".config/zed"
       {
         directory = ".local/share/zed";
