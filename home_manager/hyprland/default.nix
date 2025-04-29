@@ -1,8 +1,4 @@
-{
-  pkgs,
-  lib,
-  ...
-}: {
+{pkgs, ...}: {
   imports = [
     ../shared
     ./gtk.nix
@@ -17,19 +13,6 @@
     ./waybar.nix
   ];
 
-  home.sessionVariables.GTK_USE_PORTAL = "1";
-
-  xdg.portal = {
-    enable = lib.mkForce true;
-    extraPortals = with pkgs; [
-      xdg-desktop-portal-hyprland
-      xdg-desktop-portal-termfilechooser
-    ];
-    config.common = {
-      default = ["termfilechooser" "hyprland"];
-      "org.freedesktop.impl.portal.FileChooser" = ["termfilechooser"];
-    };
-  };
   # ---- make the portal launch Ghostty ----
   # environment.variables.TERMCMD = "${pkgs.ghostty}/bin/ghostty --app-id file_chooser";
 
