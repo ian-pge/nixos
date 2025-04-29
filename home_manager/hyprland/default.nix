@@ -12,6 +12,6 @@
     ./oh_my_posh.nix
     ./waybar.nix
     ./xdg_termfilechooser.nix
-    ./rofix.nix
+    ./fuzzel.nix
   ];
 }
