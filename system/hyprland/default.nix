@@ -22,7 +22,7 @@
     ./nautilus.nix
   ];
   xdg.portal = {
-    enable = lib.mkForce true;
+    enable = true;
     extraPortals = with pkgs; [
       xdg-desktop-portal-termfilechooser
     ];
