@@ -1,4 +1,8 @@
-{pkgs, ...}: {
+{
+  pkgs,
+  lib,
+  ...
+}: {
   imports = [
     ../shared
     ./gtk.nix
@@ -16,7 +20,7 @@
   home.sessionVariables.GTK_USE_PORTAL = "1";
 
   xdg.portal = {
-    enable = true;
+    enable = lib.mkForce true;
     extraPortals = with pkgs; [
       xdg-desktop-portal-hyprland
       xdg-desktop-portal-termfilechooser
