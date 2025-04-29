@@ -197,7 +197,7 @@
       ];
       layerrule = [
         "blur,fuzzel"
-        "blur,logout_dialog"
+        # "blur,logout_dialog"
       ];
     };
   };
