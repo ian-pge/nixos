@@ -204,7 +204,7 @@
       #clock, #cpu, #memory, #backlight, #custom-gpu,
       #pulseaudio, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher {
-          background-color: @mantle;
+          background-color: @crust;
           border-radius: 10px;
           padding: 2px 10px;
           margin: 8.5px 4px;
