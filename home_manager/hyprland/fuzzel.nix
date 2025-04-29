@@ -9,8 +9,10 @@
         keyboard-focus = "on-demand";
         exit-on-keyboard-focus-loss = "no";
         layer = "overlay";
-        icon-theme = "Papirus-Dark";
-        image-size-ratio = "0.5";
+        icon-theme = "Adwaita";
+      };
+      colors = {
+        background = "000000aa";
       };
     };
   };

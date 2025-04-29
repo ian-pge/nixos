@@ -196,7 +196,7 @@
         "tile,class:Google-chrome"
       ];
       layerrule = [
-        "blur,launcher"
+        "blur xray,launcher"
       ];
     };
   };
