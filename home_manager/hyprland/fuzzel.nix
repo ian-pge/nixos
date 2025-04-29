@@ -22,6 +22,9 @@
         counter = "8087a2ff";
         border = "ff3366ff";
       };
+      border = {
+        width = 1000;
+      };
     };
   };
 }
