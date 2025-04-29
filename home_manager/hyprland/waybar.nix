@@ -198,7 +198,7 @@
       }
 
       window#waybar {
-          background: @base;
+          background: none;
       }
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,
