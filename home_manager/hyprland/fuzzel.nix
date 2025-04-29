@@ -14,7 +14,7 @@
         prompt = "b8c0e0ff";
         placeholder = "8087a2ff";
         input = "cad3f5ff";
-        match = "8aadf4ff";
+        match = "eed49fff";
         selection = "5b6078ff";
         selection-text = "cad3f5ff";
         selection-match = "eed49fff";

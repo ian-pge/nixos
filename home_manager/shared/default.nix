@@ -6,5 +6,6 @@
     ./persistance.nix
     ./git.nix
     ./additional_packages.nix
+    ./mime_apps.nix
   ];
 }
