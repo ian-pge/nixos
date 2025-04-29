@@ -71,7 +71,7 @@
       ### GENERAL LOOK‑AND‑FEEL ###
       general = {
         gaps_in = 5;
-        gaps_out = "0,20,20,20";
+        gaps_out = "5,10,10,10";
         border_size = 3;
         "col.active_border" = "rgba(33ccffee)";
         "col.inactive_border" = "rgba(888888aa)";
