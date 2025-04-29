@@ -184,6 +184,13 @@
       @define-color base      #24273a;
       @define-color crust     #181926;
       @define-color mantle    #1e2030;
+      @define-color subtext0  #a5adcb;
+      @define-color overlay2  #939ab7;
+      @define-color overlay1  #8087a2;
+      @define-color overlay2  #6e738d;
+      @define-color surface2  #5b6078;
+      @define-color surface1  #494d64;
+      @define-color surface0  #363a4f;
 
       * {
           font-family: "Ubuntu Nerd Font";
@@ -197,7 +204,7 @@
       #clock, #cpu, #memory, #backlight, #custom-gpu,
       #pulseaudio, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher {
-          background-color: @mantle;
+          background-color: @overlay0;
           border-radius: 8px;
           padding: 2px 10px;
           margin: 8.5px 4px;
