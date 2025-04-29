@@ -6,6 +6,7 @@
         dpi-aware = "no";
         use-bold = "yes";
         font = lib.mkForce "Ubuntu Nerd Font:size=20";
+        keyboard-focus = "on-demand";
         layer = "top";
       };
     };
