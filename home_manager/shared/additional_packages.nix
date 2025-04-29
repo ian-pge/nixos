@@ -18,5 +18,7 @@
     zotero
     neofetch
     obsidian
+    lazydocker
+    lazygit
   ];
 }

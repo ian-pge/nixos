@@ -13,7 +13,6 @@
     nmap
   ];
 
-  services.mako.enable = true;
   services.swayosd.enable = true;
   services.udiskie.enable = true;
   programs.yazi.enable = true;

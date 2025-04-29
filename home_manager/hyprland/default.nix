@@ -13,5 +13,6 @@
     ./waybar.nix
     ./xdg_termfilechooser.nix
     ./fuzzel.nix
+    ./mako.nix
   ];
 }
