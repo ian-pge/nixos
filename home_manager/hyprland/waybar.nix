@@ -192,14 +192,12 @@
 
       window#waybar {
           background: none;
-          color: #ffffff;
       }
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,
       #pulseaudio, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher {
-          color: #e5e5e5;
-          background-color: @base;
+          background-color: @mantle;
           border-radius: 8px;
           padding: 2px 10px;
           margin: 8.5px 4px;
