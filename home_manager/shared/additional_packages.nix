@@ -16,5 +16,6 @@
     nvd
     nix-output-monitor
     zotero
+    neofetch
   ];
 }
