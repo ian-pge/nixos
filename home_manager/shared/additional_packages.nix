@@ -17,5 +17,6 @@
     nix-output-monitor
     zotero
     neofetch
+    obsidian
   ];
 }

@@ -38,7 +38,6 @@
 
       ### ENVIRONMENT ###
       env = [
-        "ZVM_INIT_MODE,sourcing"
         "HYPRCURSOR_THEME,catppuccin-macchiato-dark-cursors"
         "HYPRCURSOR_SIZE,24"
         "XCURSOR_THEME,catppuccin-macchiato-dark-cursors"
