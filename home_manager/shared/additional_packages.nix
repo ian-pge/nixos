@@ -20,5 +20,6 @@
     obsidian
     lazydocker
     lazygit
+    freecad-wayland
   ];
 }
