@@ -122,7 +122,6 @@
         ",XF86MonBrightnessUp,exec,swayosd-client --brightness=raise"
         ",XF86MonBrightnessDown,exec,swayosd-client --brightness=lower"
       ];
-      bindr = "SUPER,SUPER_L,exec,$menu";
       bind = [
         ",XF86AudioPlay,exec,playerctl play-pause"
         ",XF86AudioNext,exec,playerctl next"
@@ -134,6 +133,7 @@
         "$mainMod CONTROL,Q,exit"
         "$mainMod,P,pseudo"
         "$mainMod,F,exec,$fileManager"
+        "$mainMod,A,exec,$menu"
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,togglesplit"
         "$mainMod,G,exec,$browser"
