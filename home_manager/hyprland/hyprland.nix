@@ -134,7 +134,6 @@
         "$mainMod CONTROL,Q,exit"
         "$mainMod,P,pseudo"
         "$mainMod,F,exec,$fileManager"
-        ",SUPER,exec,$menu"
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,togglesplit"
         "$mainMod,G,exec,$browser"
