@@ -11,10 +11,9 @@
     borderRadius = 10;
     borderSize = 3;
 
-    # Timeout in milliseconds (0 = no timeout)
-    defaultTimeout = 5000;
+    defaultTimeout = 10000;
+    ignoreTimeout = true;
 
-    # Show notifications on a specific Wayland output
     output = "eDP-1";
 
     # Pango‐markup format string: title in blue bold, then body
