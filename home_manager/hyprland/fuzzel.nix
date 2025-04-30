@@ -10,6 +10,7 @@
         horizontal-pad = "40";
         vertical-pad = "20";
         inner-pad = "15";
+        line-height = "30";
       };
       colors = {
         background = "24273aff";
