@@ -7,6 +7,9 @@
         font = "Ubuntu Nerd Font:size=20";
         layer = "overlay";
         image-size-ratio = "1";
+        horizontal-pad = "40";
+        vertical-pad = "20";
+        inner-pad = "5";
       };
       colors = {
         background = "24273aff";
