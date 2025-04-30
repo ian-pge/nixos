@@ -14,9 +14,13 @@
       ".config/google-chrome"
       ".local/share/applications"
       ".local/share/icons"
-      ".config/zed"
+      # ".config/zed"
       {
         directory = ".local/share/zed";
+        method = "symlink";
+      }
+      {
+        directory = ".config/zed";
         method = "symlink";
       }
       ".config/history"
