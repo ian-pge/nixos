@@ -23,6 +23,7 @@
       ".zotero"
       # Gnome
       ".config/dconf"
+      ".cache"
       ".local/share/keyrings"
       {
         directory = ".local/share/Steam";
