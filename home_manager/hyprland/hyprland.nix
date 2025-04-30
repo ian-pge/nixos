@@ -133,7 +133,7 @@
         "$mainMod CONTROL,Q,exit"
         "$mainMod,P,pseudo"
         "$mainMod,F,exec,$fileManager"
-        "$mainMod,SUPER,exec,$menu"
+        ",SUPER,exec,$menu"
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,togglesplit"
         "$mainMod,G,exec,$browser"
