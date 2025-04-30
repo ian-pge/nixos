@@ -11,9 +11,9 @@
       colors = {
         background = "24273aff";
         text = "cad3f5ff";
-        prompt = "b8c0e0ff";
+        prompt = "a6da95ff";
         placeholder = "8087a2ff";
-        input = "cad3f5ff";
+        input = "a6da95ff";
         match = "a6da95ff";
         selection = "5b6078ff";
         selection-text = "cad3f5ff";
