@@ -9,7 +9,7 @@
         image-size-ratio = "1";
         horizontal-pad = "40";
         vertical-pad = "20";
-        inner-pad = "5";
+        inner-pad = "15";
       };
       colors = {
         background = "24273aff";
