@@ -122,6 +122,7 @@
         ",XF86MonBrightnessUp,exec,swayosd-client --brightness=raise"
         ",XF86MonBrightnessDown,exec,swayosd-client --brightness=lower"
       ];
+      bindr = ",SUPER,exec,$menu";
       bind = [
         ",XF86AudioPlay,exec,playerctl play-pause"
         ",XF86AudioNext,exec,playerctl next"
