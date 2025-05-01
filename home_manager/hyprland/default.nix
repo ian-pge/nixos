@@ -11,7 +11,7 @@
     # ./zsh.nix
     ./fish.nix
     # ./oh_my_posh.nix
-    # ./starship.nix
+    ./starship.nix
     ./waybar.nix
     ./xdg_termfilechooser.nix
     ./fuzzel.nix
