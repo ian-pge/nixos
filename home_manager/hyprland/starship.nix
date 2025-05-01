@@ -52,7 +52,13 @@
         disabled = false;
         style = "fg:sky";
         format = "[$symbol]($style) ";
-        symbols.NixOS = ""; # feel free to pick any glyph you like
+        symbols = {
+          NixOS = "";
+          Ubuntu = "";
+          Arch = "";
+          Fedora = "";
+          Debian = "";
+        };
       };
 
       # 3 • user@host ------------------------------------------------------------
@@ -64,7 +70,7 @@
       hostname = {
         ssh_only = false;
         style = "fg:blue";
-        format = "[@$hostname ]($style)"; # trailing space
+        format = "[$hostname]($style)"; # trailing space
       };
 
       # 4 • Path (“~/workspace/…”) ----------------------------------------------
@@ -86,6 +92,10 @@
       character = {
         success_symbol = "[❯](fg:green) ";
         error_symbol = "[❯](fg:red) ";
+        vimcmd_symbol = "[❯](fg:yellow) ";
+        vimcmd_visual_symbol = "[❯](fg:pink) ";
+        vimcmd_replace_symbol = "[❯](fg:mauve) ";
+        vimcmd_replace_one_symbol = "[❯](fg:mauve) ";
       };
 
       # ── right prompt: elapsed time (27 ms) ───────────────────────────────────
