@@ -1,0 +1,90 @@
+{pkgs, ...}: {
+  # ── Starship ──────────────────────────────────────────────────────────────────
+  programs.starship = {
+    enable = true;
+    enableFishIntegration = true; # puts `starship init fish | source` in config
+    settings = pkgs.lib.generators.toTOML {} {
+      # ─ Global options ─────────────────────────────────────────────────────────
+      add_newline = true; # first line (time-os-path …) ↩︎ second line (❯)
+      right_format = "$cmd_duration"; # right-prompt → 27 ms
+
+      # Palette (same hex codes you used in Oh-My-Posh) ─────────────────────────
+      palette = "catppuccin";
+
+      palettes.catppuccin = {
+        blue = "#8AADF4";
+        green = "#a6da95";
+        lavender = "#B7BDF8";
+        mauve = "#c6a0f6";
+        os = "#ACB0BE";
+        peach = "#F5A97F";
+        pink = "#F5BDE6";
+        sapphire = "#7dc4e4";
+        yellow = "#eed49f";
+        sky = "#91d7e3";
+      };
+
+      # ─ What gets printed on the left prompt line ─────────────────────────────
+      format = ''
+        $time $os $username@$hostname $directory $git_branch$line_break$character
+      '';
+
+      # 1 • Current time (18:49) -------------------------------------------------
+      time = {
+        disabled = false;
+        time_format = "%H:%M";
+        style = "fg:yellow";
+        format = "[$time]($style) "; # trailing space ␠
+      };
+
+      # 2 • OS icon (snow-flake Nix) --------------------------------------------
+      os = {
+        disabled = false;
+        style = "fg:sky";
+        format = "[$symbol]($style) ";
+        symbols.NixOS = ""; # feel free to pick any glyph you like
+      };
+
+      # 3 • user@host ------------------------------------------------------------
+      username = {
+        show_always = true;
+        style = "fg:blue";
+        format = "[$user]($style)";
+      };
+      hostname = {
+        ssh_only = false;
+        style = "fg:blue";
+        format = "[@$hostname ]($style)"; # trailing space
+      };
+
+      # 4 • Path (“~/workspace/…”) ----------------------------------------------
+      directory = {
+        truncation_length = 0; # full path
+        home_symbol = "~";
+        style = "fg:pink";
+        format = "[$path]($style) ";
+      };
+
+      # 5 • Git HEAD -------------------------------------------------------------
+      git_branch = {
+        symbol = "\ue725 "; # 󰜥
+        style = "fg:lavender";
+        format = "[$symbol$branch]($style) ";
+      };
+
+      # ── second line: prompt symbol ❯  ─────────────────────────────────────────
+      character = {
+        success_symbol = "[❯](fg:green) ";
+        error_symbol = "[❯](fg:red) ";
+      };
+
+      # ── right prompt: elapsed time (27 ms) ───────────────────────────────────
+      cmd_duration = {
+        min_time = 0; # always display
+        show_milliseconds = true;
+        style = "fg:peach";
+        format = "[$duration]($style)";
+      };
+    };
+  };
+}
