@@ -1,7 +1,7 @@
 {
   programs.oh-my-posh = {
     enable = true;
-    enableZshIntegration = true;
+    enableFishIntegration = true;
     settings = {
       "palette" = {
         "blue" = "#8AADF4";

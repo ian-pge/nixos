@@ -1,7 +1,7 @@
 {
   programs.ghostty = {
     enable = true;
-    enableZshIntegration = true;
+    enableFishIntegration = true;
     settings = {
       cursor-style-blink = true;
       cursor-style = "block";
