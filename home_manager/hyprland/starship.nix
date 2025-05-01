@@ -53,7 +53,7 @@
         style = "fg:sky";
         format = "[$symbol]($style) ";
         symbols = {
-          NixOS = "bold ";
+          NixOS = "";
           Ubuntu = "";
           Arch = "";
           Fedora = "";
@@ -64,7 +64,8 @@
       # 3 • user@host ------------------------------------------------------------
       username = {
         show_always = true;
-        style = "fg:blue";
+        style_user = "fg:blue";
+        style_root = "fg:red";
         format = "[$user]($style)";
       };
       hostname = {
