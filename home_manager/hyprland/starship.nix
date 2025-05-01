@@ -53,7 +53,7 @@
         style = "fg:sky";
         format = "[$symbol]($style) ";
         symbols = {
-          NixOS = "";
+          NixOS = "bold ";
           Ubuntu = "";
           Arch = "";
           Fedora = "";
