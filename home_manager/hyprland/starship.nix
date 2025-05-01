@@ -2,7 +2,7 @@
   programs.fish.functions = {
     # This overrides the default bold–green ❯ Starship shows in old prompts.
     starship_transient_prompt_func.body = ''
-      starship module time   # outputs the same yellow “18:49”
+      starship module time
     '';
     # Right side of the transient prompt stays empty, matching OMP behaviour.
   };
@@ -91,10 +91,10 @@
 
       # ── second line: prompt symbol ❯  ─────────────────────────────────────────
       character = {
-        success_symbol = "[❯](bold green) ";
+        success_symbol = "[❯](green) ";
         error_symbol = "[❯](fg:red) ";
         vimcmd_symbol = "[❯](fg:yellow) ";
-        vimcmd_visual_symbol = "[❯](bold pink) ";
+        vimcmd_visual_symbol = "[❯](fg:pink) ";
         vimcmd_replace_symbol = "[❯](fg:mauve) ";
         vimcmd_replace_one_symbol = "[❯](fg:mauve) ";
       };
