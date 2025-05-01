@@ -91,10 +91,10 @@
 
       # ── second line: prompt symbol ❯  ─────────────────────────────────────────
       character = {
-        success_symbol = "[❯](fg:green) ";
+        success_symbol = "[❯](bold green) ";
         error_symbol = "[❯](fg:red) ";
         vimcmd_symbol = "[❯](fg:yellow) ";
-        vimcmd_visual_symbol = "[❯](fg:pink) ";
+        vimcmd_visual_symbol = "[❯](bold pink) ";
         vimcmd_replace_symbol = "[❯](fg:mauve) ";
         vimcmd_replace_one_symbol = "[❯](fg:mauve) ";
       };
