@@ -91,12 +91,12 @@
 
       # ── second line: prompt symbol ❯  ─────────────────────────────────────────
       character = {
-        success_symbol = "[❯](green) ";
-        error_symbol = "[❯](fg:red) ";
-        vimcmd_symbol = "[❯](fg:yellow) ";
-        vimcmd_visual_symbol = "[❯](fg:pink) ";
-        vimcmd_replace_symbol = "[❯](fg:mauve) ";
-        vimcmd_replace_one_symbol = "[❯](fg:mauve) ";
+        success_symbol = "[❯](green)";
+        error_symbol = "[❯](fg:red)";
+        vimcmd_symbol = "[❯](fg:yellow)";
+        vimcmd_visual_symbol = "[❯](fg:pink)";
+        vimcmd_replace_symbol = "[❯](fg:mauve)";
+        vimcmd_replace_one_symbol = "[❯](fg:mauve)";
       };
 
       # ── right prompt: elapsed time (27 ms) ───────────────────────────────────
