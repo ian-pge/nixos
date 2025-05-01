@@ -1,9 +1,9 @@
-{pkgs, ...}: {
+{
   # ── Starship ──────────────────────────────────────────────────────────────────
   programs.starship = {
     enable = true;
     enableFishIntegration = true; # puts `starship init fish | source` in config
-    settings = pkgs.lib.generators.toTOML {} {
+    settings = {
       # ─ Global options ─────────────────────────────────────────────────────────
       add_newline = true; # first line (time-os-path …) ↩︎ second line (❯)
       right_format = "$cmd_duration"; # right-prompt → 27 ms
