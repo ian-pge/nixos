@@ -8,7 +8,8 @@
     ./stylix.nix
     ./hyprland.nix
     ./fzf.nix
-    ./zsh.nix
+    # ./zsh.nix
+    ./fish.nix
     ./oh_my_posh.nix
     ./waybar.nix
     ./xdg_termfilechooser.nix

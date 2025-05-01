@@ -10,7 +10,8 @@
     ./pipewire.nix
     ./greetd.nix
     ./network_manager.nix
-    ./zsh.nix
+    # ./zsh.nix
+    ./fish.nix
     ./hyprland.nix
     ./fonts.nix
     ./stylix.nix
