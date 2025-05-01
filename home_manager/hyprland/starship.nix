@@ -1,17 +1,17 @@
 {
+  programs.fish.functions = {
+    # This overrides the default bold–green ❯ Starship shows in old prompts.
+    starship_transient_prompt_func.body = ''
+      starship module time   # outputs the same yellow “18:49”
+    '';
+    # Right side of the transient prompt stays empty, matching OMP behaviour.
+  };
+
   # ── Starship ──────────────────────────────────────────────────────────────────
   programs.starship = {
     enable = true;
     enableFishIntegration = true; # puts `starship init fish | source` in config
     enableTransience = true;
-
-    programs.fish.functions = {
-      # This overrides the default bold–green ❯ Starship shows in old prompts.
-      starship_transient_prompt_func.body = ''
-        starship module time   # outputs the same yellow “18:49”
-      '';
-      # Right side of the transient prompt stays empty, matching OMP behaviour.
-    };
 
     settings = {
       # ─ Global options ─────────────────────────────────────────────────────────
