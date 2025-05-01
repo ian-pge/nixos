@@ -51,7 +51,7 @@
       os = {
         disabled = false;
         style = "fg:sky";
-        format = "[$symbol]($style) ";
+        format = "[$symbol]($style)";
         symbols = {
           NixOS = "";
           Ubuntu = "";
