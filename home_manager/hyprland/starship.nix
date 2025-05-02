@@ -82,8 +82,8 @@
         truncation_length = 10;
         home_symbol = "~";
         style = "fg:flamingo";
+        read_only = " ";
         format = "[$path]($style)";
-        read_only = " ";
         before_repo_root_style = "fg:flamingo";
         repo_root_style = "fg:maroon";
       };
