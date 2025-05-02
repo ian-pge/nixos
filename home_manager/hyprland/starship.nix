@@ -90,7 +90,7 @@
 
       # 5 • Git HEAD -------------------------------------------------------------
       git_branch = {
-        truncate_to_repo = false;
+        truncation_length = 0;
         symbol = " ";
         style = "fg:maroon";
         format = "[$symbol$branch]($style) ";
