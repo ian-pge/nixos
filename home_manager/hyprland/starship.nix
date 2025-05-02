@@ -35,6 +35,7 @@
         flamingo = "#f0c6c6";
         rosewater = "#4dbd6";
         maroon = "#ee99a0";
+        teal = "#8bd5ca";
       };
 
       # ─ What gets printed on the left prompt line ─────────────────────────────
