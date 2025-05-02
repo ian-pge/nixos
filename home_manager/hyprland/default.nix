@@ -8,6 +8,7 @@
     ./hyprpaper.nix
     ./ghostty.nix
     # ./stylix.nix
+    ./catppuccin.nix
     ./hyprland.nix
     ./fzf.nix
     # ./zsh.nix
