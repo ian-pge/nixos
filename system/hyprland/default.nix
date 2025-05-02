@@ -1,6 +1,5 @@
 {inputs, ...}: {
   imports = [
-    inputs.stylix.nixosModules.stylix
     inputs.catppuccin.nixosModules.catppuccin
 
     ./home_manager.nix
