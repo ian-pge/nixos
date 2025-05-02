@@ -5,7 +5,7 @@
     ./additional_packages.nix
     ./hyprpaper.nix
     ./ghostty.nix
-    ./stylix.nix
+    # ./stylix.nix
     ./hyprland.nix
     ./fzf.nix
     # ./zsh.nix
