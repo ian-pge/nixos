@@ -94,9 +94,9 @@
         success_symbol = "[❯](green)";
         error_symbol = "[❯](fg:red)";
         vimcmd_symbol = "[❮](fg:peach)";
-        vimcmd_visual_symbol = "[❮]fg:peach";
-        vimcmd_replace_symbol = "[❮]fg:peach";
-        vimcmd_replace_one_symbol = "[❮]fg:peach";
+        vimcmd_visual_symbol = "[❮](fg:mauve)";
+        vimcmd_replace_symbol = "[❮](fg:sky)";
+        vimcmd_replace_one_symbol = "[❮](fg:pink)";
       };
 
       # ── right prompt: elapsed time (27 ms) ───────────────────────────────────
