@@ -68,7 +68,7 @@
       # 3 • user@host ------------------------------------------------------------
       username = {
         show_always = true;
-        style_user = "fg:green";
+        style_user = "fg:pink";
         style_root = "fg:red";
         format = "[$user]($style)";
       };
@@ -97,6 +97,12 @@
         symbol = " ";
         style = "fg:teal";
         format = "[$symbol$branch]($style) ";
+      };
+
+      container = {
+        symbol = " ";
+        style = "fg:maroon";
+        format = "[$symbol$container]($style) ";
       };
 
       # ── second line: prompt symbol ❯  ─────────────────────────────────────────
