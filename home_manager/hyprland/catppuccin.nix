@@ -31,9 +31,5 @@
       flavor = "macchiato";
       accent = "sapphire";
     };
-    alacritty = {
-      enable = true;
-      flavor = "macchiato";
-    };
   };
 }

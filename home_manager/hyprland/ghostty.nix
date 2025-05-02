@@ -11,7 +11,7 @@
       confirm-close-surface = false;
       resize-overlay = "never";
       adjust-cursor-thickness = "200%";
-      font-family = "Hack Nerd Font";
+      font-family = "Hack Nerd Font Bold";
       font-size = "12";
     };
   };

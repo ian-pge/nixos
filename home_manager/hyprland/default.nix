@@ -18,6 +18,5 @@
     ./xdg_termfilechooser.nix
     ./fuzzel.nix
     ./mako.nix
-    ./alacritty.nix
   ];
 }
