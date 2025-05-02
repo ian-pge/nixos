@@ -93,10 +93,10 @@
       character = {
         success_symbol = "[❯](green)";
         error_symbol = "[❯](fg:red)";
-        vimcmd_symbol = "[❮]";
-        vimcmd_visual_symbol = "[❮]";
-        vimcmd_replace_symbol = "[❮]";
-        vimcmd_replace_one_symbol = "[❮]";
+        vimcmd_symbol = "[❮](fg:peach)";
+        vimcmd_visual_symbol = "[❮]fg:peach";
+        vimcmd_replace_symbol = "[❮]fg:peach";
+        vimcmd_replace_one_symbol = "[❮]fg:peach";
       };
 
       # ── right prompt: elapsed time (27 ms) ───────────────────────────────────
