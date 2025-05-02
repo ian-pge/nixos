@@ -8,5 +8,9 @@
       enable = true;
       flavor = "macchiato";
     };
+    lazygit = {
+      enable = true;
+      flavor = "macchiato";
+    };
   };
 }
