@@ -7,7 +7,6 @@
     ./additional_packages.nix
     ./hyprpaper.nix
     ./ghostty.nix
-    # ./stylix.nix
     ./catppuccin.nix
     ./hyprland.nix
     ./fzf.nix

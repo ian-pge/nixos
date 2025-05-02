@@ -15,7 +15,6 @@
     ./fish.nix
     ./hyprland.nix
     ./fonts.nix
-    # ./stylix.nix
     ./catppuccin.nix
     ./xdg_termfilechooser.nix
     ./nautilus.nix

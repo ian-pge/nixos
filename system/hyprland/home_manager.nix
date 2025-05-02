@@ -4,7 +4,9 @@
     extraSpecialArgs = {inherit inputs;};
     backupFileExtension = "backup";
     users = {
-      "ian" = import ../../home_manager/hyprland;
+      "ian" = import [
+        ../../home_manager/hyprland
+      ];
     };
   };
 }

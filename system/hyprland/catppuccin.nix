@@ -1,7 +1,6 @@
 {
-  # catppuccin = {
-  #   enable = true;
-  #   accent = "sapphire";
-  #   flavor = "macchiato";
-  # };
+  catppuccin.tty = {
+    enable = true;
+    flavor = "macchiato";
+  };
 }
