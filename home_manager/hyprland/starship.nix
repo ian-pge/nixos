@@ -16,7 +16,7 @@
     settings = {
       # ─ Global options ─────────────────────────────────────────────────────────
       add_newline = false; # first line (time-os-path …) ↩︎ second line (❯)
-      right_format = "$cmd_duration"; # right-prompt → 27 ms
+      # right_format = "$cmd_duration"; # right-prompt → 27 ms
 
       # Palette (same hex codes you used in Oh-My-Posh) ─────────────────────────
       palette = "catppuccin";
