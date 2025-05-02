@@ -2,8 +2,8 @@
   programs.fish.functions = {
     starship_transient_prompt_func.body = ''starship module time'';
     prompt_newline = {
-      on-event = "fish_postexec";
-      body = ''echo'';
+      onEvent = "fish_postexec";
+      body = ''echo ""'';
     };
   };
 
