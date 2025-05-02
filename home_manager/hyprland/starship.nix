@@ -1,10 +1,13 @@
 {
   programs.fish.functions = {
-    # This overrides the default bold–green ❯ Starship shows in old prompts.
     starship_transient_prompt_func.body = ''
       starship module time
     '';
-    # Right side of the transient prompt stays empty, matching OMP behaviour.
+    fish_postexec = {
+        onEvent = "fish_postexec";
+        body = ''
+          echo
+        '';
   };
 
   # ── Starship ──────────────────────────────────────────────────────────────────
