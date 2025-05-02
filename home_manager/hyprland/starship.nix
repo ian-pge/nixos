@@ -3,7 +3,7 @@
     starship_transient_prompt_func.body = ''starship module time'';
     prompt_newline = {
       onEvent = "fish_prompt";
-      body = ''echo ""'';
+      body = ''echo "hello world"'';
     };
   };
 
