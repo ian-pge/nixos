@@ -40,7 +40,7 @@
 
       # ─ What gets printed on the left prompt line ─────────────────────────────
       format = ''
-        $line_break$os $username@$hostname $directory $git_branch$line_break$character
+        $os $username@$hostname $directory $git_branch$line_break$character
       '';
 
       # 1 • Current time (18:49) -------------------------------------------------
@@ -120,7 +120,7 @@
         min_time = 0; # always display
         show_milliseconds = true;
         style = "fg:peach";
-        format = "[$duration]($style)";
+        format = "[$duration]($style)$line_break";
       };
     };
   };
