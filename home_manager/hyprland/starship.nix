@@ -79,7 +79,7 @@
 
       # 4 • Path (“~/workspace/…”) ----------------------------------------------
       directory = {
-        truncation_length = 10;
+        truncation_length = 0;
         home_symbol = "~";
         style = "fg:flamingo";
         read_only = " ";
@@ -90,7 +90,7 @@
 
       # 5 • Git HEAD -------------------------------------------------------------
       git_branch = {
-        symbol = " "; # 󰜥
+        symbol = " ";
         style = "fg:maroon";
         format = "[$symbol$branch]($style) ";
       };
