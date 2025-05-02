@@ -40,7 +40,7 @@
 
       # ─ What gets printed on the left prompt line ─────────────────────────────
       format = ''
-        $os $username@$hostname $directory $git_branch$line_break$character
+        $os $username@$hostname $directory $git_branch$character
       '';
 
       # 1 • Current time (18:49) -------------------------------------------------
