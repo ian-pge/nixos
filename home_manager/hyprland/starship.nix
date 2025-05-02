@@ -102,7 +102,6 @@
       # ── right prompt: elapsed time (27 ms) ───────────────────────────────────
       cmd_duration = {
         min_time = 0; # always display
-        show_milliseconds = false;
         style = "fg:peach";
         format = "[$duration]($style)";
       };
