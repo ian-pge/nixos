@@ -32,6 +32,9 @@
         sapphire = "#7dc4e4";
         yellow = "#eed49f";
         sky = "#91d7e3";
+        flamingo = "#f0c6c6";
+        rosewater = "#4dbd6";
+        maroon = "#ee99a0";
       };
 
       # ─ What gets printed on the left prompt line ─────────────────────────────
@@ -64,28 +67,30 @@
       # 3 • user@host ------------------------------------------------------------
       username = {
         show_always = true;
-        style_user = "fg:blue";
+        style_user = "fg:lavender";
         style_root = "fg:red";
         format = "[$user]($style)";
       };
       hostname = {
         ssh_only = false;
-        style = "fg:blue";
+        style = "fg:mauve";
         format = "[$hostname]($style)"; # trailing space
       };
 
       # 4 • Path (“~/workspace/…”) ----------------------------------------------
       directory = {
-        truncation_length = 0; # full path
         home_symbol = "~";
-        style = "fg:pink";
+        style = "fg:flamingo";
         format = "[$path]($style) ";
+        read_only = " ";
+        before_repo_root_style = "fg:flamingo";
+        repo_root_style = "fg:maroon";
       };
 
       # 5 • Git HEAD -------------------------------------------------------------
       git_branch = {
-        symbol = "\ue725 "; # 󰜥
-        style = "fg:lavender";
+        symbol = " "; # 󰜥
+        style = "fg:maroon";
         format = "[$symbol$branch]($style) ";
       };
 
@@ -102,6 +107,7 @@
       # ── right prompt: elapsed time (27 ms) ───────────────────────────────────
       cmd_duration = {
         min_time = 0; # always display
+        show_milliseconds = true;
         style = "fg:peach";
         format = "[$duration]($style)";
       };
