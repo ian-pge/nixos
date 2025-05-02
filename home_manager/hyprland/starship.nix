@@ -11,7 +11,7 @@
   programs.starship = {
     enable = true;
     enableFishIntegration = true; # puts `starship init fish | source` in config
-    enableTransience = true;
+    # enableTransience = true;
 
     settings = {
       # ─ Global options ─────────────────────────────────────────────────────────
