@@ -83,14 +83,14 @@
         home_symbol = "~";
         style = "fg:flamingo";
         read_only = " ";
-        format = "[$read_only$path]($style)";
+        read_only_style = "fg:flamingo";
+        format = "[$read_only]($read_only_style)[$before_root_path]($before_repo_root_style)[$repo_root]($repo_root_style)[$path]($style)";
         before_repo_root_style = "fg:flamingo";
         repo_root_style = "fg:maroon";
       };
 
       # 5 • Git HEAD -------------------------------------------------------------
       git_branch = {
-        truncation_length = 0;
         symbol = " ";
         style = "fg:maroon";
         format = "[$symbol$branch]($style) ";
