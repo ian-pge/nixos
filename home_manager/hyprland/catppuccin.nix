@@ -1,7 +1,8 @@
 {
   catppuccin = {
     enable = true;
-    accent = "sapphire";
     flavor = "macchiato";
+    accent = "sapphire";
+    ghostty.enable = true;
   };
 }

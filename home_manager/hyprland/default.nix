@@ -1,5 +1,8 @@
-{
+{inputs, ...}: {
   imports = [
+    inputs.impermanence.nixosModules.home-manager.impermanence
+    inputs.catppuccin.homeManagerModules.catppuccin
+
     ../shared
     ./gtk.nix
     ./additional_packages.nix
