@@ -46,7 +46,7 @@
       time = {
         disabled = false;
         time_format = "%H:%M";
-        style = "fg:pink";
+        style = "fg:yellow";
         format = "[$time]($style) "; # trailing space ␠
       };
 
@@ -88,13 +88,13 @@
         format = "[$read_only]($read_only_style)[$path]($style)";
         repo_root_format = "[$read_only]($read_only_style)[$before_root_path]($before_repo_root_style)[$repo_root]($repo_root_style)[$path]($style)";
         before_repo_root_style = "fg:flamingo";
-        repo_root_style = "fg:yellow";
+        repo_root_style = "fg:teal";
       };
 
       # 5 • Git HEAD -------------------------------------------------------------
       git_branch = {
         symbol = " ";
-        style = "fg:yellow";
+        style = "fg:teal";
         format = "[$symbol$branch]($style) ";
       };
 
