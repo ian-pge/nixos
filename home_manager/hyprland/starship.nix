@@ -1,6 +1,6 @@
 {
   programs.fish.functions = {
-    # starship_transient_prompt_func.body = ''starship module time'';
+    starship_transient_prompt_func.body = ''starship module time'';
     prompt_newline = {
       onEvent = "fish_prompt";
       body = ''echo'';
@@ -10,8 +10,8 @@
   # ── Starship ──────────────────────────────────────────────────────────────────
   programs.starship = {
     enable = true;
-    enableFishIntegration = true; # puts `starship init fish | source` in config
-    # enableTransience = true;
+    enableFishIntegration = true;
+    enableTransience = true;
 
     settings = {
       # ─ Global options ─────────────────────────────────────────────────────────
