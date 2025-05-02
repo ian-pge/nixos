@@ -15,7 +15,6 @@
 
     settings = {
       # ─ Global options ─────────────────────────────────────────────────────────
-      add_newline = true; # first line (time-os-path …) ↩︎ second line (❯)
       right_format = "$cmd_duration"; # right-prompt → 27 ms
 
       # Palette (same hex codes you used in Oh-My-Posh) ─────────────────────────
@@ -42,6 +41,8 @@
       format = ''
         $os $username@$hostname $directory $git_branch$line_break$character
       '';
+
+      add_newline = true;
 
       # 1 • Current time (18:49) -------------------------------------------------
       time = {
@@ -120,7 +121,7 @@
         min_time = 0; # always display
         show_milliseconds = true;
         style = "fg:peach";
-        format = "[$duration]($style)$line_break";
+        format = "[$duration]($style)";
       };
     };
   };
