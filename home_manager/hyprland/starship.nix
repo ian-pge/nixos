@@ -15,7 +15,7 @@
 
     settings = {
       # ─ Global options ─────────────────────────────────────────────────────────
-      right_format = "$cmd_duration$line_break"; # right-prompt → 27 ms
+      right_format = "$cmd_duration"; # right-prompt → 27 ms
 
       # Palette (same hex codes you used in Oh-My-Posh) ─────────────────────────
       palette = "catppuccin";
