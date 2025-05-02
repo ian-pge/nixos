@@ -67,7 +67,7 @@
       # 3 • user@host ------------------------------------------------------------
       username = {
         show_always = true;
-        style_user = "fg:lavender";
+        style_user = "fg:pink";
         style_root = "fg:red";
         format = "[$user]($style)";
       };
@@ -83,7 +83,7 @@
         home_symbol = "~";
         style = "fg:flamingo";
         read_only = " ";
-        format = "[$path]($style)";
+        format = "[$read_only$path]($style)";
         before_repo_root_style = "fg:flamingo";
         repo_root_style = "fg:maroon";
       };
