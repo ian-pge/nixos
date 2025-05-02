@@ -12,7 +12,7 @@
       resize-overlay = "never";
       adjust-cursor-thickness = "200%";
       font-family = "Hack Nerd Font";
-      font-size = "16";
+      font-size = "12";
     };
   };
 }
