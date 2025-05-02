@@ -79,9 +79,10 @@
 
       # 4 • Path (“~/workspace/…”) ----------------------------------------------
       directory = {
+        truncation_length = 10;
         home_symbol = "~";
         style = "fg:flamingo";
-        format = "[$path]($style) ";
+        format = "[$path]($style)";
         read_only = " ";
         before_repo_root_style = "fg:flamingo";
         repo_root_style = "fg:maroon";
