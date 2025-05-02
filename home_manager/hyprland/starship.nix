@@ -4,10 +4,11 @@
       starship module time
     '';
     fish_postexec = {
-        onEvent = "fish_postexec";
-        body = ''
-          echo
-        '';
+      onEvent = "fish_postexec";
+      body = ''
+        echo
+      '';
+    };
   };
 
   # ── Starship ──────────────────────────────────────────────────────────────────
