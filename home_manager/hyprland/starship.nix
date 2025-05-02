@@ -42,7 +42,7 @@
         $os $username@$hostname $directory $git_branch$line_break$character
       '';
 
-      # add_newline = true;
+      add_newline = false;
 
       # 1 • Current time (18:49) -------------------------------------------------
       time = {
