@@ -69,7 +69,7 @@
       # 3 • user@host ------------------------------------------------------------
       username = {
         show_always = true;
-        style_user = "fg:pink";
+        style_user = "fg:mauve";
         style_root = "fg:red";
         format = "[$user]($style)";
       };
