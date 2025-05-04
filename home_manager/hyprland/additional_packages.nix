@@ -4,14 +4,13 @@
     hyprpicker
     hyprshot
     bluetui
-    wl-clipboard
     vlc
     nvtopPackages.full
     adwaita-icon-theme
     catppuccin-cursors.macchiatoDark
     # nautilus
     nmap
-    wl-clipboard
+    wl-clipboard-rs
   ];
 
   services.swayosd.enable = true;
