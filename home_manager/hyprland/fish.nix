@@ -5,8 +5,8 @@
       set fish_greeting
       fish_vi_key_bindings
       functions -q prompt_newline; and prompt_newline >/dev/null
-      bind -M default y fish_clipboard_copy
-      bind -M default p fish_clipboard_paste
+      bind y fish_clipboard_copy
+      bind p fish_clipboard_paste
     '';
     plugins = [
       {
