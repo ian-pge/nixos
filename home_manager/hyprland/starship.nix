@@ -88,7 +88,7 @@
         read_only = " ";
         read_only_style = "fg:flamingo";
         format = "[$read_only]($read_only_style)[$path]($style)";
-        repo_root_format = "[$read_only]($read_only_style)[$before_root_path]($before_repo_root_style)[$repo_root]($repo_root_style)";
+        repo_root_format = "[$read_only]($read_only_style)[$before_root_path]($before_repo_root_style)[$repo_root]($repo_root_style)[$path]($repo_root_style)";
         before_repo_root_style = "fg:flamingo";
         repo_root_style = "fg:teal";
       };
