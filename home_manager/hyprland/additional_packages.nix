@@ -11,6 +11,7 @@
     catppuccin-cursors.macchiatoDark
     # nautilus
     nmap
+    wl-clipboard-rs
   ];
 
   services.swayosd.enable = true;
