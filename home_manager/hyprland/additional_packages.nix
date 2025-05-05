@@ -8,9 +8,9 @@
     nvtopPackages.full
     adwaita-icon-theme
     catppuccin-cursors.macchiatoDark
-    # nautilus
     nmap
     wl-clipboard-rs
+    xclip
   ];
 
   services.swayosd.enable = true;
