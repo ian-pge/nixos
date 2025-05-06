@@ -10,6 +10,7 @@
     catppuccin-cursors.macchiatoDark
     nmap
     wl-clipboard
+    ncdu
   ];
 
   services.swayosd.enable = true;

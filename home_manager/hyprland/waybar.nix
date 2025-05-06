@@ -116,7 +116,7 @@
           format-disabled = "󰤭 Off";
           format-disabled-if-down = true;
           tooltip-format = "{ifname} via {gwaddr}";
-          on-click = "ghostty -e nmcli";
+          on-click = "ghostty -e nmtui";
         };
 
         "custom/launcher" = {
@@ -148,19 +148,15 @@
         };
 
         upower = {
-          "icon-size" = 20;
           format = " {percentage}";
-          "hide-if-empty" = true;
           tooltip = true;
-          "tooltip-spacing" = 20;
-          "on-click" = "ghostty sudo powertop";
         };
 
         disk = {
           interval = 30;
           format = " {percentage_used}%";
           path = "/";
-          on-click = "ghostty -e sudo ncdu -x /";
+          on-click = "ghostty -e ncdu";
         };
       };
     };
