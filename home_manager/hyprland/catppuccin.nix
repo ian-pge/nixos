@@ -31,5 +31,9 @@
       flavor = "macchiato";
       accent = "sapphire";
     };
+    helix = {
+      enable = true;
+      flabor = "macchiato";
+    };
   };
 }
