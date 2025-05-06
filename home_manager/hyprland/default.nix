@@ -18,6 +18,6 @@
     ./xdg_termfilechooser.nix
     ./fuzzel.nix
     ./mako.nix
-    ./helix.nix
+    ./neovim.nix
   ];
 }

@@ -31,7 +31,7 @@
       flavor = "macchiato";
       accent = "sapphire";
     };
-    helix = {
+    neovim = {
       enable = true;
       flavor = "macchiato";
     };
