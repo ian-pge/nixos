@@ -31,7 +31,7 @@
       flavor = "macchiato";
       accent = "sapphire";
     };
-    neovim = {
+    nvim = {
       enable = true;
       flavor = "macchiato";
     };
