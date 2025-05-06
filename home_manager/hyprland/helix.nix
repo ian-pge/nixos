@@ -8,8 +8,6 @@
 
     ### Core editor settings -----------------------------------------------
     settings = {
-      theme = "onedark"; # pick any theme you like
-
       editor = {
         "color-modes" = true; # colour the mode indicator :contentReference[oaicite:0]{index=0}
 
