@@ -147,7 +147,6 @@
         "$mainMod SHIFT,J,movewindow,d"
         "$mainMod,SPACE,fullscreen,1"
         "$mainMod SHIFT,SPACE,fullscreen,0"
-        "$mainMod,C,exec,hyprlock"
         "$mainMod CONTROL,h,resizeactive,-50 0"
         "$mainMod CONTROL,j,resizeactive,0 50"
         "$mainMod CONTROL,k,resizeactive,0 -50"
@@ -175,6 +174,8 @@
         "$mainMod SHIFT,S,movetoworkspace,special:LLM"
         "$mainMod,D,togglespecialworkspace,Chat"
         "$mainMod SHIFT,D,movetoworkspace,special:Chat"
+        "$mainMod,C,togglespecialworkspace,Media"
+        "$mainMod SHIFT,C,movetoworkspace,special:Media"
         # mouse‑drag
         # "$mainMod,mouse:272,movewindow"
         # "$mainMod,mouse:273,resizewindow"
@@ -190,10 +191,9 @@
       windowrulev2 = [
         "workspace special:Chat,title:^(WhatsApp Web)$"
         "workspace special:Chat,title:^(Mattermost)$"
-        "workspace special:Chat,title:^(Spotify)$"
-        "workspace special:LLM,title:^(Perplexity)$"
+        "workspace special:Chat,title:^(Messenger)$"
+        "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
-        "tile,class:Google-chrome"
       ];
       layerrule = [
         "dimaround,launcher"
