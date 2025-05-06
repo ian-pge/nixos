@@ -241,19 +241,22 @@
       set -euo pipefail
       export NO_COLOR=1
 
-      # util%, temp °C, used MiB, total MiB – single line, no units
+      # util %, temp °C, used MiB, total MiB
       IFS=',' read -r util temp mem_used mem_total < <(
-        nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total \
+        nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total \
                    --format=csv,noheader,nounits 2>/dev/null | head -n1
       )
 
-      # integer VRAM %
-      vram_pct=$(echo "100*$mem_used/$mem_total" | bc)
+      # ──► VRAM % *rounded to nearest integer*
+      vram_pct=$(awk -v u="$mem_used" -v t="$mem_total" \
+                     'BEGIN { printf "%d", (u*100 + t/2)/t }')
 
-      mem_gib=$(echo "scale=1; $mem_used/1024" | bc -l)          # e.g. 4718 MiB → 4.7
-      tooltip=$(printf '%s GiB used' "$mem_gib" | jq -Rsa .)     # JSON‑escaped
+      # ──► used VRAM in GiB with one decimal
+      mem_gib=$(awk -v u="$mem_used" 'BEGIN { printf "%.1f", u/1024 }')
 
-      # single icon, text has two numbers
+      tooltip=$(printf '%s GiB used' "$mem_gib" | jq -Rsa .)
+
+      # fixed icon, two numbers separated by a space
       printf '{"text":"%s%% %s%%","alt":"gpu","tooltip":%s}\n' \
              "$util" "$vram_pct" "$tooltip"
     '')
