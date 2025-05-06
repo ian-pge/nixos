@@ -234,29 +234,30 @@
 
   home.packages = with pkgs; [
     jq # we’ll let jq escape & join lines for us
-    bc
 
     (writeShellScriptBin "waybar-gpu-nvidia" ''
       #!/usr/bin/env bash
       set -euo pipefail
       export NO_COLOR=1
 
-      # util %, temp °C, used MiB, total MiB
-      IFS=',' read -r util temp mem_used mem_total < <(
-        nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total \
-                   --format=csv,noheader,nounits 2>/dev/null | head -n1
-      )
+      # Try to read util%, temp °C, used MiB, total MiB
+      if ! IFS=',' read -r util temp mem_used mem_total < <(
+             nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total \
+                        --format=csv,noheader,nounits 2>/dev/null | head -n1
+           ) || [ -z "$mem_total" ] || [ "$mem_total" -eq 0 ]; then
+        printf '{"text":"0%% 0%%","alt":"gpu-off","tooltip":"\"GPU offline\""}\n'
+        exit 0
+      fi
 
-      # ──► VRAM % *rounded to nearest integer*
+      # VRAM % rounded
       vram_pct=$(awk -v u="$mem_used" -v t="$mem_total" \
                      'BEGIN { printf "%d", (u*100 + t/2)/t }')
 
-      # ──► used VRAM in GiB with one decimal
+      # used VRAM GiB with one decimal
       mem_gib=$(awk -v u="$mem_used" 'BEGIN { printf "%.1f", u/1024 }')
 
       tooltip=$(printf '%s GiB used' "$mem_gib" | jq -Rsa .)
 
-      # fixed icon, two numbers separated by a space
       printf '{"text":"%s%% %s%%","alt":"gpu","tooltip":%s}\n' \
              "$util" "$vram_pct" "$tooltip"
     '')
