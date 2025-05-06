@@ -33,7 +33,7 @@
     };
     helix = {
       enable = true;
-      flabor = "macchiato";
+      flavor = "macchiato";
     };
   };
 }
