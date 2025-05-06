@@ -19,6 +19,7 @@
     neofetch
     obsidian
     freecad-wayland
+    firefox
   ];
 
   programs = {
