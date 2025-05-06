@@ -17,5 +17,6 @@
     ./catppuccin.nix
     ./xdg_termfilechooser.nix
     ./nautilus.nix
+    ./upower.nix
   ];
 }

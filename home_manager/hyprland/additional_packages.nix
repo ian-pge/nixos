@@ -10,7 +10,6 @@
     catppuccin-cursors.macchiatoDark
     nmap
     wl-clipboard
-    upower
   ];
 
   services.swayosd.enable = true;
