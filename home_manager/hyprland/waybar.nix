@@ -3,19 +3,22 @@
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       set -euo pipefail
+      export NO_COLOR=1                 # many tools honour this :contentReference[oaicite:4]{index=4}
 
       flake_dir="/etc/nixos"
       scratch="$(mktemp -d)"
       trap 'rm -rf "$scratch"' EXIT
 
-      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
+      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null 2>&1
       cd "$scratch"
 
-      nix flake lock --update-input nixpkgs >/dev/null
-      nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
-                --no-link --out-link result-new >/dev/null
+      # use the new syntax; send *all* noise to /dev/null
+      nix flake update --update-input nixpkgs >/dev/null 2>&1
 
-      updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U')
+      nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
+                --no-link --out-link result-new >/dev/null 2>&1
+
+      updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)
 
       if [ "$updates" -eq 0 ]; then
         printf '{"text":"0","alt":"updated","tooltip":"System up‑to‑date"}\n'
@@ -25,14 +28,12 @@
       tooltip=$(nvd diff /run/current-system ./result-new \
                  | grep '\[U' \
                  | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
-                 | tr '\n' '\\n')
+                 | sed 's/"/\\"/g' \
+                 | tr "\n" "\\n")
 
       printf '{"text":"%s","alt":"has-updates","tooltip":"%s"}\n' \
              "$updates" "$tooltip"
     '')
-    nvd # diff two closures ➜ shows upgraded pkgs :contentReference[oaicite:3]{index=3}
-    nh # nicer rebuild CLI that Waybar can call  :contentReference[oaicite:4]{index=4}
-    rsync
   ];
 
   programs.waybar = {
