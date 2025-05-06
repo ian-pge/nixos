@@ -23,4 +23,6 @@
   programs.htop.enable = true;
   programs.obs-studio.enable = true;
   programs.bat.enable = true;
+  programs.fd.enable = true;
+  programs.fzf.enable = true;
 }
