@@ -1,9 +1,13 @@
 {pkgs, ...}: {
   home.packages = with pkgs; [
+    jq # we’ll let jq escape & join lines for us
+    nvd # diff helper  :contentReference[oaicite:3]{index=3}
+    nh # for the on‑click rebuild
+    rsync
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       set -euo pipefail
-      export NO_COLOR=1                 # many tools honour this :contentReference[oaicite:4]{index=4}
+      export NO_COLOR=1                     # strip ANSI codes  :contentReference[oaicite:4]{index=4}
 
       flake_dir="/etc/nixos"
       scratch="$(mktemp -d)"
@@ -12,8 +16,8 @@
       rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null 2>&1
       cd "$scratch"
 
-      # use the new syntax; send *all* noise to /dev/null
-      nix flake update --update-input nixpkgs >/dev/null 2>&1
+      # modern command; send **all** noise to /dev/null
+      nix flake update --update-input nixpkgs >/dev/null 2>&1   # :contentReference[oaicite:5]{index=5}
 
       nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
                 --no-link --out-link result-new >/dev/null 2>&1
@@ -25,13 +29,14 @@
         exit 0
       fi
 
+      # Build tooltip, let jq handle escaping *and* newline → \n conversion
       tooltip=$(nvd diff /run/current-system ./result-new \
                  | grep '\[U' \
                  | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
-                 | sed 's/"/\\"/g' \
-                 | tr "\n" "\\n")
+                 | jq -Rsa .)                 # gives a JSON string literal
 
-      printf '{"text":"%s","alt":"has-updates","tooltip":"%s"}\n' \
+      # tooltip already has quotes; don’t wrap again
+      printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' \
              "$updates" "$tooltip"
     '')
   ];
