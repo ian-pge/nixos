@@ -11,6 +11,7 @@
     nmap
     wl-clipboard
     ncdu
+    solaar
   ];
 
   services.swayosd.enable = true;
