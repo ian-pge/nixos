@@ -14,7 +14,7 @@
           select = "underline";
         };
       };
-      keymaps = {
+      keys = {
         normal = {
           # Quick iteration
           "C-o" = ":config-open";
