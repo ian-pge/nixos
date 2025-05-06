@@ -5,32 +5,34 @@
       set -euo pipefail
 
       flake_dir="/etc/nixos"
-      host="$(hostname)"
       scratch="$(mktemp -d)"
       trap 'rm -rf "$scratch"' EXIT
 
-      rsync -a --exclude='.git' "${flake_dir}/" "$scratch" >/dev/null
+      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
       cd "$scratch"
 
       nix flake lock --update-input nixpkgs >/dev/null
-      nix build ".#nixosConfigurations.${host}.config.system.build.toplevel" \
+      nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
                 --no-link --out-link result-new >/dev/null
 
       updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U')
 
-      if [[ $updates -eq 0 ]]; then
-        printf '{ "text":"0", "alt":"updated", "tooltip":"System up‑to‑date" }\n'
+      if [ "$updates" -eq 0 ]; then
+        printf '{"text":"0","alt":"updated","tooltip":"System up‑to‑date"}\n'
         exit 0
       fi
 
       tooltip=$(nvd diff /run/current-system ./result-new \
-                | grep '\[U' \
-                | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
-                | tr '\n' '\\n')
+                 | grep '\[U' \
+                 | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
+                 | tr '\n' '\\n')
 
-      printf '{ "text":"%s", "alt":"has-updates", "tooltip":"%s" }\n' \
+      printf '{"text":"%s","alt":"has-updates","tooltip":"%s"}\n' \
              "$updates" "$tooltip"
     '')
+    nvd # diff two closures ➜ shows upgraded pkgs :contentReference[oaicite:3]{index=3}
+    nh # nicer rebuild CLI that Waybar can call  :contentReference[oaicite:4]{index=4}
+    rsync
   ];
 
   programs.waybar = {
