@@ -1,4 +1,38 @@
-{
+{pkgs, ...}: {
+  home.packages = with pkgs; [
+    (writeShellScriptBin "waybar-update-checker" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      flake_dir="/etc/nixos"
+      host="$(hostname)"
+      scratch="$(mktemp -d)"
+      trap 'rm -rf "$scratch"' EXIT
+
+      rsync -a --exclude='.git' "${flake_dir}/" "$scratch" >/dev/null
+      cd "$scratch"
+
+      nix flake lock --update-input nixpkgs >/dev/null
+      nix build ".#nixosConfigurations.${host}.config.system.build.toplevel" \
+                --no-link --out-link result-new >/dev/null
+
+      updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U')
+
+      if [[ $updates -eq 0 ]]; then
+        printf '{ "text":"0", "alt":"updated", "tooltip":"System up‑to‑date" }\n'
+        exit 0
+      fi
+
+      tooltip=$(nvd diff /run/current-system ./result-new \
+                | grep '\[U' \
+                | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
+                | tr '\n' '\\n')
+
+      printf '{ "text":"%s", "alt":"has-updates", "tooltip":"%s" }\n' \
+             "$updates" "$tooltip"
+    '')
+  ];
+
   programs.waybar = {
     enable = true;
     systemd.enable = true;
@@ -125,8 +159,7 @@
         };
 
         "custom/nixos" = {
-          "exec" = "$HOME/bin/update-checker";
-          "on-click" = "$HOME/bin/update-checker && notify-send 'The system has been updated'";
+          "exec" = "waybar-update-checker";
           "interval" = 3600;
           "tooltip" = true;
           "return-type" = "json";
