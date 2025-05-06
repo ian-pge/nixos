@@ -248,7 +248,7 @@
       )
 
       # integer VRAM %
-      vram_pct=$(echo "100*${mem_used}/${mem_total}" | bc)
+      vram_pct=$(echo "100*$mem_used/$mem_total" | bc)
 
       # build tooltip (core %, vram %, temp)
       tooltip=$(printf 'GPU %s%%  •  VRAM %s%%  •  %s °C' "$util" "$vram_pct" "$temp" \
