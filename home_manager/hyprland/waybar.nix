@@ -248,13 +248,13 @@
       )
 
       # integer VRAM %
-      vram_pct=$(echo "100*$mem_used $mem_total" | bc)
+      vram_pct=$(echo "100*$mem_used/$mem_total" | bc)
 
       mem_gib=$(echo "scale=1; $mem_used/1024" | bc -l)          # e.g. 4718 MiB → 4.7
       tooltip=$(printf '%s GiB used' "$mem_gib" | jq -Rsa .)     # JSON‑escaped
 
       # single icon, text has two numbers
-      printf '{"text":"%s%%/%s%%","alt":"gpu","tooltip":%s}\n' \
+      printf '{"text":"%s%% %s%%","alt":"gpu","tooltip":%s}\n' \
              "$util" "$vram_pct" "$tooltip"
     '')
 
