@@ -7,20 +7,20 @@
     settings = {
       mainBar = {
         layer = "top";
-        "output" = "eDP-1";
+        output = "eDP-1";
 
-        "modules-left" = [
+        modules-left = [
           "custom/launcher"
           "disk"
           "cpu"
-          "memory"
           "custom/gpu"
+          "memory"
           "custom/nixos"
         ];
 
-        "modules-center" = ["hyprland/workspaces"];
+        modules-center = ["hyprland/workspaces"];
 
-        "modules-right" = [
+        modules-right = [
           "bluetooth"
           "network"
           "upower"
@@ -32,12 +32,12 @@
 
         ## ───── Hyprland workspaces ─────
         "hyprland/workspaces" = {
-          "active-only" = false;
-          "all-outputs" = true;
-          "show-special" = true;
-          "special-visible-only" = true;
+          active-only = false;
+          all-outputs = true;
+          show-special = true;
+          special-visible-only = true;
           format = "{icon}";
-          "format-icons" = {
+          format-icons = {
             "1" = "1";
             "2" = "2";
             "3" = "3";
@@ -66,13 +66,13 @@
         cpu = {
           interval = 5;
           format = " {usage}%";
-          "on-click" = "ghostty htop";
+          on-click = "ghostty -e htop";
         };
 
         memory = {
           interval = 5;
           format = "  {}%";
-          "on-click" = "ghostty htop";
+          "on-click" = "ghostty -e htop";
         };
 
         "custom/gpu" = {
@@ -80,8 +80,8 @@
           interval = 5;
           format = "  {text}";
           tooltip = true;
-          "return-type" = "json";
-          "on-click" = "ghostty nvtop";
+          return-type = "json";
+          on-click = "ghostty -e nvtop";
         };
 
         backlight = {
@@ -103,35 +103,35 @@
 
         pulseaudio = {
           format = "{icon} {volume}%";
-          "format-muted" = "󰖁";
-          "format-icons".default = ["󰕿" "󰖀" "󰕾"];
-          "on-click" = "ghostty pulsemixer";
+          format-muted = "󰖁";
+          format-icons.default = ["󰕿" "󰖀" "󰕾"];
+          tooltip = false;
         };
 
         network = {
-          "format-wifi" = "{icon} {essid}";
-          "format-icons" = ["󰤟" "󰤢" "󰤥" "󰤨"];
-          "format-ethernet" = "󰈀 {ifname}";
-          "format-disconnected" = "󰤭 Disconnected";
-          "format-disabled" = "󰤭 Off";
-          "format-disabled-if-down" = true;
+          format-wifi = "{icon} {essid}";
+          format-icons = ["󰤟" "󰤢" "󰤥" "󰤨"];
+          format-ethernet = "󰈀 {ifname}";
+          format-disconnected = "󰤭 Disconnected";
+          format-disabled = "󰤭 Off";
+          format-disabled-if-down = true;
           tooltip-format = "{ifname} via {gwaddr}";
-          "on-click" = "ghostty impala";
+          on-click = "ghostty -e nmcli";
         };
 
         "custom/launcher" = {
           format = "";
-          "on-click" = "pgrep -x rofi >/dev/null 2>&1 || .config/rofi/launchers/type-4/launcher.sh";
+          on-click = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
           tooltip = false;
         };
 
         "custom/nixos" = {
-          "exec" = "waybar-update-checker";
-          "interval" = 3600;
-          "tooltip" = true;
-          "return-type" = "json";
-          "format" = "{icon} {}";
-          "format-icons" = {
+          exec = "waybar-update-checker";
+          interval = 3600;
+          tooltip = true;
+          return-type = "json";
+          format = "{icon} {}";
+          format-icons = {
             "has-updates" = "";
             "updated" = "";
           };
@@ -139,12 +139,12 @@
 
         bluetooth = {
           format = "󰂲 Disconnected";
-          "format-connected" = "󰂯 {device_alias}";
+          format-connected = "󰂯 {device_alias}";
           tooltip-format = "{controller_alias}\t{controller_address}";
-          "tooltip-format-connected" = "{controller_alias}\t{controller_address}\n\n{device_enumerate}";
-          "tooltip-format-enumerate-connected" = "{device_alias}\t{device_address}";
-          "format-off" = "󰂲 Off";
-          "on-click" = "ghostty bluetui";
+          tooltip-format-connected = "{controller_alias}\t{controller_address}\n\n{device_enumerate}";
+          tooltip-format-enumerate-connected = "{device_alias}\t{device_address}";
+          format-off = "󰂲 Off";
+          on-click = "ghostty -e bluetui";
         };
 
         upower = {
@@ -160,7 +160,7 @@
           interval = 30;
           format = " {percentage_used}%";
           path = "/";
-          "on-click" = "ghostty sudo ncdu -x /";
+          on-click = "ghostty -e sudo ncdu -x /";
         };
       };
     };
