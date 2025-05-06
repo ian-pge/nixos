@@ -18,8 +18,11 @@
     zotero
     neofetch
     obsidian
-    lazydocker
-    lazygit
     freecad-wayland
   ];
+
+  programs = {
+    lazydocker.enable = true;
+    lazygit.enable = true;
+  };
 }
