@@ -213,8 +213,8 @@
       }
 
       #cpu            { color: @pink;      }
-      #memory         { color: @green;     }
-      #custom-gpu     { color: @mauve;     }
+      #memory         { color: @mauve;     }
+      #custom-gpu     { color: @green;     }
       #backlight      { color: @yellow;    }
       #network        { color: @maroon;    }
       #pulseaudio     { color: @lavender;  }

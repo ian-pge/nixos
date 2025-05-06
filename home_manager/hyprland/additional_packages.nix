@@ -23,4 +23,5 @@
   programs.htop.enable = true;
   programs.obs-studio.enable = true;
   programs.bat.enable = true;
+  services.upower.enable = true;
 }
