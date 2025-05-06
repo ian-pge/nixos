@@ -76,10 +76,11 @@
         };
 
         "custom/gpu" = {
-          format = "{icon} {0}";
-          exec = "gpu-usage-waybar";
+          exec = "waybar-gpu-nvidia";
+          interval = 5;
+          format = "  {text}";
+          tooltip = true;
           "return-type" = "json";
-          "format-icons" = "";
           "on-click" = "ghostty nvtop";
         };
 
@@ -233,13 +234,35 @@
 
   home.packages = with pkgs; [
     jq # we’ll let jq escape & join lines for us
-    nvd # diff helper  :contentReference[oaicite:3]{index=3}
-    nh # for the on‑click rebuild
-    rsync
+    bc
+
+    (writeShellScriptBin "waybar-gpu-nvidia" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export NO_COLOR=1
+
+      # util%, temp °C, used MiB, total MiB – single line, no units
+      IFS=',' read -r util temp mem_used mem_total < <(
+        nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total \
+                   --format=csv,noheader,nounits 2>/dev/null | head -n1
+      )
+
+      # integer VRAM %
+      vram_pct=$(echo "100*${mem_used}/${mem_total}" | bc)
+
+      # build tooltip (core %, vram %, temp)
+      tooltip=$(printf 'GPU %s%%  •  VRAM %s%%  •  %s °C' "$util" "$vram_pct" "$temp" \
+                | jq -Rsa .)
+
+      # single icon, text has two numbers
+      printf '{"text":"%s%%/%s%%","alt":"gpu","tooltip":%s}\n' \
+             "$util" "$vram_pct" "$tooltip"
+    '')
+
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       set -euo pipefail
-      export NO_COLOR=1                     # strip ANSI codes  :contentReference[oaicite:4]{index=4}
+      export NO_COLOR=1
 
       flake_dir="/etc/nixos"
       scratch="$(mktemp -d)"
@@ -249,7 +272,7 @@
       cd "$scratch"
 
       # modern command; send **all** noise to /dev/null
-      nix flake update --update-input nixpkgs >/dev/null 2>&1   # :contentReference[oaicite:5]{index=5}
+      nix flake update --update-input nixpkgs >/dev/null 2>&1
 
       nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
                 --no-link --out-link result-new >/dev/null 2>&1
