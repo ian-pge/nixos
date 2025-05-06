@@ -24,7 +24,7 @@
           "bluetooth"
           "network"
           "upower"
-          "pulseaudio"
+          "wireplumber"
           "backlight"
           "clock#second"
           "clock"
@@ -88,11 +88,10 @@
           tooltip = false;
         };
 
-        pulseaudio = {
+        wireplumber = {
           format = "{icon} {volume}%";
           format-muted = "󰖁";
           format-icons.default = ["󰕿" "󰖀" "󰕾"];
-          tooltip = false;
         };
 
         network = {
@@ -186,7 +185,7 @@
       }
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,
-      #pulseaudio, #network, #bluetooth, #custom-nixos,
+      #pipewire, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher {
           background-color: @crust;
           border-radius: 10px;
@@ -200,7 +199,7 @@
       #custom-gpu     { color: @green;     }
       #backlight      { color: @yellow;    }
       #network        { color: @maroon;    }
-      #pulseaudio     { color: @lavender;  }
+      #pipewire     { color: @lavender;  }
       #clock          { color: @red;       }
       #clock.second   { color: @teal;      }
       #custom-launcher{ color: @sapphire;  }
