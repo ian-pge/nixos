@@ -89,8 +89,9 @@
         };
 
         wireplumber = {
-          format = "{volume}%";
+          format = "{icon} {volume}%";
           format-muted = "󰖁";
+          format-icons = ["󰕿" "󰖀" "󰕾"];
         };
 
         network = {
