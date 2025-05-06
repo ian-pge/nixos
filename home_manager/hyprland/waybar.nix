@@ -247,37 +247,18 @@
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       set -euo pipefail
-      export NO_COLOR=1
 
-      flake_dir="/etc/nixos"
-      scratch="$(mktemp -d)"
-      trap 'rm -rf "$scratch"' EXIT
+      cur=/run/current-system
+      next_drv=$(nix eval --raw ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
 
-      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null 2>&1
-      cd "$scratch"
-
-      # modern command; send **all** noise to /dev/null
-      nix flake update --update-input nixpkgs >/dev/null 2>&1
-
-      nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
-                --no-link --out-link result-new >/dev/null 2>&1
-
-      updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)
-
-      if [ "$updates" -eq 0 ]; then
-        printf '{"text":"0","alt":"updated","tooltip":"System up‑to‑date"}\n'
+      if [ "$next_drv" = "$(nix show-derivation $cur | jq -r 'keys[0]')" ]; then
+        printf '{"text":"0","tooltip":"System up‑to‑date"}\n'
         exit 0
       fi
 
-      # Build tooltip, let jq handle escaping *and* newline → \n conversion
-      tooltip=$(nvd diff /run/current-system ./result-new \
-                 | grep '\[U' \
-                 | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
-                 | jq -Rsa .)                 # gives a JSON string literal
-
-      # tooltip already has quotes; don’t wrap again
-      printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' \
-             "$updates" "$tooltip"
+      changes=$(nix run nixpkgs#nix-diff -- --brief "$cur" "$next_drv" | wc -l)
+      printf '{"text":"%s","alt":"has-updates","tooltip":"%s packages would change"}\n' \
+             "$changes" "$changes"
     '')
   ];
 }
