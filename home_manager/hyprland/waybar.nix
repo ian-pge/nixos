@@ -185,7 +185,7 @@
       }
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,
-      #pipewire, #network, #bluetooth, #custom-nixos,
+      #wireplumber, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher {
           background-color: @crust;
           border-radius: 10px;
@@ -199,7 +199,7 @@
       #custom-gpu     { color: @green;     }
       #backlight      { color: @yellow;    }
       #network        { color: @maroon;    }
-      #pipewire     { color: @lavender;  }
+      #wireplumber     { color: @lavender;  }
       #clock          { color: @red;       }
       #clock.second   { color: @teal;      }
       #custom-launcher{ color: @sapphire;  }
