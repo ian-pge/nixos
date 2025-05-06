@@ -36,19 +36,6 @@
           all-outputs = true;
           show-special = true;
           special-visible-only = true;
-          format = "{icon}";
-          format-icons = {
-            "1" = "1";
-            "2" = "2";
-            "3" = "3";
-            "4" = "4";
-            "5" = "5";
-            "6" = "6";
-            "7" = "7";
-            "8" = "8";
-            "special:llm" = "S1";
-            "special:multimedia" = "S2";
-          };
         };
 
         ## ───── Clocks ─────
