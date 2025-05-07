@@ -1,7 +1,7 @@
 {pkgs, ...}: {
   programs.waybar = {
     enable = true;
-    systemd.enable = true;
+    systemd.enable = false;
 
     ## Main bar configuration ─ straight conversion of your JSON
     settings = {
@@ -214,6 +214,7 @@
     '';
   };
 
+  # home.sessionVariables.LD_LIBRARY_PATH = "/run/opengl-driver/lib";
   home.packages = with pkgs; [
     /*
     ── gpu‑usage‑waybar built on‑the‑fly ─────────────
