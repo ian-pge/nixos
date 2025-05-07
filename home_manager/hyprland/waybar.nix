@@ -225,11 +225,11 @@
       src = fetchCrate {
         # pulls the exact crate published to crates.io
         inherit pname version;
-        sha256 = "sha256-FIXME-1"; # first run with lib.fakeSha256, copy real hash
+        hash = "sha256-FIXME-1"; # first run with lib.fakeSha256, copy real hash
       };
 
       # Cargo.lock lives in the repo, so just grab the hashes once:
-      cargoSha256 = "sha256-FIXME-2";
+      cargoHash = "sha256-FIXME-2";
       doCheck = false; # upstream has no tests yet :contentReference[oaicite:1]{index=1}
     })
   ];
