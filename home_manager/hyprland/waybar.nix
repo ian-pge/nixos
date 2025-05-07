@@ -63,8 +63,6 @@
         };
 
         "custom/gpu" = {
-          # format = "";
-          # exec = "/home/ian/.nix-profile/bin/gpu-usage-waybar";
           exec = "gpu-usage-waybar";
           format = "{icon} {}";
           format-icons = "";
@@ -215,21 +213,21 @@
       #workspaces button.active{ color: #33ccff; }
     '';
   };
-  systemd.user.sessionVariables = {
-    LD_LIBRARY_PATH = "/run/opengl-driver/lib";
-  };
+  # systemd.user.sessionVariables = {
+  #   LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+  # };
 
-  systemd.user.services.waybar.environment = {
-    LD_LIBRARY_PATH = "/run/opengl-driver/lib";
-  };
+  # systemd.user.services.waybar.environment = {
+  #   LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+  # };
 
-  home.sessionVariables.LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+  # home.sessionVariables.LD_LIBRARY_PATH = "/run/opengl-driver/lib";
   home.packages = with pkgs; [
     /*
     ── gpu‑usage‑waybar built on‑the‑fly ─────────────
     */
     (rustPlatform.buildRustPackage {
-      pname = "gpu-usage-waybar";
+      pname = "env LD_LIBRARY_PATH='/run/opengl-driver/lib' gpu-usage-waybar";
       version = "0.1.23"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
 
       src = fetchFromGitHub {
