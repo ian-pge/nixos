@@ -63,11 +63,10 @@
         };
 
         "custom/gpu" = {
-          exec = "env LD_LIBRARY_PATH=/run/opengl-driver/lib gpu-usage-waybar";
+          exec = "gpu-usage-waybar";
           interval = 1;
           format = "{icon} {}";
           format-icons = "";
-          tooltip = true;
           return-type = "json";
           on-click = "ghostty -e nvtop";
         };
@@ -215,7 +214,7 @@
     '';
   };
 
-  # home.sessionVariables.LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+  home.sessionVariables.LD_LIBRARY_PATH = "/run/opengl-driver/lib";
   home.packages = with pkgs; [
     /*
     ── gpu‑usage‑waybar built on‑the‑fly ─────────────
