@@ -64,7 +64,7 @@
 
         "custom/gpu" = {
           # format = "";
-          exec = "gpu-usage-waybar";
+          exec = "/home/ian/.nix-profile/bin/gpu-usage-waybar";
           format = "{}";
           # format-icons = "";
           return-type = "json";
