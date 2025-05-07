@@ -63,13 +63,13 @@
         };
 
         "custom/gpu" = {
-          format = "";
-          # exec = "echo";
-          # interval = 1;
-          # format = "{} {icon}";
-          # format-icons = "";
-          # return-type = "json";
-          # on-click = "ghostty -e nvtop";
+          # format = "";
+          exec = "echo";
+          interval = 1;
+          format = "{} {icon}";
+          format-icons = "";
+          return-type = "json";
+          on-click = "ghostty -e nvtop";
         };
 
         backlight = {
