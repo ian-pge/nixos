@@ -51,21 +51,21 @@
 
         ## ───── System modules ─────
         cpu = {
-          interval = 5;
+          interval = 1;
           format = " {usage}%";
           on-click = "ghostty -e htop";
         };
 
         memory = {
-          interval = 5;
+          interval = 1;
           format = "  {}%";
           "on-click" = "ghostty -e htop";
         };
 
         "custom/gpu" = {
-          exec = "waybar-gpu-nvidia";
-          interval = 5;
-          format = "  {text}";
+          exec = "gpu-usage-waybar";
+          interval = 1;
+          format = "  {}";
           tooltip = true;
           return-type = "json";
           on-click = "ghostty -e nvtop";
