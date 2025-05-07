@@ -227,11 +227,11 @@
         owner = "PolpOnline";
         repo = "gpu-usage-waybar";
         rev = "0.1.23";
-        hash = ""; # first run with lib.fakeSha256, copy real hash
+        hash = lib.fakeSha256; # first run with lib.fakeSha256, copy real hash
       };
 
       # Cargo.lock lives in the repo, so just grab the hashes once:
-      cargoHash = "";
+      cargoHash = lib.fakeSha256;
       doCheck = false; # upstream has no tests yet :contentReference[oaicite:1]{index=1}
     })
   ];
