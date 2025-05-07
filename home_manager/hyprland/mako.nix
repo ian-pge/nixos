@@ -5,14 +5,14 @@
     settings = {
       # Styling and behavior settings
       font = "Ubuntu Nerd Font 15";
-      backgroundColor = "#181926";
-      textColor = "#eed49f";
-      borderColor = "#ffcc33";
-      borderRadius = 10;
-      borderSize = 3;
+      background-color = "#181926";
+      text-color = "#eed49f";
+      border-color = "#ffcc33";
+      border-radius = 10;
+      border-size = 3;
 
-      defaultTimeout = 10000;
-      ignoreTimeout = true;
+      default-timeout = 10000;
+      ignore-timeout = true;
 
       output = "eDP-1";
 
