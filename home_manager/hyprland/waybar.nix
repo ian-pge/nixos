@@ -219,6 +219,10 @@
     LD_LIBRARY_PATH = "/run/opengl-driver/lib";
   };
 
+  systemd.user.services.waybar.environment = {
+    LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+  };
+
   home.sessionVariables.LD_LIBRARY_PATH = "/run/opengl-driver/lib";
   home.packages = with pkgs; [
     /*
