@@ -246,21 +246,45 @@
 
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
+      #
+      # Waybar module that prints the number of packages that would change
+      # after `nix flake update` **without building or downloading anything**.
+      # Requires: nix ≥ 2.20, nix-diff, jq, rsync.
+      #
       set -euo pipefail
+      export NO_COLOR=1                # keep `nix-diff` output monochrome
 
-      export NO_COLOR=1
+      flake_dir="/etc/nixos"           # path to your system flake
 
-      cur=/etc/nixos
-      next_drv=$(nix eval --raw ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
+      # --- work in a throw‑away copy so we never mutate the real repo ----------
+      scratch="$(mktemp -d)"
+      trap 'rm -rf "$scratch"' EXIT
+      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
+      cd "$scratch"
 
-      if [ "$next_drv" = "$(nix show-derivation $cur | jq -r 'keys[0]')" ]; then
-        printf '{"text":"0","tooltip":"System up‑to‑date"}\n'
-        exit 0
+      # --- pull latest nixpkgs (or any other input you like) -------------------
+      nix flake update --update-input nixpkgs "$flake_dir" >/dev/null
+
+      # --- get the next system *derivation* – pure evaluation, zero builds -----
+      next_drv=$(nix eval --raw \
+          "$flake_dir#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
+
+      # If it’s identical to the running system, we’re done fast
+      if [ "$next_drv" = "$(nix show-derivation /run/current-system | jq -r 'keys[0]')" ]; then
+          printf '{"text":"0","alt":"updated","tooltip":"System up‑to‑date"}\n'
+          exit 0
       fi
 
-      changes=$(nix run nixpkgs#nix-diff -- --brief "$cur" "$next_drv" | wc -l)
-      printf '{"text":"%s","alt":"has-updates","tooltip":"%s packages would change"}\n' \
-             "$changes" "$changes"
+      # --- count changes at derivation level -----------------------------------
+      changes=$(nix run nixpkgs#nix-diff -- --brief /run/current-system "$next_drv" \
+                  | wc -l)
+
+      # Build a tooltip (pretty list of what will change)
+      tooltip=$(nix run nixpkgs#nix-diff -- /run/current-system "$next_drv" \
+                  | jq -Rsa .)
+
+      printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' \
+              "$changes" "$tooltip"
     '')
   ];
 }
