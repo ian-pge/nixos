@@ -63,7 +63,7 @@
         };
 
         "custom/gpu" = {
-          exec = "gpu-usage-waybar";
+          exec = "echo";
           interval = 1;
           format = "{} {icon}";
           format-icons = "";
