@@ -248,7 +248,9 @@
       #!/usr/bin/env bash
       set -euo pipefail
 
-      cur=/run/current-system
+      export NO_COLOR=1
+
+      cur=/etc/nixos
       next_drv=$(nix eval --raw ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
 
       if [ "$next_drv" = "$(nix show-derivation $cur | jq -r 'keys[0]')" ]; then
