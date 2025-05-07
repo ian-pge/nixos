@@ -1,7 +1,7 @@
 {pkgs, ...}: {
   programs.waybar = {
     enable = true;
-    systemd.enable = false;
+    systemd.enable = true;
 
     ## Main bar configuration ─ straight conversion of your JSON
     settings = {
@@ -63,7 +63,7 @@
         };
 
         "custom/gpu" = {
-          exec = "gpu-usage-waybar";
+          exec = "env LD_LIBRARY_PATH=/run/opengl-driver/lib gpu-usage-waybar";
           interval = 1;
           format = "  {}";
           tooltip = true;
