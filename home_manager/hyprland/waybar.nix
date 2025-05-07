@@ -65,7 +65,7 @@
         "custom/gpu" = {
           exec = "gpu-usage-waybar";
           interval = 1;
-          format = "{icon} {}";
+          format = "{} {icon}";
           format-icons = "";
           return-type = "json";
           on-click = "ghostty -e nvtop";
@@ -212,6 +212,9 @@
       #workspaces button:hover { background: none; }
       #workspaces button.active{ color: #33ccff; }
     '';
+  };
+  systemd.user.sessionVariables = {
+    LD_LIBRARY_PATH = "/run/opengl-driver/lib";
   };
 
   home.sessionVariables.LD_LIBRARY_PATH = "/run/opengl-driver/lib";
