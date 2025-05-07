@@ -64,7 +64,6 @@
 
         "custom/gpu" = {
           # format = "";
-          exec = "echo";
           interval = 1;
           format = "{} {icon}";
           format-icons = "";
