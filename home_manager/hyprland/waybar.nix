@@ -65,7 +65,8 @@
         "custom/gpu" = {
           exec = "env LD_LIBRARY_PATH=/run/opengl-driver/lib gpu-usage-waybar";
           interval = 1;
-          format = "  {}";
+          format = "{icon} {}";
+          format-icons = "";
           tooltip = true;
           return-type = "json";
           on-click = "ghostty -e nvtop";
