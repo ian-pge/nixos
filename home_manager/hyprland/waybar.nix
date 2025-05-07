@@ -63,7 +63,7 @@
         };
 
         "custom/gpu" = {
-          exec = "gpu-usage-waybar";
+          exec = "env LD_LIBRARY_PATH='/run/opengl-driver/lib' gpu-usage-waybar";
           format = "{icon} {}";
           format-icons = "";
           return-type = "json";
