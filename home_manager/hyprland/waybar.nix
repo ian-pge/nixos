@@ -111,16 +111,16 @@
         };
 
         "custom/nixos" = {
-          format = "";
-          # exec = "waybar-update-checker";
-          # interval = 3600;
-          # tooltip = true;
-          # return-type = "json";
-          # format = "{icon}{}";
-          # format-icons = {
-          #   "has-updates" = "";
-          #   "updated" = "";
-          # };
+          # format = "";
+          exec = "waybar-update-checker";
+          interval = 3600;
+          tooltip = true;
+          return-type = "json";
+          format = "{icon} {}";
+          format-icons = {
+            "has-updates" = "";
+            "updated" = "";
+          };
         };
 
         bluetooth = {
@@ -234,5 +234,41 @@
       cargoHash = "sha256-X3Ak0K1kt7++tE7qZgy8GaRzqemUNTJ3z1yGBJZyA4s=";
       doCheck = false; # upstream has no tests yet :contentReference[oaicite:1]{index=1}
     })
+
+    (writeShellScriptBin "waybar-update-checker" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export NO_COLOR=1
+
+      flake_dir="/etc/nixos"
+      scratch="$(mktemp -d)"
+      trap 'rm -rf "$scratch"' EXIT
+
+      # copy in your flake, without .git
+      rsync -a --exclude='.git' "$flake_dir/" "$scratch"/ >/dev/null 2>&1
+      cd "$scratch"
+
+      # update only nixpkgs in flake.lock (fast)
+      nix flake lock --update-input nixpkgs >/dev/null 2>&1
+
+      # run a dry-run plan of your system; capture output
+      plan_output="$(nix build --dry-run .#nixosConfigurations.$HOSTNAME.config.system.build.toplevel 2>&1)"
+
+      # count how many derivations would be built
+      updates=$(printf '%s\n' "$plan_output" | grep -c '^these [0-9]\+ derivations will be built')
+
+      # if none, report “up-to-date”
+      if [ "$updates" -eq 0 ]; then
+        printf '{"text":"0","alt":"updated","tooltip":"System up-to-date"}\n'
+        exit 0
+      fi
+
+      # otherwise extract the list of derivation names for tooltip
+      tooltip=$(printf '%s\n' "$plan_output" \
+                  | sed -n 's/^these [0-9]\+ derivations will be built: //p' \
+                  | jq -Rsa .)
+
+      printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' "$updates" "$tooltip"
+    '')
   ];
 }
