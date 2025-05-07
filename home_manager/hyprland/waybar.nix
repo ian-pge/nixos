@@ -13,7 +13,7 @@
           "custom/launcher"
           "disk"
           "cpu"
-          "custom/gpu"
+          "custom/gpu-usage"
           "memory"
           "custom/nixos"
         ];
@@ -62,7 +62,7 @@
           on-click = "ghostty -e htop";
         };
 
-        "custom/gpu" = {
+        "custom/gpu-usage" = {
           # format = "";
           exec = "gpu-usage-waybar";
           interval = 1;
@@ -186,7 +186,7 @@
           background: none;
       }
 
-      #clock, #cpu, #memory, #backlight, #custom-gpu,
+      #clock, #cpu, #memory, #backlight, #custom-gpu-usage,
       #wireplumber, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher {
           background-color: @crust;
@@ -198,7 +198,7 @@
 
       #cpu            { color: @pink;      }
       #memory         { color: @mauve;     }
-      #custom-gpu     { color: @green;     }
+      #custom-gpu-usage     { color: @green;     }
       #backlight      { color: @yellow;    }
       #network        { color: @maroon;    }
       #wireplumber     { color: @lavender;  }
