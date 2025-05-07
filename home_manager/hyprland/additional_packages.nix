@@ -11,6 +11,7 @@
     nmap
     wl-clipboard
     ncdu
+    nurl
   ];
 
   services.swayosd.enable = true;

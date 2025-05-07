@@ -231,7 +231,7 @@
       };
 
       # Cargo.lock lives in the repo, so just grab the hashes once:
-      cargoHash = "";
+      cargoHash = "sha256-X3Ak0K1kt7++tE7qZgy8GaRzqemUNTJ3z1yGBJZyA4s=";
       doCheck = false; # upstream has no tests yet :contentReference[oaicite:1]{index=1}
     })
   ];
