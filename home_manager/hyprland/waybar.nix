@@ -225,7 +225,7 @@
       src = fetchCrate {
         # pulls the exact crate published to crates.io
         inherit pname version;
-        hash = "sha256"; # first run with lib.fakeSha256, copy real hash
+        hash = ""; # first run with lib.fakeSha256, copy real hash
       };
 
       # Cargo.lock lives in the repo, so just grab the hashes once:
