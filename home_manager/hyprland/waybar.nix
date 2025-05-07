@@ -285,7 +285,7 @@
                  | jq -Rsa .)               # JSON‑escape for Waybar
 
       printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' \
-             "$changes" "$tooltip"
+             " $changes" "$tooltip"
     '')
   ];
 }
