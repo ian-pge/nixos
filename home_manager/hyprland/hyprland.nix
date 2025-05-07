@@ -176,10 +176,6 @@
         "$mainMod SHIFT,D,movetoworkspace,special:Chat"
         "$mainMod,C,togglespecialworkspace,Media"
         "$mainMod SHIFT,C,movetoworkspace,special:Media"
-        # mouse‑drag
-        # "$mainMod,mouse:272,movewindow"
-        # "$mainMod,mouse:273,resizewindow"
-        # lock
         "$mainMod,ESCAPE,exec,hyprlock"
       ];
       bindm = [
