@@ -284,8 +284,8 @@
       tooltip=$(nix run nixpkgs#nix-diff -- /run/current-system "$next_drv" \
                  | jq -Rsa .)               # JSON‑escape for Waybar
 
-      printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' \
-             " $changes" "$tooltip"
+      printf '{"text":" %s","alt":"has-updates","tooltip":%s}\n' \
+             "$changes" "$tooltip"
     '')
   ];
 }
