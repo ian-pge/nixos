@@ -66,8 +66,8 @@
           # format = "";
           # exec = "/home/ian/.nix-profile/bin/gpu-usage-waybar";
           exec = "gpu-usage-waybar";
-          format = "{}";
-          # format-icons = "";
+          format = "{icon} {}";
+          format-icons = "";
           return-type = "json";
           on-click = "ghostty -e nvtop";
         };
