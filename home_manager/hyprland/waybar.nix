@@ -218,15 +218,15 @@
     /*
     ── gpu‑usage‑waybar built on‑the‑fly ─────────────
     */
-    (rustPlatform.buildRustPackage rec {
+    (rustPlatform.buildRustPackage {
       pname = "gpu-usage-waybar";
       version = "0.1.23"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
 
-      src = fetchCrate {
+      src = fetchFromGitHub {
         # pulls the exact crate published to crates.io
         owner = "PolpOnline";
         repo = "gpu-usage-waybar";
-        version = "0.1.23";
+        rev = "0.1.23";
         hash = ""; # first run with lib.fakeSha256, copy real hash
       };
 
