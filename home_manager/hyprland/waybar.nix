@@ -65,7 +65,6 @@
         "custom/gpu" = {
           # format = "";
           exec = "gpu-usage-waybar";
-          interval = 5;
           format = "{}";
           # format-icons = "";
           return-type = "json";
