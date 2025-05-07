@@ -66,8 +66,8 @@
           # format = "";
           exec = "gpu-usage-waybar";
           interval = 5;
-          format = "{text} {icon}";
-          format-icons = "";
+          format = "{}";
+          # format-icons = "";
           return-type = "json";
           on-click = "ghostty -e nvtop";
         };
