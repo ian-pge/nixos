@@ -116,8 +116,9 @@
           interval = 3600;
           tooltip = true;
           return-type = "json";
-          format = {
-            "has-updates" = " {}";
+          format = "{icon} {}";
+          format-icons = {
+            "has-updates" = "";
             "updated" = "";
           };
         };
