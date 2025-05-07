@@ -59,21 +59,22 @@
         memory = {
           interval = 1;
           format = "  {}%";
-          "on-click" = "ghostty -e htop";
+          on-click = "ghostty -e htop";
         };
 
         "custom/gpu" = {
-          exec = "echo";
-          interval = 1;
-          format = "{} {icon}";
-          format-icons = "";
-          return-type = "json";
-          on-click = "ghostty -e nvtop";
+          format = "";
+          # exec = "echo";
+          # interval = 1;
+          # format = "{} {icon}";
+          # format-icons = "";
+          # return-type = "json";
+          # on-click = "ghostty -e nvtop";
         };
 
         backlight = {
           format = "{icon} {percent}%";
-          "format-icons" = [
+          format-icons = [
             "󱩎"
             "󱩏"
             "󱩐"
@@ -112,15 +113,16 @@
         };
 
         "custom/nixos" = {
-          exec = "waybar-update-checker";
-          interval = 3600;
-          tooltip = true;
-          return-type = "json";
-          format = "{icon}{}";
-          format-icons = {
-            "has-updates" = "";
-            "updated" = "";
-          };
+          format = "";
+          # exec = "waybar-update-checker";
+          # interval = 3600;
+          # tooltip = true;
+          # return-type = "json";
+          # format = "{icon}{}";
+          # format-icons = {
+          #   "has-updates" = "";
+          #   "updated" = "";
+          # };
         };
 
         bluetooth = {
