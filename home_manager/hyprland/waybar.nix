@@ -266,7 +266,7 @@
 
       # ── 3. ask Nix for the *derivation* of the next system ───────────────────
       next_drv=$(nix eval --raw \
-        ".#nixosConfigurations.${HOSTNAME}.config.system.build.toplevel.drvPath")
+        ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
 
       # ── 4. fetch the derivation hash of the running system ───────────────────
       cur_drv=$(nix derivation show /run/current-system | jq -r 'keys[0]')
