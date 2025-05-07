@@ -64,6 +64,7 @@
 
         "custom/gpu" = {
           # format = "";
+          exec = "gpu-usage-waybar";
           interval = 1;
           format = "{} {icon}";
           format-icons = "";
