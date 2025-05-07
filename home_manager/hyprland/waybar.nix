@@ -247,44 +247,45 @@
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       #
-      # Waybar module that prints the number of packages that would change
-      # after `nix flake update` **without building or downloading anything**.
-      # Requires: nix ≥ 2.20, nix-diff, jq, rsync.
+      # Show how many packages *would* change after a nixpkgs bump,
+      # without downloading or compiling anything.
       #
       set -euo pipefail
-      export NO_COLOR=1                # keep `nix-diff` output monochrome
+      export NO_COLOR=1                     # keep nix‑diff output monochrome
 
-      flake_dir="/etc/nixos"           # path to your system flake
+      flake_dir="/etc/nixos"                # path to your system flake
 
-      # --- work in a throw‑away copy so we never mutate the real repo ----------
+      # ── 1. work in a scratch copy ────────────────────────────────────────────
       scratch="$(mktemp -d)"
       trap 'rm -rf "$scratch"' EXIT
       rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
-      cd "$scratch"
+      cd "$scratch"                         # all remaining commands run here
 
-      # --- pull latest nixpkgs (or any other input you like) -------------------
-      nix flake update --update-input nixpkgs "$flake_dir" >/dev/null
+      # ── 2. bump only nixpkgs in the *scratch* lock file ──────────────────────
+      nix flake lock --update-input nixpkgs --quiet            # new syntax
 
-      # --- get the next system *derivation* – pure evaluation, zero builds -----
+      # ── 3. ask Nix for the *derivation* of the next system ───────────────────
       next_drv=$(nix eval --raw \
-          "$flake_dir#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
+        ".#nixosConfigurations.${HOSTNAME}.config.system.build.toplevel.drvPath")
 
-      # If it’s identical to the running system, we’re done fast
-      if [ "$next_drv" = "$(nix show-derivation /run/current-system | jq -r 'keys[0]')" ]; then
-          printf '{"text":"0","alt":"updated","tooltip":"System up‑to‑date"}\n'
-          exit 0
+      # ── 4. fetch the derivation hash of the running system ───────────────────
+      cur_drv=$(nix derivation show /run/current-system | jq -r 'keys[0]')
+
+      # ── 5. if hashes match ⇒ no updates ──────────────────────────────────────
+      if [[ "$next_drv" == "$cur_drv" ]]; then
+        printf '{"text":"0","alt":"updated","tooltip":"System up‑to‑date"}\n'
+        exit 0
       fi
 
-      # --- count changes at derivation level -----------------------------------
+      # ── 6. otherwise diff the two derivations (fast, build‑free) ─────────────
       changes=$(nix run nixpkgs#nix-diff -- --brief /run/current-system "$next_drv" \
-                  | wc -l)
+                | wc -l)
 
-      # Build a tooltip (pretty list of what will change)
       tooltip=$(nix run nixpkgs#nix-diff -- /run/current-system "$next_drv" \
-                  | jq -Rsa .)
+                | jq -Rsa .)              # JSON‑escape multi‑line tooltip
 
       printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' \
-              "$changes" "$tooltip"
+            "$changes" "$tooltip"
     '')
   ];
 }
