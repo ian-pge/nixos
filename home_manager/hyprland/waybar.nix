@@ -224,7 +224,9 @@
 
       src = fetchCrate {
         # pulls the exact crate published to crates.io
-        inherit pname version;
+        owner = "PolpOnline";
+        repo = "gpu-usage-waybar";
+        rev = "v${version}";
         hash = ""; # first run with lib.fakeSha256, copy real hash
       };
 
