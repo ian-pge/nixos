@@ -277,12 +277,10 @@
         exit 0
       fi
 
-      # 6. ── otherwise diff *derivations* (fast, zero builds) ─────────────────
-      changes=$(nix run nixpkgs#nix-diff -- --brief /run/current-system "$next_drv" \
-                 | wc -l)
-
-      tooltip=$(nix run nixpkgs#nix-diff -- /run/current-system "$next_drv" \
-                 | jq -Rsa .)               # JSON‑escape for Waybar
+      # 6. run nix‑diff (no --brief), count bullet lines for the number
+      diff=$(nix run nixpkgs#nix-diff -- /run/current-system "$next_drv")
+      changes=$(printf "%s\n" "$diff" | grep -c '^[[:space:]]*•' || true)
+      tooltip=$(printf "%s\n" "$diff" | jq -Rsa .)   # JSON‑escape for Waybar
 
       printf '{"text":" %s","alt":"has-updates","tooltip":%s}\n' \
              "$changes" "$tooltip"
