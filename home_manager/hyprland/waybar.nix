@@ -226,7 +226,7 @@
         # pulls the exact crate published to crates.io
         owner = "PolpOnline";
         repo = "gpu-usage-waybar";
-        rev = "0.1.23";
+        version = "0.1.23";
         hash = ""; # first run with lib.fakeSha256, copy real hash
       };
 
