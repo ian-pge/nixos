@@ -140,7 +140,7 @@
 
         disk = {
           interval = 30;
-          format = " {percentage_used}%";
+          format = "󰷏 {percentage_used}%";
           path = "/";
           on-click = "ghostty -e ncdu";
         };
