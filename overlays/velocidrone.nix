@@ -9,7 +9,7 @@ final: prev: {
     # to   url = "file://./velocidrone.zip";
     src = final.fetchzip {
       url = "file://../material/velocidrone.zip";
-      # sha256   = final.lib.fakeSha256;      # run once, copy the real hash
+      sha256 = "a55810c6e3e4b5ee40a71d3932e546761d0c61a2785b1c7e121b147bbf5a8895"; # run once, copy the real hash
       stripRoot = false;
     };
 
