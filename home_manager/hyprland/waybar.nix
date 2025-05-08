@@ -177,6 +177,7 @@
 
       * {
           font-family: "Ubuntu Nerd Font";
+          font-weight: bold;
           font-size: 19px;
       }
 
