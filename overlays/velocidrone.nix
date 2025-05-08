@@ -1,19 +1,37 @@
-# overlay-velocidrone.nix  ── drop next to your flake, edit sha256 after first build
 final: prev: {
   velocidrone = final.stdenv.mkDerivation rec {
     pname = "velocidrone";
-    version = "1.17.1"; # or leave unset – upstream bundles version
+    version = "1.17.1";
 
-    src = ../material/velocidrone.zip;
+    # 1. local archive that you saved next to the overlay (relative path!)
+    src = ./velocidrone.zip;
 
-    nativeBuildInputs = [final.unzip final.autoPatchelfHook final.makeWrapper];
-    buildInputs = [final.qt5.qtbase final.boost];
+    # 2. tell the generic builder there is nothing to unpack automatically
+    dontUnpack = true;
+
+    nativeBuildInputs = [
+      final.unzip
+      final.autoPatchelfHook
+      final.makeWrapper
+    ];
+    buildInputs = [
+      final.qt5.qtbase # runtime Qt libs
+      final.boost
+    ];
+
+    # 3. silence qtPreHook because we do our own wrapping below
+    dontWrapQtApps = true;
 
     installPhase = ''
+      runHook preInstall
+
       mkdir -p $out/share/velocidrone
-      cp -r * $out/share/velocidrone
+      unzip -qq $src -d $out/share/velocidrone
+
       makeWrapper $out/share/velocidrone/Launcher $out/bin/velocidrone \
         --set-default LD_LIBRARY_PATH ${final.lib.makeLibraryPath buildInputs}
+
+      runHook postInstall
     '';
 
     meta = with final.lib; {
