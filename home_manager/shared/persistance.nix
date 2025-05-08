@@ -32,10 +32,6 @@
       # ".local/share/Steam"
       # ".steam"
       {
-        directory = ".steam";
-        method = "symlink";
-      }
-      {
         directory = ".local/share/Steam";
         method = "symlink";
       }
