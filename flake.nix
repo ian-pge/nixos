@@ -28,6 +28,7 @@
     # Expose the overlay so it can be reused elsewhere
     overlays = {
       bambustudio = import ./overlays/bambustudio.nix;
+      velocidrone = import ./overlays/velocidrone.nix;
     };
   in {
     # Make overlay usable from outside the flake (optional)
@@ -40,6 +41,7 @@
         ({...}: {
           nixpkgs.overlays = [
             overlays.bambustudio
+            overlays.velocidrone
           ];
         })
         ./system/specialisation.nix
