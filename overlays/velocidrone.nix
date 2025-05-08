@@ -1,33 +1,26 @@
 # overlay-velocidrone.nix  ── drop next to your flake, edit sha256 after first build
 final: prev: {
-  # brand-new attribute (no upstream package to override)
   velocidrone = final.stdenv.mkDerivation rec {
-    name = "velocidrone";
+    pname = "velocidrone";
+    version = "1.17.1"; # or leave unset – upstream bundles version
 
-    # Upstream requires login, but the link is stable enough for fetchzip
-    # If the fetch fails, download manually, store next to this file and switch
-    # to   url = "file://./velocidrone.zip";
     src = final.fetchzip {
+      # URL stays unchanged
       url = "https://www.velocidrone.com/download/launcher?id=debian";
-      sha256 = "sha256-pVgQxuPkte5Apx05MuVGdh0MYaJ4Wxx+EhsUe79aiJU="; # run once, copy the real hash
+      sha256 = "sha256-pVgQxuPkte5Apx05MuVGdh0MYaJ4Wxx+EhsUe79aiJU=";
       stripRoot = false;
+
+      # <-- the crucial line
+      extension = "zip"; # tell fetchzip “this really is a .zip”
+      # (optionally) name  = "velocidrone-${version}.zip";
     };
 
-    nativeBuildInputs = [
-      final.unzip
-      final.autoPatchelfHook
-      final.makeWrapper
-    ];
-    buildInputs = [
-      final.qt5.qtbase
-      final.boost
-    ];
+    nativeBuildInputs = [final.unzip final.autoPatchelfHook final.makeWrapper];
+    buildInputs = [final.qt5.qtbase final.boost];
 
     installPhase = ''
       mkdir -p $out/share/velocidrone
-      cp -r * $out/share/velocidrone/
-
-      mkdir -p $out/bin
+      cp -r * $out/share/velocidrone
       makeWrapper $out/share/velocidrone/Launcher $out/bin/velocidrone \
         --set-default LD_LIBRARY_PATH ${final.lib.makeLibraryPath buildInputs}
     '';
@@ -35,7 +28,7 @@ final: prev: {
     meta = with final.lib; {
       description = "VelociDrone FPV drone-racing simulator";
       homepage = "https://www.velocidrone.com";
-      license = licenses.unfree; # proprietary upstream :contentReference[oaicite:3]{index=3}
+      license = licenses.unfree;
       maintainers = [maintainers.yourname];
       platforms = ["x86_64-linux"];
     };
