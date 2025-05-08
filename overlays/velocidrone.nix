@@ -4,7 +4,7 @@ final: prev: {
     pname = "velocidrone";
     version = "1.17.1"; # or leave unset – upstream bundles version
 
-    src = ./velocidrone.zip;
+    src = ../material/velocidrone.zip;
 
     nativeBuildInputs = [final.unzip final.autoPatchelfHook final.makeWrapper];
     buildInputs = [final.qt5.qtbase final.boost];
