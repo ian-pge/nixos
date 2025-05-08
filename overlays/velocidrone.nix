@@ -8,7 +8,7 @@ final: prev: {
     nativeBuildInputs = [
       final.unzip
       final.autoPatchelfHook
-      final.wrapQtAppsHook # ★ the magic wrapper
+      final.wrapGAppsHook # ★ the magic wrapper
     ];
 
     buildInputs = [
