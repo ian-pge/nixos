@@ -34,8 +34,8 @@
     # Configure bar layouts for monitors.
     # See 'https://hyprpanel.com/configuration/panel.html'.
     # Default: null
-    layout = {
-      bar.layouts = {
+    bar = {
+      layout = {
         "0" = {
           left = ["dashboard" "workspaces"];
           middle = ["media"];
