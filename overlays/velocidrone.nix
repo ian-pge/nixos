@@ -17,6 +17,7 @@ final: prev: {
     buildInputs = [
       final.qt5.qtbase # runtime Qt libs
       final.boost
+      final.xkeyboard_config
     ];
 
     # 3. silence qtPreHook because we do our own wrapping below
