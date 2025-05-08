@@ -33,6 +33,7 @@ final: prev: {
       chmod +x Launcher                    # ZIP loses exec bit
 
       mkdir -p $out/bin
+      mkdir -p $out/share/velocidrone
       mv Launcher $out/bin/velocidrone     # hook wraps everything in $out/bin
       cp -r * $out/share/velocidrone
 
