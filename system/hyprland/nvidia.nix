@@ -1,7 +1,11 @@
 {config, ...}: {
   hardware = {
     # Enable OpenGL
-    graphics.enable = true;
+    opengl.enable = true;
+    graphics = {
+      enable = true;
+      enable32Bit = true;
+    };
     nvidia = {
       modesetting.enable = true;
       powerManagement.enable = true;
