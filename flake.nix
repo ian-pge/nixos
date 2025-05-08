@@ -1,5 +1,5 @@
 {
-  description = "Nixos config flake";
+  description = "NixOS configuration (minimal & robust)";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -24,26 +24,35 @@
     };
   };
 
-  outputs = {nixpkgs, ...} @ inputs: let
-    # Expose the overlay so it can be reused elsewhere
+  outputs = inputs @ {
+    self,
+    nixpkgs,
+    ...
+  }: let
+    inherit (nixpkgs) lib;
+
+    # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
     overlays = {
       bambustudio = import ./overlays/bambustudio.nix;
     };
   in {
-    # Make overlay usable from outside the flake (optional)
     inherit overlays;
 
-    nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      specialArgs = {inherit inputs;};
-      modules = [
-        ({...}: {
-          nixpkgs.overlays = [
-            overlays.bambustudio
-          ];
-        })
-        ./system/specialisation.nix
-      ];
+    nixosConfigurations = {
+      nixos = lib.nixosSystem {
+        system = "x86_64-linux";
+        # Expose the entire `inputs` set to all modules
+        specialArgs = {inherit inputs;};
+
+        modules = [
+          ./system/specialisation.nix
+
+          # Add all declared overlays to nixpkgs
+          ({...}: {
+            nixpkgs.overlays = builtins.attrValues overlays;
+          })
+        ];
+      };
     };
   };
 }
