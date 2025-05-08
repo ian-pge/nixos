@@ -4,7 +4,7 @@ final: prev: {
     version = "1.17.1";
 
     # 1. local archive that you saved next to the overlay (relative path!)
-    src = ./velocidrone.zip;
+    src = ../material/velocidrone.zip;
 
     # 2. tell the generic builder there is nothing to unpack automatically
     dontUnpack = true;
