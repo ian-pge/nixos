@@ -45,6 +45,7 @@
         ({...}: {
           nixpkgs.overlays = [
             overlays.bambustudio
+            inputs.hyprpanel.overlay
           ];
         })
         ./system/specialisation.nix
