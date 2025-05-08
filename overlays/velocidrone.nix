@@ -4,16 +4,7 @@ final: prev: {
     pname = "velocidrone";
     version = "1.17.1"; # or leave unset – upstream bundles version
 
-    src = final.fetchzip {
-      # URL stays unchanged
-      url = "file:///etc/nixos/material/velocidrone.zip";
-      sha256 = "091w7nmsssfhyhgqi5i1ff7kgj65i1sf3zwvjsyc962wk2v5jcaj";
-      stripRoot = false;
-
-      # <-- the crucial line
-      # extension = "zip"; # tell fetchzip “this really is a .zip”
-      # (optionally) name  = "velocidrone-${version}.zip";
-    };
+    src = ./velocidrone.zip;
 
     nativeBuildInputs = [final.unzip final.autoPatchelfHook final.makeWrapper];
     buildInputs = [final.qt5.qtbase final.boost];
