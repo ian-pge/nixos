@@ -28,6 +28,8 @@ final: prev: {
       mkdir -p $out/share/velocidrone
       unzip -qq $src -d $out/share/velocidrone
 
+      chmod +x $out/share/velocidrone/Launcher   # ensure executable bit
+
       makeWrapper $out/share/velocidrone/Launcher $out/bin/velocidrone \
         --set-default LD_LIBRARY_PATH ${final.lib.makeLibraryPath buildInputs}
 
