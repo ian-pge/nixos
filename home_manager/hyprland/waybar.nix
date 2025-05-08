@@ -40,12 +40,12 @@
 
         ## ───── Clocks ─────
         clock = {
-          format = " {:%H:%M}";
+          format = " {:%H:%M}";
           timezone = "Europe/Paris";
           tooltip = false;
         };
         "clock#second" = {
-          format = " {:%b %d %Y}";
+          format = " {:%b %d %Y}";
           tooltip = false;
         };
 
