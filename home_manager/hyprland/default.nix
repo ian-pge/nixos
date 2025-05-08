@@ -20,6 +20,6 @@
     ./fuzzel.nix
     ./mako.nix
     ./neovim.nix
-    ./hyprpanel
+    ./hyprpanel.nix
   ];
 }
