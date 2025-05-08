@@ -7,7 +7,7 @@ final: prev: {
     src = final.fetchzip {
       # URL stays unchanged
       url = "file:///etc/nixos/material/velocidrone.zip";
-      hash = "";
+      sha256 = "091w7nmsssfhyhgqi5i1ff7kgj65i1sf3zwvjsyc962wk2v5jcaj";
       stripRoot = false;
 
       # <-- the crucial line
