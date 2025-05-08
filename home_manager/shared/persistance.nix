@@ -29,7 +29,7 @@
       ".config/dconf"
       ".cache"
       ".local/share/keyrings"
-      # ".local/share/Steam"
+      ".local/share/Steam"
       # ".steam"
     ];
     files = [
