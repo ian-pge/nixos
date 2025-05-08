@@ -1,7 +1,6 @@
 {config, ...}: {
   hardware = {
     # Enable OpenGL
-    opengl.enable = true;
     graphics = {
       enable = true;
       enable32Bit = true;
