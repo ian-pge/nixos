@@ -8,10 +8,11 @@ final: prev: {
       # URL stays unchanged
       url = "https://www.velocidrone.com/download/launcher?id=debian";
       sha256 = "sha256-pVgQxuPkte5Apx05MuVGdh0MYaJ4Wxx+EhsUe79aiJU=";
+      name = "velocidrone.zip";
       stripRoot = false;
 
       # <-- the crucial line
-      extension = "zip"; # tell fetchzip “this really is a .zip”
+      # extension = "zip"; # tell fetchzip “this really is a .zip”
       # (optionally) name  = "velocidrone-${version}.zip";
     };
 
