@@ -8,7 +8,7 @@ final: prev: {
     # If the fetch fails, download manually, store next to this file and switch
     # to   url = "file://./velocidrone.zip";
     src = final.fetchzip {
-      path = ../material/velocidrone.zip;
+      url = "https://www.velocidrone.com/download/launcher?id=debian";
       sha256 = "sha256-pVgQxuPkte5Apx05MuVGdh0MYaJ4Wxx+EhsUe79aiJU="; # run once, copy the real hash
       stripRoot = false;
     };
