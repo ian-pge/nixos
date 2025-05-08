@@ -2,13 +2,9 @@ final: prev: {
   velocidrone = final.stdenv.mkDerivation rec {
     pname = "velocidrone";
     version = "1.17.1";
-
-    # 1. local archive that you saved next to the overlay (relative path!)
     src = ../material/velocidrone.zip;
-
-    # 2. tell the generic builder there is nothing to unpack automatically
     dontUnpack = true;
-    dontWrapQtApps = true;
+    dontWrapQtApps = true; # we do it ourselves
 
     nativeBuildInputs = [
       final.unzip
@@ -16,21 +12,20 @@ final: prev: {
       final.makeWrapper
     ];
     buildInputs = [
-      final.qt5.qtbase # runtime Qt libs
+      final.qt5.qtbase # Qt libraries (pulls in libxkbcommon)
       final.boost
-      final.xkeyboard_config
+      final.xkeyboard_config # keyboard-layout data ★
     ];
 
     installPhase = ''
       runHook preInstall
-
       mkdir -p $out/share/velocidrone
       unzip -qq $src -d $out/share/velocidrone
-
-      chmod +x $out/share/velocidrone/Launcher   # ensure executable bit
+      chmod +x $out/share/velocidrone/Launcher
 
       makeWrapper $out/share/velocidrone/Launcher $out/bin/velocidrone \
-        --set-default LD_LIBRARY_PATH ${final.lib.makeLibraryPath buildInputs}
+        --set-default LD_LIBRARY_PATH ${final.lib.makeLibraryPath buildInputs} \
+        --set QT_XKB_CONFIG_ROOT ${final.xkeyboard_config}/share/X11/xkb
 
       runHook postInstall
     '';
