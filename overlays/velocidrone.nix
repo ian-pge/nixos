@@ -2,7 +2,7 @@
 final: prev: {
   # brand-new attribute (no upstream package to override)
   velocidrone = final.stdenv.mkDerivation rec {
-    pname = "velocidrone";
+    name = "velocidrone";
 
     # Upstream requires login, but the link is stable enough for fetchzip
     # If the fetch fails, download manually, store next to this file and switch
