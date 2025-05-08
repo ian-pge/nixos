@@ -1,34 +1,41 @@
+# overlays/velocidrone.nix
 final: prev: {
   velocidrone = final.stdenv.mkDerivation rec {
     pname = "velocidrone";
     version = "1.17.1";
-    src = ../material/velocidrone.zip; # local archive
-    dontUnpack = true; # we unzip manually
 
+    # proprietary archive you downloaded once
+    src = ../material/velocidrone.zip;
+    dontUnpack = true;
+
+    # ---- build tools ----
     nativeBuildInputs = [
       final.unzip
       final.autoPatchelfHook
-      final.wrapQtAppsHook # ★ the magic wrapper
+      final.qt5.wrapQtAppsHook # ★ correct attribute path
     ];
 
+    # ---- runtime libraries ----
     buildInputs = [
-      final.qt5.qtbase
-      final.xkeyboard_config # /share/X11/xkb → fixes XKB lookup
+      final.qt5.qtbase # Qt core libs
+      final.xkeyboard_config # /share/X11/xkb → fixes XKB error
       final.boost
-      final.alsa-lib # Unity audio
-      final.openal # fallback audio
+      final.alsa-lib # ALSA backend for Unity
+      final.openal # OpenAL fallback
       final.libpulseaudio # PulseAudio backend
-      final.mesa # libGL & friends
-      final.libudev-zero # udev symlink shim for old binaries
+      final.mesa # OpenGL drivers & libGL.so
+      final.libudev-zero # shim for /run/udev
     ];
 
     installPhase = ''
       runHook preInstall
       unzip -qq $src
-      chmod +x Launcher                # ZIP drops exec bit
+      chmod +x Launcher                    # ZIP loses exec bit
+
       mkdir -p $out/bin
-      mv Launcher $out/bin/velocidrone # hook will wrap this ELF
-      cp -r *        $out/share/velocidrone
+      mv Launcher $out/bin/velocidrone     # hook wraps everything in $out/bin
+      cp -r * $out/share/velocidrone
+
       runHook postInstall
     '';
 
