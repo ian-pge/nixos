@@ -1,6 +1,6 @@
 # overlays/velocidrone.nix
 final: prev: {
-  velocidrone = final.stdenv.mkDerivation rec {
+  velocidrone = final.stdenv.mkDerivation {
     pname = "velocidrone";
     version = "1.17.1";
     src = ../material/velocidrone.zip;
@@ -25,6 +25,9 @@ final: prev: {
 
     ### tell the hook to add QT_XKB_CONFIG_ROOT
     qtWrapperArgs = [
+      "--set"
+      "QT_XKB_CONFIG_ROOT"
+      "${final.xkeyboard_config}/share/X11/xkb"
       "--prefix"
       "QT_XKB_CONFIG_ROOT"
       ":"
