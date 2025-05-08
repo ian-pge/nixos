@@ -6,7 +6,7 @@ final: prev: {
 
     src = final.fetchzip {
       # URL stays unchanged
-      url = "file://../material/velocidrone.zip";
+      url = "file:///etc/nixos/material/velocidrone.zip";
       sha256 = "sha256-pVgQxuPkte5Apx05MuVGdh0MYaJ4Wxx+EhsUe79aiJU=";
       name = "velocidrone.zip";
       stripRoot = false;
