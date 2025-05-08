@@ -8,6 +8,7 @@ final: prev: {
 
     # 2. tell the generic builder there is nothing to unpack automatically
     dontUnpack = true;
+    dontWrapQtApps = true;
 
     nativeBuildInputs = [
       final.unzip
@@ -19,9 +20,6 @@ final: prev: {
       final.boost
       final.xkeyboard_config
     ];
-
-    # 3. silence qtPreHook because we do our own wrapping below
-    dontWrapQtApps = true;
 
     installPhase = ''
       runHook preInstall
