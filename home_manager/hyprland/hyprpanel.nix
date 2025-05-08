@@ -22,7 +22,7 @@
 
     # Import a theme from './themes/*.json'.
     # Default: ""
-    theme = "catppuccin_mocha";
+    # theme = "catppuccin_mocha";
 
     # Override the final config with an arbitrary set.
     # Useful for overriding colors in your selected theme.
