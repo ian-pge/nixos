@@ -29,10 +29,11 @@
       ".config/dconf"
       ".cache"
       ".local/share/keyrings"
-      {
-        directory = ".local/share/Steam";
-        method = "symlink";
-      }
+      ".local/share/Steam"
+      # {
+      #   directory = ".local/share/Steam";
+      #   method = "symlink";
+      # }
     ];
     files = [
       ".config/monitors.xml"
