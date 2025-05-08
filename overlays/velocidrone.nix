@@ -3,40 +3,43 @@ final: prev: {
   velocidrone = final.stdenv.mkDerivation rec {
     pname = "velocidrone";
     version = "1.17.1";
-
-    # proprietary archive you downloaded once
     src = ../material/velocidrone.zip;
     dontUnpack = true;
 
-    # ---- build tools ----
     nativeBuildInputs = [
       final.unzip
       final.autoPatchelfHook
-      final.qt5.wrapQtAppsHook # ★ correct attribute path
+      final.qt5.wrapQtAppsHook # wraps every ELF in $out/bin
     ];
 
-    # ---- runtime libraries ----
     buildInputs = [
-      final.qt5.qtbase # Qt core libs
-      final.xkeyboard_config # /share/X11/xkb → fixes XKB error
+      final.qt5.qtbase
+      final.xkeyboard_config # XKB data  ★
       final.boost
-      final.alsa-lib # ALSA backend for Unity
-      final.openal # OpenAL fallback
-      final.libpulseaudio # PulseAudio backend
-      final.mesa # OpenGL drivers & libGL.so
-      final.libudev-zero # shim for /run/udev
+      final.alsa-lib # Unity audio back-end
+      final.openal
+      final.libpulseaudio
+      final.mesa # libGL / libxcb-glx
+      final.libudev-zero # shim for old libudev
+    ];
+
+    ### tell the hook to add QT_XKB_CONFIG_ROOT
+    qtWrapperArgs = [
+      "--prefix"
+      "QT_XKB_CONFIG_ROOT"
+      ":"
+      "${final.xkeyboard_config}/share/X11/xkb"
     ];
 
     installPhase = ''
       runHook preInstall
       unzip -qq $src
-      chmod +x Launcher                    # ZIP loses exec bit
+      chmod +x Launcher
 
       mkdir -p $out/bin
       mkdir -p $out/share/velocidrone
-      mv Launcher $out/bin/velocidrone     # hook wraps everything in $out/bin
+      mv Launcher $out/bin/velocidrone      # hook will wrap this script
       cp -r * $out/share/velocidrone
-
       runHook postInstall
     '';
 
