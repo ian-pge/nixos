@@ -16,6 +16,10 @@
       url = "github:catppuccin/nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hyprpanel = {
+      url = "github:Jas-SinghFSU/HyprPanel";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs @ {
@@ -43,7 +47,7 @@
 
           # Add all declared overlays to nixpkgs
           ({...}: {
-            nixpkgs.overlays = builtins.attrValues overlays;
+            nixpkgs.overlays = builtins.attrValues overlays ++ [inputs.hyprpanel.overlay];
           })
         ];
       };
