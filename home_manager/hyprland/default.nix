@@ -1,6 +1,7 @@
 {inputs, ...}: {
   imports = [
     inputs.catppuccin.homeModules.catppuccin
+    inputs.hyprpanel.homeManagerModules.hyprpanel
 
     ../shared
     ./gtk.nix
@@ -19,5 +20,6 @@
     ./fuzzel.nix
     ./mako.nix
     ./neovim.nix
+    ./hyprpanel
   ];
 }
