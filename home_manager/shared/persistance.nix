@@ -31,10 +31,14 @@
       ".local/share/keyrings"
       ".local/share/Steam"
       # ".steam"
-      # {
-      #   directory = ".local/share/Steam";
-      #   method = "symlink";
-      # }
+      {
+        directory = ".steam";
+        method = "symlink";
+      }
+      {
+        directory = ".local/share/Steam";
+        method = "symlink";
+      }
     ];
     files = [
       ".config/monitors.xml"
