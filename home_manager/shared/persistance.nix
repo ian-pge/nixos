@@ -30,7 +30,7 @@
       ".cache"
       ".local/share/keyrings"
       ".local/share/Steam"
-      ".steam"
+      # ".steam"
       # {
       #   directory = ".local/share/Steam";
       #   method = "symlink";
