@@ -35,5 +35,10 @@
       enable = true;
       flavor = "macchiato";
     };
+    hyprlock = {
+      enable = true;
+      flavor = "macchiato";
+      accent = "sapphire";
+    };
   };
 }
