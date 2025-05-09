@@ -3,5 +3,6 @@
     lutris
     protonup-qt
     wine
+    winetricks
   ];
 }
