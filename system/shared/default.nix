@@ -16,6 +16,6 @@
     ./nh.nix
     ./ssh.nix
     ./stereolabs.nix
-    ./lutrix.nix
+    ./lutris.nix
   ];
 }
