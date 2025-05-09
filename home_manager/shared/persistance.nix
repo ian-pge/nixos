@@ -14,6 +14,7 @@
       ".config/google-chrome"
       ".local/share/applications"
       ".local/share/icons"
+      ".local/share/lutris"
       # ".config/zed"
       {
         directory = ".local/share/zed";
