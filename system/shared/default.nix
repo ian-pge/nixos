@@ -17,5 +17,6 @@
     ./ssh.nix
     ./stereolabs.nix
     ./lutris.nix
+    ./betaflight.nix
   ];
 }

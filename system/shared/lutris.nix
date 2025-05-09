@@ -3,7 +3,5 @@
     lutris
     protonup-qt
     wine
-    dxvk
-    vkd3d
   ];
 }
