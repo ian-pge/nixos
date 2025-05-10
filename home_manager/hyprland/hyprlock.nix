@@ -61,6 +61,13 @@
       "$crust" = "rgb(181926)";
       "$crustAlpha" = "181926";
 
+      general = {
+        # disable_loading_bar = true;
+        # grace = 300;
+        # hide_cursor = true;
+        no_fade_in = false;
+      };
+
       # ───── Backgrounds ─────
       background = [
         {
