@@ -21,5 +21,7 @@
     ./mako.nix
     ./neovim.nix
     # ./hyprpanel.nix
+    ./hypridle.nix
+    ./hyprlock.nix
   ];
 }

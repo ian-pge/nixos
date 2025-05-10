@@ -12,6 +12,8 @@
     wl-clipboard
     ncdu
     nurl
+    inkscape
+    brightnessctl
   ];
 
   services.swayosd.enable = true;
