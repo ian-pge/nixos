@@ -66,7 +66,7 @@
       # ---------------- Backgrounds ----------------
       background {
           monitor = eDP-1
-          path = ~/.config/hypr/wallpaper.jpg   # only png supported upstream right now
+          path = /etc/nixos/material/wallpaper.png
           blur_size = 2
           blur_passes = 3
           noise = 0.0117
@@ -78,7 +78,7 @@
 
       background {
           monitor = HDMI-A-1
-          path = ~/.config/hypr/wallpaper.jpg
+          path = /etc/nixos/material/wallpaper.png
           blur_size = 2
           blur_passes = 3
           noise = 0.0117
@@ -94,7 +94,7 @@
           text = cmd[update:1000] echo "<b><big> $(date +\"%H:%M\") </big></b>"
           color = rgba(33ccffee)
           font_size = 112
-          font_family = Geist Mono 10
+          font_family = Ubuntu Nerd Font
           shadow_passes = 3
           shadow_size = 4
           position = 0, -40
@@ -107,7 +107,7 @@
           text = cmd[update:18000000] echo "<b><big> \"$(date +'%A')\" </big></b>"
           color = $text
           font_size = 50
-          font_family = UbuntuMono Nerd Font 10
+          font_family = Ubuntu Nerd Font
           position = 0, -220
           halign = center
           valign = top
@@ -118,7 +118,7 @@
           text = cmd[update:18000000] echo "<b> \"$(date +'%d %b')\" </b>"
           color = $text
           font_size = 30
-          font_family = UbuntuMono Nerd Font 10
+          font_family = Ubuntu Nerd Font
           position = 0, -280
           halign = center
           valign = top
@@ -129,7 +129,7 @@
           text = cmd[update:100] echo "<b> <big> $(python3 -c 'import datetime,sys;birth=datetime.datetime(1998,11,15);print(f\"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}\")') </big></b>"
           color = $text
           font_size = 20
-          font_family = Geist Mono 10
+          font_family = Ubuntu Nerd Font
           position = 0, 40
           halign = center
           valign = bottom
