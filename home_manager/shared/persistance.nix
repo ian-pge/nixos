@@ -15,8 +15,7 @@
       ".local/share/applications"
       ".local/share/icons"
       ".local/share/lutris"
-      # ".config/zed"
-      # ".local/share/zed"
+      ".local/share/zed"
       # {
       #   directory = ".local/share/zed";
       #   method = "symlink";
