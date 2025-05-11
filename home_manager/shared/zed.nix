@@ -71,10 +71,10 @@
         };
       };
 
-      theme = {
-        mode = "system";
-        dark = "Catppuccin Macchiato (sapphire)";
-      };
+      # theme = {
+      #   mode = "system";
+      #   dark = "Catppuccin Macchiato (sapphire)";
+      # };
 
       terminal = {
         font_family = "Hack Nerd Font";
