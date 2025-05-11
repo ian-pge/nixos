@@ -15,11 +15,11 @@
       ".local/share/applications"
       ".local/share/icons"
       ".local/share/lutris"
-      ".local/share/zed"
-      # {
-      #   directory = ".local/share/zed";
-      #   method = "symlink";
-      # }
+      # ".local/share/zed"
+      {
+        directory = ".local/share/zed";
+        method = "symlink";
+      }
       # {
       #   directory = ".config/zed";
       #   method = "symlink";
