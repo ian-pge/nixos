@@ -73,7 +73,6 @@
 
       theme = {
         mode = "system";
-        light = "Catppuccin Macchiato";
         dark = "Catppuccin Macchiato (sapphire)";
       };
 
