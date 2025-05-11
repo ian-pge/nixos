@@ -2,12 +2,11 @@
   programs.hyprlock = {
     enable = true;
 
-    # Ensure all $variables appear before any section that uses them
+    # keep colour vars first
     importantPrefixes = ["$"];
 
-    # Declarative Hyprlock configuration
     settings = {
-      # ───── Palette ─────
+      # ───────── Catppuccin Mocha palette ─────────
       "$rosewater" = "rgb(f4dbd6)";
       "$rosewaterAlpha" = "f4dbd6";
       "$flamingo" = "rgb(f0c6c6)";
@@ -61,18 +60,20 @@
       "$crust" = "rgb(181926)";
       "$crustAlpha" = "181926";
 
+      # ───────── General (no more `no_fade_in`) ─────────
       general = {
-        # disable_loading_bar = true;
-        # grace = 300;
-        # hide_cursor = true;
-        no_fade_in = false;
+        grace = 300;
+        hide_cursor = true;
       };
 
-      # ───── Backgrounds ─────
+      # Turn *all* fade animations off (replacement for no_fade_in/out)
+      animation = ["fade,0,0,default"]; # optional – drop if you like the fade
+
+      # ───────── Backgrounds ─────────
       background = [
         {
           monitor = "eDP-1";
-          path = "/etc/nixos/material/wallpaper.png";
+          path = "~/.config/hypr/wallpaper.jpg";
           blur_size = 2;
           blur_passes = 3;
           noise = 0.0117;
@@ -83,7 +84,7 @@
         }
         {
           monitor = "HDMI-A-1";
-          path = "/etc/nixos/material/wallpaper.png";
+          path = "~/.config/hypr/wallpaper.jpg";
           blur_size = 2;
           blur_passes = 3;
           noise = 0.0117;
@@ -94,60 +95,62 @@
         }
       ];
 
-      # ───── Time & date labels ─────
+      # ───────── Labels ─────────
       label = [
+        # Time
         {
           monitor = "eDP-1";
           text = ''cmd[update:1000] echo "<b><big> $(date +\"%H:%M\") </big></b>"'';
           color = "rgba(33ccffee)";
           font_size = 112;
-          font_family = "Ubuntu Nerd Font";
+          font_family = "Geist Mono 10";
           shadow_passes = 3;
           shadow_size = 4;
           position = "0, -40";
           halign = "center";
           valign = "top";
         }
+
+        # Day name
         {
           monitor = "eDP-1";
-          text = ''cmd[update:18000000] echo "<b><big> \"$(date +'%A')\" </big></b>"'';
+          text = ''cmd[update:1800000] echo "<b><big> $(date +'%A') </big></b>"'';
           color = "$text";
           font_size = 50;
-          font_family = "Ubuntu Nerd Font";
+          font_family = "UbuntuMono Nerd Font 10";
           position = "0, -220";
           halign = "center";
           valign = "top";
         }
+
+        # Date
         {
           monitor = "eDP-1";
-          text = ''cmd[update:18000000] echo "<b> \"$(date +'%d %b')\" </b>"'';
+          text = ''cmd[update:1800000] echo "<b> $(date +'%d %b') </b>"'';
           color = "$text";
           font_size = 30;
-          font_family = "Ubuntu Nerd Font";
+          font_family = "UbuntuMono Nerd Font 10";
           position = "0, -280";
           halign = "center";
           valign = "top";
         }
+
+        # Age ticker (single-line Python so it stays inside the string)
         {
           monitor = "eDP-1";
-          text = ''
-                        cmd[update:100] echo "<b> <big> $(
-                          python3 - <<'PY'
-            import datetime,sys
-            age=((datetime.datetime.now()-datetime.datetime(1998,11,15)).total_seconds())/(365.2425*24*3600)
-            print(f'{age:.9f}')
-            PY
-                        ) </big></b>"'';
+          text = ''            cmd[update:100] echo "<b><big>$(
+                        python3 -c 'import datetime,sys;print(f\"{(datetime.datetime.now()-datetime.datetime(1998,11,15)).total_seconds()/31556952:.9f}\")'
+                      )</big></b>"'';
           color = "$text";
           font_size = 20;
-          font_family = "Ubuntu Nerd Font";
+          font_family = "Geist Mono 10";
           position = "0, 40";
           halign = "center";
           valign = "bottom";
         }
       ];
 
-      # ───── Password box ─────
+      # ───────── Password box ─────────
       "input-field" = [
         {
           monitor = "eDP-1";
@@ -156,7 +159,7 @@
           dots_size = 0.26;
           dots_spacing = 0.64;
           dots_center = true;
-          dots_rouding = -1;
+          dots_rounding = -1; # ← typo fixed
           rounding = 22;
           outer_color = "$surface0";
           inner_color = "$surface0";
