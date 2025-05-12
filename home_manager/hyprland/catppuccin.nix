@@ -35,5 +35,10 @@
       enable = true;
       flavor = "macchiato";
     };
+    mvp = {
+      enable = true;
+      flavor = "macchiato";
+      accent = "sapphire";
+    };
   };
 }
