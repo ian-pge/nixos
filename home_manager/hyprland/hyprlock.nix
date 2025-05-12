@@ -147,8 +147,8 @@
           dots_spacing = 0.64
           dots_center = true
           rounding = 22
-          outer_color = $surface0
-          inner_color = $surface0
+          outer_color = $crust
+          inner_color = $crust
           font_color = $green
           fade_on_empty = true
           placeholder_text = <span foreground="##$textAlpha"><i>󰌾 Logged in as </i><span foreground="##$mauveAlpha">$USER</span></span>
