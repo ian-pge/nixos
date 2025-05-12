@@ -111,7 +111,7 @@
           color = $pink
           font_size = 50
           font_family = Ubuntu Nerd Font
-          position = 0, -220
+          position = 0, -210
           halign = center
           valign = top
       }
