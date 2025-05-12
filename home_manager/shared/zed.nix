@@ -18,29 +18,6 @@
       };
       restore_on_startup = "none";
 
-      ssh_connections = [
-        {
-          host = "10.238.247.73";
-          username = "darknav";
-          projects = [{paths = ["/home"];}];
-        }
-        {
-          host = "192.168.2.18";
-          username = "jetson";
-          projects = [{paths = ["~/Desktop"];}];
-        }
-        {
-          host = "192.168.100.83";
-          username = "jetson";
-          projects = [{paths = ["/home"];}];
-        }
-        {
-          host = "192.168.100.12";
-          username = "jetson";
-          projects = [{paths = ["~/ian"];}];
-        }
-      ];
-
       tab_size = 2;
 
       lsp = {
