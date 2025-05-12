@@ -20,7 +20,7 @@
   services.udiskie.enable = true;
   programs.yazi.enable = true;
   services.playerctld.enable = true;
-  programs.hyprlock.enable = true;
+  # programs.hyprlock.enable = true;
   services.hyprpolkitagent.package = true;
   programs.htop.enable = true;
   programs.obs-studio.enable = true;
