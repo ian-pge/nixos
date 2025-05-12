@@ -124,7 +124,7 @@
           color = $text
           font_size = 20
           font_family = Ubuntu Nerd Font
-          position = 0, 0
+          position = 0, 40
           halign = center
           valign = bottom
       }
