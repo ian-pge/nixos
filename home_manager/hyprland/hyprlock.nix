@@ -74,7 +74,7 @@
           blur_passes = 3
           noise = 0.0117
           contrast = 1.3000
-          brightness = 0.8000
+          brightness = 0.4000
           vibrancy = 0.2100
           vibrancy_darkness = 0.0
       }
@@ -149,7 +149,7 @@
           rounding = 22
           outer_color = $surface0
           inner_color = $surface0
-          font_color = rgba(33ccffee)
+          font_color = $green
           fade_on_empty = true
           placeholder_text = <span foreground="##$textAlpha"><i>󰌾 Logged in as </i><span foreground="##$mauveAlpha">$USER</span></span>
           position = 0, 0
