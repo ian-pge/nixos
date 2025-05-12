@@ -57,12 +57,12 @@
       $crust = rgb(181926)
       $crustAlpha = 181926
 
-      animations {
-        bezier = [
-          "easeInExpo,0.16,1,0.3,1"
-        ]
-        animation = fadeIn,1,20,easeInExpo
-      }
+      # animations {
+      #   bezier = [
+      #     "easeInExpo,0.16,1,0.3,1"
+      #   ]
+      #   animation = fadeIn,1,20,easeInExpo
+      # }
 
       # ---------------- Backgrounds ----------------
       background {
