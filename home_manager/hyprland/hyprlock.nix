@@ -57,10 +57,15 @@
       $crust = rgb(181926)
       $crustAlpha = 181926
 
+      general {
+        hide_cursor = true
+      }
+
       animations {
         bezier = ease,0.42,0,1,1
-
-        animation = fadeIn,1,10,ease
+        animation = global,  1,  10, ease
+        animation = fade,    1,  10, ease
+        animation = fadeIn,  1,  10, ease
       }
 
       # ---------------- Backgrounds ----------------
