@@ -96,7 +96,7 @@
           valign = top
       }
 
-      # label {
+      label {
           monitor = eDP-1
           text = cmd[update:18000000] echo "<b><big> $(date +'%A') </big></b>"
           color = $text
