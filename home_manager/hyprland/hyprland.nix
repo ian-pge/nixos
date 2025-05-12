@@ -82,9 +82,16 @@
       };
 
       animations.enabled = true;
-      bezier = ["myBezier,0.05,0.9,0.1,1.05"];
+      bezier = [
+        "quick,0.15,0,0.1,1"
+        "easeOutQuint,0.23,1,0.32,1"
+        "easeInOutCubic,0.65,0.05,0.36,1"
+        "linear,0,0,1,1"
+        "almostLinear,0.5,0.5,0.75,1.0"
+      ];
+
       animation = [
-        "windows,1,7,myBezier,popin"
+        "windows,1,7,default,popin"
         "border,1,10,default"
         "fade,1,4,default"
         "workspaces,1,6,default,slide"

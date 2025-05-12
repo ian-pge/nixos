@@ -58,8 +58,9 @@
       $crustAlpha = 181926
 
       animations {
-        bezier = ease, 0.42, 0, 1, 1
-        animation = fadeIn,1,10,default
+        bezier = quick,0.15,0,0.1,1
+
+        animation = fadeIn,1,10,quick
       }
 
       # ---------------- Backgrounds ----------------
