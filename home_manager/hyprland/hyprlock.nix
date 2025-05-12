@@ -2,12 +2,6 @@
   programs.hyprlock = {
     enable = true;
 
-    /*
-    Everything below is copied from your message verbatim, so you
-    keep full control of Hyprlock’s own syntax, variables, and
-    comments.  Multi-line strings ('' … '') mean you don’t have
-    to escape quotes.
-    */
     extraConfig = ''
       # ---------------- Catppuccin Mocha palette ----------------
       $rosewater = rgb(f4dbd6)
