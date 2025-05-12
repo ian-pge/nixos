@@ -22,6 +22,7 @@
     firefox
     gyroflow
     wget
+    pika-backup
   ];
 
   programs = {
