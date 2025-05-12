@@ -61,13 +61,13 @@
       background {
           monitor = eDP-1
           path = /etc/nixos/material/wallpaper.png
-          # blur_size = 2
-          # blur_passes = 3
-          # noise = 0.0117
-          # contrast = 1.3000
-          # brightness = 0.8000
-          # vibrancy = 0.2100
-          # vibrancy_darkness = 0.0
+          blur_size = 2
+          blur_passes = 3
+          noise = 0.0117
+          contrast = 1.3000
+          brightness = 0.8000
+          vibrancy = 0.2100
+          vibrancy_darkness = 0.0
       }
 
       background {
