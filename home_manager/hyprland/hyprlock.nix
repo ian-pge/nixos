@@ -61,7 +61,7 @@
         bezier = [
           "ease,0.42,0,1,1"
         ]
-        animation = fadeIn,1,20,ease
+        animation = fadeOut,1,20,ease
       }
 
       # ---------------- Backgrounds ----------------
