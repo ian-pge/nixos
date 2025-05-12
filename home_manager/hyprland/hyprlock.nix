@@ -60,7 +60,7 @@
       # ---------------- Backgrounds ----------------
       background {
           monitor = eDP-1
-          # path = /etc/nixos/material/wallpaper.png
+          path = /etc/nixos/material/wallpaper.png
           # blur_size = 2
           # blur_passes = 3
           # noise = 0.0117
