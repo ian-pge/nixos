@@ -18,5 +18,6 @@
     ./stereolabs.nix
     ./lutris.nix
     ./betaflight.nix
+    ./virtualisation.nix
   ];
 }
