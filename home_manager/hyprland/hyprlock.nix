@@ -59,7 +59,6 @@
 
       animations {
         bezier = ease, 0.42, 0, 1, 1
-        animation = fade, 1, 4, default
         animation = fadeIn, 1, 10, ease
       }
 
