@@ -152,7 +152,7 @@
         dots_spacing = 0.64;
         dots_center = true;
         rounding = 22;
-        outer_color = "$crust";
+        outer_color = "$mauve";
         inner_color = "$crust";
         font_color = "$green";
         fade_on_empty = true;
