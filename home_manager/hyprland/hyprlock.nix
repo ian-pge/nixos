@@ -91,7 +91,7 @@
       # ---------------- Labels ----------------
       label {
           monitor = eDP-1
-          text = cmd[update:1000] echo "<b><big> $(date +\"%H:%M\") </big></b>"
+          text = cmd[update:1000] echo "<b><big> $(date +'%H:%M') </big></b>"
           color = rgba(33ccffee)
           font_size = 112
           font_family = "Ubuntu Nerd Font"
@@ -143,7 +143,6 @@
           dots_size = 0.26
           dots_spacing = 0.64
           dots_center = true
-          dots_rouding = -1
           rounding = 22
           outer_color = $surface0
           inner_color = $surface0
