@@ -61,7 +61,7 @@
         bezier = [
           "easeInExpo,0.7,0,0.84,0"
         ]
-        animation = fadeIn,1,20,easeInSine
+        animation = fadeIn,1,20,easeInExpo
       }
 
       # ---------------- Backgrounds ----------------
