@@ -59,7 +59,7 @@
 
       animations {
         bezier = [
-          "easeInExpo,0.7,0,0.84,0"
+          "easeInExpo,0.16,1,0.3,1"
         ]
         animation = fadeIn,1,20,easeInExpo
       }
