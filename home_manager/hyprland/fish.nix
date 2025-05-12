@@ -9,7 +9,7 @@
       fish_vi_key_bindings
       bind yy fish_clipboard_copy
       bind -M visual y fish_clipboard_copy
-      bind -M default p forward-char yank
+      bind -M default p 'forward-char; fish_clipboard_paste'
     '';
     plugins = [
       {
