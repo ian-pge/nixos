@@ -35,7 +35,7 @@
       enable = true;
       flavor = "macchiato";
     };
-    mvp = {
+    mpv = {
       enable = true;
       flavor = "macchiato";
       accent = "sapphire";
