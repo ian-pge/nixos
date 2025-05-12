@@ -12,10 +12,11 @@
         commandline -f backward-char
       end
 
-      fish_vi_key_bindings
+      fish_vi_key_bindings --no-erase
       bind yy fish_clipboard_copy
       bind -M visual y fish_clipboard_copy
       # bind -M default P fish_clipboard_paste
+      bind --erase --preset -M default p
       bind -M default p __vim_put_after_clipboard
     '';
     plugins = [
