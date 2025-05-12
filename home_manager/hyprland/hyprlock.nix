@@ -120,7 +120,7 @@
 
       label {
           monitor = eDP-1
-          text = cmd[update:100] echo "<b> <big> $(python3 -c 'import datetime,sys;birth=datetime.datetime(1998,11,15);print(f\"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}\")') </big></b>"
+          text = cmd[update:100] <b> <big> $(python3 -c 'import datetime,sys;birth=datetime.datetime(1998,11,15);print(f"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}")') </big></b>
           color = $text
           font_size = 20
           font_family = Ubuntu Nerd Font
