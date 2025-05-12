@@ -23,6 +23,6 @@
     # ./hyprpanel.nix
     ./hypridle.nix
     ./hyprlock.nix
-    ./mvp.nix
+    ./mpv.nix
   ];
 }
