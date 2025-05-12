@@ -16,7 +16,6 @@
     brightnessctl
     gnome-boxes
     celluloid
-    baobab
   ];
 
   services.swayosd.enable = true;
