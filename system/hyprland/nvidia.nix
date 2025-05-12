@@ -1,9 +1,14 @@
-{config, ...}: {
+{
+  pkgs,
+  config,
+  ...
+}: {
   hardware = {
     # Enable OpenGL
     graphics = {
       enable = true;
       enable32Bit = true;
+      extraPackages = with pkgs; [nvidia-vaapi-driver];
     };
     nvidia = {
       modesetting.enable = true;
