@@ -59,9 +59,8 @@
 
       animations {
         bezier = ease, 0.42, 0, 1, 1
-        animation = global, 1, 5, ease
-        animation = fade,    1, 5, ease
-        animation = fadeIn, 1, 5, ease
+        animation = fade,    1, 30, ease
+        animation = fadeIn, 1, 30, ease
       }
 
       # ---------------- Backgrounds ----------------
