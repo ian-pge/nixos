@@ -104,7 +104,7 @@
 
       label {
           monitor = eDP-1
-          text = cmd[update:18000000] echo "<b><big> \"$(date +'%A')\" </big></b>"
+          text = cmd[update:18000000] echo "<b><big> $(date +'%A') </big></b>"
           color = $text
           font_size = 50
           font_family = "Ubuntu Nerd Font"
@@ -115,7 +115,7 @@
 
       label {
           monitor = eDP-1
-          text = cmd[update:18000000] echo "<b> \"$(date +'%d %b')\" </b>"
+          text = cmd[update:18000000] echo "<b> $(date +'%d %b') </b>"
           color = $text
           font_size = 30
           font_family = "Ubuntu Nerd Font"
@@ -124,16 +124,16 @@
           valign = top
       }
 
-      label {
-          monitor = eDP-1
-          text = cmd[update:100] echo "<b> <big> $(python3 -c 'import datetime,sys;birth=datetime.datetime(1998,11,15);print(f\"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}\")') </big></b>"
-          color = $text
-          font_size = 20
-          font_family = "Ubuntu Nerd Font"
-          position = 0, 40
-          halign = center
-          valign = bottom
-      }
+      # label {
+      #     monitor = eDP-1
+      #     text = cmd[update:100] echo "<b> <big> $(python3 -c 'import datetime,sys;birth=datetime.datetime(1998,11,15);print(f\"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}\")') </big></b>"
+      #     color = $text
+      #     font_size = 20
+      #     font_family = "Ubuntu Nerd Font"
+      #     position = 0, 0
+      #     halign = center
+      #     valign = bottom
+      # }
 
       # ---------------- Input field ----------------
       input-field {
