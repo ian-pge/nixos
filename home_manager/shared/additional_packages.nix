@@ -20,6 +20,7 @@
     obsidian
     freecad-wayland
     firefox
+    gyroflow
   ];
 
   programs = {
