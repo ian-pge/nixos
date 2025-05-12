@@ -8,7 +8,6 @@
   virtualisation.spiceUSBRedirection.enable = true;
 
   environment.systemPackages = with pkgs; [
-    quickgui
     quickemu
   ];
 }

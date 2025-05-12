@@ -21,6 +21,7 @@
     freecad-wayland
     firefox
     gyroflow
+    wget
   ];
 
   programs = {
