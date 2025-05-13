@@ -28,5 +28,6 @@
   programs = {
     lazydocker.enable = true;
     lazygit.enable = true;
+    keepassxc.enable = true;
   };
 }
