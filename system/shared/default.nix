@@ -19,5 +19,6 @@
     ./lutris.nix
     ./betaflight.nix
     ./virtualisation.nix
+    ./tailscale.nix
   ];
 }
