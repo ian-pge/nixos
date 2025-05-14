@@ -3,6 +3,8 @@
 
   users.users."ian".extraGroups = ["libvirtd"];
 
+  virtualisation.spiceUSBRedirection.enable = true;
+
   virtualisation.libvirtd = {
     enable = true;
     qemu = {
