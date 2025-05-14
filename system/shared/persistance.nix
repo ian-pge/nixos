@@ -10,8 +10,8 @@
       "/var/lib/systemd/coredump"
       "/var/lib/docker"
       "/var/lib/libvirt"
+      "var/lib/tailscale"
       "/var/lib/NetworkManager"
-      "/var/lib/iwd"
       "/var/cache/tuigreet"
       "/etc/NetworkManager/system-connections"
       {
