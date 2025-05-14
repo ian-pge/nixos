@@ -1,6 +1,5 @@
 {pkgs, ...}: {
   home.packages = with pkgs; [
-    oh-my-posh
     hyprpicker
     hyprshot
     bluetui
@@ -12,9 +11,7 @@
     wl-clipboard
     ncdu
     nurl
-    inkscape
     brightnessctl
-    gnome-boxes
     celluloid
   ];
 

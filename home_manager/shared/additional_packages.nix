@@ -23,6 +23,7 @@
     gyroflow
     wget
     pika-backup
+    inkscape
   ];
 
   programs = {
