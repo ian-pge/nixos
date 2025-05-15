@@ -104,12 +104,12 @@
         };
 
         "custom/nixos" = {
-          exec = "waybar-update-checker";
-          interval = 3600;
-          tooltip = true;
+          on-click = "waybar-update-checker";
           return-type = "json";
-          format = "{icon}{}";
+          tooltip = true;
+          format = "{icon} {}";
           format-icons = {
+            "busy" = "";
             "has-updates" = "";
             "updated" = "";
           };
@@ -212,6 +212,8 @@
       #!/usr/bin/env bash
       set -euo pipefail
       export NO_COLOR=1
+
+      printf {'"text":"...","alt":"busy","tooltip":"Building ..."\n'}
 
       flake_dir="/etc/nixos"
       scratch="$(mktemp -d)"

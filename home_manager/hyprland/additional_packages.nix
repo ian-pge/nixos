@@ -13,6 +13,7 @@
     nurl
     brightnessctl
     celluloid
+    jq
   ];
 
   services.swayosd.enable = true;
