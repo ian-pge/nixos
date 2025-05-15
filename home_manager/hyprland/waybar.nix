@@ -256,6 +256,7 @@
       fi
 
       printf '{"alt":"outdated","tooltip":"New nixpkgs revision available","text":""}\n'
+
     '')
 
     (writeShellScriptBin "waybar-update-builder" ''
