@@ -121,7 +121,7 @@
 
           format = "{icon} {text}";
           format-icons = {
-            idle = ""; # closed box  (initial state)
+            idle = ""; # closed box  (initial state)
             busy = ""; # spinner     (while building)
             has-updates = ""; # circular arrows
             updated = ""; # check mark
