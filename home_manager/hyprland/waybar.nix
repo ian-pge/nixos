@@ -107,7 +107,7 @@
           on-click = "waybar-update-checker";
           return-type = "json";
           tooltip = true;
-          format = "{icon} {}";
+          format = "{icon} {text}";
           format-icons = {
             "busy" = "";
             "has-updates" = "";
