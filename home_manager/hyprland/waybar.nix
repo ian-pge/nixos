@@ -242,7 +242,7 @@
       #######################################################
 
       # heavy path: only when invoked with --refresh
-      printf '{"class":"busy","text":"…","tooltip":"checking…"}\n' >"$STATE"
+      printf '{"alt":"busy","text":"…","tooltip":"checking…"}\n' >"$STATE"
       pkill -RTMIN+$SIG waybar 2>/dev/null || true             # repaint spinner
 
       (
