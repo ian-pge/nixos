@@ -213,7 +213,7 @@
       set -euo pipefail
       export NO_COLOR=1
 
-      printf {'"text":"...","alt":"busy","tooltip":"Building ..."\n'}
+      printf '{"text":"...","alt":"busy","tooltip":"Building ..."}\n'
 
       flake_dir="/etc/nixos"
       scratch="$(mktemp -d)"
