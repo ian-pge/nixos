@@ -235,7 +235,7 @@
         if [[ -r $STATE ]]; then
           cat "$STATE"
         else
-          printf '{"class":"idle","text":""}\n'
+          printf '{"alt":"idle","text":""}\n'
         fi
         exit 0
       fi
@@ -258,12 +258,12 @@
         count=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)
 
         if (( count == 0 )); then
-          printf '{"class":"updated","text":"0","tooltip":"system up-to-date"}\n' >"$STATE"
+          printf '{"alt":"updated","text":"0","tooltip":"system up-to-date"}\n' >"$STATE"
         else
           tip=$(nvd diff /run/current-system ./result-new \
                   | grep '\[U' | awk '{for(i=3;i<NF;i++)printf $i" ";print $NF}' \
                   | jq -Rsa .)
-          printf '{"class":"has-updates","text":"%s","tooltip":%s}\n' "$count" "$tip" >"$STATE"
+          printf '{"alt":"has-updates","text":"%s","tooltip":%s}\n' "$count" "$tip" >"$STATE"
         fi
         pkill -RTMIN+$SIG waybar                           # repaint result
       ) & disown
