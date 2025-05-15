@@ -104,29 +104,19 @@
         };
 
         "custom/nixos" = {
-          # on-click = "waybar-update-checker";
-          # return-type = "json";
-          # tooltip = true;
-          # format = "{icon} {text}";
-          # format-icons = {
-          #   "busy" = "";
-          #   "has-updates" = "";
-          #   "updated" = "";
-          # };
-          exec = "waybar-update-checker --print"; # ultra-cheap path
-          interval = "once"; # run exactly once
-          signal = 9; # SIGRTMIN+9
-          on-click = "waybar-update-checker --refresh"; # heavy path
+          exec = "waybar-update-checker";
+          interval = "3600";
+          on-click = "waybar-update-builder"; # heavy path
+          signal = 8;
           return-type = "json";
-
+          tooltip = true;
           format = "{icon} {text}";
           format-icons = {
-            idle = ""; # closed box  (initial state)
-            busy = ""; # spinner     (while building)
-            has-updates = ""; # circular arrows
-            updated = ""; # check mark
+            busy = ""; # spinner     (while building)
+            has-updates = ""; # circular arrows
+            updated = ""; # check mark
+            outdated = "";
           };
-          tooltip = true;
         };
 
         bluetooth = {
@@ -226,52 +216,89 @@
       #!/usr/bin/env bash
       set -euo pipefail
 
-      STATE="$XDG_RUNTIME_DIR/nixos-update.json"
-      SIG=9          # must match the module
+      STATE_DIR="$XDG_RUNTIME_DIR/waybar-nixos"
+      BUSY_FILE="$STATE_DIR/busy"
+      INFO_FILE="$STATE_DIR/updates.json"
+      mkdir -p "$STATE_DIR"
 
-      #######################################################
-      # cheap code-path: just print the cache (or an idle icon)
-      if [ $# -eq 0 ] || [ "$1" != "--refresh" ]; then
-        if [[ -r $STATE ]]; then
-          cat "$STATE"
-        else
-          printf '{"alt":"idle","text":""}\n'
-        fi
+      flake_dir="/etc/nixos"
+      scratch="$(mktemp -d)"
+      trap 'rm -rf "$scratch"' EXIT
+
+      # 1. BUSY has absolute priority
+      if [[ -e $BUSY_FILE ]]; then
+        printf '{"alt":"busy","tooltip":"Building…","text":""}\n'
         exit 0
       fi
-      #######################################################
 
-      # heavy path: only when invoked with --refresh
-      printf '{"alt":"busy","text":"…","tooltip":"checking…"}\n' >"$STATE"
-      pkill -RTMIN+$SIG waybar 2>/dev/null || true             # repaint spinner
-
-      (
-        set -e
-        scratch=$(mktemp -d); trap 'rm -rf "$scratch"' EXIT
-        rsync -a --exclude=.git /etc/nixos/ "$scratch" &>/dev/null
-        cd "$scratch"
-
-        nix flake update --update-input nixpkgs &>/dev/null
-        nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
-                  --no-link --out-link result-new &>/dev/null
-
-        count=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)
-
-        if (( count == 0 )); then
-          printf '{"alt":"updated","text":"0","tooltip":"system up-to-date"}\n' >"$STATE"
+      # 2. Already built once → keep “has-updates” until host catches up
+      if [[ -e $INFO_FILE ]]; then
+        # If the diff is gone we switched or rebooted → clean slate
+        if nvd diff /run/current-system "$(jq -r .new_path "$INFO_FILE")" >/dev/null; then
+          rm -f "$INFO_FILE"
         else
-          tip=$(nvd diff /run/current-system ./result-new \
-                  | grep '\[U' | awk '{for(i=3;i<NF;i++)printf $i" ";print $NF}' \
-                  | jq -Rsa .)
-          printf '{"alt":"has-updates","text":"%s","tooltip":%s}\n' "$count" "$tip" >"$STATE"
+          cat "$INFO_FILE"
+          exit 0
         fi
-        pkill -RTMIN+$SIG waybar                           # repaint result
-      ) & disown
+      fi
+
+      # 3. Fresh comparison between current system and a *potential* update
+      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null 2>&1
+      cd "$scratch"
+      nix flake update --update-input nixpkgs >/dev/null 2>&1
+
+      old_rev=$(jq -r '.nodes.nixpkgs.locked.rev' "$flake_dir/flake.lock")
+      new_rev=$(jq -r '.nodes.nixpkgs.locked.rev' flake.lock)
+
+      if [[ $old_rev == "$new_rev" ]]; then
+        printf '{"alt":"updated","tooltip":"System up-to-date","text":""}\n'
+        exit 0
+      fi
+
+      printf '{"alt":"outdated","tooltip":"New nixpkgs revision available","text":""}\n'
     '')
 
-    /*
-    ── gpu‑usage‑waybar built on‑the‑fly ─────────────
-    */
+    (writeShellScriptBin "waybar-update-checker" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      STATE_DIR="$XDG_RUNTIME_DIR/waybar-nixos"
+      BUSY_FILE="$STATE_DIR/busy"
+      INFO_FILE="$STATE_DIR/updates.json"
+      mkdir -p "$STATE_DIR"
+
+      touch "$BUSY_FILE"
+      pkill -RTMIN+8 -x waybar            # refresh → shows the spinner :contentReference[oaicite:4]{index=4}
+
+      flake_dir="/etc/nixos"
+      scratch="$(mktemp -d)"
+      trap 'rm -rf "$scratch"' EXIT
+      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
+      cd "$scratch"
+
+      echo "Updating flake inputs…"
+      nix flake update --update-input nixpkgs
+
+      echo "Building system… (this can take a while)"
+      nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
+                --no-link --out-link result-new
+
+      updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)   # :contentReference[oaicite:5]{index=5}
+      tooltip=$(nvd diff /run/current-system ./result-new \
+                  | grep '\[U' \
+                  | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
+                  | jq -Rsa .)
+
+      jq -n --arg path "$(readlink -f ./result-new)" \
+            --argjson tooltip "$tooltip" \
+            --arg updates "$updates" '
+            {alt:"has-updates", text:$updates, tooltip:$tooltip, new_path:$path}' \
+      > "$INFO_FILE"
+
+      rm -f "$BUSY_FILE"
+      pkill -RTMIN+8 -x waybar            # refresh → shows the “⬇ n” icon
+    '')
+
     (rustPlatform.buildRustPackage {
       pname = "gpu-usage-waybar";
       version = "0.1.23"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
