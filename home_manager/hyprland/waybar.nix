@@ -231,7 +231,7 @@
 
       #######################################################
       # cheap code-path: just print the cache (or an idle icon)
-      if ["$1" != "--refresh"]; then
+      if [[ ${1:}- != --refresh ]]; then
         if [[ -r $STATE ]]; then
           cat "$STATE"
         else
