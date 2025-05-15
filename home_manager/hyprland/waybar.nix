@@ -104,15 +104,29 @@
         };
 
         "custom/nixos" = {
-          on-click = "waybar-update-checker";
+          # on-click = "waybar-update-checker";
+          # return-type = "json";
+          # tooltip = true;
+          # format = "{icon} {text}";
+          # format-icons = {
+          #   "busy" = "";
+          #   "has-updates" = "";
+          #   "updated" = "";
+          # };
+          exec = "waybar-update-checker --print"; # ultra-cheap path
+          interval = "once"; # run exactly once
+          signal = 9; # SIGRTMIN+9
+          on-click = "waybar-update-checker --refresh"; # heavy path
           return-type = "json";
-          tooltip = true;
+
           format = "{icon} {text}";
           format-icons = {
-            "busy" = "";
-            "has-updates" = "";
-            "updated" = "";
+            idle = ""; # closed box  (initial state)
+            busy = ""; # spinner     (while building)
+            has-updates = ""; # circular arrows
+            updated = ""; # check mark
           };
+          tooltip = true;
         };
 
         bluetooth = {
@@ -211,39 +225,48 @@
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       set -euo pipefail
-      export NO_COLOR=1
 
-      printf '{"text":"...","alt":"busy","tooltip":"Building ..."}\n'
+      STATE="$XDG_RUNTIME_DIR/nixos-update.json"
+      SIG=9          # must match the module
 
-      flake_dir="/etc/nixos"
-      scratch="$(mktemp -d)"
-      trap 'rm -rf "$scratch"' EXIT
-
-      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null 2>&1
-      cd "$scratch"
-
-      # modern command; send **all** noise to /dev/null
-      nix flake update --update-input nixpkgs >/dev/null 2>&1
-
-      nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
-                --no-link --out-link result-new >/dev/null 2>&1
-
-      updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)
-
-      if [ "$updates" -eq 0 ]; then
-        printf '{"text":"0","alt":"updated","tooltip":"System up‑to‑date"}\n'
+      #######################################################
+      # cheap code-path: just print the cache (or an idle icon)
+      if [[ $1:- != --refresh ]]; then
+        if [[ -r $STATE ]]; then
+          cat "$STATE"
+        else
+          printf '{"class":"idle","text":""}\n'
+        fi
         exit 0
       fi
+      #######################################################
 
-      # Build tooltip, let jq handle escaping *and* newline → \n conversion
-      tooltip=$(nvd diff /run/current-system ./result-new \
-                  | grep '\[U' \
-                  | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
-                  | jq -Rsa .)                 # gives a JSON string literal
+      # heavy path: only when invoked with --refresh
+      printf '{"class":"busy","text":"…","tooltip":"checking…"}\n' >"$STATE"
+      pkill -RTMIN+$SIG waybar 2>/dev/null || true             # repaint spinner
 
-      # tooltip already has quotes; don’t wrap again
-      printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' \
-              "$updates" "$tooltip"
+      (
+        set -e
+        scratch=$(mktemp -d); trap 'rm -rf "$scratch"' EXIT
+        rsync -a --exclude=.git /etc/nixos/ "$scratch" &>/dev/null
+        cd "$scratch"
+
+        nix flake update --update-input nixpkgs &>/dev/null
+        nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
+                  --no-link --out-link result-new &>/dev/null
+
+        count=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)
+
+        if (( count == 0 )); then
+          printf '{"class":"updated","text":"0","tooltip":"system up-to-date"}\n' >"$STATE"
+        else
+          tip=$(nvd diff /run/current-system ./result-new \
+                  | grep '\[U' | awk '{for(i=3;i<NF;i++)printf $i" ";print $NF}' \
+                  | jq -Rsa .)
+          printf '{"class":"has-updates","text":"%s","tooltip":%s}\n' "$count" "$tip" >"$STATE"
+        fi
+        pkill -RTMIN+$SIG waybar                           # repaint result
+      ) & disown
     '')
 
     /*

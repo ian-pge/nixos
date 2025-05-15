@@ -15,15 +15,14 @@
       ".local/share/applications"
       ".local/share/icons"
       ".local/share/lutris"
-      ".config/zed"
       {
         directory = ".local/share/zed";
         method = "symlink";
       }
-      # {
-      #   directory = ".config/zed";
-      #   method = "symlink";
-      # }
+      {
+        directory = ".config/zed";
+        method = "symlink";
+      }
       ".config/history"
       ".zotero"
       # Gnome
