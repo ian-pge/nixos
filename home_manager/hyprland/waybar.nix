@@ -258,7 +258,7 @@
       printf '{"alt":"outdated","tooltip":"New nixpkgs revision available","text":""}\n'
     '')
 
-    (writeShellScriptBin "waybar-update-checker" ''
+    (writeShellScriptBin "waybar-update-builder" ''
       #!/usr/bin/env bash
       set -euo pipefail
 
