@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
       set -euo pipefail
-      export NO_COLOR=1
 
       flake_dir="/etc/nixos"
       scratch="$(mktemp -d)"
@@ -39,14 +38,10 @@
 
              (writeShellScriptBin "waybar-update-checker" ''
                    #!/usr/bin/env bash
-                   #
-                   # Waybar module: count packages that would change after bumping nixpkgs,
-                   #                without fetching substitutes or building anything.
-                   #
-                   set -euo pipefail
-                   export NO_COLOR=1                      # nix‑diff → monochrome
 
-                   flake_dir="/etc/nixos"                 # system flake location
+                   set -euo pipefail
+
+                   flake_dir="${../..}"                 # system flake location
 
                    # 1. ── work in a throw‑away copy so we never touch the real repo ─────────
                    scratch="$(mktemp -d)"

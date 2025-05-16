@@ -106,11 +106,11 @@
         "custom/nixos" = {
           exec = "waybar-update-checker";
           interval = "3600";
-          on-click = "waybar-update-builder"; # heavy path
-          signal = 8;
+          # on-click = "waybar-update-builder"; # heavy path
+          # signal = 8;
           return-type = "json";
           tooltip = true;
-          format = "{icon} {text}";
+          format = "{icon}{text}";
           format-icons = {
             busy = ""; # spinner     (while building)
             has-updates = ""; # circular arrows
@@ -214,90 +214,33 @@
   home.packages = with pkgs; [
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
+
       set -euo pipefail
 
-      STATE_DIR="$XDG_RUNTIME_DIR/waybar-nixos"
-      BUSY_FILE="$STATE_DIR/busy"
-      INFO_FILE="$STATE_DIR/updates.json"
-      mkdir -p "$STATE_DIR"
+      flake_dir="${../..}"                 # system flake location
 
-      flake_dir="/etc/nixos"
-      scratch="$(mktemp -d)"
-      trap 'rm -rf "$scratch"' EXIT
-
-      # 1. BUSY has absolute priority
-      if [[ -e $BUSY_FILE ]]; then
-        printf '{"alt":"busy","tooltip":"Building…","text":""}\n'
-        exit 0
-      fi
-
-      # 2. Already built once → keep “has-updates” until host catches up
-      if [[ -e $INFO_FILE ]]; then
-        # If the diff is gone we switched or rebooted → clean slate
-        if nvd diff /run/current-system "$(jq -r .new_path "$INFO_FILE")" >/dev/null; then
-          rm -f "$INFO_FILE"
-        else
-          cat "$INFO_FILE"
-          exit 0
-        fi
-      fi
-
-      # 3. Fresh comparison between current system and a *potential* update
-      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null 2>&1
-      cd "$scratch"
-      nix flake update --update-input nixpkgs >/dev/null 2>&1
-
-      old_rev=$(jq -r '.nodes.nixpkgs.locked.rev' "$flake_dir/flake.lock")
-      new_rev=$(jq -r '.nodes.nixpkgs.locked.rev' flake.lock)
-
-      if [[ $old_rev == "$new_rev" ]]; then
-        printf '{"alt":"updated","tooltip":"System up-to-date","text":""}\n'
-        exit 0
-      fi
-
-      printf '{"alt":"outdated","tooltip":"New nixpkgs revision available","text":""}\n'
-
-    '')
-
-    (writeShellScriptBin "waybar-update-builder" ''
-      #!/usr/bin/env bash
-      set -euo pipefail
-
-      STATE_DIR="$XDG_RUNTIME_DIR/waybar-nixos"
-      BUSY_FILE="$STATE_DIR/busy"
-      INFO_FILE="$STATE_DIR/updates.json"
-      mkdir -p "$STATE_DIR"
-
-      touch "$BUSY_FILE"
-      pkill -RTMIN+8 -x waybar            # refresh → shows the spinner :contentReference[oaicite:4]{index=4}
-
-      flake_dir="/etc/nixos"
+      # 1. ── work in a throw‑away copy so we never touch the real repo ─────────
       scratch="$(mktemp -d)"
       trap 'rm -rf "$scratch"' EXIT
       rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
       cd "$scratch"
 
-      echo "Updating flake inputs…"
-      nix flake update --update-input nixpkgs
+      # 2. ── update nixpkgs input in the *scratch* lock file (quietly) ─────────
+      nix flake update nixpkgs --quiet    # modern flag
 
-      echo "Building system… (this can take a while)"
-      nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel" \
-                --no-link --out-link result-new
+      # 3. ── ask Nix for the next system’s *derivation* only (pure eval) ──────
+      next_drv=$(nix eval --raw \
+        ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
 
-      updates=$(nvd diff /run/current-system ./result-new | grep -c '\[U' || true)   # :contentReference[oaicite:5]{index=5}
-      tooltip=$(nvd diff /run/current-system ./result-new \
-                  | grep '\[U' \
-                  | awk '{for(i=3;i<NF;i++)printf $i" "; print $NF}' \
-                  | jq -Rsa .)
+      # 4. ── get the derivation of the running system (modern sub‑command) ────
+      cur_drv=$(nix derivation show /run/current-system | jq -r 'keys[0]')
 
-      jq -n --arg path "$(readlink -f ./result-new)" \
-            --argjson tooltip "$tooltip" \
-            --arg updates "$updates" '
-            {alt:"has-updates", text:$updates, tooltip:$tooltip, new_path:$path}' \
-      > "$INFO_FILE"
-
-      rm -f "$BUSY_FILE"
-      pkill -RTMIN+8 -x waybar            # refresh → shows the “⬇ n” icon
+      # 5. ── identical hashes ⇒ system already up to date ─────────────────────
+      if [[ "$next_drv" == "$cur_drv" ]]; then
+        printf '{"text":"","alt":"updated","tooltip":"System up‑to‑date"}\n'
+      else
+        printf '{"text":"","alt":"outdated","tooltip":"System outdated"}\n'
+      fi     # refresh → shows the “⬇ n” icon
     '')
 
     (rustPlatform.buildRustPackage {
