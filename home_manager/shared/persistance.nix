@@ -9,6 +9,7 @@
       "PhD"
       "Perso"
 
+      ".config/nixos"
       ".ssh"
       ".devpod"
       ".config/google-chrome"
