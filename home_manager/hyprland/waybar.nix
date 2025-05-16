@@ -217,7 +217,7 @@
 
       set -euo pipefail
 
-      flake_dir="${../..}"                 # system flake location
+      flake_dir="/home/ian/.config/nixos"                 # system flake location
 
       # 1. ── work in a throw‑away copy so we never touch the real repo ─────────
       scratch="$(mktemp -d)"
