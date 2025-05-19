@@ -245,13 +245,13 @@
 
     (rustPlatform.buildRustPackage {
       pname = "gpu-usage-waybar";
-      version = "0.1.23"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
+      version = "v0.1.23"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
 
       src = fetchFromGitHub {
         # pulls the exact crate published to crates.io
         owner = "PolpOnline";
         repo = "gpu-usage-waybar";
-        rev = "0.1.23";
+        rev = "v0.1.23";
         hash = "sha256-DUIKiUgTy4jn8NZZvjC0zuA993Sbq1Fvr7tvJw3+tNw="; # first run with lib.fakeSha256, copy real hash
       };
 
