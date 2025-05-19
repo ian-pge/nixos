@@ -9,7 +9,7 @@
 
     zed-editor
     devpod
-    bambu-studio
+    # bambu-studio
     google-chrome
     blender
     davinci-resolve
