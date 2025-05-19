@@ -1,11 +1,19 @@
 final: prev: {
   bambu-studio = prev.bambu-studio.overrideAttrs (old: {
-    # version = "v02.00.02.57";
+    version = "v02.00.03.54";
+    src = final.fetchFromGitHub {
+      owner = "bambulab";
+      repo = "BambuStudio";
+      rev = "v02.00.03.54";
+      hash = "sha256-DUrlmeH3XJmke6VOwC7HREONQMIhg3wFYw7QTndY2/Y=";
+    };
+
+    # version = "01.00.01.50";
     # src = final.fetchFromGitHub {
     #   owner = "bambulab";
     #   repo = "BambuStudio";
-    #   rev = "v02.00.02.57";
-    #   hash = "sha256-DUrlmeH3XJmke6VOwC7HREONQMIhg3wFYw7QTndY2/Y=";
+    #   rev = "v01.00.01.50";
+    #   hash = "sha256-7mkrPl2CQSfc1lRjl1ilwxdYcK5iRU//QGKmdCicK30=";
     # };
 
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [prev.makeWrapper];
