@@ -14,6 +14,7 @@
     brightnessctl
     celluloid
     jq
+    gnome-disk-utility
   ];
 
   services.swayosd.enable = true;
