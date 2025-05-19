@@ -114,8 +114,8 @@
           format-icons = {
             busy = ""; # spinner     (while building)
             has-updates = ""; # circular arrows
-            updated = "󰗠"; # check mark
-            outdated = "󰅙";
+            updated = ""; # check mark
+            outdated = "";
           };
         };
 
