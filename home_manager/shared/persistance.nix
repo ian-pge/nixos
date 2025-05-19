@@ -15,6 +15,7 @@
       ".config/google-chrome"
       ".local/share/applications"
       ".local/share/icons"
+      ".config/BambuStudio"
       ".local/share/lutris"
       {
         directory = ".local/share/zed";
