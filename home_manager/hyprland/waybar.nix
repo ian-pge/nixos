@@ -105,7 +105,7 @@
 
         "custom/nixos" = {
           exec = "waybar-update-checker";
-          interval = "3600";
+          interval = "1800";
           # on-click = "waybar-update-builder"; # heavy path
           # signal = 8;
           return-type = "json";
