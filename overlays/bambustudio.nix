@@ -8,13 +8,13 @@ final: prev: {
     #   hash = "sha256-DUrlmeH3XJmke6VOwC7HREONQMIhg3wFYw7QTndY2/Y=";
     # };
 
-    version = "01.00.01.50";
-    src = final.fetchFromGitHub {
-      owner = "bambulab";
-      repo = "BambuStudio";
-      rev = "v01.00.01.50";
-      hash = "sha256-7mkrPl2CQSfc1lRjl1ilwxdYcK5iRU//QGKmdCicK30=";
-    };
+    # version = "01.00.01.50";
+    # src = final.fetchFromGitHub {
+    #   owner = "bambulab";
+    #   repo = "BambuStudio";
+    #   rev = "v01.00.01.50";
+    #   hash = "sha256-7mkrPl2CQSfc1lRjl1ilwxdYcK5iRU//QGKmdCicK30=";
+    # };
 
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [prev.makeWrapper];
     postInstall =
