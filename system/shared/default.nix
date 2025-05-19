@@ -21,5 +21,6 @@
     ./virtualisation.nix
     ./tailscale.nix
     # ./flatpak.nix
+    ./avahi.nix
   ];
 }
