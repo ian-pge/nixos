@@ -19,7 +19,7 @@
     neofetch
     obsidian
     freecad-wayland
-    firefox
+    # firefox
     gyroflow
     wget
     pika-backup
