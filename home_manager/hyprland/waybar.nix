@@ -240,7 +240,7 @@
         printf '{"text":"","alt":"updated","tooltip":"System up‑to‑date"}\n'
       else
         printf '{"text":"","alt":"outdated","tooltip":"System outdated"}\n'
-      fi     # refresh → shows the “⬇ n” icon
+      fi
     '')
 
     (rustPlatform.buildRustPackage {
