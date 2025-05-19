@@ -1,5 +1,13 @@
 final: prev: {
   bambu-studio = prev.bambu-studio.overrideAttrs (old: {
+    # version = "v02.00.02.57";
+    # src = final.fetchFromGitHub {
+    #   owner = "bambulab";
+    #   repo = "BambuStudio";
+    #   rev = "v02.00.02.57";
+    #   hash = "sha256-DUrlmeH3XJmke6VOwC7HREONQMIhg3wFYw7QTndY2/Y=";
+    # };
+
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [prev.makeWrapper];
     postInstall =
       (old.postInstall or "")
