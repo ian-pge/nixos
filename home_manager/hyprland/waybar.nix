@@ -106,7 +106,7 @@
         "custom/nixos" = {
           exec = "waybar-update-checker";
           interval = 5;
-          # on-click = "waybar-update-builder"; # heavy path
+          on-click = "ghostty -e waybar-update-builder &";
           # signal = 8;
           return-type = "json";
           tooltip = true;
@@ -243,6 +243,24 @@
       else
         printf '{"text":"","alt":"outdated","tooltip":"System outdated"}\n'
       fi
+    '')
+
+    (writeShellScriptBin "waybar-update-builder" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      cd "$HOME/.config/nixos"
+
+      nix flake update
+
+      # Only commit if something changed
+      if ! git diff --quiet flake.lock; then
+        git add flake.lock
+        git commit -m "flake: update inputs ($(date -u +%F))"
+        git push
+      fi
+
+      nh os switch
     '')
 
     (rustPlatform.buildRustPackage {
