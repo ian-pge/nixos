@@ -228,10 +228,10 @@
         cur_rev=""
       fi
 
-      # ── latest revision (may fail if no network) ───────────────────
+      # ── latest revision  ───────────────────
       latest_rev=$(
         timeout 10s \
-          nix flake metadata --refresh --json "github:NixOS/nixpkgs?ref=$branch" 2>/dev/null |
+          nix flake metadata --json "github:NixOS/nixpkgs?ref=$branch" 2>/dev/null |
         jq -er '.locked.rev' 2>/dev/null || true
       )
 
