@@ -105,13 +105,14 @@
 
         "custom/nixos" = {
           exec = "waybar-update-checker";
-          interval = "1800";
+          interval = 5;
           # on-click = "waybar-update-builder"; # heavy path
           # signal = 8;
           return-type = "json";
           tooltip = true;
           format = "{icon}{text}";
           format-icons = {
+            error = "";
             busy = ""; # spinner     (while building)
             has-updates = ""; # circular arrows
             updated = ""; # check mark
@@ -214,30 +215,31 @@
   home.packages = with pkgs; [
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
+      set -uo pipefail                      # keep it simple: no -e, no traps
 
-      set -euo pipefail
+      flake_lock="$HOME/.config/nixos/flake.lock"
+      branch="nixpkgs-unstable"            # sensible fallback
 
-      flake_dir="/home/ian/.config/nixos"                 # system flake location
+      # ── current revision ────────────────────────────────────────────
+      if [[ -f $flake_lock ]]; then
+        cur_rev=$(jq -er '.nodes.nixpkgs.locked.rev' "$flake_lock" 2>/dev/null || true)
+        branch=$(jq -er '.nodes.nixpkgs.original.ref // empty' "$flake_lock" 2>/dev/null || echo "$branch")
+      else
+        cur_rev=""
+      fi
 
-      # 1. ── work in a throw‑away copy so we never touch the real repo ─────────
-      scratch="$(mktemp -d)"
-      trap 'rm -rf "$scratch"' EXIT
-      rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
-      cd "$scratch"
+      # ── latest revision (may fail if no network) ───────────────────
+      latest_rev=$(
+        timeout 10s \
+          nix flake metadata --refresh --json "github:NixOS/nixpkgs?ref=$branch" 2>/dev/null |
+        jq -er '.locked.rev' 2>/dev/null || true
+      )
 
-      # 2. ── update nixpkgs input in the *scratch* lock file (quietly) ─────────
-      nix flake update nixpkgs --quiet    # modern flag
-
-      # 3. ── ask Nix for the next system’s *derivation* only (pure eval) ──────
-      next_drv=$(nix eval --raw \
-        ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
-
-      # 4. ── get the derivation of the running system (modern sub‑command) ────
-      cur_drv=$(nix derivation show /run/current-system | jq -r 'keys[0]')
-
-      # 5. ── identical hashes ⇒ system already up to date ─────────────────────
-      if [[ "$next_drv" == "$cur_drv" ]]; then
-        printf '{"text":"","alt":"updated","tooltip":"System up‑to‑date"}\n'
+      # ── single decision point ──────────────────────────────────────
+      if [[ -z $cur_rev || -z $latest_rev ]]; then
+        printf '{"text":"","alt":"error","tooltip":"Error"}\n'
+      elif [[ $cur_rev == "$latest_rev" ]]; then
+        printf '{"text":"","alt":"updated","tooltip":"System up-to-date"}\n'
       else
         printf '{"text":"","alt":"outdated","tooltip":"System outdated"}\n'
       fi

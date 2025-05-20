@@ -111,3 +111,35 @@
 
 
                   ];
+
+
+
+
+                  #!/usr/bin/env bash
+
+                       set -euo pipefail
+
+                       flake_dir="/home/ian/.config/nixos"                 # system flake location
+
+                       # 1. ── work in a throw‑away copy so we never touch the real repo ─────────
+                       scratch="$(mktemp -d)"
+                       trap 'rm -rf "$scratch"' EXIT
+                       rsync -a --exclude='.git' "$flake_dir/" "$scratch" >/dev/null
+                       cd "$scratch"
+
+                       # 2. ── update nixpkgs input in the *scratch* lock file (quietly) ─────────
+                       nix flake update nixpkgs --quiet    # modern flag
+
+                       # 3. ── ask Nix for the next system’s *derivation* only (pure eval) ──────
+                       next_drv=$(nix eval --raw \
+                         ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel.drvPath")
+
+                       # 4. ── get the derivation of the running system (modern sub‑command) ────
+                       cur_drv=$(nix derivation show /run/current-system | jq -r 'keys[0]')
+
+                       # 5. ── identical hashes ⇒ system already up to date ─────────────────────
+                       if [[ "$next_drv" == "$cur_drv" ]]; then
+                         printf '{"text":"","alt":"updated","tooltip":"System up‑to‑date"}\n'
+                       else
+                         printf '{"text":"","alt":"outdated","tooltip":"System outdated"}\n'
+                       fi
