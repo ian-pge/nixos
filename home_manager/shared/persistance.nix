@@ -17,6 +17,8 @@
       ".local/share/icons"
       ".config/BambuStudio"
       ".local/share/lutris"
+      ".config/Code"
+      ".vscode"
       {
         directory = ".local/share/zed";
         method = "symlink";
