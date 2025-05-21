@@ -230,7 +230,7 @@
 
       # ── latest revision  ───────────────────
       latest_rev=$(
-        timeout 30s \
+        timeout 60s \
           nix flake metadata --json "github:NixOS/nixpkgs?ref=$branch" 2>/dev/null |
         jq -er '.locked.rev' 2>/dev/null || true
       )
