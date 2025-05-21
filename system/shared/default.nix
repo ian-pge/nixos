@@ -12,7 +12,7 @@
     ./nixos_config.nix
     ./docker.nix
     ./qmk_keyboard.nix
-    ./steam.nix
+    # ./steam.nix
     ./nh.nix
     ./ssh.nix
     ./stereolabs.nix
