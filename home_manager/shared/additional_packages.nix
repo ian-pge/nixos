@@ -8,6 +8,7 @@
     alejandra
 
     zed-editor
+    vscode
     devpod
     bambu-studio
     google-chrome
