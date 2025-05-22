@@ -87,10 +87,10 @@
         };
 
         network = {
-          format-wifi = "{icon} {bandwidthDownBytes} | {essid}";
+          format-wifi = "{icon} {essid}";
           format-icons = ["󰤟" "󰤢" "󰤥" "󰤨"];
           interval = 5;
-          format-ethernet = "󰈀 {bandwidthDownBytes} | {ifname}";
+          format-ethernet = "󰈀 {ifname}";
           format-disconnected = "󰤭 Disconnected";
           format-disabled = "󰤭 Off";
           format-disabled-if-down = true;
