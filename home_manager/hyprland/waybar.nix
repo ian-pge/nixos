@@ -11,18 +11,18 @@
 
         modules-left = [
           "custom/launcher"
+          "custom/nixos"
           "disk"
           "cpu"
-          "custom/gpu"
           "memory"
-          "custom/nixos"
+          "custom/gpu"
         ];
 
         modules-center = ["hyprland/workspaces"];
 
         modules-right = [
-          "bluetooth"
           "network"
+          "bluetooth"
           "upower"
           "wireplumber"
           "backlight"
@@ -87,9 +87,10 @@
         };
 
         network = {
-          format-wifi = "{icon} {essid}";
+          format-wifi = "{icon} {bandwidthDownBytes} | {essid}";
           format-icons = ["󰤟" "󰤢" "󰤥" "󰤨"];
-          format-ethernet = "󰈀 {ifname}";
+          interval = 5;
+          format-ethernet = "󰈀 {bandwidthDownBytes} | {ifname}";
           format-disconnected = "󰤭 Disconnected";
           format-disabled = "󰤭 Off";
           format-disabled-if-down = true;
