@@ -12,7 +12,7 @@
     ncdu
     nurl
     brightnessctl
-    celluloid
+    # celluloid
     jq
     gnome-disk-utility
   ];
