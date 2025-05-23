@@ -24,6 +24,7 @@
     ./hypridle.nix
     ./hyprlock.nix
     ./mpv.nix
-    ./mime_apps.nix
+    ./xdg_mime_apps.nix
+    ./xdg_mime.nix
   ];
 }

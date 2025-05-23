@@ -17,6 +17,7 @@
     gnome-disk-utility
     viu
     oculante
+    xdg-desktop-portal-gtk
   ];
 
   services.swayosd.enable = true;
