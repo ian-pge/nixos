@@ -29,7 +29,7 @@
     ];
   };
 
-  environment.persistence."/persist/home" = {
+  environment.persistence."/persist" = {
     hideMounts = true;
     users.ian = {
       directories = [
