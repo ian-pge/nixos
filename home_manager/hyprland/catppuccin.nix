@@ -40,5 +40,9 @@
       flavor = "macchiato";
       accent = "sapphire";
     };
+    obs = {
+      enable = true;
+      flavor = "macchiato";
+    };
   };
 }
