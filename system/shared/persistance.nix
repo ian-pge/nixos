@@ -63,6 +63,7 @@
         ".config/dconf"
         ".cache"
         ".local/share/keyrings"
+        ".config/pika-backup"
       ];
       files = [
         ".config/monitors.xml"
