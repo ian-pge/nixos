@@ -9,7 +9,7 @@
       "image/bmp" = "oculante.desktop";
       "image/webp" = "oculante.desktop";
 
-      "inode/directory" = "nautilus.desktop";
+      "inode/directory" = "org.gnome.Nautilus.desktop";
     };
   };
 }
