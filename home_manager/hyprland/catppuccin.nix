@@ -48,12 +48,12 @@
       enable = true;
       flavor = "macchiato";
       accent = "sapphire";
-
       icon = {
         enable = true;
         flavor = "macchiato";
         accent = "sapphire";
       };
+      tweaks = ["rimless" "float"];
     };
   };
 }
