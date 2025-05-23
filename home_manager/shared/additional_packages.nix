@@ -31,5 +31,6 @@
     lazydocker.enable = true;
     lazygit.enable = true;
     keepassxc.enable = true;
+    obs-studio.enable = true;
   };
 }

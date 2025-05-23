@@ -19,6 +19,7 @@
       ".local/share/lutris"
       ".config/Code"
       ".vscode"
+      ".config/obs-studio"
       {
         directory = ".local/share/zed";
         method = "symlink";
