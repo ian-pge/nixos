@@ -44,5 +44,10 @@
       enable = true;
       flavor = "macchiato";
     };
+    gtk = {
+      enable = true;
+      flavor = "macchiato";
+      accent = "sapphire";
+    };
   };
 }
