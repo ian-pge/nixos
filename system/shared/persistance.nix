@@ -27,6 +27,10 @@
         parentDirectory = {mode = "u=rwx,g=,o=";};
       }
     ];
+  };
+
+  environment.persistence."/persist/home" = {
+    hideMounts = true;
     users.ian = {
       directories = [
         "Music"
@@ -35,6 +39,7 @@
         "PhD"
         "Perso"
         "Pictures"
+        "Downloads"
         ".config/nixos"
         ".local/share/zed"
         ".config/zed"
@@ -68,8 +73,8 @@
 
   programs.fuse.userAllowOther = true;
 
-  systemd.tmpfiles.rules = [
-    "d /persist/home 0777 root root -"
-    "d /persist/home/ian 0700 ian users -"
-  ];
+  # systemd.tmpfiles.rules = [
+  #   "d /persist/home 0777 root root -"
+  #   "d /persist/home/ian 0700 ian users -"
+  # ];
 }
