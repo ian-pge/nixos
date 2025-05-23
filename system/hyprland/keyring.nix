@@ -5,5 +5,6 @@
     greetd.enableGnomeKeyring = true;
     hyprlock.enableGnomeKeyring = true;
     gnome.enableGnomeKeyring = true;
+    login.enableGnomeKeyring = true;
   };
 }
