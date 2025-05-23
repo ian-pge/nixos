@@ -18,6 +18,7 @@
     viu
     oculante
     xdg-desktop-portal-gtk
+    seahorse
   ];
 
   services.swayosd.enable = true;
