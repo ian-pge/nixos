@@ -15,6 +15,8 @@
     # celluloid
     jq
     gnome-disk-utility
+    viu
+    oculante
   ];
 
   services.swayosd.enable = true;
