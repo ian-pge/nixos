@@ -66,7 +66,6 @@
       ];
       files = [
         ".config/monitors.xml"
-        ".config/mimeapps.list"
       ];
     };
   };
