@@ -21,6 +21,8 @@
       ".vscode"
       ".config/obs-studio"
       ".local/share/oculante"
+      ".config/nautilus"
+      ".local/share/nautilus"
       {
         directory = ".local/share/zed";
         method = "symlink";
