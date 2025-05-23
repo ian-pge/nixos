@@ -53,7 +53,7 @@
         flavor = "macchiato";
         accent = "sapphire";
       };
-      tweaks = ["rimless" "float"];
+      # tweaks = ["rimless" "float"];
     };
   };
 }
