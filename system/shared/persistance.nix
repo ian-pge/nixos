@@ -27,6 +27,43 @@
         parentDirectory = {mode = "u=rwx,g=,o=";};
       }
     ];
+    users.ian = {
+      directories = [
+        "Music"
+        "Documents"
+        "Videos"
+        "PhD"
+        "Perso"
+        "Pictures"
+        ".config/nixos"
+        ".local/share/zed"
+        ".config/zed"
+        ".ssh"
+        ".devpod"
+        ".config/google-chrome"
+        ".local/share/applications"
+        ".local/share/icons"
+        ".config/BambuStudio"
+        ".local/share/lutris"
+        ".config/Code"
+        ".vscode"
+        ".config/obs-studio"
+        ".local/share/oculante"
+        ".config/nautilus"
+        ".local/share/nautilus"
+
+        ".config/history"
+        ".zotero"
+        # Gnome
+        ".config/dconf"
+        ".cache"
+        ".local/share/keyrings"
+      ];
+      files = [
+        ".config/monitors.xml"
+        ".config/mimeapps.list"
+      ];
+    };
   };
 
   programs.fuse.userAllowOther = true;

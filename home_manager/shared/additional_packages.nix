@@ -7,7 +7,7 @@
     nixpkgs-fmt
     alejandra
 
-    zed-editor
+    # zed-editor
     vscode
     devpod
     bambu-studio
