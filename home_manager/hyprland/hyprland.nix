@@ -39,7 +39,7 @@
       ### ENVIRONMENT ###
       env = [
         "HYPRCURSOR_THEME,catppuccin-macchiato-dark-cursors"
-        "HYPERSHOT_CONFIG_DIR,~/Pictures/"
+        # "HYPERSHOT_DIR,~/Pictures/"
         "HYPRCURSOR_SIZE,24"
         "XCURSOR_THEME,catppuccin-macchiato-dark-cursors"
         "XCURSOR_SIZE,24"
@@ -140,7 +140,7 @@
         ",XF86AudioNext,exec,playerctl next"
         ",XF86AudioPrev,exec,playerctl previous"
         ",XF86AudioMute,exec,swayosd-client --output-volume=mute-toggle"
-        ",PRINT,exec,hyprshot -m region -o ~/Screenshots"
+        ",PRINT,exec,hyprshot -m region -o ~/Pictures/Screenshots"
         "$mainMod,RETURN,exec,$terminal"
         "$mainMod,W,killactive"
         "$mainMod CONTROL,Q,exit"
