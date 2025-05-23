@@ -40,7 +40,9 @@
         "Perso"
         "Pictures"
         "Downloads"
+
         ".config/nixos"
+
         ".local/share/zed"
         ".config/zed"
         ".ssh"
@@ -56,10 +58,8 @@
         ".local/share/oculante"
         ".config/nautilus"
         ".local/share/nautilus"
-
         ".config/history"
         ".zotero"
-        # Gnome
         ".config/dconf"
         ".cache"
         ".local/share/keyrings"
