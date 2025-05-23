@@ -39,6 +39,7 @@
       ### ENVIRONMENT ###
       env = [
         "HYPRCURSOR_THEME,catppuccin-macchiato-dark-cursors"
+        "HYPERSHOT_CONFIG_DIR,~/Pictures/"
         "HYPRCURSOR_SIZE,24"
         "XCURSOR_THEME,catppuccin-macchiato-dark-cursors"
         "XCURSOR_SIZE,24"
