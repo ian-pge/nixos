@@ -20,6 +20,7 @@
       ".config/Code"
       ".vscode"
       ".config/obs-studio"
+      ".local/share/oculante"
       {
         directory = ".local/share/zed";
         method = "symlink";
