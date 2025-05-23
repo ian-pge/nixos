@@ -18,5 +18,6 @@
     # ./xdg_termfilechooser.nix
     ./nautilus.nix
     ./upower.nix
+    ./xdg_mime.nix
   ];
 }
