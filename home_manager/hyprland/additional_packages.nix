@@ -18,11 +18,6 @@
     viu
     oculante
     seahorse
-    cosmic-files
-    cosmic-ext-calculator
-    cosmic-settings
-    cosmic-osd
-    cosmic-player
   ];
 
   services.swayosd.enable = true;

@@ -11,5 +11,8 @@
 
       "inode/directory" = "cosmic-files.desktop";
     };
+    addedAssociations = {
+      "inode/directory" = "cosmic-files.desktop";
+    };
   };
 }

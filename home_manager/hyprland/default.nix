@@ -24,5 +24,6 @@
     ./hypridle.nix
     ./hyprlock.nix
     ./mpv.nix
+    ./cosmic.nix
   ];
 }
