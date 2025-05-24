@@ -6,6 +6,13 @@
     Exec=${pkgs.cosmic-files}/bin/cosmic-files %u
   '';
 
+  xdg.portal = {
+    enable = true;
+    # pull in the Hyprland-aware backend
+    extraPortals = [pkgs.xdg-desktop-portal-cosmic];
+    # make it the default so GNOME’s backend is ignored
+  };
+
   home.packages = with pkgs; [
     cosmic-files
     cosmic-ext-calculator
