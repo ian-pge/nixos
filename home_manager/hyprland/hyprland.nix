@@ -47,6 +47,7 @@
         "TERMINAL,ghostty"
         "BROWSER,google-chrome-stable"
         "GTK_USE_PORTAL,1"
+        "NIXOS_XDG_OPEN_USE_PORTAL,1"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
         # NVIDIA tweaks
         "LIBVA_DRIVER_NAME,nvidia"

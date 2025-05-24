@@ -8,7 +8,6 @@
       "image/svg+xml" = "oculante.desktop";
       "image/bmp" = "oculante.desktop";
       "image/webp" = "oculante.desktop";
-
       "inode/directory" = "cosmic-files.desktop";
     };
     addedAssociations = {
