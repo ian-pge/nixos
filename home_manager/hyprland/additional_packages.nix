@@ -17,8 +17,12 @@
     gnome-disk-utility
     viu
     oculante
-    xdg-desktop-portal-gtk
     seahorse
+    cosmic-files
+    cosmic-ext-calculator
+    cosmic-settings
+    cosmic-osd
+    cosmic-player
   ];
 
   services.swayosd.enable = true;
