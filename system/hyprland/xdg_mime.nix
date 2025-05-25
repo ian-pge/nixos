@@ -8,10 +8,10 @@
       "image/svg+xml" = "oculante.desktop";
       "image/bmp" = "oculante.desktop";
       "image/webp" = "oculante.desktop";
-      "inode/directory" = "cosmic-files.desktop";
+      # "inode/directory" = "cosmic-files.desktop";
     };
     addedAssociations = {
-      "inode/directory" = "comsic-files.desktop";
+      # "inode/directory" = "comsic-files.desktop";
     };
   };
 }

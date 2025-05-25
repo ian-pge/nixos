@@ -4,7 +4,7 @@
     # inputs.hyprpanel.homeManagerModules.hyprpanel
 
     ../shared
-    ./gtk.nix
+    # ./gtk.nix
     ./additional_packages.nix
     ./hyprpaper.nix
     ./ghostty.nix
@@ -24,6 +24,6 @@
     ./hypridle.nix
     ./hyprlock.nix
     ./mpv.nix
-    ./cosmic.nix
+    # ./cosmic.nix
   ];
 }

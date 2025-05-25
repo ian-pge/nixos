@@ -44,16 +44,16 @@
       enable = true;
       flavor = "macchiato";
     };
-    # gtk = {
-    #   enable = true;
-    #   flavor = "macchiato";
-    #   accent = "sapphire";
-    #   icon = {
-    #     enable = true;
-    #     flavor = "macchiato";
-    #     accent = "sapphire";
-    #   };
-    #   # tweaks = ["rimless" "float"];
-    # };
+    gtk = {
+      enable = true;
+      flavor = "macchiato";
+      accent = "sapphire";
+      icon = {
+        enable = true;
+        flavor = "macchiato";
+        accent = "sapphire";
+      };
+      # tweaks = ["rimless" "float"];
+    };
   };
 }

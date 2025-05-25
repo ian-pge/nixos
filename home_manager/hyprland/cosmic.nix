@@ -16,15 +16,15 @@
   #   };
   # };
 
-  # home.packages = with pkgs; [
-  #   cosmic-files
-  #   cosmic-ext-calculator
-  #   cosmic-settings
-  #   cosmic-osd
-  #   cosmic-player
-  #   catppuccin-papirus-folders
-  # ];
+  home.packages = with pkgs; [
+    cosmic-files
+    cosmic-ext-calculator
+    cosmic-settings
+    cosmic-osd
+    cosmic-player
+    catppuccin-papirus-folders
+  ];
 
-  xdg.mimeApps.enable = true;
-  xdg.mimeApps.defaultApplications."inode/directory" = "cosmic-files.desktop";
+  # xdg.mimeApps.enable = true;
+  # xdg.mimeApps.defaultApplications."inode/directory" = "cosmic-files.desktop";
 }
