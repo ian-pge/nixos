@@ -16,7 +16,7 @@
     ./fonts.nix
     ./catppuccin.nix
     # ./xdg_portal.nix
-    # ./nautilus.nix
+    ./nautilus.nix
     ./upower.nix
     ./xdg_mime.nix
   ];
