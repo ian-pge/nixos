@@ -30,34 +30,23 @@
 # }
 #
 {pkgs, ...}: {
-  ############################################
-  ## 1. install the backend                 ##
-  ############################################
+  # 1) install the app and its helpers
   environment.systemPackages = with pkgs; [
-    cosmic-files # the GUI file manager
-    xdg-desktop-portal-cosmic # the portal backend (MUST be present)
+    cosmic-files
+    xdg-desktop-portal-hyprland
   ];
 
-  ############################################
-  ## 2. aggregate all portals               ##
-  ############################################
+  # 2) wire the portal stack
   xdg.portal = {
     enable = true;
-    xdgOpenUsePortal = true; # make GTK/Qt ask the portal
-
-    ## tell the aggregator which back-ends exist
+    xdgOpenUsePortal = true; # force apps to use portals
     extraPortals = [
-      pkgs.xdg-desktop-portal-hyprland # compositor bridge
-      pkgs.xdg-desktop-portal-cosmic # new file chooser
+      pkgs.xdg-desktop-portal-hyprland # OpenURI, Screencast, etc.
+      pkgs.xdg-desktop-portal-cosmic
     ];
-
-    ## quickest way: reuse the config shipped by COSMIC
-    # configPackages = [pkgs.xdg-desktop-portal-cosmic];
-
-    ## equivalent fully-inline variant (uncomment if you dislike the above)
-    config.hyprland = {
-      fileChooser = ["cosmic"]; # try COSMIC first, fall back to GTK
+    config.common = {
+      default = ["hyprland" "cosmic"]; # first match wins
+      "org.freedesktop.impl.portal.FileChooser" = ["cosmic"];
     };
-    config.default = ["hyprland" "cosmic"];
   };
 }
