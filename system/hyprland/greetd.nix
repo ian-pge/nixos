@@ -19,7 +19,7 @@
           "--theme"
           "'border=magenta;prompt=yellow;time=cyan;container=black;input=green'"
           "--cmd"
-          "uwsm start -- hyprland.desktop"
+          "'uwsm start hyprland-uwsm.desktop'"
         ];
         user = "greeter"; # unprivileged greeter user
       };
