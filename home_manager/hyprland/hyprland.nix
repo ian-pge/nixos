@@ -204,6 +204,7 @@
         "workspace special:Chat,title:^(Messenger)$"
         "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
+        "float,title:^(Calculator)$"
       ];
       layerrule = [
         "dimaround,launcher"
