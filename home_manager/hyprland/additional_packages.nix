@@ -12,7 +12,6 @@
     ncdu
     nurl
     brightnessctl
-    # celluloid
     jq
     gnome-disk-utility
     viu
