@@ -22,7 +22,7 @@
     cosmic-settings
     cosmic-osd
     cosmic-player
-    catppuccin-papirus-folders
+    # catppuccin-papirus-folders
   ];
 
   # xdg.mimeApps.enable = true;
