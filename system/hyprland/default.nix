@@ -19,5 +19,6 @@
     ./nautilus.nix
     ./upower.nix
     ./xdg_mime.nix
+    ./antimicrox.nix
   ];
 }
