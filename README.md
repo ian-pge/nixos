@@ -16,13 +16,13 @@ sudo nixos-generate-config --no-filesystems --root /mnt
 
 ## replace hardware conf with the generated one
 ```bash
-sudo mv /etc/nixos /tmp/nixos
-sudo rm -r /etc/nixos
+sudo mv -f /mnt/etc/nixos/hardware-configuration.nix /tmp/nixos/system/shared
+sudo rm -r /mnt/etc/nixos
 ```
 
 ## move config
 ```bash
-sudo mv /tmp/nixos /etc/nixos
+sudo mv /tmp/nixos /mnt/etc/
 ```
 
 ## installing nixos
