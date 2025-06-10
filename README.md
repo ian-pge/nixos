@@ -1,3 +1,6 @@
+## reference youtube channel
+https://youtube.com/@vimjoyer?feature=shared
+
 ## clone configuration repository
 ```bash
 sudo nix-shell -p git --run "git clone https://github.com/ian-pge/nixos.git /tmp/nixos"
