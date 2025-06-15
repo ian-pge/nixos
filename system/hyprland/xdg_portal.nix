@@ -30,12 +30,6 @@
 # }
 #
 {pkgs, ...}: {
-  # 1) install the app and its helpers
-  environment.systemPackages = with pkgs; [
-    cosmic-files
-    xdg-desktop-portal-hyprland
-  ];
-
   # 2) wire the portal stack
   xdg.portal = {
     enable = true;
