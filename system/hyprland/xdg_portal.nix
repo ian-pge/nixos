@@ -39,7 +39,7 @@
       pkgs.xdg-desktop-portal-cosmic
     ];
     config.common = {
-      default = ["hyprland" "cosmic"]; # first match wins
+      default = ["cosmic" "hyprland"]; # first match wins
       "org.freedesktop.impl.portal.FileChooser" = ["cosmic"];
     };
   };

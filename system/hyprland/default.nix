@@ -15,7 +15,7 @@
     ./hyprland.nix
     ./fonts.nix
     ./catppuccin.nix
-    ./xdg_portal.nix
+    # ./xdg_portal.nix
     ./nautilus.nix
     ./upower.nix
     ./xdg_mime.nix
