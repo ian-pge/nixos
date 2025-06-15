@@ -38,9 +38,9 @@
       pkgs.xdg-desktop-portal-hyprland # OpenURI, Screencast, etc.
       pkgs.xdg-desktop-portal-cosmic
     ];
-    config.common = {
-      default = ["cosmic" "hyprland"]; # first match wins
-      "org.freedesktop.impl.portal.FileChooser" = ["cosmic"];
+    config = {
+      preferred."org.freedesktop.impl.portal.FileChooser" = "cosmic";
+      common.default = ["cosmic" "hyprland"]; # first match wins
     };
   };
 }
