@@ -63,6 +63,7 @@
         ".cache"
         ".local/share/keyrings"
         ".config/pika-backup"
+        ".local/share/DaVinciResolve"
       ];
       files = [
         ".config/monitors.xml"
