@@ -190,6 +190,8 @@
         "$mainMod SHIFT,D,movetoworkspace,special:Chat"
         "$mainMod,C,togglespecialworkspace,Media"
         "$mainMod SHIFT,C,movetoworkspace,special:Media"
+        "$mainMod,K,togglespecialworkspace,Notes"
+        "$mainMod SHIFT,K,movetoworkspace,special:Notes"
         "$mainMod,ESCAPE,exec,hyprlock"
       ];
       bindm = [
@@ -204,6 +206,7 @@
         "workspace special:Chat,title:^(Messenger)$"
         "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
+        "workspace special:LLM,title:^(Google Keep)$"
         "float,title:^(Calculator)$"
       ];
       layerrule = [
