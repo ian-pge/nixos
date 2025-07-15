@@ -203,6 +203,7 @@
       windowrulev2 = [
         "workspace special:Chat,title:^(WhatsApp Web)$"
         "workspace special:Chat,title:^(Mattermost)$"
+        "workspace special:Chat,title:^(Gmail)$"
         "workspace special:Chat,title:^(Messenger)$"
         "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
