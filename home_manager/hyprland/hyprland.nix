@@ -206,7 +206,7 @@
         "workspace special:Chat,title:^(Messenger)$"
         "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
-        "workspace special:LLM,title:^(Google Keep)$"
+        "workspace special:Notes,title:^(Google Keep)$"
         "float,title:^(Calculator)$"
       ];
       layerrule = [
