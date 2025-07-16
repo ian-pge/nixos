@@ -7,6 +7,7 @@
     nixpkgs-fmt
     alejandra
     texliveTeTeX
+    texlab
 
     # zed-editor
     vscode
