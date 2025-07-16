@@ -8,6 +8,7 @@
     alejandra
     texliveTeTeX
     texlab
+    texpresso
 
     # zed-editor
     vscode
