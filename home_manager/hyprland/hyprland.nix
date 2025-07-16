@@ -190,8 +190,8 @@
         "$mainMod SHIFT,D,movetoworkspace,special:Chat"
         "$mainMod,C,togglespecialworkspace,Media"
         "$mainMod SHIFT,C,movetoworkspace,special:Media"
-        "$mainMod,K,togglespecialworkspace,Notes"
-        "$mainMod SHIFT,K,movetoworkspace,special:Notes"
+        "$mainMod,;,togglespecialworkspace,Notes"
+        "$mainMod SHIFT,;,movetoworkspace,special:Notes"
         "$mainMod,ESCAPE,exec,hyprlock"
       ];
       bindm = [
