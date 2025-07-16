@@ -6,7 +6,7 @@
     nixd
     nixpkgs-fmt
     alejandra
-    # texliveFull
+    texlive.combined.scheme-full
     texlab
     texpresso
 
