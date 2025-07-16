@@ -29,6 +29,9 @@
             };
           };
         };
+        texpresso = {
+          enabled = true;
+        };
       };
 
       languages = {
