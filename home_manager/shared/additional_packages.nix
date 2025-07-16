@@ -6,6 +6,7 @@
     nixd
     nixpkgs-fmt
     alejandra
+    texliveTeTeX
 
     # zed-editor
     vscode
