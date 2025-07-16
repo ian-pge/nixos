@@ -29,8 +29,19 @@
             };
           };
         };
-        texpresso = {
-          enabled = true;
+        texpresso-lsp = {
+          initialization_options = {
+            root_tex = "main.tex";
+          };
+        };
+        texlab = {
+          settings = {
+            texlab = {
+              build = {
+                onSave = true;
+              };
+            };
+          };
         };
       };
 
