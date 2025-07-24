@@ -214,6 +214,7 @@
         "size 400 500,title:^(Calculator)$"
         "center,title:^(Calculator)$"
         "float,title:^(File)$"
+        "size 800 600,title:^(File)$"
         "center,title:^(File)$"
       ];
       layerrule = [
