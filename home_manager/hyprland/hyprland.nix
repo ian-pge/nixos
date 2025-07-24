@@ -14,7 +14,8 @@
       ### VARIABLES ###
       "$terminal" = "ghostty";
       "$browser" = "google-chrome-stable";
-      "$fileManager" = "ghostty -e yazi";
+      "$fileManager" = "ghostty --title=File -e yazi";
+      "$calculator" = "ghostty --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
 
@@ -151,6 +152,7 @@
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,togglesplit"
         "$mainMod,G,exec,$browser"
+        "$mainMod,X,exec,$calculator"
         "$mainMod,H,movefocus,l"
         "$mainMod,L,movefocus,r"
         "$mainMod,K,movefocus,u"
@@ -209,6 +211,10 @@
         "workspace special:LLM,title:^(ChatGPT)$"
         "workspace special:Notes,title:^(Google Keep)$"
         "float,title:^(Calculator)$"
+        "size 400 500,title:^(Calculator)$"
+        "center,title:^(Calculator)$"
+        "float,title:^(File)$"
+        "center,title:^(File)$"
       ];
       layerrule = [
         "dimaround,launcher"
