@@ -65,7 +65,7 @@
         gaps_in = 5;
         gaps_out = "10,10,10,10";
         border_size = 3;
-        "col.active_border" = "rgba(ff33ccee)";
+        "col.active_border" = "rgba(33ff33ff)";
         "col.inactive_border" = "rgba(888888aa)";
         resize_on_border = true;
         allow_tearing = false;
@@ -95,7 +95,7 @@
 
       animation = [
         "windows,1,7,default,popin"
-        "border,1,10,default"
+        "border,0"
         "fade,1,4,default"
         "workspaces,1,6,default,slide"
         "layers,0.5,6,default,fade"
