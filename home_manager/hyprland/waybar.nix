@@ -7,6 +7,11 @@
     settings = {
       mainBar = {
         layer = "top";
+        position = "top";
+        margin-top = 10;
+        margin-left = 5;
+        margin-right = 5;
+        margin-bottom = 0;
         # output = "eDP-1";
 
         modules-left = [
@@ -176,7 +181,7 @@
       * {
           font-family: "Ubuntu Nerd Font";
           font-weight: bold;
-          font-size: 19px;
+          font-size: 15px;
       }
 
       window#waybar {
@@ -188,9 +193,9 @@
       #upower, #disk, #workspaces, #custom-launcher {
           background-color: @crust;
           border-radius: 10px;
-          padding: 2px 10px;
-          margin: 8.5px 4px;
-          font-size: 19px;
+          padding: 0px 10px;
+          margin: 0px 5px;
+          font-size: 16px;
       }
 
       #cpu            { color: @pink;      }
