@@ -23,7 +23,7 @@
         selection-text = "cad3f5ff";
         selection-match = "a6da95ff";
         counter = "8087a2ff";
-        border = "ff0000ee";
+        border = "33ccffee";
       };
       border = {
         width = "4";
