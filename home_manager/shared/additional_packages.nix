@@ -14,6 +14,7 @@
     vscode
     devpod
     # bambu-studio
+    kalker
     google-chrome
     blender
     davinci-resolve
