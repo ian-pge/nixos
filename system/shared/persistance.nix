@@ -11,6 +11,7 @@
       "/var/lib/libvirt"
       "/var/lib/tailscale"
       "/var/lib/NetworkManager"
+      "/var/lib/flatpak"
       "/var/cache/tuigreet"
       "/etc/NetworkManager/system-connections"
       {
@@ -52,6 +53,7 @@
         ".local/share/icons"
         ".config/BambuStudio"
         ".local/share/lutris"
+        ".local/share/flatpak"
         ".config/Code"
         ".vscode"
         ".config/obs-studio"
