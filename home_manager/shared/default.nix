@@ -7,5 +7,6 @@
     ./additional_packages.nix
     # ./mime_apps.nix
     ./zed.nix
+    ./bambustudio.nix
   ];
 }
