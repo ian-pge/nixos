@@ -25,6 +25,6 @@
     ./hyprlock.nix
     ./mpv.nix
     ./cosmic.nix
-    ./yazi.ni
+    ./yazi.nix
   ];
 }
