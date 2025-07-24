@@ -1,5 +1,12 @@
 {
   services.flatpak.enable = true;
+  services.flatpak.update.onActivation = true;
+  services.flatpak.remotes = [
+    {
+      name = "flathub-beta";
+      location = "flathub https://flathub.org/repo/flathub.flatpakrepo";
+    }
+  ];
   services.flatpak.packages = ["com.bambulab.BambuStudio"];
 
   services.flatpak.overrides = {
