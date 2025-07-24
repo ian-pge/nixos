@@ -21,7 +21,6 @@
 
   services.swayosd.enable = true;
   services.udiskie.enable = true;
-  programs.yazi.enable = true;
   services.playerctld.enable = true;
   services.hyprpolkitagent.package = true;
   programs.htop.enable = true;

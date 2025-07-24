@@ -65,7 +65,7 @@
         gaps_in = 5;
         gaps_out = "10,10,10,10";
         border_size = 3;
-        "col.active_border" = "rgba(33ccffee)";
+        "col.active_border" = "rgba(ff33ccee)";
         "col.inactive_border" = "rgba(888888aa)";
         resize_on_border = true;
         allow_tearing = false;
@@ -214,7 +214,7 @@
         "size 400 500,title:^(Calculator)$"
         "center,title:^(Calculator)$"
         "float,title:^(File)$"
-        "size 800 600,title:^(File)$"
+        "size 1000 600,title:^(File)$"
         "center,title:^(File)$"
       ];
       layerrule = [
