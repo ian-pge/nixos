@@ -52,6 +52,7 @@
         ".local/share/applications"
         ".local/share/icons"
         ".config/BambuStudio"
+        ".var/app/com.bambulab.BambuStudio"
         ".local/share/lutris"
         ".local/share/flatpak"
         ".config/Code"

@@ -1,6 +1,6 @@
 {inputs, ...}: {
   imports = [
-    inputs.impermanence.nixosModules.home-manager.impermanence
+    inputs.nix-flatpak.homeManagerModules.nix-flatpak
 
     ./home_manager.nix
     ./git.nix
