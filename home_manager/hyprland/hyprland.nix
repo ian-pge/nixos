@@ -31,10 +31,14 @@
         "2, monitor:eDP-1"
         "3, monitor:eDP-1"
         "4, monitor:eDP-1"
-        "5, monitor:HDMI-A-1"
-        "6, monitor:HDMI-A-1"
-        "7, monitor:HDMI-A-1"
-        "8, monitor:HDMI-A-1"
+        "5, monitor:DP-2"
+        "6, monitor:DP-2"
+        "7, monitor:DP-2"
+        "8, monitor:DP-2"
+        # "5, monitor:HDMI-A-1"
+        # "6, monitor:HDMI-A-1"
+        # "7, monitor:HDMI-A-1"
+        # "8, monitor:HDMI-A-1"
       ];
 
       ### ENVIRONMENT ###
