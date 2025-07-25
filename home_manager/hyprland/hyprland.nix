@@ -68,7 +68,7 @@
       general = {
         gaps_in = 5;
         gaps_out = "10,10,10,10";
-        border_size = 3;
+        border_size = 4;
         "col.active_border" = "rgba(33ff33ff)";
         "col.inactive_border" = "rgba(888888aa)";
         resize_on_border = true;
