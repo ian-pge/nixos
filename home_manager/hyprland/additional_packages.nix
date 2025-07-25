@@ -8,6 +8,7 @@
     adwaita-icon-theme
     catppuccin-cursors.macchiatoDark
     nmap
+    nettools
     wl-clipboard
     ncdu
     nurl

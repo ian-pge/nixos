@@ -69,7 +69,7 @@
         gaps_in = 5;
         gaps_out = "10,10,10,10";
         border_size = 3;
-        "col.active_border" = "rgba(33ff33ff)";
+        "col.active_border" = "rgba(ff33ffff)";
         "col.inactive_border" = "rgba(888888aa)";
         resize_on_border = true;
         allow_tearing = false;
