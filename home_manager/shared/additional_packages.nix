@@ -12,6 +12,7 @@
 
     # zed-editor
     vscode
+    pavucontrol
     devpod
     # bambu-studio
     kalker
