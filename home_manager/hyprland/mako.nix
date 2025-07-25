@@ -14,7 +14,7 @@
       default-timeout = 10000;
       ignore-timeout = true;
 
-      # output = "eDP-1";
+      output = "*";
 
       # Pango‐markup format string: title in blue bold, then body
       format = "<span color=\"#eed49f\"><b>%s</b></span>\\n%b";
