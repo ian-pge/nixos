@@ -214,7 +214,7 @@
 
       #workspaces button       { color: @text; background: none; border: none; }
       #workspaces button:hover { background: none; }
-      #workspaces button.active{ color: #33ccff; }
+      #workspaces button.active{ color: #ff33ff; }
     '';
   };
 
