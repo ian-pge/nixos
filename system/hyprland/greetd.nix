@@ -5,7 +5,6 @@
 }: {
   services.greetd = {
     enable = true; # start greetd daemon
-    vt = 1; # run on tty1
     settings = {
       default_session = {
         # tuigreet binary from nixpkgs
