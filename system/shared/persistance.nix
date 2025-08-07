@@ -57,6 +57,7 @@
         ".local/share/flatpak"
         ".config/Code"
         ".vscode"
+        ".config/obsidian"
         ".config/obs-studio"
         ".local/share/oculante"
         ".config/cosmic"
