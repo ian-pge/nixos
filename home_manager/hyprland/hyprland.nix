@@ -219,7 +219,7 @@
         "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
         "workspace special:Notes,title:^(Google Keep)$"
-        "workspace special:Notes,title:^(Obsidian)$"
+        "workspace special:Notes,initialClass:^(obsidian)$"
         "float,title:^(Calculator)$"
         "size 400 500,title:^(Calculator)$"
         "center,title:^(Calculator)$"
