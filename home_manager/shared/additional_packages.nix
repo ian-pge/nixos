@@ -10,6 +10,7 @@
     texlab
     texpresso
 
+    zathura
     # zed-editor
     vscode
     pavucontrol
