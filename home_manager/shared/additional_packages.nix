@@ -15,7 +15,7 @@
     vscode
     pavucontrol
     devpod
-    # bambu-studio
+    bambu-studio
     kalker
     google-chrome
     blender

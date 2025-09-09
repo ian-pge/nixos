@@ -21,6 +21,6 @@
     ./betaflight.nix
     ./virtualisation.nix
     ./tailscale.nix
-    ./flatpak.nix
+    # ./flatpak.nix
   ];
 }
