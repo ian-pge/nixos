@@ -34,15 +34,15 @@
             root_tex = "main.tex";
           };
         };
-        texlab = {
-          settings = {
-            texlab = {
-              build = {
-                onSave = true;
-              };
-            };
-          };
-        };
+        # texlab = {
+        #   settings = {
+        #     texlab = {
+        #       build = {
+        #         onSave = true;
+        #       };
+        #     };
+        #   };
+        # };
       };
 
       languages = {
