@@ -44,9 +44,9 @@
       enable = true;
       flavor = "macchiato";
     };
-    zathura = {
-      enable = true;
-      flavor = "macchiato";
-    };
+    # zathura = {
+    #   enable = true;
+    #   flavor = "macchiato";
+    # };
   };
 }

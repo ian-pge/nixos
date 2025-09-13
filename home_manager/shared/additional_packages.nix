@@ -10,7 +10,6 @@
     texlab
     texpresso
 
-    zathura
     # zed-editor
     vscode
     pavucontrol
@@ -38,5 +37,6 @@
     lazygit.enable = true;
     keepassxc.enable = true;
     obs-studio.enable = true;
+    zathura.enable = true;
   };
 }
