@@ -26,5 +26,6 @@
     ./mpv.nix
     ./cosmic.nix
     ./yazi.nix
+    ./zathura.nix
   ];
 }
