@@ -134,7 +134,7 @@
         touchpad.natural_scroll = false;
       };
 
-      gestures.workspace_swipe = true;
+      # gestures.workspace_swipe = true;
 
       ### KEYBINDINGS ###
       "$mainMod" = "SUPER";
