@@ -11,6 +11,7 @@
     ./greetd.nix
     ./network_manager.nix
     # ./zsh.nix
+    ./avahi.nix
     ./fish.nix
     ./hyprland.nix
     ./fonts.nix

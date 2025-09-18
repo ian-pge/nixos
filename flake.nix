@@ -32,7 +32,7 @@
 
     # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
     overlays = {
-      # bambustudio = import ./overlays/bambustudio.nix;
+      bambustudio = import ./overlays/bambustudio.nix;
     };
   in {
     inherit overlays;
