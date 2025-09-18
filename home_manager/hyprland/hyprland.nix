@@ -14,8 +14,8 @@
       ### VARIABLES ###
       "$terminal" = "ghostty";
       "$browser" = "google-chrome-stable";
-      "$fileManager" = "ghostty --title=File -e yazi";
-      "$calculator" = "ghostty --title=Calculator -e kalker";
+      "$fileManager" = "ghostty --class=File --title=File -e yazi";
+      "$calculator" = "ghostty --class=Calculator --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
 
@@ -220,9 +220,9 @@
         "workspace special:LLM,title:^(ChatGPT)$"
         "workspace special:Notes,title:^(Google Keep)$"
         "workspace special:Notes,initialClass:^(obsidian)$"
-        "float,title:^(Calculator)$"
-        "size 400 500,title:^(Calculator)$"
-        "center,title:^(Calculator)$"
+        "float,class:^(Calculator)$"
+        "size 400 500,class:^(Calculator)$"
+        "center,class:^(Calculator)$"
         "float,title:^(File)$"
         "size 1000 600,title:^(File)$"
         "center,title:^(File)$"
