@@ -9,7 +9,7 @@
       default_session = {
         # tuigreet binary from nixpkgs
         command = lib.concatStringsSep " " [
-          "${pkgs.greetd.tuigreet}/bin/tuigreet"
+          "${pkgs.tuigreet}/bin/tuigreet"
           "--remember"
           "--width"
           "40"
