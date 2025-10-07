@@ -17,7 +17,7 @@
     ./nh.nix
     ./ssh.nix
     ./stereolabs.nix
-    # ./lutris.nix
+    ./lutris.nix
     ./betaflight.nix
     ./virtualisation.nix
     ./tailscale.nix
