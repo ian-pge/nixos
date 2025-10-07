@@ -210,7 +210,7 @@
       ];
 
       ### WINDOW / LAYER RULES ###
-      windowrulev2 = [
+      windowrule = [
         "workspace special:Chat,title:^(WhatsApp Web)$"
         "workspace special:Chat,title:^(Mattermost)$"
         "workspace special:Chat,title:^(Gmail)$"
