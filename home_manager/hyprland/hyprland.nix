@@ -14,8 +14,10 @@
       ### VARIABLES ###
       "$terminal" = "ghostty";
       "$browser" = "google-chrome-stable";
-      "$fileManager" = "ghostty --class=File --title=File -e yazi";
-      "$calculator" = "ghostty --class=Calculator --title=Calculator -e kalker";
+      # "$fileManager" = "ghostty --title=File -e yazi";
+      "$fileManager" = "ghostty --class=dev.me.file --title=File -e yazi";
+      "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
+      # "$calculator" = "ghostty --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
 
@@ -220,12 +222,15 @@
         "workspace special:LLM,title:^(ChatGPT)$"
         "workspace special:Notes,title:^(Google Keep)$"
         # "workspace special:Notes,initialClass:^(obsidian)$"
-        "float,title:^(Calculator)$"
-        "size 400 500,title:^(Calculator)$"
-        "center,title:^(Calculator)$"
-        "float,title:^(File)$"
-        "size 1000 600,title:^(File)$"
-        "center,title:^(File)$"
+        # "float, class:^(com\\.mitchellh\\.ghostty)$"
+        # "float, title:^(Calculator)$"
+        "float, class:^(dev\\.me\\.calc)$"
+        "center, class:^(dev\\.me\\.calc)$"
+        "size 400 500, class:^(dev\\.me\\.calc)$"
+        "center, class:^(dev\\.me\\.calc)$"
+        "float, class:^(dev\\.me\\.file)$"
+        "size 1000 600, class:^(dev\\.me\\.file)$"
+        "center, class:^(dev\\.me\\.file)$"
       ];
       layerrule = [
         "dimaround,launcher"

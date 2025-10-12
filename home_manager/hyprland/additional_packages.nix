@@ -16,7 +16,7 @@
     jq
     gnome-disk-utility
     viu
-    oculante
+    # oculante
     seahorse
   ];
 
