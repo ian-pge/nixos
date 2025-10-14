@@ -44,6 +44,11 @@
       enable = true;
       flavor = "macchiato";
     };
+    gtk.icon = {
+      enable = true;
+      flavor = "macchiato";
+      accent = "sapphire";
+    };
     # zathura = {
     #   enable = true;
     #   flavor = "macchiato";

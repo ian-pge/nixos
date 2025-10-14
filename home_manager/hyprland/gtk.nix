@@ -3,7 +3,7 @@
   dconf.settings = {
     "org/gnome/desktop/interface" = {
       color-scheme = "prefer-dark"; # Preferred color scheme
-      gtk-theme = "Adwaita-dark"; # Set GTK theme to Adwaita-dark
+      # gtk-theme = "Adwaita-dark"; # Set GTK theme to Adwaita-dark
     };
   };
 
@@ -14,10 +14,10 @@
       name = "Adwaita-dark";
       package = pkgs.gnome-themes-extra;
     };
-    iconTheme = {
-      name = "Adwaita";
-      package = pkgs.adwaita-icon-theme;
-    };
+    # iconTheme = {
+    #   name = "Adwaita";
+    #   package = pkgs.adwaita-icon-theme;
+    # };
     cursorTheme = {
       name = "catppuccin-macchiato-dark-cursors";
       package = pkgs.catppuccin-cursors.macchiatoDark;
