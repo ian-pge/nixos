@@ -68,8 +68,8 @@
         };
 
         "custom/gpu" = {
-          exec = "env LD_LIBRARY_PATH='/run/opengl-driver/lib' gpu-usage-waybar";
-          format = "{icon} {}";
+          exec = "LD_LIBRARY_PATH=/run/opengl-driver/lib gpu-usage-waybar";
+          format = "{icon} {text}";
           format-icons = "";
           return-type = "json";
           on-click = "ghostty -e nvtop";
@@ -271,7 +271,7 @@
 
     (rustPlatform.buildRustPackage {
       pname = "gpu-usage-waybar";
-      version = "v0.1.23"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
+      version = "v0.1.24"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
 
       src = fetchFromGitHub {
         # pulls the exact crate published to crates.io
