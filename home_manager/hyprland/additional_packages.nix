@@ -19,6 +19,7 @@
     # oculante
     seahorse
     gcalcli
+    aichat
   ];
 
   services.swayosd.enable = true;
