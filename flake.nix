@@ -17,6 +17,10 @@
       url = "github:catppuccin/nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nextmeeting = {
+      url = "github:chmouel/nextmeeting?dir=packaging";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # hyprpanel = {
     #   url = "github:Jas-SinghFSU/HyprPanel";
     #   inputs.nixpkgs.follows = "nixpkgs";
