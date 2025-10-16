@@ -18,6 +18,7 @@
     viu
     # oculante
     seahorse
+    gcalcli
   ];
 
   services.swayosd.enable = true;
