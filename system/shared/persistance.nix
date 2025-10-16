@@ -68,6 +68,7 @@
         ".local/share/keyrings"
         ".config/pika-backup"
         ".local/share/DaVinciResolve"
+        ".config/aichat"
       ];
       files = [
         ".config/monitors.xml"
