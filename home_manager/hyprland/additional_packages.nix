@@ -20,6 +20,7 @@
     seahorse
     gcalcli
     aichat
+    pulsemixer
   ];
 
   services.swayosd.enable = true;
