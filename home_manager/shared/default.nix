@@ -7,6 +7,9 @@
     ./additional_packages.nix
     # ./mime_apps.nix
     ./zed.nix
+
+    ./razer.nix
+
     # ./bambustudio.nix
   ];
 }
