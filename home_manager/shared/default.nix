@@ -8,8 +8,6 @@
     # ./mime_apps.nix
     ./zed.nix
 
-    ./razer.nix
-
     # ./bambustudio.nix
   ];
 }
