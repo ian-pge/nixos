@@ -31,6 +31,7 @@
     pika-backup
     inkscape
     polychromatic
+    razergenie
   ];
 
   programs = {
