@@ -69,6 +69,7 @@
         ".config/pika-backup"
         ".local/share/DaVinciResolve"
         ".config/aichat"
+        ".config/polychromatic"
       ];
       files = [
         ".config/monitors.xml"
