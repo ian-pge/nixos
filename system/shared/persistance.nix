@@ -54,7 +54,6 @@
         ".config/BambuStudio"
         ".var/app/com.bambulab.BambuStudio"
         ".local/share/lutris"
-        ".local/share/flatpak"
         ".config/Code"
         ".vscode"
         ".config/obsidian"
@@ -70,6 +69,8 @@
         ".local/share/DaVinciResolve"
         ".config/aichat"
         ".config/polychromatic"
+        ".config/openrazer"
+        ".config/gazelle"
       ];
       files = [
         ".config/monitors.xml"

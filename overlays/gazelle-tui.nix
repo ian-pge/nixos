@@ -10,6 +10,8 @@ in {
     nativeBuildInputs = [prev.makeWrapper];
     buildInputs = [pythonEnv prev.networkmanager];
 
+    # NEW: append a Macchiato theme + register it on startup
+
     postPatch = ''
         cat >> app.py <<'PY'
       # --- Begin injected Catppuccin Macchiato theme registration ---
