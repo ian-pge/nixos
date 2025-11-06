@@ -1,5 +1,5 @@
 {pkgs, ...}: {
-  environment.systemPackages = [pkgs.gazelle-tui];
+  # environment.systemPackages = [pkgs.gazelle-tui];
   networking = {
     useDHCP = false; # NM will do DHCP itself
     networkmanager = {
