@@ -10,37 +10,61 @@ in {
     nativeBuildInputs = [prev.makeWrapper];
     buildInputs = [pythonEnv prev.networkmanager];
 
-    # NEW: append a Macchiato theme + register it on startup
     postPatch = ''
-            cat >> app.py <<'PY'
-      from textual.theme import Theme
-
-      CATPPUCCIN_MACCHIATO = Theme(
-          name="catppuccin-macchiato",
-          # core Catppuccin Macchiato colors
-          background="#24273a",  # base
-          surface="#363a4f",     # surface0
-          panel="#494d64",       # surface1
-          foreground="#cad3f5",  # text
-          primary="#b7bdf8",     # lavender
-          secondary="#8aadf4",   # blue
-          accent="#c6a0f6",      # mauve
-          success="#a6da95",     # green
-          warning="#eed49f",     # yellow
-          error="#ed8796",       # red
-          dark=True,
-      )
-
-      # Ensure the theme is available even before you pick it in the palette.
+        cat >> app.py <<'PY'
+      # --- Begin injected Catppuccin Macchiato theme registration ---
       try:
-          _orig_on_mount = Gazelle.on_mount
-          def _on_mount_with_theme(self, *a, **kw):
-              self.register_theme(CATPPUCCIN_MACCHIATO)
-              return _orig_on_mount(self, *a, **kw)
-          Gazelle.on_mount = _on_mount_with_theme
+          import inspect
+          from textual.theme import Theme
+
+          CATPPUCCIN_MACCHIATO = Theme(
+              name="catppuccin-macchiato",
+              background="#24273a",  # base
+              surface="#363a4f",     # surface0
+              panel="#494d64",       # surface1
+              foreground="#cad3f5",  # text
+              primary="#b7bdf8",     # lavender
+              secondary="#8aadf4",   # blue
+              accent="#c6a0f6",      # mauve
+              success="#a6da95",     # green
+              warning="#eed49f",     # yellow
+              error="#ed8796",       # red
+              dark=True,
+          )
+
+          def _wrap_register_theme(cls, method_name: str):
+              if not hasattr(cls, method_name):
+                  return
+              orig = getattr(cls, method_name)
+
+              def wrapper(self, *a, **kw):
+                  # Make the theme available before the original hook runs
+                  try:
+                      self.register_theme(CATPPUCCIN_MACCHIATO)
+                  except Exception:
+                      pass
+
+                  # Call original method with a signature-compatible call
+                  try:
+                      return orig(self, *a, **kw)  # if it accepts (event)
+                  except TypeError:
+                      return orig(self)            # if it's a no-arg handler
+
+              setattr(cls, method_name, wrapper)
+
+          # Prefer earlier hook; fall back if not present.
+          try:
+              _wrap_register_theme(Gazelle, "on_load")
+          except Exception:
+              pass
+          try:
+              _wrap_register_theme(Gazelle, "on_mount")
+          except Exception:
+              pass
       except Exception:
-          # If class name or lifecycle changes upstream, we skip silently.
+          # If Textual or Gazelle internals change, fail soft.
           pass
+      # --- End injected Catppuccin Macchiato theme registration ---
       PY
     '';
 
