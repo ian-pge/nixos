@@ -25,7 +25,11 @@
     #   url = "github:Jas-SinghFSU/HyprPanel";
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
-    gazelle-src.url = "github:Zeus-Deus/gazelle-tui";
+
+    gazelle-src = {
+      url = "github:Zeus-Deus/gazelle-tui";
+      flake = false;
+    };
   };
 
   outputs = inputs @ {
