@@ -100,7 +100,7 @@
           format-disabled = "󰤭 Off";
           format-disabled-if-down = true;
           tooltip-format = "{ifname} via {gwaddr}";
-          on-click = "ghostty -e 'nmcli device wifi list; exec fish'";
+          on-click = "ghostty -e gazelle";
         };
 
         "custom/launcher" = {
