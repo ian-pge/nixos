@@ -25,6 +25,7 @@
     #   url = "github:Jas-SinghFSU/HyprPanel";
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
+    gazelle-src.url = "github:Zeus-Deus/gazelle-tui";
   };
 
   outputs = inputs @ {
@@ -37,6 +38,7 @@
     # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
     overlays = {
       bambustudio = import ./overlays/bambustudio.nix;
+      gazelle = import ./overlays/gazelle-tui.nix {inherit inputs;};
     };
   in {
     inherit overlays;
