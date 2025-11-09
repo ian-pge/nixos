@@ -71,6 +71,7 @@
         ".config/polychromatic"
         ".config/openrazer"
         ".config/gazelle"
+        ".local/state/wireplumber"
       ];
       files = [
         ".config/monitors.xml"

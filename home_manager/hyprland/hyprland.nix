@@ -16,6 +16,7 @@
       "$browser" = "google-chrome-stable";
       # "$fileManager" = "ghostty --title=File -e yazi";
       "$fileManager" = "ghostty --class=dev.me.file --title=File -e yazi";
+      "$fileManagergraphic" = "cosmic-files";
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
       # "$calculator" = "ghostty --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
@@ -158,6 +159,7 @@
         "$mainMod CONTROL,Q,exit"
         "$mainMod,P,pseudo"
         "$mainMod,F,exec,$fileManager"
+        "$mainMod SHIFT,F,exec,$fileManagergraphic"
         "$mainMod,A,exec,$menu"
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,togglesplit"
@@ -215,7 +217,6 @@
       windowrule = [
         "workspace special:Chat,title:^(WhatsApp Web)$"
         "workspace special:Chat,title:^(Mattermost)$"
-        "workspace special:Chat,title:^(Gmail)$"
         "workspace special:Chat,title:^(Messenger)$"
         "workspace special:Chat,title:^(Instagram)$"
         "workspace special:Media,title:^(Spotify)$"
