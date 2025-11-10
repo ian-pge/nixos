@@ -101,7 +101,7 @@
           format-disabled = "󰤭 Off";
           format-disabled-if-down = true;
           tooltip-format = "{ifname} via {gwaddr}";
-          on-click = "pgrep -x gazelle >/dev/null 2>&1 || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
+          on-click = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
         };
 
         "custom/launcher" = {
