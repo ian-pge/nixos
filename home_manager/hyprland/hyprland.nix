@@ -21,6 +21,10 @@
       # "$calculator" = "ghostty --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
+      "$wifi" = "ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
+      "$bluetooth" = "ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
+      "$audio" = "ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
+      "$settings" = "cosmic-settings";
 
       ### AUTOSTART ###
       "exec-once" = [
@@ -160,6 +164,10 @@
         "$mainMod,P,pseudo"
         "$mainMod,F,exec,$fileManager"
         "$mainMod SHIFT,F,exec,$fileManagergraphic"
+        "$mainMod,N,exec,$wifi"
+        "$mainMod,B,exec,$bluetooth"
+        "$mainMod,Q,exec,$settings"
+        "$mainMod,R,exec,$audio"
         "$mainMod,A,exec,$menu"
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,togglesplit"
@@ -232,6 +240,15 @@
         "float, class:^(dev\\.me\\.file)$"
         "size 1000 600, class:^(dev\\.me\\.file)$"
         "center, class:^(dev\\.me\\.file)$"
+        "float, class:^(dev\\.me\\.audio)$"
+        "size 1000 600, class:^(dev\\.me\\.audio)$"
+        "center, class:^(dev\\.me\\.audio)$"
+        "float, class:^(dev\\.me\\.wifi)$"
+        "size 700 1000, class:^(dev\\.me\\.wifi)$"
+        "center, class:^(dev\\.me\\.wifi)$"
+        "float, class:^(dev\\.me\\.bluetooth)$"
+        "size 700 1000, class:^(dev\\.me\\.bluetooth)$"
+        "center, class:^(dev\\.me\\.bluetooth)$"
       ];
       layerrule = [
         "dimaround,launcher"
