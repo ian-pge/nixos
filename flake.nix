@@ -21,6 +21,10 @@
       url = "github:chmouel/nextmeeting?dir=packaging";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    gazelle-tui = {
+      url = "github:Zeus-Deus/gazelle-tui";
+      flake = false;
+    };
     # hyprpanel = {
     #   url = "github:Jas-SinghFSU/HyprPanel";
     #   inputs.nixpkgs.follows = "nixpkgs";
@@ -37,7 +41,11 @@
     # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
     overlays = {
       bambustudio = import ./overlays/bambustudio.nix;
-      gazelle-tui = import ./overlays/gazelle-tui.nix;
+      gazelle-tui = final: prev: {
+        gazelle-tui = (import ./overlays/gazelle-tui.nix final prev).gazelle-tui.overrideAttrs (old: {
+          src = inputs.gazelle-tui;
+        });
+      };
     };
   in {
     inherit overlays;

@@ -58,6 +58,22 @@
         "type": "github"
       }
     },
+    "gazelle-tui": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1761846179,
+        "narHash": "sha256-KLkEUL4SAyN+n3e/F2sc/JwqVh2kOG9h9mRxYNH2EM0=",
+        "owner": "Zeus-Deus",
+        "repo": "gazelle-tui",
+        "rev": "b8dc5f30c4834775924df0ae350d95067a3cd25f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Zeus-Deus",
+        "repo": "gazelle-tui",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -152,6 +168,7 @@
       "inputs": {
         "catppuccin": "catppuccin",
         "disko": "disko",
+        "gazelle-tui": "gazelle-tui",
         "home-manager": "home-manager",
         "impermanence": "impermanence",
         "nextmeeting": "nextmeeting",

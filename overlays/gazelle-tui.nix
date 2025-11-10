@@ -1,12 +1,13 @@
 final: prev: {
-  gazelle-tui = prev.stdenv.mkDerivation rec {
+  gazelle-tui = prev.stdenv.mkDerivation {
     pname = "gazelle-tui";
-    version = "1.7.2";
+    version = "unstable";
 
+    # Source will be overridden by flake input
     src = prev.fetchFromGitHub {
       owner = "Zeus-Deus";
       repo = "gazelle-tui";
-      rev = "v${version}";
+      rev = "v1.7.2";
       hash = "sha256-LHXnYXkBskyrHZqcoRoOKfFIWRVSkg7pKaVNFFC9YCI=";
     };
 
