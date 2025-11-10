@@ -89,6 +89,7 @@
           format = "{icon} {volume}%";
           format-muted = "󰖁";
           format-icons = ["󰕿" "󰖀" "󰕾"];
+          on-click = "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
         };
 
         network = {
@@ -100,7 +101,7 @@
           format-disabled = "󰤭 Off";
           format-disabled-if-down = true;
           tooltip-format = "{ifname} via {gwaddr}";
-          on-click = "ghostty -e gazelle";
+          on-click = "pgrep -x gazelle >/dev/null 2>&1 || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
         };
 
         "custom/launcher" = {
@@ -133,7 +134,7 @@
           tooltip-format-connected = "{controller_alias}\t{controller_address}\n\n{device_enumerate}";
           tooltip-format-enumerate-connected = "{device_alias}\t{device_address}";
           format-off = "󰂲 Off";
-          on-click = "ghostty -e bluetui";
+          on-click = "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
         };
 
         upower = {
