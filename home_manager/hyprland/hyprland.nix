@@ -21,9 +21,9 @@
       # "$calculator" = "ghostty --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
-      "$wifi" = "ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
-      "$bluetooth" = "ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
-      "$audio" = "ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
+      "$wifi" = "pgrep -x gazelle >/dev/null 2>&1 || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
+      "$bluetooth" = "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
+      "$audio" = "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
       "$settings" = "cosmic-settings";
 
       ### AUTOSTART ###
@@ -241,7 +241,7 @@
         "size 1000 600, class:^(dev\\.me\\.file)$"
         "center, class:^(dev\\.me\\.file)$"
         "float, class:^(dev\\.me\\.audio)$"
-        "size 1000 600, class:^(dev\\.me\\.audio)$"
+        "size 1300 500, class:^(dev\\.me\\.audio)$"
         "center, class:^(dev\\.me\\.audio)$"
         "float, class:^(dev\\.me\\.wifi)$"
         "size 700 1000, class:^(dev\\.me\\.wifi)$"
