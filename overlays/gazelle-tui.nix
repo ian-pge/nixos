@@ -1,5 +1,5 @@
 final: prev: {
-  gazelle-tui = prev.python3Packages.buildPythonApplication rec {
+  gazelle-tui = prev.stdenv.mkDerivation rec {
     pname = "gazelle-tui";
     version = "1.7.2";
 
@@ -10,43 +10,51 @@ final: prev: {
       hash = "sha256-LHXnYXkBskyrHZqcoRoOKfFIWRVSkg7pKaVNFFC9YCI=";
     };
 
+    nativeBuildInputs = [
+      prev.makeWrapper
+      prev.python3
+    ];
+
+    buildInputs = [
+      prev.python3
+      prev.networkmanager
+    ];
+
     propagatedBuildInputs = with prev.python3Packages; [
       textual
     ];
 
-    nativeBuildInputs = [prev.makeWrapper];
-
-    # Don't try to fetch dependencies from PyPI
-    dontUsePipInstall = true;
+    dontBuild = true;
 
     installPhase = ''
-            runHook preInstall
+      runHook preInstall
 
-            mkdir -p $out/bin
-            mkdir -p $out/lib/python${prev.python3.pythonVersion}/site-packages/gazelle
+      mkdir -p $out/bin
+      mkdir -p $out/share/gazelle-tui
 
-            # Install Python modules
-            cp app.py $out/lib/python${prev.python3.pythonVersion}/site-packages/gazelle/
-            cp network.py $out/lib/python${prev.python3.pythonVersion}/site-packages/gazelle/
-            touch $out/lib/python${prev.python3.pythonVersion}/site-packages/gazelle/__init__.py
+      # Install Python modules
+      cp app.py $out/share/gazelle-tui/
+      cp network.py $out/share/gazelle-tui/
 
-            # Create wrapper script
-            cat > $out/bin/gazelle <<EOF
-      #!/usr/bin/env python3
+      # Create main executable
+      cat > $out/bin/gazelle <<EOF
+      #!${prev.python3}/bin/python3
       import sys
-      sys.path.insert(0, "$out/lib/python${prev.python3.pythonVersion}/site-packages")
-      from gazelle.app import main
-      if __name__ == '__main__':
-          main()
+      sys.path.insert(0, "$out/share/gazelle-tui")
+      from app import Gazelle
+
+      if __name__ == "__main__":
+          app = Gazelle()
+          app.run()
       EOF
-            chmod +x $out/bin/gazelle
+      chmod +x $out/bin/gazelle
 
-            # Wrap with NetworkManager in PATH
-            wrapProgram $out/bin/gazelle \
-              --prefix PATH : ${prev.lib.makeBinPath [prev.networkmanager]} \
-              --prefix PYTHONPATH : "$out/lib/python${prev.python3.pythonVersion}/site-packages:$PYTHONPATH"
+      # Wrap with proper Python path and NetworkManager
+      wrapProgram $out/bin/gazelle \
+        --prefix PATH : ${prev.lib.makeBinPath [prev.networkmanager]} \
+        --prefix PYTHONPATH : ${prev.python3.pkgs.makePythonPath propagatedBuildInputs}
 
-            runHook postInstall
+      runHook postInstall
     '';
 
     meta = with prev.lib; {
