@@ -40,7 +40,43 @@ final: prev: {
     dontBuild = true;
 
     postPatch = ''
-es = [./gazelle-macchiato.patch];
+            # Add Catppuccin Macchiato with green accent theme
+            cat > patch_theme.py << 'EOF'
+      import re
+
+      with open('app.py', 'r') as f:
+          content = f.read()
+
+      # Build theme code with proper indentation (8 spaces for the method level)
+      theme_lines = [
+          "        # Register Catppuccin Macchiato with green accent",
+          "        self.register_theme(",
+          "            Theme(",
+          '                name="catppuccin-macchiato-green",',
+          '                primary="#a6da95",      # Catppuccin Macchiato Green',
+          '                secondary="#a6da95",',
+          '                accent="#a6da95",',
+          '                foreground="#cad3f5",   # Catppuccin Macchiato Text',
+          '                background="#24273a",   # Catppuccin Macchiato Base',
+          '                surface="#24273a",',
+          '                panel="#24273a",',
+          '                dark=True,',
+          "            )",
+          "        )",
+      ]
+      theme_code = "\n".join(theme_lines)
+
+      # Find the line AFTER the entire if/else block (the "Load saved theme" comment)
+      # and insert our theme registration before it
+      pattern = r'(        # Load saved theme or use default\n)'
+      replacement = theme_code + '\n\n' + r'\1'
+      content = re.sub(pattern, replacement, content)
+
+      with open('app.py', 'w') as f:
+          f.write(content)
+      EOF
+            ${prev.python3}/bin/python3 patch_theme.py
+    '';
 
     installPhase = ''
       runHook preInstall
