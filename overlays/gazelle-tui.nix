@@ -1,9 +1,21 @@
+# Gazelle-TUI NetworkManager TUI
+#
+# This package automatically tracks the latest version from GitHub.
+# The src below is just a fallback - it gets overridden by the flake input.
+#
+# To update to the latest version, run:
+#   nix flake update gazelle-tui
+# or update all inputs:
+#   nix flake update
+# or use nh with automatic updates:
+#   nh os switch --update
 final: prev: {
   gazelle-tui = prev.stdenv.mkDerivation {
     pname = "gazelle-tui";
     version = "unstable";
 
-    # Source will be overridden by flake input
+    # Source will be overridden by flake input (see flake.nix)
+    # This is just a fallback if the input is not available
     src = prev.fetchFromGitHub {
       owner = "Zeus-Deus";
       repo = "gazelle-tui";
@@ -26,6 +38,9 @@ final: prev: {
     ];
 
     dontBuild = true;
+
+    postPatch = ''
+es = [./gazelle-macchiato.patch];
 
     installPhase = ''
       runHook preInstall
@@ -53,7 +68,7 @@ final: prev: {
       # Wrap with proper Python path and NetworkManager
       wrapProgram $out/bin/gazelle \
         --prefix PATH : ${prev.lib.makeBinPath [prev.networkmanager]} \
-        --prefix PYTHONPATH : ${prev.python3.pkgs.makePythonPath propagatedBuildInputs}
+        --prefix PYTHONPATH : ${prev.python3.pkgs.makePythonPath (with prev.python3Packages; [textual])}
 
       runHook postInstall
     '';
