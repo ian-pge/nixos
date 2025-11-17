@@ -20,6 +20,6 @@
     ./nautilus.nix
     ./upower.nix
     ./xdg_mime.nix
-    ./typing_booster.nix
+    # ./typing_booster.nix
   ];
 }
