@@ -220,6 +220,9 @@
   };
 
   home.packages = with pkgs; [
+
+    wttrbar
+
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       set -uo pipefail                      # keep it simple: no -e, no traps
