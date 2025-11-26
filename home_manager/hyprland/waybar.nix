@@ -31,6 +31,7 @@
           "upower"
           "wireplumber"
           "backlight"
+          "custom/weather"
           "clock#second"
           "clock"
         ];
@@ -52,6 +53,14 @@
         "clock#second" = {
           format = " {:%b %d %Y}";
           tooltip = false;
+        };
+
+        "custom/weather" = {
+          format = "{}°";
+          tooltip = true;
+          interval = 3600;
+          exec = "wttrbar --location=Grenoble --nerd";
+          return-type = "json";
         };
 
         ## ───── System modules ─────
@@ -97,7 +106,7 @@
           format-icons = ["󰤟" "󰤢" "󰤥" "󰤨"];
           interval = 5;
           format-ethernet = "󰈀 {ifname}";
-          format-disconnected = "󰤭 Disconnected";
+          format-disconnected = "󰤭 ";
           format-disabled = "󰤭 Off";
           format-disabled-if-down = true;
           tooltip-format = "{ifname} via {gwaddr}";
@@ -128,7 +137,7 @@
         };
 
         bluetooth = {
-          format = "󰂲 Disconnected";
+          format = "󰂲";
           format-connected = "󰂯 {device_alias}";
           tooltip-format = "{controller_alias}\t{controller_address}";
           tooltip-format-connected = "{controller_alias}\t{controller_address}\n\n{device_enumerate}";
@@ -191,7 +200,7 @@
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,
       #wireplumber, #network, #bluetooth, #custom-nixos,
-      #upower, #disk, #workspaces, #custom-launcher {
+      #upower, #disk, #workspaces, #custom-launcher, #custom-weather {
           background-color: @crust;
           border-radius: 10px;
           padding: 0px 10px;
@@ -212,6 +221,7 @@
       #upower         { color: @rosewater; }
       #disk           { color: @peach;     }
       #custom-nixos  { color: @flamingo;  }
+      #custom-weather { color: @flamingo;  }
 
       #workspaces button       { color: @text; background: none; border: none; }
       #workspaces button:hover { background: none; }
@@ -220,7 +230,6 @@
   };
 
   home.packages = with pkgs; [
-
     wttrbar
 
     (writeShellScriptBin "waybar-update-checker" ''
