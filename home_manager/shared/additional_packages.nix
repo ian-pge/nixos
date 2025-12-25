@@ -11,6 +11,7 @@
     texpresso
 
     # zed-editor
+    google-cloud-sdk
     vscode
     pavucontrol
     devpod
@@ -32,6 +33,7 @@
     inkscape
     polychromatic
     razergenie
+    unrar
   ];
 
   programs = {
