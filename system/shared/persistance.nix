@@ -72,6 +72,7 @@
         ".config/openrazer"
         ".config/gazelle"
         ".local/state/wireplumber"
+        ".config/gcloud"
       ];
       files = [
         ".config/monitors.xml"
