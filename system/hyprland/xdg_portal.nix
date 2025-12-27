@@ -30,17 +30,28 @@
 # }
 #
 {pkgs, ...}: {
-  # 2) wire the portal stack
   xdg.portal = {
     enable = true;
-    xdgOpenUsePortal = true; # force apps to use portals
+    xdgOpenUsePortal = true;
+
     extraPortals = [
-      pkgs.xdg-desktop-portal-hyprland # OpenURI, Screencast, etc.
+      pkgs.xdg-desktop-portal-hyprland
       pkgs.xdg-desktop-portal-cosmic
+      pkgs.xdg-desktop-portal-gtk
     ];
+
     config = {
-      preferred."org.freedesktop.impl.portal.FileChooser" = "cosmic";
-      common.default = ["cosmic" "hyprland"]; # first match wins
+      # This is the important part: per-desktop config for Hyprland
+      hyprland = {
+        default = ["hyprland" "gtk" "cosmic"];
+
+        # Force screencast to XDPH (what you already fixed)
+        "org.freedesktop.impl.portal.ScreenCast" = ["hyprland"];
+        "org.freedesktop.impl.portal.RemoteDesktop" = ["hyprland"];
+
+        # Force file chooser to COSMIC
+        "org.freedesktop.impl.portal.FileChooser" = ["cosmic"];
+      };
     };
   };
 }
