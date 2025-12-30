@@ -73,6 +73,8 @@
         ".config/gazelle"
         ".local/state/wireplumber"
         ".config/gcloud"
+        ".config/Antigravity"
+        ".gemini"
       ];
       files = [
         ".config/monitors.xml"

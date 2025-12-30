@@ -34,6 +34,10 @@
     polychromatic
     razergenie
     unrar
+    mutagen
+    antigravity
+    ffmpeg
+    meshlab
   ];
 
   programs = {
