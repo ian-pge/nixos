@@ -37,7 +37,7 @@
     mutagen
     antigravity
     ffmpeg
-    meshlab
+    f3d
   ];
 
   programs = {
