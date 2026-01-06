@@ -22,6 +22,7 @@
     gcalcli
     aichat
     pulsemixer
+    hyprpaper
   ];
 
   services.swayosd.enable = true;

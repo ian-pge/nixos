@@ -61,6 +61,7 @@
         "GTK_USE_PORTAL,1"
         "NIXOS_XDG_OPEN_USE_PORTAL,1"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
+        "XDG_CURRENT_DESKTOP,Hyprland"
         # NVIDIA tweaks
         "LIBVA_DRIVER_NAME,nvidia"
         "XDG_SESSION_TYPE,wayland"
@@ -231,6 +232,7 @@
         "workspace special:Chat,title:^(Instagram)$"
         "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
+        "workspace special:LLM,title:^(Gemini)$"
         "workspace special:Notes,title:^(Google Keep)$"
 
         # Floating Rules
