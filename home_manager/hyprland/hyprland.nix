@@ -16,7 +16,7 @@
       "$browser" = "google-chrome-stable";
       # "$fileManager" = "ghostty --title=File -e yazi";
       "$fileManager" = "ghostty --class=dev.me.file --title=File -e yazi";
-      "$fileManagergraphic" = "cosmic-files";
+      "$fileManagergraphic" = "nautilus";
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
       # "$calculator" = "ghostty --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
