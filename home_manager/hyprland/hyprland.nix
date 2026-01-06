@@ -14,11 +14,9 @@
       ### VARIABLES ###
       "$terminal" = "ghostty";
       "$browser" = "google-chrome-stable";
-      # "$fileManager" = "ghostty --title=File -e yazi";
       "$fileManager" = "ghostty --class=dev.me.file --title=File -e yazi";
       "$fileManagergraphic" = "nautilus";
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
-      # "$calculator" = "ghostty --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
       "$wifi" = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
@@ -42,16 +40,11 @@
         "6, monitor:DP-2"
         "7, monitor:DP-2"
         "8, monitor:DP-2"
-        # "5, monitor:HDMI-A-1"
-        # "6, monitor:HDMI-A-1"
-        # "7, monitor:HDMI-A-1"
-        # "8, monitor:HDMI-A-1"
       ];
 
       ### ENVIRONMENT ###
       env = [
         "HYPRCURSOR_THEME,catppuccin-macchiato-dark-cursors"
-        # "HYPERSHOT_DIR,~/Pictures/"
         "HYPRCURSOR_SIZE,24"
         "XCURSOR_THEME,catppuccin-macchiato-dark-cursors"
         "XCURSOR_SIZE,24"
@@ -62,7 +55,7 @@
         "NIXOS_XDG_OPEN_USE_PORTAL,1"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
         "XDG_CURRENT_DESKTOP,Hyprland"
-        # NVIDIA tweaks
+        # NVIDIA tweaks
         "LIBVA_DRIVER_NAME,nvidia"
         "XDG_SESSION_TYPE,wayland"
         "GBM_BACKEND,nvidia-drm"
@@ -72,7 +65,7 @@
       ### CURSOR ###
       cursor.no_hardware_cursors = true;
 
-      ### GENERAL LOOK‑AND‑FEEL ###
+      ### GENERAL LOOK-AND-FEEL ###
       general = {
         gaps_in = 5;
         gaps_out = "10,10,10,10";
@@ -130,7 +123,7 @@
 
       ecosystem = {
         no_update_news = true;
-        no_donation_nag = true; # again, optional
+        no_donation_nag = true;
       };
 
       ### INPUT ###
@@ -142,8 +135,6 @@
         touchpad.natural_scroll = false;
       };
 
-      # gestures.workspace_swipe = true;
-
       ### KEYBINDINGS ###
       "$mainMod" = "SUPER";
 
@@ -153,6 +144,7 @@
         ",XF86MonBrightnessUp,exec,swayosd-client --brightness=raise"
         ",XF86MonBrightnessDown,exec,swayosd-client --brightness=lower"
       ];
+
       bind = [
         ",XF86AudioPlay,exec,playerctl play-pause"
         ",XF86AudioNext,exec,playerctl next"
@@ -189,7 +181,6 @@
         "$mainMod CONTROL,j,resizeactive,0 50"
         "$mainMod CONTROL,k,resizeactive,0 -50"
         "$mainMod CONTROL,l,resizeactive,50 0"
-        # workspaces 1‑6 (focus)
         "$mainMod,1,workspace,1"
         "$mainMod,2,workspace,2"
         "$mainMod,3,workspace,3"
@@ -198,7 +189,6 @@
         "$mainMod,6,workspace,6"
         "$mainMod,7,workspace,7"
         "$mainMod,8,workspace,8"
-        # move to workspace
         "$mainMod SHIFT,1,movetoworkspace,1"
         "$mainMod SHIFT,2,movetoworkspace,2"
         "$mainMod SHIFT,3,movetoworkspace,3"
@@ -207,7 +197,6 @@
         "$mainMod SHIFT,6,movetoworkspace,6"
         "$mainMod SHIFT,7,movetoworkspace,7"
         "$mainMod SHIFT,8,movetoworkspace,8"
-        # scratchpads
         "$mainMod,S,togglespecialworkspace,LLM"
         "$mainMod SHIFT,S,movetoworkspace,special:LLM"
         "$mainMod,D,togglespecialworkspace,Chat"
@@ -218,47 +207,52 @@
         "$mainMod SHIFT,V,movetoworkspace,special:Notes"
         "$mainMod,ESCAPE,exec,hyprlock"
       ];
+
       bindm = [
         "$mainMod,mouse:272,movewindow"
         "$mainMod,mouse:273,resizewindow"
       ];
 
       ### WINDOW / LAYER RULES ###
-      # CHANGE: Renamed from windowrule to windowrulev2
-      windowrulev2 = [
-        "workspace special:Chat,title:^(WhatsApp Web)$"
-        "workspace special:Chat,title:^(Mattermost)$"
-        "workspace special:Chat,title:^(Messenger)$"
-        "workspace special:Chat,title:^(Instagram)$"
-        "workspace special:Media,title:^(Spotify)$"
-        "workspace special:LLM,title:^(ChatGPT)$"
-        "workspace special:LLM,title:^(Gemini)$"
-        "workspace special:Notes,title:^(Google Keep)$"
+      # NOTE: new rules use `windowrule` (not windowrulev2)
+      # NOTE: effects like float/center require `on`
+      windowrule = [
+        # Special workspaces (NO "silent" so it switches/focuses immediately)
+        "match:title ^(WhatsApp Web)$, workspace special:Chat"
+        "match:title ^(Mattermost)$, workspace special:Chat"
+        "match:title ^(Messenger)$, workspace special:Chat"
+        "match:title ^(Instagram)$, workspace special:Chat"
+
+        "match:title .*Spotify.* , workspace special:Media"
+        "match:title .*ChatGPT.* , workspace special:LLM"
+        "match:title .*Gemini.* , workspace special:LLM"
+        "match:title .*Google Keep.* , workspace special:Notes"
 
         # Floating Rules
-        "float, class:^(dev\\.me\\.calc)$"
-        "center, class:^(dev\\.me\\.calc)$"
-        "size 400 500, class:^(dev\\.me\\.calc)$"
+        "match:class ^(dev\\.me\\.calc)$, float on"
+        "match:class ^(dev\\.me\\.calc)$, center on"
+        "match:class ^(dev\\.me\\.calc)$, size 400 500"
 
-        "float, class:^(dev\\.me\\.file)$"
-        "size 1000 600, class:^(dev\\.me\\.file)$"
-        "center, class:^(dev\\.me\\.file)$"
+        "match:class ^(dev\\.me\\.file)$, float on"
+        "match:class ^(dev\\.me\\.file)$, center on"
+        "match:class ^(dev\\.me\\.file)$, size 1000 600"
 
-        "float, class:^(dev\\.me\\.audio)$"
-        "size 1300 500, class:^(dev\\.me\\.audio)$"
-        "center, class:^(dev\\.me\\.audio)$"
+        "match:class ^(dev\\.me\\.audio)$, float on"
+        "match:class ^(dev\\.me\\.audio)$, center on"
+        "match:class ^(dev\\.me\\.audio)$, size 1300 500"
 
-        "float, class:^(dev\\.me\\.wifi)$"
-        "size 700 1000, class:^(dev\\.me\\.wifi)$"
-        "center, class:^(dev\\.me\\.wifi)$"
+        "match:class ^(dev\\.me\\.wifi)$, float on"
+        "match:class ^(dev\\.me\\.wifi)$, center on"
+        "match:class ^(dev\\.me\\.wifi)$, size 700 1000"
 
-        "float, class:^(dev\\.me\\.bluetooth)$"
-        "size 700 1000, class:^(dev\\.me\\.bluetooth)$"
-        "center, class:^(dev\\.me\\.bluetooth)$"
+        "match:class ^(dev\\.me\\.bluetooth)$, float on"
+        "match:class ^(dev\\.me\\.bluetooth)$, center on"
+        "match:class ^(dev\\.me\\.bluetooth)$, size 700 1000"
       ];
 
+      # New syntax: match first
       layerrule = [
-        "dim_around on, match:namespace launcher"
+        "match:namespace launcher, dim_around on"
       ];
     };
   };
