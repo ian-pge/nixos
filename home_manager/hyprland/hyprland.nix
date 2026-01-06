@@ -223,7 +223,8 @@
       ];
 
       ### WINDOW / LAYER RULES ###
-      windowrule = [
+      # CHANGE: Renamed from windowrule to windowrulev2
+      windowrulev2 = [
         "workspace special:Chat,title:^(WhatsApp Web)$"
         "workspace special:Chat,title:^(Mattermost)$"
         "workspace special:Chat,title:^(Messenger)$"
@@ -231,28 +232,31 @@
         "workspace special:Media,title:^(Spotify)$"
         "workspace special:LLM,title:^(ChatGPT)$"
         "workspace special:Notes,title:^(Google Keep)$"
-        # "workspace special:Notes,initialClass:^(obsidian)$"
-        # "float, class:^(com\\.mitchellh\\.ghostty)$"
-        # "float, title:^(Calculator)$"
+
+        # Floating Rules
         "float, class:^(dev\\.me\\.calc)$"
         "center, class:^(dev\\.me\\.calc)$"
         "size 400 500, class:^(dev\\.me\\.calc)$"
-        "center, class:^(dev\\.me\\.calc)$"
+
         "float, class:^(dev\\.me\\.file)$"
         "size 1000 600, class:^(dev\\.me\\.file)$"
         "center, class:^(dev\\.me\\.file)$"
+
         "float, class:^(dev\\.me\\.audio)$"
         "size 1300 500, class:^(dev\\.me\\.audio)$"
         "center, class:^(dev\\.me\\.audio)$"
+
         "float, class:^(dev\\.me\\.wifi)$"
         "size 700 1000, class:^(dev\\.me\\.wifi)$"
         "center, class:^(dev\\.me\\.wifi)$"
+
         "float, class:^(dev\\.me\\.bluetooth)$"
         "size 700 1000, class:^(dev\\.me\\.bluetooth)$"
         "center, class:^(dev\\.me\\.bluetooth)$"
       ];
+
       layerrule = [
-        "dimaround,launcher"
+        "dim_around on, match:namespace launcher"
       ];
     };
   };

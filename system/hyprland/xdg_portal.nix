@@ -36,7 +36,7 @@
 
     extraPortals = [
       pkgs.xdg-desktop-portal-hyprland
-      pkgs.xdg-desktop-portal-cosmic
+      # pkgs.xdg-desktop-portal-cosmic
       pkgs.xdg-desktop-portal-gtk
     ];
 
@@ -50,7 +50,7 @@
         "org.freedesktop.impl.portal.RemoteDesktop" = ["hyprland"];
 
         # Force file chooser to COSMIC
-        "org.freedesktop.impl.portal.FileChooser" = ["cosmic"];
+        # "org.freedesktop.impl.portal.FileChooser" = ["cosmic"];
       };
     };
   };

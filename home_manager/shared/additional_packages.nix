@@ -25,7 +25,7 @@
     zotero
     neofetch
     obsidian
-    freecad-wayland
+    # freecad-wayland
     # firefox
     gyroflow
     wget
