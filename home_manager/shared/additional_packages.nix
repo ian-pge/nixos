@@ -38,6 +38,7 @@
     antigravity
     ffmpeg
     f3d
+    discord
   ];
 
   programs = {
