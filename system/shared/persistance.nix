@@ -74,6 +74,7 @@
         ".local/state/wireplumber"
         ".config/gcloud"
         ".config/Antigravity"
+        ".config/discord"
         ".antigravity"
         ".gemini"
       ];
