@@ -78,6 +78,7 @@
       ];
       files = [
         ".config/monitors.xml"
+        ".config/access-token"
       ];
     };
   };

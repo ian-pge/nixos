@@ -1,4 +1,8 @@
-{pkgs, ...}: {
+{
+  pkgs,
+  config,
+  ...
+}: {
   programs.waybar = {
     enable = true;
     systemd.enable = true;
@@ -119,19 +123,27 @@
           tooltip = false;
         };
 
+        # ───── UPDATED CUSTOM/NIXOS MODULE ─────
         "custom/nixos" = {
           exec = "waybar-update-checker";
-          interval = 5;
-          on-click = "ghostty -e waybar-update-builder &";
-          # signal = 8;
           return-type = "json";
-          tooltip = true;
+          interval = 3600; # Check every hour (network heavy!)
+          signal = 8; # Allows manual update via signal
+
+          # Left-click: Build & Switch (in terminal)
+          on-click = "ghostty -e waybar-update-builder";
+
+          # Right-click: Force check for updates NOW
+          on-click-right = "pkill -SIGRTMIN+8 waybar";
+
           format = "{icon}{text}";
+          tooltip = true;
+
           format-icons = {
             error = "";
-            busy = ""; # spinner     (while building)
-            has-updates = ""; # circular arrows
-            updated = ""; # check mark
+            busy = "";
+            has-updates = " "; # The icon when updates are found
+            updated = ""; # The icon when system is clean
             outdated = "";
           };
         };
@@ -232,54 +244,94 @@
   home.packages = with pkgs; [
     wttrbar
 
+    jq # Ensure jq is installed for JSON formatting
+
+    # ───── 1. THE CHECKER SCRIPT (Tooltip Logic) ─────
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
-      set -uo pipefail                      # keep it simple: no -e, no traps
+      set -uo pipefail
 
-      flake_lock="$HOME/.config/nixos/flake.lock"
-      branch="nixpkgs-unstable"            # sensible fallback
+      FLAKE_DIR="$HOME/.config/nixos"
+      TMP_DIR=$(mktemp -d)
+      trap 'rm -rf "$TMP_DIR"' EXIT
 
-      # ── current revision ────────────────────────────────────────────
-      if [[ -f $flake_lock ]]; then
-        cur_rev=$(jq -er '.nodes.nixpkgs.locked.rev' "$flake_lock" 2>/dev/null || true)
-        branch=$(jq -er '.nodes.nixpkgs.original.ref // empty' "$flake_lock" 2>/dev/null || echo "$branch")
+      if [[ -f "$FLAKE_DIR/flake.nix" ]]; then
+        cp "$FLAKE_DIR/flake.nix" "$TMP_DIR/"
+        cp "$FLAKE_DIR/flake.lock" "$TMP_DIR/" 2>/dev/null || true
       else
-        cur_rev=""
+        echo '{"text":"?","alt":"error","tooltip":"No flake found"}'
+        exit 0
       fi
 
-      # ── latest revision  ───────────────────
-      latest_rev=$(
-        timeout 30s \
-          nix flake metadata --json "github:NixOS/nixpkgs?ref=$branch" 2>/dev/null |
-        jq -er '.locked.rev' 2>/dev/null || true
-      )
+      update_output=$(timeout 60s nix flake update --flake "$TMP_DIR" 2>&1 || echo "Error checking")
 
-      # ── single decision point ──────────────────────────────────────
-      if [[ -z $cur_rev || -z $latest_rev ]]; then
-        printf '{"text":"","alt":"error","tooltip":"Error"}\n'
-      elif [[ $cur_rev == "$latest_rev" ]]; then
-        printf '{"text":"","alt":"updated","tooltip":"System up-to-date"}\n'
+      if [[ "$update_output" == *"Error checking"* ]]; then
+         echo '{"text":"err","alt":"error","tooltip":"Timeout or network error"}'
+         exit 0
+      fi
+
+      # ─── PARSING LOGIC ───
+      updates=$(echo "$update_output" | awk '
+        /Updated input/ {
+            # 1. Match the name inside single quotes (Hex 27)
+            match($0, /\x27[^\x27]+\x27/);
+            if (RSTART > 0) {
+              # Strip the quotes from the match
+              name = substr($0, RSTART+1, RLENGTH-2);
+            }
+        }
+        /→/ {
+            # 2. Match the date inside parentheses: (YYYY-MM-DD)
+            match($0, /\([0-9]{4}-[0-9]{2}-[0-9]{2}\)/);
+            if (RSTART > 0) {
+              date = substr($0, RSTART+1, RLENGTH-2);
+            } else {
+              date = "unknown";
+            }
+            # 3. Print clean output: "nixpkgs: 2026-01-07"
+            print name ": " date;
+        }
+      ')
+
+      count=$(echo -n "$updates" | grep -c '^' || true)
+
+      if [[ -n "$updates" && "$count" -gt 0 ]]; then
+        tooltip_esc=$(echo "$updates" | jq -R -s '.')
+        printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' "$count" "$tooltip_esc"
       else
-        printf '{"text":"","alt":"outdated","tooltip":"System outdated"}\n'
+        printf '{"text":"","alt":"updated","tooltip":"System is up to date"}\n'
       fi
     '')
 
+    # ───── 2. THE BUILDER SCRIPT (Click Logic) ─────
     (writeShellScriptBin "waybar-update-builder" ''
       #!/usr/bin/env bash
-      set -euo pipefail
+      set -e
 
+      echo "  Starting System Update..."
       cd "$HOME/.config/nixos"
 
+      # Update the lockfile for real
       nix flake update
 
-      # Only commit if something changed
+      # Commit if changed
       if ! git diff --quiet flake.lock; then
         git add flake.lock
         git commit -m "flake: update inputs ($(date -u +%F))"
-        git push
+        echo "  Flake lockfile updated and committed."
+      else
+        echo "  No changes in flake inputs."
       fi
 
+      echo "------------------------------------------------"
+      echo "🔨 Rebuilding system..."
+
+      # Using nh as in your previous config
       nh os switch
+
+      echo "------------------------------------------------"
+      echo "✅ Update complete! You can close this window."
+      read -p "Press Enter to exit..."
     '')
 
     (rustPlatform.buildRustPackage {
@@ -299,4 +351,7 @@
       doCheck = false; # upstream has no tests yet :contentReference[oaicite:1]{index=1}
     })
   ];
+  nix.extraOptions = ''
+    !include /home/ian/.config/nix/access-tokens
+  '';
 }
