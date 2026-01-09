@@ -74,6 +74,7 @@
         ".local/state/wireplumber"
         ".config/gcloud"
         ".config/Antigravity"
+        ".antigravity"
         ".gemini"
       ];
       files = [
