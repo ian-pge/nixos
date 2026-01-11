@@ -266,7 +266,7 @@
       update_output=$(timeout 60s nix flake update --flake "$TMP_DIR" 2>&1 || echo "Error checking")
 
       if [[ "$update_output" == *"Error checking"* ]]; then
-         echo '{"text":"err","alt":"error","tooltip":"Timeout or network error"}'
+         echo '{"text":"","alt":"error","tooltip":"Timeout or network error"}'
          exit 0
       fi
 
