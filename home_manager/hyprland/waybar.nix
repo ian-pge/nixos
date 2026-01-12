@@ -127,7 +127,7 @@
         "custom/nixos" = {
           exec = "waybar-update-checker";
           return-type = "json";
-          interval = 60; # Check every hour (network heavy!)
+          interval = 3600; # Check every hour (network heavy!)
           signal = 8; # Allows manual update via signal
 
           # Left-click: Build & Switch (in terminal)
