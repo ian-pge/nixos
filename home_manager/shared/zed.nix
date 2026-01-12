@@ -12,6 +12,10 @@
         version = "2";
       };
 
+      inlay_hints = {
+        enabled = true;
+      };
+
       # Added session settings here
       session = {
         trust_all_worktrees = true;
