@@ -40,6 +40,9 @@
     ffmpeg
     f3d
     discord
+    codex
+    claude-code
+    gemini-cli
   ];
 
   programs = {

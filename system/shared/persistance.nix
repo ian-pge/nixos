@@ -77,6 +77,8 @@
         ".config/discord"
         ".antigravity"
         ".gemini"
+        ".claude"
+        ".codex"
       ];
       files = [
         ".config/monitors.xml"
