@@ -12,6 +12,11 @@
         version = "2";
       };
 
+      # Added session settings here
+      session = {
+        trust_all_worktrees = true;
+      };
+
       icon_theme = "Catppuccin Macchiato";
       features = {
         edit_prediction_provider = "zed";
@@ -47,7 +52,8 @@
 
       languages = {
         Nix = {
-          format_on_save = "language_server";
+          format_on_save = "on";
+          formatter = "language_server";
         };
       };
 
