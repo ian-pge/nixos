@@ -20,7 +20,6 @@
     # oculante
     seahorse
     gcalcli
-    aichat
     pulsemixer
     hyprpaper
   ];

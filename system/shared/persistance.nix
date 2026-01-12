@@ -67,7 +67,6 @@
         ".local/share/keyrings"
         ".config/pika-backup"
         ".local/share/DaVinciResolve"
-        ".config/aichat"
         ".config/polychromatic"
         ".config/openrazer"
         ".config/gazelle"
