@@ -15,6 +15,7 @@
     vscode
     pavucontrol
     devpod
+    devcontainer
     bambu-studio
     kalker
     google-chrome
