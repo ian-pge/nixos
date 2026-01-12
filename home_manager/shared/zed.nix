@@ -22,9 +22,7 @@
       };
 
       icon_theme = "Catppuccin Macchiato";
-      features = {
-        edit_prediction_provider = "zed";
-      };
+      edit_prediction_provider = "zed";
       restore_on_startup = "none";
 
       tab_size = 2;
