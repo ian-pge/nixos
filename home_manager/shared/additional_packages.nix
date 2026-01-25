@@ -38,11 +38,12 @@
     mutagen
     antigravity
     ffmpeg
-    f3d
+    # f3d
     discord
     codex
     claude-code
     gemini-cli
+    runpodctl
   ];
 
   programs = {

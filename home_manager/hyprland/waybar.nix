@@ -127,14 +127,15 @@
         "custom/nixos" = {
           exec = "waybar-update-checker";
           return-type = "json";
-          interval = 3600; # Check every hour (network heavy!)
+          interval = 3600; # Check file age every hour
           signal = 8; # Allows manual update via signal
 
           # Left-click: Build & Switch (in terminal)
           on-click = "ghostty -e waybar-update-builder";
 
           # Right-click: Force check for updates NOW
-          on-click-right = "pkill -SIGRTMIN+8 waybar";
+          # 1. Set busy state 2. Signal (show busy) 3. Force check 4. Signal (show result)
+          on-click-right = "echo '{\"text\":\"\",\"alt\":\"busy\",\"tooltip\":\"Checking...\"}' > /tmp/waybar-nixos-updates.json && pkill -SIGRTMIN+8 waybar && waybar-update-checker --force && pkill -SIGRTMIN+8 waybar";
 
           format = "{icon}{text}";
           tooltip = true;
@@ -246,32 +247,41 @@
 
     jq # Ensure jq is installed for JSON formatting
 
-    # ───── 1. THE CHECKER SCRIPT (Tooltip Logic) ─────
+    # ───── 1. THE CHECKER SCRIPT (Smart Wrapper) ─────
     (writeShellScriptBin "waybar-update-checker" ''
       #!/usr/bin/env bash
       set -uo pipefail
 
+      CACHE_FILE="/tmp/waybar-nixos-updates.json"
       FLAKE_DIR="$HOME/.config/nixos"
-      TMP_DIR=$(mktemp -d)
-      trap 'rm -rf "$TMP_DIR"' EXIT
+      LOCK_FILE="/tmp/waybar-nixos-updates.lock"
 
-      if [[ -f "$FLAKE_DIR/flake.nix" ]]; then
-        cp "$FLAKE_DIR/flake.nix" "$TMP_DIR/"
-        cp "$FLAKE_DIR/flake.lock" "$TMP_DIR/" 2>/dev/null || true
-      else
-        echo '{"text":"?","alt":"error","tooltip":"No flake found"}'
-        exit 0
-      fi
+      # Function to perform the actual check
+      do_check() {
+        # Prevent concurrent checks
+        exec 9>"$LOCK_FILE"
+        flock -n 9 || return
 
-      update_output=$(timeout 60s nix flake update --flake "$TMP_DIR" 2>&1 || echo "Error checking")
+        TMP_DIR=$(mktemp -d)
+        trap 'rm -rf "$TMP_DIR"' EXIT
 
-      if [[ "$update_output" == *"Error checking"* ]]; then
-         echo '{"text":"","alt":"error","tooltip":"Timeout or network error"}'
-         exit 0
-      fi
+        if [[ -f "$FLAKE_DIR/flake.nix" ]]; then
+          cp "$FLAKE_DIR/flake.nix" "$TMP_DIR/"
+          cp "$FLAKE_DIR/flake.lock" "$TMP_DIR/" 2>/dev/null || true
+        else
+          echo '{"text":"?","alt":"error","tooltip":"No flake found"}' > "$CACHE_FILE"
+          return
+        fi
 
-      # ─── PARSING LOGIC ───
-      updates=$(echo "$update_output" | awk '
+        update_output=$(timeout 60s nix flake update --flake "$TMP_DIR" 2>&1 || echo "Error checking")
+
+        if [[ "$update_output" == *"Error checking"* ]]; then
+           echo '{"text":"","alt":"error","tooltip":"Timeout or network error"}' > "$CACHE_FILE"
+           return
+        fi
+
+        # ─── PARSING LOGIC ───
+        updates=$(echo "$update_output" | awk '
         /Updated input/ {
             # 1. Match the name inside single quotes (Hex 27)
             match($0, /\x27[^\x27]+\x27/);
@@ -293,13 +303,39 @@
         }
       ')
 
-      count=$(echo -n "$updates" | grep -c '^' || true)
+        count=$(echo -n "$updates" | grep -c '^' || true)
 
-      if [[ -n "$updates" && "$count" -gt 0 ]]; then
-        tooltip_esc=$(echo "$updates" | jq -R -s '.')
-        printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' "$count" "$tooltip_esc"
+        if [[ -n "$updates" && "$count" -gt 0 ]]; then
+          tooltip_esc=$(echo "$updates" | jq -R -s '.')
+          printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' "$count" "$tooltip_esc" > "$CACHE_FILE"
+        else
+          printf '{"text":"","alt":"updated","tooltip":"System is up to date"}\n' > "$CACHE_FILE"
+        fi
+      }
+
+      # If --force is passed, run check regardless of cache
+      if [[ "''${1:-}" == "--force" ]]; then
+        do_check
+        exit 0
+      fi
+
+      # If cache doesn't exist or is older than 1 hour (3600s)
+      current_time=$(date +%s)
+      if [[ -f "$CACHE_FILE" ]]; then
+        file_time=$(stat -c %Y "$CACHE_FILE")
+        age=$((current_time - file_time))
       else
-        printf '{"text":"","alt":"updated","tooltip":"System is up to date"}\n'
+        age=99999
+      fi
+
+      if [[ $age -ge 3600 ]]; then
+        do_check
+      fi
+
+      if [[ -f "$CACHE_FILE" ]]; then
+        cat "$CACHE_FILE"
+      else
+        echo '{"text":"...","alt":"busy","tooltip":"Checking..."}'
       fi
     '')
 
@@ -331,6 +367,11 @@
 
       echo "------------------------------------------------"
       echo "✅ Update complete! You can close this window."
+
+      # Reset cache to updated state and signal Waybar
+      echo '{"text":"","alt":"updated","tooltip":"System is up to date"}' > /tmp/waybar-nixos-updates.json
+      pkill -SIGRTMIN+8 waybar
+
       read -p "Press Enter to exit..."
     '')
 
