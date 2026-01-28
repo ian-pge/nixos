@@ -30,7 +30,7 @@
     # firefox
     # gyroflow
     wget
-    pika-backup
+    # pika-backup
     inkscape
     polychromatic
     razergenie
