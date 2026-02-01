@@ -27,10 +27,10 @@
     neofetch
     obsidian
     # freecad-wayland
-    # firefox
-    # gyroflow
+    firefox
+    gyroflow
     wget
-    # pika-backup
+    pika-backup
     inkscape
     polychromatic
     razergenie
@@ -38,7 +38,7 @@
     mutagen
     antigravity
     ffmpeg
-    # f3d
+    f3d
     discord
     codex
     claude-code
