@@ -143,11 +143,11 @@
       },
       "locked": {
         "dir": "packaging",
-        "lastModified": 1766543984,
-        "narHash": "sha256-sGjjt7OFpIIPByhhaS7fMZGqBMq1G+HjKue47GwXxsM=",
+        "lastModified": 1770145473,
+        "narHash": "sha256-I/i0N9gr1ykw1OISnja95n3rwLoxZ2u7AwbuERIchvc=",
         "owner": "chmouel",
         "repo": "nextmeeting",
-        "rev": "cac791b31e683b29a4af83f55b0e5c7c6800f0f3",
+        "rev": "6bdaf126d8eacb115ff0445f252a66b451af2c75",
         "type": "github"
       },
       "original": {
@@ -191,11 +191,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1770019141,
-        "narHash": "sha256-VKS4ZLNx4PNrABoB0L8KUpc1fE7CLpQXQs985tGfaCU=",
+        "lastModified": 1770115704,
+        "narHash": "sha256-KHFT9UWOF2yRPlAnSXQJh6uVcgNcWlFqqiAZ7OVlHNc=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "cb369ef2efd432b3cdf8622b0ffc0a97a02f3137",
+        "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
         "type": "github"
       },
       "original": {
