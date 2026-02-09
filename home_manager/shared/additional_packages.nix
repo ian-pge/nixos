@@ -44,6 +44,7 @@
     claude-code
     gemini-cli
     runpodctl
+    opencode
   ];
 
   programs = {

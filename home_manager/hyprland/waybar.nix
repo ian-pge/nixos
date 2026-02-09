@@ -125,27 +125,23 @@
 
         # ───── UPDATED CUSTOM/NIXOS MODULE ─────
         "custom/nixos" = {
-          exec = "waybar-update-checker";
+          exec = "nixos-update-checker";
           return-type = "json";
-          interval = 3600; # Check file age every hour
-          signal = 8; # Allows manual update via signal
+          interval = 1800; # Check every 30 minutes
+          signal = 8; # Allows manual refresh
 
-          # Left-click: Build & Switch (in terminal)
-          on-click = "ghostty -e waybar-update-builder";
+          # Left-click: Run update in terminal
+          on-click = "ghostty -e nixos-update-installer";
 
-          # Right-click: Force check for updates NOW
-          # 1. Set busy state 2. Signal (show busy) 3. Force check 4. Signal (show result)
-          on-click-right = "echo '{\"text\":\"\",\"alt\":\"busy\",\"tooltip\":\"Checking...\"}' > /tmp/waybar-nixos-updates.json && pkill -SIGRTMIN+8 waybar && waybar-update-checker --force && pkill -SIGRTMIN+8 waybar";
+          # Right-click: Force check NOW (and refresh icon)
+          on-click-right = "nixos-update-checker force && pkill -SIGRTMIN+8 waybar";
 
-          format = "{icon}{text}";
+          format = "{icon}";
           tooltip = true;
 
           format-icons = {
-            error = "";
-            busy = "";
-            has-updates = " "; # The icon when updates are found
-            updated = ""; # The icon when system is clean
-            outdated = "";
+            updated = ""; # Icon when clean
+            has-updates = ""; # Icon when updates exist
           };
         };
 
@@ -248,78 +244,72 @@
     jq # Ensure jq is installed for JSON formatting
 
     # ───── 1. THE CHECKER SCRIPT (Smart Wrapper) ─────
-    (writeShellScriptBin "waybar-update-checker" ''
+    (writeShellScriptBin "nixos-update-checker" ''
       #!/usr/bin/env bash
       set -uo pipefail
 
-      CACHE_FILE="/tmp/waybar-nixos-updates.json"
+      CACHE_FILE="/tmp/nixos-update-status.json"
       FLAKE_DIR="$HOME/.config/nixos"
-      LOCK_FILE="/tmp/waybar-nixos-updates.lock"
 
-      # Function to perform the actual check
+      # 1. The Heavy Check Function
       do_check() {
-        # Prevent concurrent checks
-        exec 9>"$LOCK_FILE"
-        flock -n 9 || return
-
+        # Create temp directory to avoid locking the real flake
         TMP_DIR=$(mktemp -d)
         trap 'rm -rf "$TMP_DIR"' EXIT
 
-        if [[ -f "$FLAKE_DIR/flake.nix" ]]; then
-          cp "$FLAKE_DIR/flake.nix" "$TMP_DIR/"
-          cp "$FLAKE_DIR/flake.lock" "$TMP_DIR/" 2>/dev/null || true
-        else
-          echo '{"text":"?","alt":"error","tooltip":"No flake found"}' > "$CACHE_FILE"
-          return
-        fi
+        cp "$FLAKE_DIR/flake.nix" "$TMP_DIR/"
+        cp "$FLAKE_DIR/flake.lock" "$TMP_DIR/" 2>/dev/null || true
 
-        update_output=$(timeout 60s nix flake update --flake "$TMP_DIR" 2>&1 || echo "Error checking")
+        # Run the update in dry-run mode
+        update_output=$(nix flake update --flake "$TMP_DIR" 2>&1 || echo "Error checking")
 
-        if [[ "$update_output" == *"Error checking"* ]]; then
-           echo '{"text":"","alt":"error","tooltip":"Timeout or network error"}' > "$CACHE_FILE"
-           return
-        fi
-
-        # ─── PARSING LOGIC ───
+        # Parse the output using your original AWK logic
         updates=$(echo "$update_output" | awk '
-        /Updated input/ {
-            # 1. Match the name inside single quotes (Hex 27)
-            match($0, /\x27[^\x27]+\x27/);
-            if (RSTART > 0) {
-              # Strip the quotes from the match
-              name = substr($0, RSTART+1, RLENGTH-2);
-            }
-        }
-        /→/ {
-            # 2. Match the date inside parentheses: (YYYY-MM-DD)
-            match($0, /\([0-9]{4}-[0-9]{2}-[0-9]{2}\)/);
-            if (RSTART > 0) {
-              date = substr($0, RSTART+1, RLENGTH-2);
-            } else {
-              date = "unknown";
-            }
-            # 3. Print clean output: "nixpkgs: 2026-01-07"
-            print name ": " date;
-        }
-      ')
+          /Updated input/ {
+              # Match name inside single quotes
+              match($0, /\x27[^\x27]+\x27/);
+              if (RSTART > 0) {
+                name = substr($0, RSTART+1, RLENGTH-2);
+              }
+          }
+          /→/ {
+              # Match date inside parentheses (YYYY-MM-DD)
+              match($0, /\([0-9]{4}-[0-9]{2}-[0-9]{2}\)/);
+              if (RSTART > 0) {
+                date = substr($0, RSTART+1, RLENGTH-2);
+              } else {
+                date = "unknown";
+              }
+              # Print "nixpkgs: 2026-02-09"
+              print name ": " date;
+          }
+        ')
 
+        # Count how many updates found
         count=$(echo -n "$updates" | grep -c '^' || true)
 
         if [[ -n "$updates" && "$count" -gt 0 ]]; then
+          # Safely escape the list for JSON (requires jq)
           tooltip_esc=$(echo "$updates" | jq -R -s '.')
-          printf '{"text":"%s","alt":"has-updates","tooltip":%s}\n' "$count" "$tooltip_esc" > "$CACHE_FILE"
+
+          # Write JSON: icon is "has-updates", tooltip has the list
+          printf '{"text":"","alt":"has-updates","tooltip":%s}\n' "$tooltip_esc" > "$CACHE_FILE"
         else
+          # Write JSON: icon is "updated", tooltip is simple text
           printf '{"text":"","alt":"updated","tooltip":"System is up to date"}\n' > "$CACHE_FILE"
         fi
       }
 
-      # If --force is passed, run check regardless of cache
-      if [[ "''${1:-}" == "--force" ]]; then
+      # 2. Logic Controller
+
+      # A) Force check (Right Click)
+      if [[ "''${1:-}" == "force" ]]; then
         do_check
+        cat "$CACHE_FILE"
         exit 0
       fi
 
-      # If cache doesn't exist or is older than 1 hour (3600s)
+      # B) Interval Check (Every 30m)
       current_time=$(date +%s)
       if [[ -f "$CACHE_FILE" ]]; then
         file_time=$(stat -c %Y "$CACHE_FILE")
@@ -328,53 +318,48 @@
         age=99999
       fi
 
-      if [[ $age -ge 3600 ]]; then
+      # Only run check if cache is older than 30 mins (1800s)
+      if [[ $age -ge 1800 ]]; then
         do_check
       fi
 
+      # C) Always print the result for Waybar
       if [[ -f "$CACHE_FILE" ]]; then
         cat "$CACHE_FILE"
       else
-        echo '{"text":"...","alt":"busy","tooltip":"Checking..."}'
+        # Fallback if first run hasn't finished
+        echo '{"text":"","alt":"updated","tooltip":"Checking..."}'
       fi
     '')
 
     # ───── 2. THE BUILDER SCRIPT (Click Logic) ─────
-    (writeShellScriptBin "waybar-update-builder" ''
+    (writeShellScriptBin "nixos-update-installer" ''
       #!/usr/bin/env bash
       set -e
+      echo "📦 Starting update..."
+      cd ~/.config/nixos
 
-      echo "  Starting System Update..."
-      cd "$HOME/.config/nixos"
-
-      # Update the lockfile for real
+      # Update lockfile
       nix flake update
 
-      # Commit if changed
-      if ! git diff --quiet flake.lock; then
-        git add flake.lock
-        git commit -m "flake: update inputs ($(date -u +%F))"
-        echo "  Flake lockfile updated and committed."
+      # Rebuild System (using nh or nixos-rebuild)
+      if nh os switch; then
+        echo ""
+        echo "✅ Update Complete!"
+
+        # 1. Overwrite the cache with "Up to date" status
+        echo '{"text":"", "alt":"updated", "tooltip":"Just updated"}' > /tmp/nixos-update-status.json
+
+        # 2. Signal Waybar to refresh the module immediately
+        pkill -SIGRTMIN+8 waybar
+
+        echo "Icon refreshed."
+        read -p "Press Enter to close..."
       else
-        echo "  No changes in flake inputs."
+        echo "❌ Update Failed."
+        read -p "Press Enter to inspect error..."
       fi
-
-      echo "------------------------------------------------"
-      echo "🔨 Rebuilding system..."
-
-      # Using nh as in your previous config
-      nh os switch
-
-      echo "------------------------------------------------"
-      echo "✅ Update complete! You can close this window."
-
-      # Reset cache to updated state and signal Waybar
-      echo '{"text":"","alt":"updated","tooltip":"System is up to date"}' > /tmp/waybar-nixos-updates.json
-      pkill -SIGRTMIN+8 waybar
-
-      read -p "Press Enter to exit..."
     '')
-
     (rustPlatform.buildRustPackage {
       pname = "gpu-usage-waybar";
       version = "v0.1.24"; # latest release, 3 May 2025 :contentReference[oaicite:0]{index=0}
