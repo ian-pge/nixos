@@ -24,7 +24,7 @@
     nvd
     nix-output-monitor
     zotero
-    neofetch
+    fastfetch
     obsidian
     # freecad-wayland
     firefox
