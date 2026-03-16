@@ -6,7 +6,7 @@
       "/var/log"
       "/var/lib/bluetooth"
       "/var/lib/nixos"
-      "/var/lib/systemd/coredump"
+      "/var/lib/systemd"
       "/var/lib/docker"
       "/var/lib/libvirt"
       "/var/lib/tailscale"
