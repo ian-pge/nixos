@@ -227,6 +227,7 @@
         "match:title .*Spotify.* , workspace special:Media"
         "match:title .*ChatGPT.* , workspace special:LLM"
         "match:title .*Gemini.* , workspace special:LLM"
+        "match:title .*Claude.* , workspace special:LLM"
         "match:title .*Google Keep.* , workspace special:Notes"
 
         # Floating Rules
