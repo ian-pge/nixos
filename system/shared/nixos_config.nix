@@ -12,6 +12,7 @@
 
   users.users."ian" = {
     isNormalUser = true;
-extraGroups = ["wheel" "nix-users"]; # Enable ‘sudo’ for the user.
+    password = "ian";
+    extraGroups = ["wheel" "nix-users"]; # Enable ‘sudo’ for the user.
   };
 }
