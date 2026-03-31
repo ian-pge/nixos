@@ -8,6 +8,6 @@
     # ./mime_apps.nix
     ./zed.nix
 
-    # ./bambustudio.nix
+    ./bambustudio.nix
   ];
 }
