@@ -77,7 +77,7 @@
 
       terminal = {
         font_family = "Hack Nerd Font";
-        dock = "bottom";
+        dock = "right";
         font_size = 16;
         blinking = "on";
         line_height = "standard";
@@ -89,5 +89,25 @@
       ui_font_family = "Ubuntu Nerd Font";
       ui_font_size = 16;
     };
+    userKeymaps = [
+      {
+        context = "Pane";
+        bindings = {
+          "alt-h" = "pane::ActivatePrevItem";
+          "alt-l" = "pane::ActivateNextItem";
+        };
+      }
+      {
+        context = "Terminal";
+        bindings = {
+          "alt-k" = "terminal::ScrollLineUp";
+          "alt-j" = "terminal::ScrollLineDown";
+          "alt-u" = "terminal::ScrollPageUp";
+          "alt-d" = "terminal::ScrollPageDown";
+          "alt-h" = "pane::ActivatePrevItem";
+          "alt-l" = "pane::ActivateNextItem";
+        };
+      }
+    ];
   };
 }
