@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{config, pkgs, ...}: {
   # Enable dconf to manage GNOME settings
   dconf.settings = {
     "org/gnome/desktop/interface" = {
@@ -25,5 +25,6 @@
 
     # Tells GTK 3 to prefer a dark theme variant
     gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
+    gtk4.theme = config.gtk.theme;
   };
 }

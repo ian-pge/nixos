@@ -1,7 +1,9 @@
 {
   programs.neovim = {
     enable = true;
-    extraLuaConfig = ''
+    withRuby = true;
+    withPython3 = true;
+    initLua = ''
       vim.opt.number = true
       vim.opt.shortmess:append("I")
     '';

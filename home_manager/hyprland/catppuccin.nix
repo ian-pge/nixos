@@ -32,7 +32,7 @@
       accent = "sapphire";
     };
     nvim = {
-      enable = true;
+      enable = false;
       flavor = "macchiato";
     };
     mpv = {
