@@ -1,4 +1,8 @@
-{config, pkgs, ...}: {
+{
+  config,
+  pkgs,
+  ...
+}: {
   # Enable dconf to manage GNOME settings
   dconf.settings = {
     "org/gnome/desktop/interface" = {

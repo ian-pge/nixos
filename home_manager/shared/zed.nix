@@ -93,21 +93,55 @@
       {
         context = "Pane";
         bindings = {
-          "alt-h" = "pane::ActivatePrevItem";
-          "alt-l" = "pane::ActivateNextItem";
+          "alt-h" = "pane::SplitLeft";
+          "alt-j" = "pane::SplitDown";
+          "alt-k" = "pane::SplitUp";
+          "alt-l" = "pane::SplitRight";
+          "ctrl-w" = "pane::CloseActiveItem";
+        };
+      }
+      {
+        context = "VimControl";
+        bindings = {
+          "ctrl-h" = "workspace::ActivatePaneLeft";
+          "ctrl-j" = "workspace::ActivatePaneDown";
+          "ctrl-k" = "workspace::ActivatePaneUp";
+          "ctrl-l" = "workspace::ActivatePaneRight";
+        };
+      }
+      {
+        context = "Dock";
+        bindings = {
+          "ctrl-h" = "workspace::ActivatePaneLeft";
+          "ctrl-j" = "workspace::ActivatePaneDown";
+          "ctrl-k" = "workspace::ActivatePaneUp";
+          "ctrl-l" = "workspace::ActivatePaneRight";
         };
       }
       {
         context = "Terminal";
         bindings = {
-          "alt-k" = "terminal::ScrollLineUp";
-          "alt-j" = "terminal::ScrollLineDown";
-          "alt-u" = "terminal::ScrollPageUp";
-          "alt-d" = "terminal::ScrollPageDown";
-          "alt-h" = "pane::ActivatePrevItem";
-          "alt-l" = "pane::ActivateNextItem";
+          "ctrl-y" = "terminal::ScrollLineUp";
+          "ctrl-e" = "terminal::ScrollLineDown";
+          "ctrl-u" = "terminal::ScrollPageUp";
+          "ctrl-d" = "terminal::ScrollPageDown";
+          "alt-h" = "pane::SplitLeft";
+          "alt-j" = "pane::SplitDown";
+          "alt-k" = "pane::SplitUp";
+          "alt-l" = "pane::SplitRight";
+          "ctrl-w" = "pane::CloseActiveItem";
         };
       }
+      # {
+      #   # Forcefully target both code editors AND terminal tabs
+      #   context = "Editor || VimControl || Terminal";
+      #   bindings = {
+      #     "ctrl-alt-h" = "vim::ResizePaneLeft";
+      #     "ctrl-alt-j" = "vim::ResizePaneDown";
+      #     "ctrl-alt-k" = "vim::ResizePaneUp";
+      #     "ctrl-alt-l" = "vim::ResizePaneRight";
+      #   };
+      # }
     ];
   };
 }
