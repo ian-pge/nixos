@@ -45,7 +45,6 @@
     gemini-cli
     runpodctl
     opencode
-    vivaldi
     chromium
   ];
 
