@@ -45,7 +45,8 @@
     gemini-cli
     runpodctl
     opencode
-    telegram-desktop
+    vivaldi
+    chromium
   ];
 
   programs = {
