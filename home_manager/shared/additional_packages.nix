@@ -16,7 +16,7 @@
     pavucontrol
     devpod
     devcontainer
-    # bambu-studio
+    bambu-studio
     kalker
     google-chrome
     blender
@@ -28,9 +28,9 @@
     obsidian
     # freecad-wayland
     firefox
-    # gyroflow
+    gyroflow
     wget
-    # pika-backup
+    pika-backup
     inkscape
     polychromatic
     razergenie

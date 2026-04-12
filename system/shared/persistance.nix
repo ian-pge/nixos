@@ -43,11 +43,11 @@
         "Downloads"
 
         ".config/nixos"
-
         ".local/share/zed"
         ".config/zed"
         ".ssh"
         ".devpod"
+        ".config/chromium"
         ".config/google-chrome"
         ".local/share/applications"
         ".local/share/icons"
