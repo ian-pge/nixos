@@ -5,6 +5,7 @@
 
   virtualisation.docker = {
     enable = true;
+    daemon.settings.features.cdi = true;
     storageDriver = "btrfs";
   };
 }

@@ -1,6 +1,15 @@
 {pkgs, ...}: {
   programs.fish = {
     enable = true;
+
+    functions = {
+      starship_transient_prompt_func.body = ''starship module time'';
+      prompt_newline = {
+        onEvent = "fish_postexec";
+        body = ''echo'';
+      };
+    };
+
     interactiveShellInit = ''
       set fish_greeting
 

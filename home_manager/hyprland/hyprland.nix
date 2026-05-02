@@ -244,11 +244,11 @@
 
         "match:class ^(dev\\.me\\.wifi)$, float on"
         "match:class ^(dev\\.me\\.wifi)$, center on"
-        "match:class ^(dev\\.me\\.wifi)$, size 700 1000"
+        "match:class ^(dev\\.me\\.wifi)$, size 600 800"
 
         "match:class ^(dev\\.me\\.bluetooth)$, float on"
         "match:class ^(dev\\.me\\.bluetooth)$, center on"
-        "match:class ^(dev\\.me\\.bluetooth)$, size 700 1000"
+        "match:class ^(dev\\.me\\.bluetooth)$, size 600 800"
       ];
 
       # New syntax: match first

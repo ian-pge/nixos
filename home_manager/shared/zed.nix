@@ -1,15 +1,31 @@
 {
   programs.zed-editor = {
     enable = true;
+    mutableUserSettings = false;
 
     # This whole block is rendered to ~/.config/zed/settings.json
     userSettings = {
-      assistant = {
-        default_model = {
-          provider = "anthropic";
-          model = "claude-3-7-sonnet-latest";
-        };
-        version = "2";
+      disable_ai = true;
+
+      file_scan_exclusions = [
+        "**/.git"
+        "**/node_modules"
+        "**/.local/share/mise"
+        "**/.local/share/pnpm"
+        "**/.cache"
+        "**/.npm"
+        "**/.cargo"
+        "**/.rustup"
+        "**/target"
+        "**/dist"
+        "**/.next"
+        "**/__pycache__"
+        "**/.venv"
+      ];
+
+      agent = {
+        enabled = false;
+        button = false;
       };
 
       inlay_hints = {
@@ -22,7 +38,9 @@
       };
 
       icon_theme = "Catppuccin Macchiato";
-      edit_prediction_provider = "zed";
+      edit_predictions = {
+        provider = "zed";
+      };
       restore_on_startup = "none";
 
       tab_size = 2;
@@ -75,12 +93,35 @@
       #   dark = "Catppuccin Macchiato (sapphire)";
       # };
 
+      project_panel = {
+        dock = "left";
+      };
+
+      git_panel = {
+        dock = "left";
+      };
+
+      outline_panel = {
+        dock = "left";
+      };
+
+      collaboration_panel = {
+        dock = "right";
+        button = false;
+      };
+
+
       terminal = {
         font_family = "Hack Nerd Font";
         dock = "right";
         font_size = 16;
         blinking = "on";
         line_height = "standard";
+      };
+
+      active_pane_modifiers = {
+        border_size = 2.0;
+        inactive_opacity = 1.0;
       };
 
       buffer_font_family = "Hack Nerd Font";

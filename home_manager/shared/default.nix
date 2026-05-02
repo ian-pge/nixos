@@ -3,6 +3,7 @@
     inputs.nix-flatpak.homeManagerModules.nix-flatpak
 
     ./home_manager.nix
+    ./chezmoi.nix
     ./git.nix
     ./additional_packages.nix
     # ./mime_apps.nix

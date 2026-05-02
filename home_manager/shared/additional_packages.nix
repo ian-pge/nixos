@@ -1,4 +1,8 @@
-{pkgs, ...}: {
+{
+  pkgs,
+  config,
+  ...
+}: {
   home.packages = with pkgs; [
     clang-tools
     package-version-server
@@ -43,9 +47,21 @@
     codex
     claude-code
     gemini-cli
+    nodejs_latest
+    (symlinkJoin {
+      name = "pi-coding-agent";
+      paths = [pi-coding-agent];
+      nativeBuildInputs = [makeWrapper];
+      postBuild = ''
+        wrapProgram $out/bin/pi \
+          --set NPM_CONFIG_PREFIX ${config.home.homeDirectory}/.pi/npm \
+          --prefix PATH : ${lib.makeBinPath [nodejs_latest]}
+      '';
+    })
     runpodctl
     opencode
     chromium
+    chezmoi
   ];
 
   programs = {

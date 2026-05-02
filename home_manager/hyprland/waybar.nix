@@ -22,6 +22,7 @@
           "custom/launcher"
           "custom/nixos"
           "disk"
+          "upower"
           "cpu"
           "memory"
           "custom/gpu"
@@ -32,7 +33,6 @@
         modules-right = [
           "network"
           "bluetooth"
-          "upower"
           "wireplumber"
           "backlight"
           "custom/weather"
