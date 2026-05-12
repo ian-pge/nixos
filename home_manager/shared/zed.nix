@@ -110,9 +110,8 @@
         button = false;
       };
 
-
       terminal = {
-        font_family = "Hack Nerd Font";
+        font_family = "JetBrainsMono Nerd Font";
         dock = "right";
         font_size = 16;
         blinking = "on";
@@ -124,7 +123,7 @@
         inactive_opacity = 1.0;
       };
 
-      buffer_font_family = "Hack Nerd Font";
+      buffer_font_family = "JetBrainsMono Nerd Font";
       buffer_font_size = 16;
 
       ui_font_family = "Ubuntu Nerd Font";

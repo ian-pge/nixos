@@ -1,6 +1,7 @@
 {
   pkgs,
   config,
+  inputs,
   ...
 }: {
   home.packages = with pkgs; [
@@ -44,13 +45,14 @@
     ffmpeg
     f3d
     discord
-    codex
-    claude-code
-    gemini-cli
+    krabby
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli
     nodejs_latest
     (symlinkJoin {
-      name = "pi-coding-agent";
-      paths = [pi-coding-agent];
+      name = "pi";
+      paths = [inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi];
       nativeBuildInputs = [makeWrapper];
       postBuild = ''
         wrapProgram $out/bin/pi \
@@ -59,7 +61,7 @@
       '';
     })
     runpodctl
-    opencode
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode
     chromium
     chezmoi
   ];

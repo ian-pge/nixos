@@ -5,7 +5,12 @@
     systemd.variables = ["--all"];
 
     settings = {
-      ### MONITORS ###
+      # ### MONITORS ###
+      # monitor = [
+      #   "DP-2,5120x2160@120,0x0,1.25"
+      #   "eDP-1,2560x1600@165,4096x728,1.6"
+      # ];
+
       monitor = [
         "DP-2,5120x2160@120,0x0,1.25"
         "eDP-1,2560x1600@165,4096x728,1.6"
