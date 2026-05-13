@@ -12,6 +12,7 @@
       mainBar = {
         layer = "top";
         position = "top";
+        height = 0;
         margin-top = 10;
         margin-left = 5;
         margin-right = 5;
@@ -22,7 +23,6 @@
           "custom/launcher"
           "custom/nixos"
           "disk"
-          "upower"
           "cpu"
           "memory"
           "custom/gpu"
@@ -33,6 +33,7 @@
         modules-right = [
           "network"
           "bluetooth"
+          "upower"
           "wireplumber"
           "backlight"
           "custom/weather"
@@ -106,14 +107,17 @@
         };
 
         network = {
-          format-wifi = "{icon} {essid}";
+          format-wifi = "{icon}";
           format-icons = ["󰤟" "󰤢" "󰤥" "󰤨"];
           interval = 5;
-          format-ethernet = "󰈀 {ifname}";
+          format-ethernet = "󰈀";
           format-disconnected = "󰤭 ";
-          format-disabled = "󰤭 Off";
+          format-disabled = "󰤭";
           format-disabled-if-down = true;
-          tooltip-format = "{ifname} via {gwaddr}";
+          tooltip-format-wifi = "{essid}";
+          tooltip-format-ethernet = "{ifname}";
+          tooltip-format-disconnected = "Disconnected";
+          tooltip-format-disabled = "Wi-Fi Off";
           on-click = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
         };
 
@@ -147,11 +151,11 @@
 
         bluetooth = {
           format = "󰂲";
-          format-connected = "󰂯 {device_alias}";
-          tooltip-format = "{controller_alias}\t{controller_address}";
-          tooltip-format-connected = "{controller_alias}\t{controller_address}\n\n{device_enumerate}";
-          tooltip-format-enumerate-connected = "{device_alias}\t{device_address}";
-          format-off = "󰂲 Off";
+          format-connected = "󰂯";
+          tooltip-format = "{controller_alias}";
+          tooltip-format-connected = "{device_enumerate}";
+          tooltip-format-enumerate-connected = "{device_alias}";
+          format-off = "󰂲";
           on-click = "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
         };
 
@@ -211,9 +215,9 @@
       #wireplumber, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher, #custom-weather {
           background-color: @crust;
-          border-radius: 10px;
-          padding: 0px 10px;
-          margin: 0px 5px;
+          border-radius: 100px;
+          padding: 0px 8px;
+          margin: 0px 4px;
           font-size: 16px;
       }
 

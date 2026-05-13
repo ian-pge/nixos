@@ -227,7 +227,7 @@
         "match:title ^(Mattermost)$, workspace special:Chat"
         "match:title ^(Messenger)$, workspace special:Chat"
         "match:title ^(Instagram)$, workspace special:Chat"
-        "match:class ^(org\.telegram\.desktop|TelegramDesktop)$, workspace special:Chat"
+        "match:title ^(Telegram Web - Telegram)$, workspace special:Chat"
 
         "match:title .*Spotify.* , workspace special:Media"
         "match:title .*ChatGPT.* , workspace special:LLM"
