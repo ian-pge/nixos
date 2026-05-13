@@ -22,6 +22,8 @@
         modules-left = [
           "custom/launcher"
           "custom/nixos"
+          "network"
+          "bluetooth"
           "disk"
           "cpu"
           "memory"
@@ -31,8 +33,6 @@
         modules-center = ["hyprland/workspaces"];
 
         modules-right = [
-          "network"
-          "bluetooth"
           "upower"
           "wireplumber"
           "backlight"
@@ -47,6 +47,18 @@
           all-outputs = true;
           show-special = true;
           special-visible-only = true;
+          on-click = "activate";
+          format = "{icon}";
+          persistent-workspaces = {
+            "*" = 8;
+          };
+          format-icons = {
+            active = "󰮯"; # Pacman: current workspace
+            special = "󰮯"; # Red Pacman: visible scratchpad/special workspace
+            default = "󰊠"; # Ghost: workspace has apps
+            empty = ""; # Dot: empty workspace
+            urgent = "󰊠"; # Same ghost as normal occupied workspaces
+          };
         };
 
         ## ───── Clocks ─────
@@ -64,7 +76,7 @@
           format = "{}°";
           tooltip = true;
           interval = 3600;
-          exec = "wttrbar --location=Grenoble --nerd";
+          exec = "wttrbar --nerd";
           return-type = "json";
         };
 
@@ -216,8 +228,8 @@
       #upower, #disk, #workspaces, #custom-launcher, #custom-weather {
           background-color: @crust;
           border-radius: 100px;
-          padding: 0px 8px;
-          margin: 0px 4px;
+          padding: 0px 10px;
+          margin: 0px 5px;
           font-size: 16px;
       }
 
@@ -236,9 +248,54 @@
       #custom-nixos  { color: @flamingo;  }
       #custom-weather { color: @flamingo;  }
 
-      #workspaces button       { color: @text; background: none; border: none; }
-      #workspaces button:hover { background: none; }
-      #workspaces button.active{ color: #33ff33; }
+      #workspaces {
+          padding: 6px 6px;
+          border-radius: 20px;
+      }
+
+      #workspaces button {
+          min-width: 32px;
+          padding: 0px 4px;
+          margin: 0px 2px;
+          background: transparent;
+          border: none;
+          border-radius: 16px;
+          color: @mauve;
+          transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+
+      #workspaces button.active {
+          padding: 0px 12px;
+          background-color: @green;
+          color: @crust;
+      }
+
+      #workspaces button:hover {
+          background-color: @surface0;
+          color: @green;
+      }
+
+      #workspaces button.active:hover {
+          background-color: @green;
+          color: @crust;
+      }
+
+      #workspaces button.empty {
+          color: @overlay0;
+      }
+
+      #workspaces button.special {
+          color: @red;
+      }
+
+      #workspaces button.special.active {
+          background-color: @red;
+          color: @crust;
+      }
+
+      #workspaces button.urgent {
+          color: @mauve;
+      }
     '';
   };
 
