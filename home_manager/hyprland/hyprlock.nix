@@ -1,4 +1,4 @@
-{
+{pkgs, ...}: {
   programs.hyprlock = {
     enable = true;
 
@@ -132,7 +132,7 @@
         {
           monitor = "eDP-1";
           text = ''
-            cmd[update:100] echo "<b> <big> $(python3 -c 'import datetime,sys;birth=datetime.datetime(1998,11,15);print(f"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}")') </big></b>"
+            cmd[update:100] echo "<b> <big> $(${pkgs.python3}/bin/python3 -c 'import datetime; birth=datetime.datetime(1998,11,15); print(f"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}")') </big></b>"
           '';
           color = "$yellow";
           font_size = 20;

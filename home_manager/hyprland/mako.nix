@@ -7,7 +7,7 @@
       font = "Ubuntu Nerd Font 15";
       background-color = "#181926";
       text-color = "#eed49f";
-      border-color = "#ffcc33";
+      border-color = "#ff3333";
       border-radius = 10;
       border-size = 3;
 

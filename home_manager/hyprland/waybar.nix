@@ -45,8 +45,7 @@
         "hyprland/workspaces" = {
           active-only = false;
           all-outputs = true;
-          show-special = true;
-          special-visible-only = true;
+          show-special = false;
           on-click = "activate";
           format = "{icon}";
           persistent-workspaces = {
@@ -54,10 +53,8 @@
           };
           format-icons = {
             active = "󰮯"; # Pacman: current workspace
-            special = "󰮯"; # Red Pacman: visible scratchpad/special workspace
             default = "󰊠"; # Ghost: workspace has apps
             empty = ""; # Dot: empty workspace
-            urgent = "󰊠"; # Same ghost as normal occupied workspaces
           };
         };
 
@@ -233,7 +230,7 @@
           font-size: 16px;
       }
 
-      #cpu            { color: @pink;      }
+      #cpu            { color: @sky;       }
       #memory         { color: @mauve;     }
       #custom-gpu     { color: @green;     }
       #backlight      { color: @yellow;    }
@@ -246,7 +243,7 @@
       #upower         { color: @rosewater; }
       #disk           { color: @peach;     }
       #custom-nixos  { color: @flamingo;  }
-      #custom-weather { color: @flamingo;  }
+      #custom-weather { color: @pink;      }
 
       #workspaces {
           padding: 6px 6px;
@@ -260,23 +257,23 @@
           background: transparent;
           border: none;
           border-radius: 16px;
-          color: @mauve;
+          color: #ffcc33;
           transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       }
 
       #workspaces button.active {
           padding: 0px 12px;
-          background-color: @green;
+          background-color: #ff33cc;
           color: @crust;
       }
 
       #workspaces button:hover {
           background-color: @surface0;
-          color: @green;
+          color: #ff33cc;
       }
 
       #workspaces button.active:hover {
-          background-color: @green;
+          background-color: #ff33cc;
           color: @crust;
       }
 
@@ -284,18 +281,7 @@
           color: @overlay0;
       }
 
-      #workspaces button.special {
-          color: @red;
-      }
 
-      #workspaces button.special.active {
-          background-color: @red;
-          color: @crust;
-      }
-
-      #workspaces button.urgent {
-          color: @mauve;
-      }
     '';
   };
 

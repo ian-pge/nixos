@@ -86,6 +86,7 @@
         rounding = 10;
         active_opacity = 1.0;
         inactive_opacity = 1.0;
+        dim_special = 0.5;
         blur = {
           enabled = true;
           size = 4;
@@ -108,6 +109,7 @@
         "border,0"
         "fade,1,4,default"
         "workspaces,1,6,default,slide"
+        "specialWorkspace,1,6,default,slidevert"
         "layers,0.5,6,default,fade"
       ];
 
