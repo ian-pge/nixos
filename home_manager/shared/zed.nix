@@ -6,6 +6,7 @@
     # This whole block is rendered to ~/.config/zed/settings.json
     userSettings = {
       disable_ai = true;
+      dev_container_suggest_dismissed = true;
 
       file_scan_exclusions = [
         "**/.git"
