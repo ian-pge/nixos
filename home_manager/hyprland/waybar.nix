@@ -251,18 +251,21 @@
       }
 
       #workspaces button {
-          min-width: 32px;
-          padding: 0px 4px;
-          margin: 0px 2px;
+          min-width: 40px;
+          min-height: 24px;
+          padding: 0px 0px;
+          margin: 0px 0px;
           background: transparent;
           border: none;
           border-radius: 16px;
           color: #ffcc33;
-          transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          transition-property: min-width, background-color, color;
+          transition-duration: 0.4s;
+          transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
       }
 
       #workspaces button.active {
-          padding: 0px 12px;
+          min-width: 60px;
           background-color: #ff33cc;
           color: @crust;
       }
