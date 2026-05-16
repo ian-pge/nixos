@@ -65,7 +65,7 @@
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode
     chromium
     chezmoi
-    speedtest-cli
+    ookla-speedtest
   ];
 
   programs = {
