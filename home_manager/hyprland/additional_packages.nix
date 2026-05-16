@@ -3,7 +3,7 @@
     hyprpicker
     hyprshot
     bluetui
-    gazelle-tui
+    # gazelle-tui
     vlc
     nvtopPackages.full
     adwaita-icon-theme

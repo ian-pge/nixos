@@ -320,7 +320,8 @@
         "llm-agents": "llm-agents",
         "nextmeeting": "nextmeeting",
         "nix-flatpak": "nix-flatpak",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "wlctl": "wlctl"
       }
     },
     "systems": {
@@ -371,6 +372,26 @@
       "original": {
         "owner": "numtide",
         "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "wlctl": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1777614703,
+        "narHash": "sha256-94WfzaBBjzGIkgHlco8T3iQqsjyAWxG+dw0lAfsKsfQ=",
+        "owner": "aashish-thapa",
+        "repo": "wlctl",
+        "rev": "4bfb8c28655cc2a7e0e67bfe3d5d76e8d632b1b6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aashish-thapa",
+        "repo": "wlctl",
         "type": "github"
       }
     }

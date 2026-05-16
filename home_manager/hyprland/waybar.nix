@@ -127,7 +127,7 @@
           tooltip-format-ethernet = "{ifname}";
           tooltip-format-disconnected = "Disconnected";
           tooltip-format-disabled = "Wi-Fi Off";
-          on-click = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
+          on-click = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e wlctl";
         };
 
         "custom/launcher" = {

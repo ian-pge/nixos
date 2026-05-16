@@ -24,7 +24,7 @@
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
       "$editor" = "zeditor";
-      "$wifi" = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e gazelle";
+      "$wifi" = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e wlctl";
       "$bluetooth" = "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
       "$audio" = "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
       "$settings" = "cosmic-settings";

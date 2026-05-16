@@ -25,14 +25,14 @@
       url = "github:numtide/llm-agents.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    wlctl = {
+      url = "github:aashish-thapa/wlctl";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     gazelle-tui = {
       url = "github:Zeus-Deus/gazelle-tui";
       flake = false;
     };
-    # hyprpanel = {
-    #   url = "github:Jas-SinghFSU/HyprPanel";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
   };
 
   outputs = inputs @ {
@@ -45,11 +45,11 @@
     # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
     overlays = {
       bambustudio = import ./overlays/bambustudio.nix;
-      gazelle-tui = final: prev: {
-        gazelle-tui = (import ./overlays/gazelle-tui.nix final prev).gazelle-tui.overrideAttrs (old: {
-          src = inputs.gazelle-tui;
-        });
-      };
+      # gazelle-tui = final: prev: {
+      #   gazelle-tui = (import ./overlays/gazelle-tui.nix final prev).gazelle-tui.overrideAttrs (old: {
+      #     src = inputs.gazelle-tui;
+      # });
+      # };
     };
   in {
     inherit overlays;
