@@ -220,6 +220,21 @@
           background: none;
       }
 
+      tooltip {
+          background-color: alpha(@crust, 0.96);
+          border: none;
+          border-radius: 14px;
+          padding: 8px 10px;
+          box-shadow: 0 8px 24px alpha(@crust, 0.55);
+      }
+
+      tooltip label {
+          color: @text;
+          font-size: 14px;
+          font-weight: 700;
+          padding: 4px 6px;
+      }
+
       #clock, #cpu, #memory, #backlight, #custom-gpu,
       #wireplumber, #network, #bluetooth, #custom-nixos,
       #upower, #disk, #workspaces, #custom-launcher, #custom-weather {
@@ -244,6 +259,28 @@
       #disk           { color: @peach;     }
       #custom-nixos  { color: @flamingo;  }
       #custom-weather { color: @pink;      }
+
+      @keyframes pulse-update {
+          0% {
+              background-color: @crust;
+              color: @flamingo;
+          }
+          50% {
+              background-color: @flamingo;
+              color: @crust;
+          }
+          100% {
+              background-color: @crust;
+              color: @flamingo;
+          }
+      }
+
+      #custom-nixos.has-updates {
+          animation-name: pulse-update;
+          animation-duration: 1.6s;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+      }
 
       #workspaces {
           padding: 6px 6px;
