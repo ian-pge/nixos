@@ -170,7 +170,7 @@
 
         upower = {
           format = " {percentage}";
-          tooltip = true;
+          tooltip = false;
         };
 
         disk = {
@@ -220,19 +220,33 @@
           background: none;
       }
 
-      tooltip {
-          background-color: alpha(@crust, 0.96);
+      tooltip,
+      tooltip.background,
+      tooltip decoration,
+      tooltip window,
+      tooltip box {
+          background: none;
+          background-color: transparent;
           border: none;
-          border-radius: 14px;
-          padding: 8px 10px;
-          box-shadow: 0 8px 24px alpha(@crust, 0.55);
+          border-radius: 0;
+          margin: 0;
+          padding: 0;
+          box-shadow: none;
+          text-shadow: none;
       }
 
       tooltip label {
+          background: none;
+          background-color: @surface0;
+          border: none;
+          border-radius: 14px;
           color: @text;
           font-size: 14px;
           font-weight: 700;
-          padding: 4px 6px;
+          margin: 0;
+          padding: 10px 12px;
+          box-shadow: none;
+          text-shadow: none;
       }
 
       #clock, #cpu, #memory, #backlight, #custom-gpu,
@@ -260,27 +274,28 @@
       #custom-nixos  { color: @flamingo;  }
       #custom-weather { color: @pink;      }
 
-      @keyframes pulse-update {
-          0% {
-              background-color: @crust;
-              color: @flamingo;
-          }
-          50% {
-              background-color: @flamingo;
-              color: @crust;
-          }
-          100% {
-              background-color: @crust;
-              color: @flamingo;
-          }
+      #clock, #cpu, #memory, #backlight, #custom-gpu,
+      #wireplumber, #network, #bluetooth, #custom-nixos,
+      #upower, #disk, #custom-launcher, #custom-weather {
+          transition-property: background-color, color, box-shadow;
+          transition-duration: 0.22s;
+          transition-timing-function: ease;
       }
 
-      #custom-nixos.has-updates {
-          animation-name: pulse-update;
-          animation-duration: 1.6s;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-      }
+      #cpu:hover             { background-color: @sky;       color: @crust; }
+      #memory:hover          { background-color: @mauve;     color: @crust; }
+      #custom-gpu:hover      { background-color: @green;     color: @crust; }
+      #backlight:hover       { background-color: @yellow;    color: @crust; }
+      #network:hover         { background-color: @maroon;    color: @crust; }
+      #wireplumber:hover     { background-color: @lavender;  color: @crust; }
+      #clock:hover           { background-color: @red;       color: @crust; }
+      #clock.second:hover    { background-color: @teal;      color: @crust; }
+      #custom-launcher:hover { background-color: @sapphire;  color: @crust; }
+      #bluetooth:hover       { background-color: @blue;      color: @crust; }
+      #upower:hover          { background-color: @rosewater; color: @crust; }
+      #disk:hover            { background-color: @peach;     color: @crust; }
+      #custom-nixos:hover    { background-color: @flamingo;  color: @crust; }
+      #custom-weather:hover  { background-color: @pink;      color: @crust; }
 
       #workspaces {
           padding: 6px 6px;
@@ -380,10 +395,10 @@
           tooltip_esc=$(echo "$updates" | jq -R -s '.')
 
           # Write JSON: icon is "has-updates", tooltip has the list
-          printf '{"text":"","alt":"has-updates","tooltip":%s}\n' "$tooltip_esc" > "$CACHE_FILE"
+          printf '{"text":"","alt":"has-updates","class":"has-updates","tooltip":%s}\n' "$tooltip_esc" > "$CACHE_FILE"
         else
           # Write JSON: icon is "updated", tooltip is simple text
-          printf '{"text":"","alt":"updated","tooltip":"System is up to date"}\n' > "$CACHE_FILE"
+          printf '{"text":"","alt":"updated","class":"updated","tooltip":"System is up to date"}\n' > "$CACHE_FILE"
         fi
       }
 
@@ -415,7 +430,7 @@
         cat "$CACHE_FILE"
       else
         # Fallback if first run hasn't finished
-        echo '{"text":"","alt":"updated","tooltip":"Checking..."}'
+        echo '{"text":"","alt":"updated","class":"updated","tooltip":"Checking..."}'
       fi
     '')
 
@@ -435,7 +450,7 @@
         echo "✅ Update Complete!"
 
         # 1. Overwrite the cache with "Up to date" status
-        echo '{"text":"", "alt":"updated", "tooltip":"Just updated"}' > /tmp/nixos-update-status.json
+        echo '{"text":"", "alt":"updated", "class":"updated", "tooltip":"Just updated"}' > /tmp/nixos-update-status.json
 
         # 2. Signal Waybar to refresh the module immediately
         pkill -SIGRTMIN+8 waybar

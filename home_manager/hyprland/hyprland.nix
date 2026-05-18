@@ -1,6 +1,7 @@
 {
   wayland.windowManager.hyprland = {
     enable = true;
+    configType = "hyprlang";
     systemd.enable = false;
     systemd.variables = ["--all"];
 
@@ -87,6 +88,9 @@
         active_opacity = 1.0;
         inactive_opacity = 1.0;
         dim_special = 0.4;
+        shadow = {
+          enabled = false;
+        };
         blur = {
           enabled = true;
           size = 4;
@@ -114,7 +118,6 @@
       ];
 
       dwindle = {
-        pseudotile = true;
         preserve_split = true;
       };
 
@@ -171,7 +174,7 @@
         "$mainMod,R,exec,$audio"
         "$mainMod,A,exec,$menu"
         "$mainMod,E,exec,$editor"
-        "$mainMod,Z,togglesplit"
+        "$mainMod,Z,layoutmsg,togglesplit"
         "$mainMod,G,exec,$browser"
         "$mainMod,X,exec,$calculator"
         "$mainMod,H,movefocus,l"

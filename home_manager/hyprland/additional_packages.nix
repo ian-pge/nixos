@@ -19,7 +19,6 @@
     viu
     oculante
     seahorse
-    gcalcli
     pulsemixer
     hyprpaper
   ];

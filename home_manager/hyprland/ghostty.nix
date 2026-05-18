@@ -13,6 +13,12 @@
       adjust-cursor-thickness = "200%";
       font-family = "JetBrainsMono Nerd Font";
       font-size = "12";
+      keybind = [
+        "ctrl+y=scroll_page_lines:-1"
+        "ctrl+e=scroll_page_lines:1"
+        "ctrl+u=scroll_page_up"
+        "ctrl+d=scroll_page_down"
+      ];
     };
   };
 }
