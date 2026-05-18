@@ -44,12 +44,13 @@
         ## ───── Hyprland workspaces ─────
         "hyprland/workspaces" = {
           active-only = false;
+          # Show the full workspace set on every monitor's bar.
           all-outputs = true;
           show-special = false;
           on-click = "activate";
           format = "{icon}";
           persistent-workspaces = {
-            "*" = 8;
+            "*" = [1 2 3 4 5 6 7 8];
           };
           format-icons = {
             active = "󰮯"; # Pacman: current workspace

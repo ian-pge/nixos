@@ -38,14 +38,14 @@
 
       ### STATIC WORKSPACES ###
       workspace = [
-        "5, monitor:eDP-1"
-        "6, monitor:eDP-1"
-        "7, monitor:eDP-1"
-        "8, monitor:eDP-1"
-        "1, monitor:DP-2"
-        "2, monitor:DP-2"
-        "3, monitor:DP-2"
-        "4, monitor:DP-2"
+        "5, monitor:eDP-1, persistent:true"
+        "6, monitor:eDP-1, persistent:true"
+        "7, monitor:eDP-1, persistent:true"
+        "8, monitor:eDP-1, persistent:true"
+        "1, monitor:DP-2, persistent:true"
+        "2, monitor:DP-2, persistent:true"
+        "3, monitor:DP-2, persistent:true"
+        "4, monitor:DP-2, persistent:true"
       ];
 
       ### ENVIRONMENT ###
