@@ -28,6 +28,13 @@ in {
 
     keymap.mgr.prepend_keymap = [
       {
+        # In picker mode, Yazi exits when the normal `open` action fires.
+        # Keep `o` as a non-picker open action so Yazi stays open.
+        on = "o";
+        run = ''shell --orphan -- ${pkgs.coreutils}/bin/env -u NIXOS_XDG_OPEN_USE_PORTAL -u GTK_USE_PORTAL ${pkgs.xdg-utils}/bin/xdg-open "$0"'';
+        desc = "Open hovered item with default app without quitting";
+      }
+      {
         on = "M";
         run = "plugin mount";
         desc = "Open mount manager";
