@@ -7,6 +7,7 @@
     userSettings = {
       disable_ai = true;
       dev_container_suggest_dismissed = true;
+      cli_default_open_behavior = "new_window";
 
       file_scan_exclusions = [
         "**/.git"
