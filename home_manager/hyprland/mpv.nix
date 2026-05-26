@@ -1,6 +1,6 @@
 {
   programs.mpv = {
-    enable = false;
+    enable = true;
     config = {
       # --- decoding ---
       hwdec = "nvdec"; # fastest on NVIDIA ≥ 515

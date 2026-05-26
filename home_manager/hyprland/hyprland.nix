@@ -20,7 +20,7 @@
       ### VARIABLES ###
       "$terminal" = "ghostty";
       "$browser" = "google-chrome-stable";
-      "$fileManager" = "ghostty --class=dev.me.file --title=File -e yazi";
+      "$fileManager" = "ghostty --class=dev.me.file --title=File -e /home/ian/.nix-profile/bin/yazi-open";
       "$fileManagergraphic" = "nautilus";
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
       "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";

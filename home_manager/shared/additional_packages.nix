@@ -33,7 +33,7 @@
     obsidian
     # freecad-wayland
     firefox
-    gyroflow
+    # gyroflow
     wget
     pika-backup
     inkscape

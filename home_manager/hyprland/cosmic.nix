@@ -21,7 +21,7 @@
     cosmic-ext-calculator
     cosmic-settings
     cosmic-osd
-    cosmic-player
+    # cosmic-player
     # catppuccin-papirus-folders
   ];
 

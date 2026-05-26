@@ -121,7 +121,7 @@
           format-icons = ["󰤟" "󰤢" "󰤥" "󰤨"];
           interval = 5;
           format-ethernet = "󰈀";
-          format-disconnected = "󰤭 ";
+          format-disconnected = "󰤭";
           format-disabled = "󰤭";
           format-disabled-if-down = true;
           tooltip-format-wifi = "{essid}";
@@ -393,7 +393,7 @@
 
         if [[ -n "$updates" && "$count" -gt 0 ]]; then
           # Safely escape the list for JSON (requires jq)
-          tooltip_esc=$(echo "$updates" | jq -R -s '.')
+          tooltip_esc=$(printf '%s' "$updates" | jq -R -s '.')
 
           # Write JSON: icon is "has-updates", tooltip has the list
           printf '{"text":"","alt":"has-updates","class":"has-updates","tooltip":%s}\n' "$tooltip_esc" > "$CACHE_FILE"
