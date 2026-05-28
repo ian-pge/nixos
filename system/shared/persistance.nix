@@ -46,6 +46,7 @@
         ".local/share/zed"
         ".ssh"
         ".devpod"
+        ".runpod"
         ".config/chromium"
         ".config/google-chrome"
         ".local/share/applications"
