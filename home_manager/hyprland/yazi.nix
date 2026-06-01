@@ -1,18 +1,34 @@
 { pkgs, ... }: let
   yaziOpen = pkgs.writeShellScriptBin "yazi-open" ''
+    # Debug logging used while fixing this wrapper; left here for easy re-enable:
+    # log_dir="$HOME/.cache/yazi-open"
+    # mkdir -p "$log_dir"
+    # log_file="$log_dir/debug.log"
+    # exec 3>>"$log_file"
+    # log() { printf '%s [pid=%s] %s\n' "$(date --iso-8601=ns)" "$$" "$*" >&3; }
+
     tmp="$(${pkgs.coreutils}/bin/mktemp -t yazi-chooser.XXXXXX)"
+    cleanup() {
+      ${pkgs.coreutils}/bin/rm -f -- "$tmp"
+    }
+    trap cleanup EXIT
 
     ${pkgs.yazi}/bin/yazi "$@" --chooser-file="$tmp"
 
     if [ -s "$tmp" ]; then
       opened_file="$(${pkgs.coreutils}/bin/head -n 1 "$tmp")"
-      ${pkgs.util-linux}/bin/setsid ${pkgs.coreutils}/bin/env \
-        -u NIXOS_XDG_OPEN_USE_PORTAL \
-        -u GTK_USE_PORTAL \
-        ${pkgs.xdg-utils}/bin/xdg-open "$opened_file" >/dev/null 2>&1 &
-    fi
+      unit="yazi-zed-$(${pkgs.coreutils}/bin/date +%s)-$$"
 
-    ${pkgs.coreutils}/bin/rm -f -- "$tmp"
+      # Run Zed in a user-systemd scope so it survives this short-lived terminal.
+      ${pkgs.coreutils}/bin/nohup ${pkgs.systemd}/bin/systemd-run --user --scope --quiet \
+        --unit="$unit" \
+        --setenv=WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
+        --setenv=DISPLAY="$DISPLAY" \
+        --setenv=XDG_CURRENT_DESKTOP="$XDG_CURRENT_DESKTOP" \
+        --setenv=XDG_SESSION_TYPE="$XDG_SESSION_TYPE" \
+        --setenv=HYPRLAND_INSTANCE_SIGNATURE="$HYPRLAND_INSTANCE_SIGNATURE" \
+        ${pkgs.zed-editor}/bin/zeditor --new "$opened_file" >/dev/null 2>&1 &
+    fi
   '';
 in {
   home.packages = [ yaziOpen ];

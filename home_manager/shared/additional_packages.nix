@@ -57,8 +57,9 @@
       nativeBuildInputs = [makeWrapper];
       postBuild = ''
         wrapProgram $out/bin/pi \
-          --set NPM_CONFIG_PREFIX ${config.home.homeDirectory}/.pi/npm \
-          --prefix PATH : ${lib.makeBinPath [nodejs_latest]}
+          --set NPM_CONFIG_PREFIX ${config.home.homeDirectory}/.pi/agent/npm \
+          --set NPM_CONFIG_CACHE ${config.home.homeDirectory}/.cache/pi/npm \
+          --prefix PATH : ${lib.makeBinPath [nodejs_latest git]}
       '';
     })
     runpodctl
