@@ -22,6 +22,6 @@
     ./virtualisation.nix
     ./tailscale.nix
     ./flatpak.nix
-    # ./razer.nix
+    ./razer.nix
   ];
 }

@@ -1,5 +1,8 @@
 {
   catppuccin = {
+    enable = true;
+    autoEnable = false;
+
     ghostty = {
       enable = true;
       flavor = "macchiato";

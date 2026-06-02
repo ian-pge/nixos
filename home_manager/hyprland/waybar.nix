@@ -312,6 +312,10 @@
           border: none;
           border-radius: 16px;
           color: #ffcc33;
+          font-size: 16px;
+          font-weight: bold;
+          box-shadow: none;
+          text-shadow: none;
           transition-property: min-width, background-color, color;
           transition-duration: 0.4s;
           transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);

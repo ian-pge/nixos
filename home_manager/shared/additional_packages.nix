@@ -21,7 +21,7 @@
     pavucontrol
     devpod
     devcontainer
-    bambu-studio
+    # bambu-studio
     kalker
     google-chrome
     blender
