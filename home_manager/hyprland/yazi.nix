@@ -17,17 +17,12 @@
 
     if [ -s "$tmp" ]; then
       opened_file="$(${pkgs.coreutils}/bin/head -n 1 "$tmp")"
-      unit="yazi-zed-$(${pkgs.coreutils}/bin/date +%s)-$$"
+      unit="yazi-zed-$(${pkgs.coreutils}/bin/date +%s)-$$.scope"
 
-      # Run Zed in a user-systemd scope so it survives this short-lived terminal.
-      ${pkgs.coreutils}/bin/nohup ${pkgs.systemd}/bin/systemd-run --user --scope --quiet \
-        --unit="$unit" \
-        --setenv=WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
-        --setenv=DISPLAY="$DISPLAY" \
-        --setenv=XDG_CURRENT_DESKTOP="$XDG_CURRENT_DESKTOP" \
-        --setenv=XDG_SESSION_TYPE="$XDG_SESSION_TYPE" \
-        --setenv=HYPRLAND_INSTANCE_SIGNATURE="$HYPRLAND_INSTANCE_SIGNATURE" \
-        ${pkgs.zed-editor}/bin/zeditor --new "$opened_file" >/dev/null 2>&1 &
+      # UWSM is the native launcher for this Hyprland session; it creates a
+      # user-systemd scope with the right graphical session environment.
+      ${pkgs.uwsm}/bin/uwsm app -u "$unit" -S both -- \
+        ${pkgs.zed-editor}/bin/zeditor --new "$opened_file" >/dev/null 2>&1
     fi
   '';
 in {
