@@ -21,7 +21,7 @@
 
       # UWSM is the native launcher for this Hyprland session; it creates a
       # user-systemd scope with the right graphical session environment.
-      ${pkgs.uwsm}/bin/uwsm app -u "$unit" -S both -- \
+      ${pkgs.util-linux}/bin/setsid -f ${pkgs.uwsm}/bin/uwsm app -u "$unit" -S both -- \
         ${pkgs.zed-editor}/bin/zeditor --new "$opened_file" >/dev/null 2>&1
     fi
   '';
