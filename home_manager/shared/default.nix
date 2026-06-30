@@ -10,5 +10,6 @@
     ./zed.nix
 
     ./bambustudio.nix
+    ./rapidraw.nix
   ];
 }

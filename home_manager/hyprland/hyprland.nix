@@ -164,7 +164,7 @@
         "$mainMod,RETURN,exec,$terminal"
         "$mainMod,W,killactive"
         "$mainMod CONTROL,Q,exit"
-        "$mainMod,P,pseudo"
+        "$mainMod,P,exec,ghostty --class=dev.me.pi --title=Pi -e pi"
         "$mainMod,F,exec,$fileManager"
         "$mainMod SHIFT,F,exec,$fileManagergraphic"
         "$mainMod,N,exec,$wifi"

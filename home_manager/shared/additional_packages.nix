@@ -16,7 +16,8 @@
     texpresso
 
     # zed-editor
-    google-cloud-sdk
+    tmux
+    rapidraw
     vscode
     pavucontrol
     devpod
@@ -42,7 +43,7 @@
     unrar
     mutagen
     antigravity
-    ffmpeg
+    ffmpeg-full
     f3d
     discord
     krabby

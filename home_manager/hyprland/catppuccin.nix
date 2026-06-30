@@ -22,7 +22,6 @@
     fzf = {
       enable = true;
       flavor = "macchiato";
-      accent = "sapphire";
     };
     yazi = {
       enable = true;

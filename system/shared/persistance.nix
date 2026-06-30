@@ -58,6 +58,7 @@
         ".vscode"
         ".config/obsidian"
         ".config/obs-studio"
+        ".docker"
         ".local/share/oculante"
         ".config/cosmic"
         ".config/history"
