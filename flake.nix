@@ -41,6 +41,7 @@
     # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
     overlays = {
       bambustudio = import ./overlays/bambustudio.nix;
+      paper-desktop = import ./overlays/paper-desktop.nix;
       # gazelle-tui = final: prev: {
       #   gazelle-tui = (import ./overlays/gazelle-tui.nix final prev).gazelle-tui.overrideAttrs (old: {
       #     src = inputs.gazelle-tui;
@@ -53,16 +54,11 @@
     nixosConfigurations = {
       nixos = lib.nixosSystem {
         system = "x86_64-linux";
-        # Expose the entire `inputs` set to all modules
-        specialArgs = {inherit inputs;};
+        # Expose the flake inputs and local overlays to all modules.
+        specialArgs = {inherit inputs overlays;};
 
         modules = [
           ./system/specialisation.nix
-
-          # Add all declared overlays to nixpkgs
-          ({...}: {
-            nixpkgs.overlays = builtins.attrValues overlays; #++ [inputs.hyprpanel.overlay];
-          })
         ];
       };
     };
