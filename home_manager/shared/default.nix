@@ -9,9 +9,6 @@
     ./paper-desktop.nix
     # ./mime_apps.nix
     ./zed.nix
-
-    ./bambustudio.nix
-    ./rapidraw.nix
   ];
 
 }

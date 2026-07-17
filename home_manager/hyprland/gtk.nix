@@ -3,6 +3,13 @@
   pkgs,
   ...
 }: {
+  # Let XWayland applications scale themselves at 1.25x without compositor
+  # scaling, which otherwise enlarges their cursors disproportionately.
+  xresources.properties = {
+    "Xft.dpi" = 120;
+    "Xcursor.size" = 24;
+  };
+
   # Enable dconf to manage GNOME settings
   dconf.settings = {
     "org/gnome/desktop/interface" = {

@@ -4,6 +4,20 @@
 
     functions = {
       starship_transient_prompt_func.body = ''starship module time'';
+      fish_title.body = ''
+        # Disable Fish's default prompt/path terminal title updates so OSC2
+        # titles set by Zed tasks or scripts remain visible.
+        true
+      '';
+      fish_tab_title.body = ''
+        # Fish 4 can set a separate tab title. Keep it quiet too.
+        true
+      '';
+      zed_title.body = ''
+        # Set Zed's terminal-title breadcrumb (not the Zed tab label).
+        set -l title (string join " " -- $argv)
+        printf '\033]2;%s\007' "$title"
+      '';
       prompt_newline = {
         onEvent = "fish_postexec";
         body = ''echo'';

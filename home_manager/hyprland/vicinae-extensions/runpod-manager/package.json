@@ -1,0 +1,65 @@
+{
+  "$schema": "https://raw.githubusercontent.com/vicinaehq/vicinae/refs/heads/main/extra/schemas/extension.json",
+  "name": "runpod-manager",
+  "title": "RunPod Manager",
+  "description": "List, inspect, start, and stop your RunPod Pods from Vicinae.",
+  "categories": [
+    "Developer Tools",
+    "System"
+  ],
+  "license": "MIT",
+  "platforms": [
+    "Linux"
+  ],
+  "author": "ian",
+  "contributors": [],
+  "pastContributors": [],
+  "icon": "extension_icon.svg",
+  "commands": [
+    {
+      "name": "manage-pods",
+      "title": "Manage RunPod Pods",
+      "subtitle": "RunPod",
+      "description": "List running and stopped Pods, then start, stop, or inspect them.",
+      "mode": "view",
+      "keywords": [
+        "runpod",
+        "gpu",
+        "pod",
+        "cloud",
+        "start",
+        "stop"
+      ]
+    }
+  ],
+  "preferences": [
+    {
+      "name": "apiKey",
+      "title": "RunPod API Key",
+      "description": "Restricted RunPod API key with permission to read, start, and stop Pods.",
+      "type": "password",
+      "placeholder": "Enter your RunPod API key",
+      "required": true
+    },
+    {
+      "name": "consoleUrl",
+      "title": "RunPod Console URL",
+      "description": "URL opened by the Open RunPod Console action.",
+      "type": "textfield",
+      "default": "https://console.runpod.io/pods",
+      "required": true
+    }
+  ],
+  "scripts": {
+    "build": "vici build",
+    "dev": "vici develop",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vicinae/api": "0.22.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  }
+}

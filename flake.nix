@@ -40,7 +40,6 @@
 
     # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
     overlays = {
-      bambustudio = import ./overlays/bambustudio.nix;
       paper-desktop = import ./overlays/paper-desktop.nix;
       # gazelle-tui = final: prev: {
       #   gazelle-tui = (import ./overlays/gazelle-tui.nix final prev).gazelle-tui.overrideAttrs (old: {

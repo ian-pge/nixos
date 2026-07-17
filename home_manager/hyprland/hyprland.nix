@@ -1,4 +1,4 @@
-{
+{pkgs, ...}: {
   wayland.windowManager.hyprland = {
     enable = true;
     configType = "hyprlang";
@@ -23,7 +23,7 @@
       "$fileManager" = "ghostty --class=dev.me.file --title=File -e /home/ian/.nix-profile/bin/yazi-open";
       "$fileManagergraphic" = "nautilus";
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
-      "$menu" = "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel";
+      "$menu" = "vicinae toggle";
       "$editor" = "zeditor";
       "$wifi" = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e wlctl";
       "$bluetooth" = "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
@@ -34,6 +34,7 @@
       "exec-once" = [
         "uwsm finalize"
         "xhost +local:"
+        "${pkgs.xrdb}/bin/xrdb -merge /home/ian/.Xresources"
       ];
 
       ### STATIC WORKSPACES ###
@@ -88,6 +89,7 @@
         active_opacity = 1.0;
         inactive_opacity = 1.0;
         dim_special = 0.4;
+        dim_around = 0.55;
         shadow = {
           enabled = false;
         };
@@ -122,6 +124,7 @@
       };
 
       misc = {
+        focus_on_activate = true;
         force_default_wallpaper = 0;
         disable_hyprland_logo = true;
         disable_splash_rendering = true;
@@ -173,6 +176,7 @@
         "$mainMod SHIFT,Q,exec,$settings"
         "$mainMod,R,exec,$audio"
         "$mainMod,A,exec,$menu"
+        "$mainMod,code:47,exec,vicinae deeplink vicinae://launch/browser-extension/browse-tabs?toggle=true"
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,layoutmsg,togglesplit"
         "$mainMod,G,exec,$browser"
@@ -265,6 +269,7 @@
       # New syntax: match first
       layerrule = [
         "match:namespace launcher, dim_around on"
+        "match:namespace vicinae, dim_around on"
       ];
     };
   };

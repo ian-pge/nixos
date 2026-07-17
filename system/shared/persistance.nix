@@ -44,6 +44,7 @@
 
         ".config/nixos"
         ".local/share/zed"
+        ".local/share/vicinae"
         ".ssh"
         ".devpod"
         ".runpod"
@@ -52,6 +53,7 @@
         ".local/share/applications"
         ".local/share/icons"
         ".config/BambuStudio"
+        ".local/share/bambu-studio"
         ".var/app/com.bambulab.BambuStudio"
         ".local/share/lutris"
         ".config/Code"
@@ -75,6 +77,7 @@
         ".config/gazelle"
         ".config/chezmoi"
         ".local/state/wireplumber"
+        ".local/state/vicinae"
         ".config/gcloud"
         ".config/Antigravity"
         ".config/discord"

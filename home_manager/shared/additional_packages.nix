@@ -16,13 +16,18 @@
     texpresso
 
     # zed-editor
+    mermaid-cli
     tmux
     rapidraw
     vscode
     pavucontrol
     devpod
     devcontainer
-    # bambu-studio
+    orca-slicer
+    (bambu-studio.override {
+      withNvidiaGLWorkaround = true;
+    })
+    # bambuddy
     kalker
     google-chrome
     blender
@@ -44,7 +49,7 @@
     mutagen
     antigravity
     ffmpeg-full
-    f3d
+    # f3d # disabled: pulls vtk -> pdal -> gdal-minimal, currently failing GDAL tests
     discord
     krabby
     t3code

@@ -18,6 +18,7 @@
     ./waybar.nix
     # ./xdg_termfilechooser.nix
     ./fuzzel.nix
+    ./vicinae.nix
     ./mako.nix
     ./neovim.nix
     # ./hyprpanel.nix
