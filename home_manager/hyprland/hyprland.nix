@@ -150,17 +150,17 @@
       "$mainMod" = "SUPER";
 
       binde = [
-        ",XF86AudioRaiseVolume,exec,${pkgs.wireplumber}/bin/wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 2%+; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showVolume"
-        ",XF86AudioLowerVolume,exec,${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 2%-; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showVolume"
+        ",XF86AudioRaiseVolume,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar volumeUp"
+        ",XF86AudioLowerVolume,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar volumeDown"
         ",XF86MonBrightnessUp,exec,${pkgs.brightnessctl}/bin/brightnessctl set +5%; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showBrightness"
         ",XF86MonBrightnessDown,exec,${pkgs.brightnessctl}/bin/brightnessctl set 5%-; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showBrightness"
       ];
 
       bind = [
-        ",XF86AudioPlay,exec,playerctl play-pause"
-        ",XF86AudioNext,exec,playerctl next"
-        ",XF86AudioPrev,exec,playerctl previous"
-        ",XF86AudioMute,exec,${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showVolume"
+        ",XF86AudioPlay,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar mediaPlayPause"
+        ",XF86AudioNext,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar mediaNext"
+        ",XF86AudioPrev,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar mediaPrevious"
+        ",XF86AudioMute,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleAudioMute"
         ",PRINT,exec,hyprshot -m region -o ~/Pictures/Screenshots"
         "$mainMod,RETURN,exec,$terminal"
         "$mainMod,W,killactive"

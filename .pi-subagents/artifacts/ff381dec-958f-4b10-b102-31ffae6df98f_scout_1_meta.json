@@ -1,0 +1,89 @@
+{
+  "runId": "ff381dec-958f-4b10-b102-31ffae6df98f",
+  "agent": "scout",
+  "task": "Exhaustively analyze the installed JetBrainsMono Nerd Font and Nerd Fonts 3.4.0 glyph metadata for explicit coherent multi-glyph families usable as terminal animations. Go beyond keyword search: programmatically group glyph names by numeric/word-number/state/direction suffixes, verify cmap, terminal width, advance/bbox stability, and classify animation semantics. Produce (1) ranked strong candidates, (2) exhaustive inventory of all plausible named sequence families with exact names/codepoints/counts, (3) exclusions and reasons, and (4) renderer risks for Ghostty/Zed. Do not edit project files. Save a concise but comprehensive report.\n\n---\n**Output:**\nWrite your findings to exactly this path: /tmp/local-nerdfont-exhaustive.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: checked\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Return concrete findings with file paths and severity when applicable\n\nRequired evidence: changed-files, tests-added, commands-run, residual-risks, no-staged-files\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.\n`commandsRun[].result` must be exactly one of: passed, failed, not-run.\n`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 1,
+  "model": "openai-codex/gpt-5.6-sol:low",
+  "attemptedModels": [
+    "openai-codex/gpt-5.6-sol:low"
+  ],
+  "modelAttempts": [
+    {
+      "model": "openai-codex/gpt-5.6-sol:low",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 44309,
+        "output": 5513,
+        "cacheRead": 167936,
+        "cacheWrite": 0,
+        "cost": 0.47090300000000007,
+        "turns": 14
+      }
+    }
+  ],
+  "error": "Acceptance rejected: Structured acceptance report not found.",
+  "acceptance": {
+    "status": "rejected",
+    "explicit": true,
+    "effectiveAcceptance": {
+      "level": "checked",
+      "explicit": true,
+      "inferredReason": [
+        "read-only/reviewer-style agent"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Return concrete findings with file paths and severity when applicable",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "changed-files",
+        "tests-added",
+        "commands-run",
+        "residual-risks",
+        "no-staged-files"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "read-only/reviewer-style agent"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Return concrete findings with file paths and severity when applicable",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "id": "attestation",
+        "status": "failed",
+        "message": "Structured acceptance report not found."
+      }
+    ],
+    "verifyRuns": [],
+    "childReportParseError": "Structured acceptance report not found."
+  },
+  "transcriptPath": "/home/ian/.config/nixos/.pi-subagents/artifacts/ff381dec-958f-4b10-b102-31ffae6df98f_scout_1_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1784726826664
+}

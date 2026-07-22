@@ -39,6 +39,14 @@
     text = builtins.readFile ./update-installer.sh;
   };
 
+  systemStats = pkgs.writeShellApplication {
+    name = "quickshell-system-stats";
+    runtimeInputs = [pkgs.python3];
+    text = ''
+      exec python3 ${../top-bar/scripts/system-stats.py}
+    '';
+  };
+
   gpuMonitor = pkgs.writeShellApplication {
     name = "quickshell-gpu-monitor";
     text = ''
@@ -58,8 +66,8 @@ in {
   home.packages = [
     updateChecker
     updateInstaller
+    systemStats
     gpuMonitor
     weather
-    pkgs.jq
   ];
 }

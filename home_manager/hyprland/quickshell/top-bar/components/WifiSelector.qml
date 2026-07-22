@@ -105,14 +105,13 @@ FocusScope {
       event.accepted = true;
     } else if (event.key === Qt.Key_G && !(event.modifiers & Qt.ShiftModifier)) {
       wheelNavigationPending = true;
-      statusData.wifiSelectionDirection = -1;
-      statusData.wifiSelectedIndex = 0;
+      statusData.setWifiSelection(0, -1);
       wheelNavigationPending = false;
       event.accepted = true;
     } else if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
       wheelNavigationPending = true;
-      statusData.wifiSelectionDirection = 1;
-      statusData.wifiSelectedIndex = Math.max(0, statusData.wifiNetworks.length - 1);
+      statusData.setWifiSelection(
+        Math.max(0, statusData.wifiNetworks.length - 1), 1);
       wheelNavigationPending = false;
       event.accepted = true;
     } else if (event.key === Qt.Key_R) {

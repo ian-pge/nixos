@@ -2,6 +2,8 @@ import Quickshell
 import Quickshell.Bluetooth
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Networking
+import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 import QtQuick
@@ -13,9 +15,6 @@ Scope {
   property int memoryUsage: 0
   property int diskUsage: 0
   property int brightness: 0
-  property string networkType: "disconnected"
-  property string networkName: "Disconnected"
-  property int networkStrength: 0
 
   property string gpuText: "--"
   property string gpuTooltip: "GPU data unavailable"
@@ -26,13 +25,15 @@ Scope {
   property var nixUpdates: []
   property bool nixChecking: true
   property bool updateSelectorVisible: false
+  property bool mediaOverlayVisible: false
+  property bool mprisInitialized: false
   property bool updateMorphGentle: false
   property string updateTargetMonitor: ""
   property bool volumeOverlayVisible: false
   property bool brightnessOverlayVisible: false
   property bool wifiSelectorVisible: false
-  property var wifiNetworks: []
   property int wifiSelectedIndex: 0
+  property string wifiSelectedSsid: ""
   property int wifiSelectionDirection: 1
   property bool wifiLoading: false
   property bool wifiRefreshSilent: false
@@ -41,9 +42,9 @@ Scope {
   property bool wifiPasswordMode: false
   property string wifiPassword: ""
   property var wifiPendingNetwork: null
+  property bool wifiConnectionUsedPassword: false
   property bool bluetoothSelectorVisible: false
   property string bluetoothTargetMonitor: ""
-  property var bluetoothSelectorDevices: []
   property int bluetoothTab: 0
   property int bluetoothSelectedIndex: 0
   property int bluetoothSelectionDirection: 1
@@ -52,21 +53,85 @@ Scope {
   property bool bluetoothSelectorRefreshSilent: false
   property string bluetoothSelectorMessage: ""
   property string bluetoothAction: ""
+  property var bluetoothActionDevice: null
+  property bool bluetoothStartedDiscovery: false
   readonly property bool centerOverlayVisible: volumeOverlayVisible
-    || brightnessOverlayVisible || wifiSelectorVisible
+    || brightnessOverlayVisible || mediaOverlayVisible || wifiSelectorVisible
     || bluetoothSelectorVisible || updateSelectorVisible
 
   onCenterOverlayVisibleChanged: setFocusedWindowBorder(centerOverlayVisible)
 
-  Component.onCompleted: {
-    setFocusedWindowBorder(false);
-    refreshWifiNetworks(false, true);
-    refreshBluetoothSelectorDevices(false, true);
-  }
+  Component.onCompleted: setFocusedWindowBorder(false)
 
   Component.onDestruction: setFocusedWindowBorder(false)
 
+  readonly property var wifiDevice: Networking.devices.values.find(device =>
+    device.type === DeviceType.Wifi) ?? null
+  readonly property var wiredDevice: Networking.devices.values.find(device =>
+    device.type === DeviceType.Wired && device.connected) ?? null
+  readonly property var wifiNetworks: {
+    if (wifiDevice === null)
+      return [];
+    const networks = wifiDevice.networks.values.map(network => ({
+      "ssid": network.name,
+      "strength": Math.round(network.signalStrength * 100),
+      "security": WifiSecurityType.toString(network.security),
+      "active": network.connected,
+      "known": network.known,
+      "nativeNetwork": network
+    }));
+    networks.sort((left, right) => {
+      if (left.active !== right.active)
+        return left.active ? -1 : 1;
+      if (left.strength !== right.strength)
+        return right.strength - left.strength;
+      return left.ssid.localeCompare(right.ssid);
+    });
+    return networks;
+  }
+  readonly property var activeWifiNetwork: wifiNetworks.find(network =>
+    network.active) ?? null
+  readonly property string networkType: activeWifiNetwork !== null
+    ? "wifi" : wiredDevice !== null ? "ethernet"
+      : !Networking.wifiEnabled ? "disabled" : "disconnected"
+  readonly property string networkName: activeWifiNetwork !== null
+    ? activeWifiNetwork.ssid : wiredDevice !== null ? wiredDevice.name
+      : !Networking.wifiEnabled ? "Wi-Fi Off" : "Disconnected"
+  readonly property int networkStrength: activeWifiNetwork !== null
+    ? activeWifiNetwork.strength : wiredDevice !== null ? 100 : 0
+
+  onWifiNetworksChanged: {
+    if (wifiNetworks.length === 0) {
+      wifiSelectedIndex = 0;
+      wifiSelectedSsid = "";
+      return;
+    }
+    const preservedIndex = wifiNetworks.findIndex(network =>
+      network.ssid === wifiSelectedSsid);
+    wifiSelectedIndex = preservedIndex >= 0 ? preservedIndex
+      : Math.min(wifiSelectedIndex, wifiNetworks.length - 1);
+    wifiSelectedSsid = wifiNetworks[wifiSelectedIndex].ssid;
+  }
+
   readonly property var bluetoothAdapter: Bluetooth.defaultAdapter
+  readonly property var bluetoothSelectorDevices: Bluetooth.devices.values.map(device => ({
+    "address": device.address,
+    "name": device.name || device.deviceName || device.address,
+    "paired": device.paired,
+    "connected": device.connected,
+    "nativeDevice": device
+  })).sort((left, right) => {
+    if (left.connected !== right.connected)
+      return left.connected ? -1 : 1;
+    if (left.paired !== right.paired)
+      return left.paired ? -1 : 1;
+    return left.name.localeCompare(right.name);
+  })
+  onBluetoothSelectorDevicesChanged: {
+    const devices = currentBluetoothDevices();
+    bluetoothSelectedIndex = Math.min(bluetoothSelectedIndex,
+      Math.max(0, devices.length - 1));
+  }
   readonly property bool bluetoothEnabled: bluetoothAdapter !== null
     && bluetoothAdapter.enabled
   readonly property var connectedBluetoothDevices: Bluetooth.devices.values
@@ -90,6 +155,19 @@ Scope {
   readonly property int batteryPercent: batteryAvailable
     ? Math.round(battery.percentage * 100)
     : 0
+
+  readonly property var mprisPlayer: {
+    const players = Mpris.players.values.filter(player => player.canControl);
+    return players.find(player => player.dbusName.includes("playerctld"))
+      ?? players.find(player => player.isPlaying)
+      ?? players.find(player => player.playbackState === MprisPlaybackState.Paused)
+      ?? players[0] ?? null;
+  }
+
+  onMprisPlayerChanged: {
+    if (mprisPlayer === null)
+      hideMediaOverlay();
+  }
 
   readonly property var audioSink: Pipewire.defaultAudioSink
   readonly property var audio: audioSink !== null ? audioSink.audio : null
@@ -182,10 +260,70 @@ Scope {
     return "󰤨";
   }
 
+  function showMediaOverlay() {
+    if (mprisPlayer === null || wifiSelectorVisible
+        || bluetoothSelectorVisible || updateSelectorVisible)
+      return;
+    volumeOverlayVisible = false;
+    brightnessOverlayVisible = false;
+    volumeOverlayTimer.stop();
+    brightnessOverlayTimer.stop();
+    mediaOverlayVisible = true;
+    mediaOverlayTimer.restart();
+  }
+
+  function hideMediaOverlay() {
+    mediaOverlayVisible = false;
+    mediaOverlayTimer.stop();
+  }
+
+  function mediaPlayPause() {
+    if (mprisPlayer === null)
+      return;
+    if (mprisPlayer.canTogglePlaying)
+      mprisPlayer.togglePlaying();
+    else if (mprisPlayer.isPlaying && mprisPlayer.canPause)
+      mprisPlayer.pause();
+    else if (!mprisPlayer.isPlaying && mprisPlayer.canPlay)
+      mprisPlayer.play();
+    showMediaOverlay();
+  }
+
+  function mediaNext() {
+    if (mprisPlayer !== null && mprisPlayer.canGoNext) {
+      mprisPlayer.next();
+      showMediaOverlay();
+    }
+  }
+
+  function mediaPrevious() {
+    if (mprisPlayer !== null && mprisPlayer.canGoPrevious) {
+      mprisPlayer.previous();
+      showMediaOverlay();
+    }
+  }
+
   function setVolume(delta) {
     if (audio === null)
       return;
     audio.volume = Math.max(0, Math.min(1, audio.volume + delta));
+  }
+
+  function volumeUp() {
+    setVolume(0.02);
+    showVolumeOverlay();
+  }
+
+  function volumeDown() {
+    setVolume(-0.02);
+    showVolumeOverlay();
+  }
+
+  function toggleAudioMute() {
+    if (audio === null)
+      return;
+    audio.muted = !audio.muted;
+    showVolumeOverlay();
   }
 
   function setFocusedWindowBorder(overlayActive) {
@@ -194,8 +332,11 @@ Scope {
   }
 
   function showVolumeOverlay() {
+    hideMediaOverlay();
     wifiSelectorVisible = false;
+    stopWifiScan();
     bluetoothSelectorVisible = false;
+    stopBluetoothDiscovery();
     if (updateSelectorVisible)
       hideUpdateSelector();
     brightnessOverlayVisible = false;
@@ -205,8 +346,11 @@ Scope {
   }
 
   function showBrightnessOverlay() {
+    hideMediaOverlay();
     wifiSelectorVisible = false;
+    stopWifiScan();
     bluetoothSelectorVisible = false;
+    stopBluetoothDiscovery();
     if (updateSelectorVisible)
       hideUpdateSelector();
     volumeOverlayVisible = false;
@@ -224,7 +368,9 @@ Scope {
   }
 
   function showWifiSelector() {
+    hideMediaOverlay();
     bluetoothSelectorVisible = false;
+    stopBluetoothDiscovery();
     if (updateSelectorVisible)
       hideUpdateSelector();
     volumeOverlayVisible = false;
@@ -235,6 +381,7 @@ Scope {
       ? Hyprland.focusedMonitor.name : "";
     wifiSelectorVisible = true;
     wifiSelectedIndex = 0;
+    wifiSelectedSsid = wifiNetworks.length > 0 ? wifiNetworks[0].ssid : "";
     wifiMessage = "";
     refreshWifiNetworks(false, true);
   }
@@ -243,8 +390,11 @@ Scope {
     wifiSelectorVisible = false;
     wifiPasswordMode = false;
     wifiPassword = "";
+    wifiConnectionTimer.stop();
     wifiPendingNetwork = null;
+    wifiConnectionUsedPassword = false;
     wifiMessage = "";
+    stopWifiScan();
   }
 
   function cancelWifiPassword() {
@@ -263,28 +413,53 @@ Scope {
     wifiMessage = "";
   }
 
-  function moveWifiSelection(delta) {
+  function setWifiSelection(index, direction) {
     if (wifiNetworks.length === 0)
       return;
-    wifiSelectionDirection = delta >= 0 ? 1 : -1;
-    wifiSelectedIndex = (wifiSelectedIndex + delta + wifiNetworks.length)
-      % wifiNetworks.length;
+    wifiSelectionDirection = direction;
+    wifiSelectedIndex = Math.max(0, Math.min(index, wifiNetworks.length - 1));
+    wifiSelectedSsid = wifiNetworks[wifiSelectedIndex].ssid;
     wifiPasswordMode = false;
     wifiPassword = "";
     wifiMessage = "";
   }
 
-  function refreshWifiNetworks(forceRescan = false, silent = false) {
-    if (wifiScanProcess.running)
+  function moveWifiSelection(delta) {
+    if (wifiNetworks.length === 0)
       return;
+    setWifiSelection((wifiSelectedIndex + delta + wifiNetworks.length)
+      % wifiNetworks.length, delta >= 0 ? 1 : -1);
+  }
+
+  function stopWifiScan() {
+    wifiScanTimer.stop();
+    if (wifiDevice !== null && wifiDevice.scannerEnabled)
+      wifiDevice.scannerEnabled = false;
+    wifiLoading = false;
+    wifiRefreshSilent = false;
+  }
+
+  function refreshWifiNetworks(forceRescan = false, silent = false) {
+    if (wifiDevice === null) {
+      if (!silent)
+        wifiMessage = "Wi-Fi device unavailable";
+      return;
+    }
+
     wifiRefreshSilent = silent;
     if (!silent) {
       wifiLoading = true;
       wifiMessage = "";
     }
-    wifiScanProcess.command = ["bash", Quickshell.shellDir + "/scripts/wifi-networks.sh",
-      forceRescan ? "yes" : "auto"];
-    wifiScanProcess.running = true;
+
+    if (wifiDevice.scannerEnabled)
+      wifiDevice.scannerEnabled = false;
+    Qt.callLater(() => {
+      if (root.wifiDevice === null)
+        return;
+      root.wifiDevice.scannerEnabled = true;
+      wifiScanTimer.restart();
+    });
   }
 
   function toggleBluetoothSelector() {
@@ -295,7 +470,9 @@ Scope {
   }
 
   function showBluetoothSelector() {
+    hideMediaOverlay();
     wifiSelectorVisible = false;
+    stopWifiScan();
     if (updateSelectorVisible)
       hideUpdateSelector();
     volumeOverlayVisible = false;
@@ -314,6 +491,7 @@ Scope {
   function hideBluetoothSelector() {
     bluetoothSelectorVisible = false;
     bluetoothSelectorMessage = "";
+    stopBluetoothDiscovery();
   }
 
   function currentBluetoothDevices() {
@@ -331,64 +509,90 @@ Scope {
     bluetoothSelectorMessage = "";
   }
 
+  function stopBluetoothDiscovery() {
+    bluetoothScanTimer.stop();
+    if (bluetoothStartedDiscovery && bluetoothAdapter !== null)
+      bluetoothAdapter.discovering = false;
+    bluetoothStartedDiscovery = false;
+    bluetoothSelectorLoading = false;
+    bluetoothSelectorScanning = false;
+    bluetoothSelectorRefreshSilent = false;
+  }
+
   function switchBluetoothTab() {
     bluetoothTab = bluetoothTab === 0 ? 1 : 0;
     bluetoothSelectedIndex = 0;
     bluetoothSelectorMessage = "";
-    refreshBluetoothSelectorDevices(bluetoothTab === 1, bluetoothTab === 0);
+    if (bluetoothTab === 1)
+      refreshBluetoothSelectorDevices(true, false);
+    else
+      stopBluetoothDiscovery();
   }
 
   function refreshBluetoothSelectorDevices(scan, silent = false) {
-    if (bluetoothSelectorProcess.running)
+    if (!scan)
       return;
+    if (bluetoothAdapter === null) {
+      if (!silent)
+        bluetoothSelectorMessage = "Bluetooth adapter unavailable";
+      return;
+    }
+
     bluetoothSelectorRefreshSilent = silent;
     if (!silent) {
       bluetoothSelectorLoading = true;
-      bluetoothSelectorScanning = scan;
+      bluetoothSelectorScanning = true;
       bluetoothSelectorMessage = "";
     }
-    bluetoothSelectorProcess.command = ["bash",
-      Quickshell.shellDir + "/scripts/bluetooth-devices.sh", scan ? "yes" : "no"];
-    bluetoothSelectorProcess.running = true;
+    if (!bluetoothAdapter.discovering) {
+      bluetoothStartedDiscovery = true;
+      bluetoothAdapter.discovering = true;
+    }
+    bluetoothScanTimer.restart();
   }
 
   function activateSelectedBluetoothDevice() {
-    if (bluetoothActionProcess.running)
+    if (bluetoothActionDevice !== null)
       return;
     const devices = currentBluetoothDevices();
     if (devices.length === 0)
       return;
     const device = devices[Math.min(bluetoothSelectedIndex, devices.length - 1)];
-    const connectedNow = Bluetooth.devices.values.some(candidate =>
-      candidate.address === device.address && candidate.connected);
+    const nativeDevice = device.nativeDevice;
     bluetoothAction = bluetoothTab === 1
-      ? "pair" : connectedNow ? "disconnect" : "connect";
+      ? "pair" : nativeDevice.connected ? "disconnect" : "connect";
+    bluetoothActionDevice = nativeDevice;
     bluetoothSelectorMessage = bluetoothAction === "pair"
       ? "Pairing with " + device.name + "…"
       : bluetoothAction === "connect"
         ? "Connecting to " + device.name + "…"
         : "Disconnecting " + device.name + "…";
-    bluetoothActionProcess.exec(["bluetoothctl", "--timeout", "20",
-      bluetoothAction, device.address]);
+    bluetoothActionTimer.restart();
+
+    if (bluetoothAction === "pair")
+      nativeDevice.pair();
+    else if (bluetoothAction === "connect")
+      nativeDevice.connect();
+    else
+      nativeDevice.disconnect();
   }
 
-  function finishBluetoothAction(output) {
-    const result = output.toLowerCase();
-    const failed = result.includes("failed") || result.includes("not available")
-      || result.includes("error");
-    const succeeded = !failed && (result.includes("successful")
-      || result.includes("successfully"));
-
+  function finishBluetoothAction(succeeded) {
+    bluetoothActionTimer.stop();
     if (succeeded) {
       if (bluetoothAction === "pair") {
+        if (bluetoothActionDevice !== null)
+          bluetoothActionDevice.trusted = true;
         bluetoothTab = 0;
         bluetoothSelectedIndex = 0;
+        stopBluetoothDiscovery();
       }
       bluetoothSelectorMessage = "";
-      refreshBluetoothSelectorDevices(false, true);
     } else {
       bluetoothSelectorMessage = "Bluetooth action failed";
     }
+    bluetoothActionDevice = null;
+    bluetoothAction = "";
   }
 
   function wifiIsSecured(network) {
@@ -397,8 +601,7 @@ Scope {
   }
 
   function connectSelectedWifi() {
-    if (wifiNetworks.length === 0 || wifiConnectProcess.running
-        || wifiPasswordConnectProcess.running)
+    if (wifiNetworks.length === 0 || wifiPendingNetwork !== null)
       return;
     const network = wifiNetworks[Math.min(wifiSelectedIndex, wifiNetworks.length - 1)];
     if (network.active) {
@@ -406,20 +609,12 @@ Scope {
       return;
     }
 
-    if (wifiPasswordMode) {
-      if (wifiPassword.length === 0) {
-        wifiMessage = "Password required";
-        return;
-      }
-      wifiPendingNetwork = network;
-      wifiMessage = "Connecting to " + network.ssid + "…";
-      wifiPasswordConnectProcess.command = ["bash",
-        Quickshell.shellDir + "/scripts/wifi-connect-password.sh", network.ssid];
-      wifiPasswordConnectProcess.running = true;
+    if (wifiPasswordMode && wifiPassword.length === 0) {
+      wifiMessage = "Password required";
       return;
     }
 
-    if (wifiIsSecured(network) && !network.known) {
+    if (!wifiPasswordMode && wifiIsSecured(network) && !network.known) {
       wifiPasswordMode = true;
       wifiPassword = "";
       wifiMessage = "";
@@ -427,24 +622,32 @@ Scope {
     }
 
     wifiPendingNetwork = network;
+    wifiConnectionUsedPassword = wifiPasswordMode;
     wifiMessage = "Connecting to " + network.ssid + "…";
-    wifiConnectProcess.exec(["nmcli", "--wait", "15", "device", "wifi", "connect", network.ssid]);
+    wifiConnectionTimer.restart();
+
+    if (wifiPasswordMode) {
+      network.nativeNetwork.connectWithPsk(wifiPassword);
+      wifiPassword = "";
+      wifiPasswordMode = false;
+    } else {
+      network.nativeNetwork.connect();
+    }
   }
 
-  function finishWifiConnection(exitCode, usedPassword) {
-    if (exitCode === 0) {
-      hideWifiSelector();
-      refreshWifiNetworks(false, true);
-      return;
-    }
-
-    if (wifiPendingNetwork !== null && wifiIsSecured(wifiPendingNetwork)) {
+  function failWifiConnection() {
+    wifiConnectionTimer.stop();
+    const network = wifiPendingNetwork;
+    wifiPendingNetwork = null;
+    if (network !== null && wifiIsSecured(network)) {
       wifiPasswordMode = true;
       wifiPassword = "";
-      wifiMessage = usedPassword ? "Incorrect password" : "Password required";
+      wifiMessage = wifiConnectionUsedPassword
+        ? "Incorrect password" : "Password required";
     } else {
       wifiMessage = "Unable to connect";
     }
+    wifiConnectionUsedPassword = false;
   }
 
   function toggleUpdateSelector() {
@@ -455,8 +658,11 @@ Scope {
   }
 
   function showUpdateSelector() {
+    hideMediaOverlay();
     wifiSelectorVisible = false;
+    stopWifiScan();
     bluetoothSelectorVisible = false;
+    stopBluetoothDiscovery();
     volumeOverlayVisible = false;
     brightnessOverlayVisible = false;
     volumeOverlayTimer.stop();
@@ -531,21 +737,22 @@ Scope {
 
   Process {
     id: systemStatsProcess
-    command: ["bash", Quickshell.shellDir + "/scripts/system-stats.sh"]
+    command: ["quickshell-system-stats"]
     running: true
 
     stdout: SplitParser {
       onRead: data => {
         try {
           const stats = JSON.parse(data);
+          if (stats.error !== undefined) {
+            console.warn("System telemetry error:", stats.error);
+            return;
+          }
           root.cpuUsage = stats.cpu;
           root.memoryUsage = stats.memory;
           root.diskUsage = stats.disk;
           if (!root.brightnessOverlayVisible)
             root.brightness = stats.brightness;
-          root.networkType = stats.networkType;
-          root.networkName = stats.networkName;
-          root.networkStrength = stats.networkStrength;
         } catch (error) {
           console.warn("Unable to parse system stats:", error);
         }
@@ -553,86 +760,76 @@ Scope {
     }
   }
 
-  Process {
-    id: bluetoothSelectorProcess
-    command: ["bash", Quickshell.shellDir + "/scripts/bluetooth-devices.sh", "no"]
+  Connections {
+    target: root.mprisPlayer
 
-    stdout: StdioCollector {
-      onStreamFinished: {
-        try {
-          root.bluetoothSelectorDevices = JSON.parse(text.trim());
-          const devices = root.currentBluetoothDevices();
-          root.bluetoothSelectedIndex = Math.min(root.bluetoothSelectedIndex,
-            Math.max(0, devices.length - 1));
-        } catch (error) {
-          if (!root.bluetoothSelectorRefreshSilent) {
-            root.bluetoothSelectorDevices = [];
-            root.bluetoothSelectorMessage = "Unable to list devices";
-          }
-        }
-        root.bluetoothSelectorLoading = false;
-        root.bluetoothSelectorScanning = false;
-        root.bluetoothSelectorRefreshSilent = false;
+    function onPostTrackChanged() {
+      if (root.mprisInitialized)
+        root.showMediaOverlay();
+    }
+  }
+
+  Connections {
+    target: root.wifiPendingNetwork !== null
+      ? root.wifiPendingNetwork.nativeNetwork : null
+
+    function onConnectedChanged() {
+      if (root.wifiPendingNetwork !== null
+          && root.wifiPendingNetwork.nativeNetwork.connected) {
+        wifiConnectionTimer.stop();
+        root.wifiPendingNetwork = null;
+        root.wifiConnectionUsedPassword = false;
+        root.hideWifiSelector();
       }
     }
-  }
 
-  Process {
-    id: bluetoothActionProcess
-
-    stdout: StdioCollector { id: bluetoothActionOutput }
-    stderr: StdioCollector { id: bluetoothActionError }
-    onExited: (exitCode, exitStatus) => root.finishBluetoothAction(
-      bluetoothActionOutput.text + "\n" + bluetoothActionError.text)
-  }
-
-  Process {
-    id: wifiScanProcess
-    command: ["bash", Quickshell.shellDir + "/scripts/wifi-networks.sh", "auto"]
-
-    stdout: StdioCollector {
-      onStreamFinished: {
-        try {
-          const selectedSsid = root.wifiNetworks.length > 0
-            ? root.wifiNetworks[Math.min(root.wifiSelectedIndex,
-              root.wifiNetworks.length - 1)].ssid : "";
-          const networks = JSON.parse(text.trim());
-          root.wifiNetworks = networks;
-          const refreshedIndex = networks.findIndex(network =>
-            network.ssid === selectedSsid);
-          root.wifiSelectedIndex = root.wifiRefreshSilent && refreshedIndex >= 0
-            ? refreshedIndex : 0;
-        } catch (error) {
-          if (!root.wifiRefreshSilent) {
-            root.wifiNetworks = [];
-            root.wifiMessage = "Unable to scan networks";
-          }
-        }
-        root.wifiLoading = false;
-        root.wifiRefreshSilent = false;
-      }
+    function onConnectionFailed(reason) {
+      root.failWifiConnection();
     }
   }
 
-  Process {
-    id: wifiConnectProcess
+  Connections {
+    target: root.bluetoothActionDevice
 
-    stdout: StdioCollector {}
-    stderr: StdioCollector {}
-    onExited: (exitCode, exitStatus) => root.finishWifiConnection(exitCode, false)
+    function onConnectedChanged() {
+      if (root.bluetoothActionDevice === null)
+        return;
+      if (root.bluetoothAction === "connect" && root.bluetoothActionDevice.connected)
+        root.finishBluetoothAction(true);
+      else if (root.bluetoothAction === "disconnect"
+          && !root.bluetoothActionDevice.connected)
+        root.finishBluetoothAction(true);
+    }
+
+    function onPairedChanged() {
+      if (root.bluetoothAction === "pair" && root.bluetoothActionDevice !== null
+          && root.bluetoothActionDevice.paired)
+        root.finishBluetoothAction(true);
+    }
   }
 
-  Process {
-    id: wifiPasswordConnectProcess
-    stdinEnabled: true
+  Timer {
+    id: wifiScanTimer
+    interval: 5000
+    onTriggered: root.stopWifiScan()
+  }
 
-    stdout: StdioCollector {}
-    stderr: StdioCollector {}
-    onStarted: {
-      write(root.wifiPassword + "\n");
-      root.wifiPassword = "";
-    }
-    onExited: (exitCode, exitStatus) => root.finishWifiConnection(exitCode, true)
+  Timer {
+    id: wifiConnectionTimer
+    interval: 20000
+    onTriggered: root.failWifiConnection()
+  }
+
+  Timer {
+    id: bluetoothScanTimer
+    interval: 5000
+    onTriggered: root.stopBluetoothDiscovery()
+  }
+
+  Timer {
+    id: bluetoothActionTimer
+    interval: 20000
+    onTriggered: root.finishBluetoothAction(false)
   }
 
   Process {
@@ -712,6 +909,18 @@ Scope {
   }
 
   Timer {
+    interval: 2000
+    running: true
+    onTriggered: root.mprisInitialized = true
+  }
+
+  Timer {
+    id: mediaOverlayTimer
+    interval: 4000
+    onTriggered: root.mediaOverlayVisible = false
+  }
+
+  Timer {
     id: updateMorphTimer
     interval: 360
     onTriggered: root.updateMorphGentle = false
@@ -741,6 +950,30 @@ Scope {
 
     function refreshNix() {
       root.refreshNixStatus();
+    }
+
+    function mediaPlayPause() {
+      root.mediaPlayPause();
+    }
+
+    function mediaNext() {
+      root.mediaNext();
+    }
+
+    function mediaPrevious() {
+      root.mediaPrevious();
+    }
+
+    function volumeUp() {
+      root.volumeUp();
+    }
+
+    function volumeDown() {
+      root.volumeDown();
+    }
+
+    function toggleAudioMute() {
+      root.toggleAudioMute();
     }
 
     function showVolume() {

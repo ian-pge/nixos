@@ -20,6 +20,7 @@ PanelWindow {
   readonly property bool wifiSelectorActive: statusData.wifiSelectorVisible
   readonly property bool bluetoothSelectorActive: statusData.bluetoothSelectorVisible
   readonly property bool updateSelectorActive: statusData.updateSelectorVisible
+  readonly property bool mediaOverlayActive: statusData.mediaOverlayVisible
   readonly property bool wifiSelectorKeyboardActive: wifiSelectorActive
     && hyprlandMonitor !== null
     && hyprlandMonitor.name === statusData.wifiTargetMonitor
@@ -173,14 +174,16 @@ PanelWindow {
   Rectangle {
     id: centerMorph
     readonly property bool overlayVisible: statusData.volumeOverlayVisible
-      || statusData.brightnessOverlayVisible || window.wifiSelectorActive
-      || window.bluetoothSelectorActive || window.updateSelectorActive
+      || statusData.brightnessOverlayVisible || window.mediaOverlayActive
+      || window.wifiSelectorActive || window.bluetoothSelectorActive
+      || window.updateSelectorActive
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: parent.top
     width: window.updateSelectorActive ? updateSelector.implicitWidth
       : window.wifiSelectorActive ? wifiSelector.implicitWidth
       : window.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
+      : window.mediaOverlayActive ? nowPlayingIndicator.implicitWidth
       : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
     height: window.updateSelectorActive ? updateSelector.implicitHeight : 36
     radius: 18
@@ -244,6 +247,14 @@ PanelWindow {
 
     }
 
+    NowPlayingIndicator {
+      id: nowPlayingIndicator
+      anchors.fill: parent
+      statusData: window.statusData
+      opacity: window.mediaOverlayActive ? 1 : 0
+      enabled: window.mediaOverlayActive
+    }
+
     WifiSelector {
       id: wifiSelector
       anchors.fill: parent
@@ -278,8 +289,8 @@ PanelWindow {
       z: 100
 
       property real phase: 0
-      readonly property real inset: 2
-      readonly property real pathRadius: Math.min(16,
+      readonly property real inset: 1
+      readonly property real pathRadius: Math.min(17,
         Math.max(0, width / 2 - inset), Math.max(0, height / 2 - inset))
       readonly property real horizontalLength: Math.max(0,
         width - inset * 2 - pathRadius * 2)
@@ -350,9 +361,9 @@ PanelWindow {
 
           x: pathPoint.x - width / 2
           y: pathPoint.y - height / 2
-          width: 3.5
-          height: 3.5
-          radius: 1.75
+          width: 2
+          height: 2
+          radius: 1
           color: "#ff33cc"
           opacity: Math.pow(1 - trailPosition, 1.35)
         }

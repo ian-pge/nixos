@@ -8,7 +8,7 @@ La barre doit donner l’impression d’être un seul système animé, pas une c
 
 Principes fondamentaux :
 
-- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, luminosité, Wi-Fi, Bluetooth et mises à jour.
+- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, luminosité, média MPRIS, Wi-Fi, Bluetooth et mises à jour.
 - Les changements de taille utilisent un rebond court et visible.
 - Le contenu change instantanément : **pas de fondu entre les widgets**.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
@@ -24,10 +24,11 @@ Principes fondamentaux :
 - `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
+- `../components/NowPlayingIndicator.qml` : média MPRIS, pochette et métadonnées.
 - `../components/WifiSelector.qml` / `BluetoothSelector.qml` : sélecteurs clavier.
 - `../components/UpdateSelector.qml` : liste des mises à jour.
 - `../components/Pill.qml` : capsule générique des modules latéraux.
-- `../scripts/` : implémentations maintenues des helpers locaux Wi-Fi, Bluetooth et statistiques.
+- `../scripts/system-stats.py` : télémétrie persistante CPU, mémoire, disque et luminosité.
 - `../../helpers/` : paquets Nix optimisés et nommés pour Quickshell.
 
 ### État partagé, rendu multi-écran
@@ -36,7 +37,7 @@ Principes fondamentaux :
 
 Conséquences :
 
-- Wi-Fi, Bluetooth, volume, luminosité et updates apparaissent sur **tous les écrans**.
+- Wi-Fi, Bluetooth, volume, luminosité, média et updates apparaissent sur **tous les écrans**.
 - Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor` et `updateTargetMonitor` désignent uniquement l’écran qui reçoit le focus clavier.
 - Ne jamais limiter l’affichage au moniteur ciblé. Limiter uniquement `enabled` et `WlrLayershell.keyboardFocus`.
 
@@ -172,6 +173,7 @@ Le liseré apparaît lorsque `centerMorph.overlayVisible` est vrai, donc pour :
 - luminosité ;
 - Wi-Fi ;
 - Bluetooth ;
+- média MPRIS ;
 - updates.
 
 Il disparaît uniquement quand la capsule redevient le widget des workspaces.
@@ -183,7 +185,7 @@ Le liseré n’utilise pas un `Canvas` avec un dash animé. Cette approche produ
 La version stable utilise :
 
 - un chemin mathématique de rectangle arrondi ;
-- `220` petits points de `3.5px` ;
+- `220` petits points de `2px` ;
 - un segment couvrant `50 %` du périmètre ;
 - couleur `#ff33cc` ;
 - une opacité arrière progressive : `Math.pow(1 - trailPosition, 1.35)` ;
@@ -255,18 +257,18 @@ Les deux sélecteurs doivent rester visuellement parallèles :
 
 La roue ne se déclenche que pour une navigation volontaire (`j/k/h/l`, flèches, `g/G` pour le Wi-Fi). Elle ne doit pas tourner lors de l’ouverture, de la fermeture, d’un scan ou d’un changement de message.
 
-### Cache et scans
+### Services natifs et scans
 
-À l’ouverture :
+Le Wi-Fi utilise exclusivement `Quickshell.Networking` : devices NetworkManager, réseaux, puissance, sécurité, états, scan et connexion PSK. Aucun helper `nmcli` ne doit être réintroduit.
 
-- afficher immédiatement le cache ;
-- actualiser silencieusement en arrière-plan ;
-- ne pas afficher un spinner pour un simple rechargement.
+Le Bluetooth utilise exclusivement `Quickshell.Bluetooth` : découverte BlueZ, appareils, appairage, connexion et déconnexion. Aucun helper `bluetoothctl` ne doit être réintroduit.
+
+À l’ouverture, les modèles natifs déjà chargés s’affichent immédiatement. Le rafraîchissement silencieux active temporairement `WifiDevice.scannerEnabled` sans spinner.
 
 Un vrai spinner est réservé à :
 
-- `r` pour un scan explicite ;
-- l’onglet Bluetooth `NEARBY`.
+- `r` pour un scan Wi-Fi explicite ;
+- l’onglet Bluetooth `NEARBY`, via `BluetoothAdapter.discovering`.
 
 ### Couleurs d’état
 
@@ -281,9 +283,21 @@ Un vrai spinner est réservé à :
 - Aucun pourcentage dans le widget central.
 - Timeout de visibilité : `2000ms`.
 - La barre de progression anime sa largeur en `140ms`.
-- Les valeurs volume et luminosité peuvent être modifiées depuis leurs modules latéraux, mais l’indicateur central est partagé sur tous les écrans.
+- Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
+- La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif.
+- Les indicateurs centraux sont partagés sur tous les écrans.
 
-## 12. Exclusivité entre overlays
+## 12. Contrôles média MPRIS
+
+Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `playerctl`.
+
+`StatusData.mprisPlayer` préfère le contrôleur D-Bus `playerctld`, qui conserve la notion de dernier lecteur actif lorsque plusieurs applications ou onglets publient MPRIS. En son absence, la sélection tombe sur le lecteur en cours de lecture, puis un lecteur en pause.
+
+Les raccourcis Hyprland appellent les méthodes IPC `mediaPlayPause`, `mediaNext` et `mediaPrevious`. Chaque méthode vérifie les capacités du lecteur avant l’action.
+
+`NowPlayingIndicator.qml` occupe `300px`, affiche quatre petites barres d’égaliseur animées, la pochette, le titre, l’artiste et l’état play/pause. Les barres restent basses lorsque le lecteur est en pause et s’animent indépendamment pendant la lecture. Le widget reste visible `4000ms` après une action média ou un changement de piste. Un changement automatique de piste ne doit jamais interrompre un sélecteur interactif Wi-Fi, Bluetooth ou updates.
+
+## 13. Exclusivité entre overlays
 
 Un seul mode central peut être actif à la fois.
 
@@ -296,7 +310,7 @@ Lors de l’ouverture d’un overlay :
 
 Éviter les mutations directes de `updateSelectorVisible = false` pendant une autre transition. Passer par `hideUpdateSelector()`.
 
-## 13. Raccourcis et contrôles
+## 14. Raccourcis et contrôles
 
 `Cmd` dans les demandes utilisateur correspond à `SUPER` dans Hyprland.
 
@@ -326,7 +340,7 @@ Lors de l’ouverture d’un overlay :
 
 Ne pas tester `Enter` automatiquement : cela lance réellement `nix flake update` puis `nh os switch`.
 
-## 14. Pièges connus
+## 15. Pièges connus
 
 1. **Animer la hauteur du `PanelWindow`** : provoque un glitch vertical du reste de la barre.
 2. **Overshoot update à `5.5`** : recouvre les modules latéraux sur l’écran interne.
@@ -338,10 +352,10 @@ Ne pas tester `Enter` automatiquement : cela lance réellement `nix flake update
 8. **Fade entre widgets** : contraire à la convention actuelle ; les contenus changent instantanément.
 9. **Focus clavier sur tous les panels** : plusieurs surfaces se disputent le clavier.
 10. **Rendu uniquement sur le moniteur ciblé** : contraire à la convention multi-écran.
-11. **Mot de passe Wi-Fi dans les arguments de commande** : interdit ; utiliser stdin via `scripts/wifi-connect-password.sh`.
+11. **Mot de passe Wi-Fi dans les arguments de commande** : interdit ; utiliser directement `WifiNetwork.connectWithPsk()`.
 12. **Oublier de restaurer la bordure Hyprland** : laisse les fenêtres avec une bordure grise.
 
-## 15. Procédure de validation
+## 16. Procédure de validation
 
 ### Vérification QML rapide
 
@@ -397,7 +411,7 @@ hyprctl getoption general:col.active_border -j
 
 La réserve supérieure doit rester `[0,46,0,0]`. Hors overlay, la bordure active doit être revenue à `ff33ff33`.
 
-## 16. Règle finale pour une future IA
+## 17. Règle finale pour une future IA
 
 Avant toute modification visuelle, identifier clairement :
 
