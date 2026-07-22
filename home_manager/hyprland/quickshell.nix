@@ -1,4 +1,6 @@
 {
+  imports = [./quickshell/helpers];
+
   programs.quickshell = {
     enable = true;
 

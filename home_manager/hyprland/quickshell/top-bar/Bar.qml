@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
+import "components"
 
 PanelWindow {
   id: window
@@ -18,14 +19,18 @@ PanelWindow {
   readonly property var hyprlandMonitor: Hyprland.monitorFor(window.screen)
   readonly property bool wifiSelectorActive: statusData.wifiSelectorVisible
   readonly property bool bluetoothSelectorActive: statusData.bluetoothSelectorVisible
+  readonly property bool updateSelectorActive: statusData.updateSelectorVisible
   readonly property bool wifiSelectorKeyboardActive: wifiSelectorActive
     && hyprlandMonitor !== null
     && hyprlandMonitor.name === statusData.wifiTargetMonitor
   readonly property bool bluetoothSelectorKeyboardActive: bluetoothSelectorActive
     && hyprlandMonitor !== null
     && hyprlandMonitor.name === statusData.bluetoothTargetMonitor
+  readonly property bool updateSelectorKeyboardActive: updateSelectorActive
+    && hyprlandMonitor !== null
+    && hyprlandMonitor.name === statusData.updateTargetMonitor
   readonly property bool keyboardSelectorActive: wifiSelectorKeyboardActive
-    || bluetoothSelectorKeyboardActive
+    || bluetoothSelectorKeyboardActive || updateSelectorKeyboardActive
 
   screen: modelData
 
@@ -41,13 +46,22 @@ PanelWindow {
     right: 5
   }
 
-  implicitHeight: 36
+  // Keep the layer surface geometry fixed so expanding the update card cannot
+  // nudge the other bar modules. The mask leaves the unused area click-through.
+  implicitHeight: 600
   color: "transparent"
-  exclusionMode: ExclusionMode.Auto
+  exclusionMode: ExclusionMode.Normal
+  exclusiveZone: 36
   aboveWindows: true
   WlrLayershell.namespace: "quickshell-top-bar"
   WlrLayershell.keyboardFocus: keyboardSelectorActive
     ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+  mask: Region {
+    Region { item: leftModules }
+    Region { item: centerMorph }
+    Region { item: rightModules }
+  }
 
   Component.onCompleted: entered = true
 
@@ -81,7 +95,7 @@ PanelWindow {
   Row {
     id: leftModules
     anchors.left: parent.left
-    anchors.verticalCenter: parent.verticalCenter
+    y: 0
     spacing: 10
     opacity: window.entered ? 1 : 0
     transform: Translate {
@@ -107,7 +121,7 @@ PanelWindow {
       tooltipText: statusData.nixTooltip
       tooltipHost: window
       interactive: true
-      leftCommand: "ghostty -e nixos-update-installer"
+      onLeftClicked: statusData.toggleUpdateSelector()
       onRightClicked: statusData.forceNixStatus()
     }
 
@@ -160,14 +174,15 @@ PanelWindow {
     id: centerMorph
     readonly property bool overlayVisible: statusData.volumeOverlayVisible
       || statusData.brightnessOverlayVisible || window.wifiSelectorActive
-      || window.bluetoothSelectorActive
+      || window.bluetoothSelectorActive || window.updateSelectorActive
 
     anchors.horizontalCenter: parent.horizontalCenter
-    anchors.verticalCenter: parent.verticalCenter
-    width: window.wifiSelectorActive ? wifiSelector.implicitWidth
+    anchors.top: parent.top
+    width: window.updateSelectorActive ? updateSelector.implicitWidth
+      : window.wifiSelectorActive ? wifiSelector.implicitWidth
       : window.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
       : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
-    height: 36
+    height: window.updateSelectorActive ? updateSelector.implicitHeight : 36
     radius: 18
     color: "#181926"
     clip: true
@@ -186,7 +201,15 @@ PanelWindow {
       NumberAnimation {
         duration: 300
         easing.type: Easing.OutBack
-        easing.overshoot: 5.5
+        easing.overshoot: statusData.updateMorphGentle ? 1.8 : 5.5
+      }
+    }
+
+    Behavior on height {
+      NumberAnimation {
+        duration: 300
+        easing.type: Easing.OutBack
+        easing.overshoot: 1.8
       }
     }
 
@@ -196,6 +219,8 @@ PanelWindow {
       id: workspaceSwitcher
       anchors.fill: parent
       backgroundColor: "transparent"
+      monitorName: window.hyprlandMonitor !== null
+        ? window.hyprlandMonitor.name : ""
       opacity: centerMorph.overlayVisible ? 0 : 1
       enabled: !centerMorph.overlayVisible
 
@@ -236,12 +261,117 @@ PanelWindow {
       enabled: window.bluetoothSelectorKeyboardActive
 
     }
+
+    UpdateSelector {
+      id: updateSelector
+      anchors.fill: parent
+      statusData: window.statusData
+      presented: window.updateSelectorActive
+      opacity: window.updateSelectorActive ? 1 : 0
+      enabled: window.updateSelectorKeyboardActive
+    }
+
+    Item {
+      id: activityBorder
+      anchors.fill: parent
+      visible: centerMorph.overlayVisible
+      z: 100
+
+      property real phase: 0
+      readonly property real inset: 2
+      readonly property real pathRadius: Math.min(16,
+        Math.max(0, width / 2 - inset), Math.max(0, height / 2 - inset))
+      readonly property real horizontalLength: Math.max(0,
+        width - inset * 2 - pathRadius * 2)
+      readonly property real verticalLength: Math.max(0,
+        height - inset * 2 - pathRadius * 2)
+      readonly property real arcLength: Math.PI * pathRadius / 2
+      readonly property real perimeter: Math.max(1,
+        horizontalLength * 2 + verticalLength * 2 + arcLength * 4)
+
+      function pointAt(normalizedPosition) {
+        let distance = (normalizedPosition - Math.floor(normalizedPosition))
+          * perimeter;
+        const radius = Math.max(0.001, pathRadius);
+        let angle = 0;
+
+        if (distance <= horizontalLength)
+          return { "x": inset + pathRadius + distance, "y": inset };
+        distance -= horizontalLength;
+
+        if (distance <= arcLength) {
+          angle = -Math.PI / 2 + distance / radius;
+          return { "x": width - inset - pathRadius + Math.cos(angle) * radius,
+            "y": inset + pathRadius + Math.sin(angle) * radius };
+        }
+        distance -= arcLength;
+
+        if (distance <= verticalLength)
+          return { "x": width - inset,
+            "y": inset + pathRadius + distance };
+        distance -= verticalLength;
+
+        if (distance <= arcLength) {
+          angle = distance / radius;
+          return { "x": width - inset - pathRadius + Math.cos(angle) * radius,
+            "y": height - inset - pathRadius + Math.sin(angle) * radius };
+        }
+        distance -= arcLength;
+
+        if (distance <= horizontalLength)
+          return { "x": width - inset - pathRadius - distance,
+            "y": height - inset };
+        distance -= horizontalLength;
+
+        if (distance <= arcLength) {
+          angle = Math.PI / 2 + distance / radius;
+          return { "x": inset + pathRadius + Math.cos(angle) * radius,
+            "y": height - inset - pathRadius + Math.sin(angle) * radius };
+        }
+        distance -= arcLength;
+
+        if (distance <= verticalLength)
+          return { "x": inset,
+            "y": height - inset - pathRadius - distance };
+        distance -= verticalLength;
+
+        angle = Math.PI + distance / radius;
+        return { "x": inset + pathRadius + Math.cos(angle) * radius,
+          "y": inset + pathRadius + Math.sin(angle) * radius };
+      }
+
+      Repeater {
+        model: 220
+
+        Rectangle {
+          readonly property real trailPosition: index / 219
+          readonly property var pathPoint: activityBorder.pointAt(
+            activityBorder.phase - trailPosition * 0.50)
+
+          x: pathPoint.x - width / 2
+          y: pathPoint.y - height / 2
+          width: 3.5
+          height: 3.5
+          radius: 1.75
+          color: "#ff33cc"
+          opacity: Math.pow(1 - trailPosition, 1.35)
+        }
+      }
+
+      FrameAnimation {
+        running: activityBorder.visible
+        onTriggered: {
+          const delta = Math.min(frameTime, 0.05);
+          activityBorder.phase += delta / 1.6;
+        }
+      }
+    }
   }
 
   Row {
     id: rightModules
     anchors.right: parent.right
-    anchors.verticalCenter: parent.verticalCenter
+    y: 0
     spacing: 10
     opacity: window.entered ? 1 : 0
     transform: Translate {
@@ -316,7 +446,7 @@ PanelWindow {
       return Math.max(0, Math.min(window.width - width,
         point.x + window.tooltipAnchor.width / 2 - width / 2));
     }
-    anchor.rect.y: window.height + 6
+    anchor.rect.y: 42
 
     implicitWidth: Math.min(620, Math.max(120, window.tooltipText.length * 7 + 24))
     implicitHeight: tooltipLabel.implicitHeight + 20

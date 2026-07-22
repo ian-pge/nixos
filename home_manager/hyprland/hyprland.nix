@@ -170,6 +170,7 @@
         "$mainMod SHIFT,F,exec,$fileManagergraphic"
         "$mainMod,N,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleWifi"
         "$mainMod,B,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleBluetooth"
+        "$mainMod,U,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleUpdates"
         "$mainMod,Q,exec,zeditor /home/ian/.config/nixos"
         "$mainMod SHIFT,Q,exec,$settings"
         "$mainMod,R,exec,$audio"

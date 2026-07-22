@@ -1,6 +1,7 @@
 {
   pkgs,
   config,
+  lib,
   ...
 }: {
   # Kept for the helper packages and update scripts below; Quickshell now owns
@@ -348,7 +349,9 @@
     '';
   };
 
-  home.packages = with pkgs; [
+  # Legacy helper definitions are preserved for Waybar, but are only installed
+  # when Waybar is enabled. Quickshell owns its optimized helpers separately.
+  home.packages = lib.optionals config.programs.waybar.enable (with pkgs; [
     wttrbar
 
     jq # Ensure jq is installed for JSON formatting
@@ -486,7 +489,7 @@
       cargoHash = "sha256-X3Ak0K1kt7++tE7qZgy8GaRzqemUNTJ3z1yGBJZyA4s=";
       doCheck = false; # upstream has no tests yet :contentReference[oaicite:1]{index=1}
     })
-  ];
+  ]);
   nix.extraOptions = ''
     !include /home/ian/.config/nix/access-tokens
   '';

@@ -5,6 +5,14 @@ Item {
   id: root
 
   property color backgroundColor: "#181926"
+  property string monitorName: ""
+  property string activeSpecialWorkspace: ""
+  readonly property bool specialWorkspaceVisible: activeSpecialWorkspace !== ""
+  readonly property string specialWorkspaceName: activeSpecialWorkspace.startsWith("special:")
+    ? activeSpecialWorkspace.slice(8) : activeSpecialWorkspace
+  readonly property real specialSlotWidth: Math.max(70, specialLabel.implicitWidth + 24)
+  readonly property real specialExtraWidth: specialWorkspaceVisible
+    ? specialSlotWidth + 12 : 0
   readonly property real naturalContentWidth: {
     let total = 0;
     for (let workspaceId = 1; workspaceId <= 8; workspaceId++) {
@@ -18,13 +26,38 @@ Item {
     return Hyprland.workspaces.values.find(workspace => workspace.id === workspaceId) ?? null;
   }
 
-  implicitWidth: naturalContentWidth + 12
+  function syncSpecialWorkspace() {
+    const monitor = Hyprland.monitors.values.find(candidate =>
+      candidate.name === monitorName);
+    if (monitor === undefined || monitor.lastIpcObject === undefined)
+      return;
+    const special = monitor.lastIpcObject.specialWorkspace;
+    activeSpecialWorkspace = special !== undefined && special.id < 0
+      ? special.name : "";
+  }
+
+  readonly property real baseImplicitWidth: naturalContentWidth + 12
+  implicitWidth: baseImplicitWidth + specialExtraWidth
   implicitHeight: 36
 
-  Behavior on implicitWidth {
-    NumberAnimation {
-      duration: 400
-      easing.type: Easing.OutCubic
+  Component.onCompleted: Qt.callLater(syncSpecialWorkspace)
+
+  Timer {
+    interval: 200
+    running: true
+    onTriggered: root.syncSpecialWorkspace()
+  }
+
+  Connections {
+    target: Hyprland
+
+    function onRawEvent(event) {
+      if (event.name !== "activespecial")
+        return;
+      const separator = event.data.lastIndexOf(",");
+      if (separator < 0 || event.data.slice(separator + 1) !== root.monitorName)
+        return;
+      root.activeSpecialWorkspace = event.data.slice(0, separator);
     }
   }
 
@@ -33,10 +66,17 @@ Item {
     radius: 18
     color: root.backgroundColor
 
-    Row {
-      id: workspaceRow
-      anchors.centerIn: parent
-      spacing: (root.width - root.naturalContentWidth - 12) / 7
+    Item {
+      id: workspaceArea
+      anchors.left: parent.left
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      width: Math.max(12, parent.width - root.specialExtraWidth)
+
+      Row {
+        id: workspaceRow
+        anchors.centerIn: parent
+        spacing: (workspaceArea.width - root.naturalContentWidth - 12) / 7
 
       Repeater {
         model: 8
@@ -104,6 +144,38 @@ Item {
             onClicked: Hyprland.dispatch("workspace " + workspaceButton.workspaceId)
           }
         }
+      }
+    }
+    }
+
+    Rectangle {
+      id: specialSlot
+      visible: root.specialWorkspaceVisible
+      anchors.right: parent.right
+      anchors.rightMargin: 6
+      anchors.verticalCenter: parent.verticalCenter
+      width: root.specialSlotWidth
+      height: 24
+      radius: 12
+      color: "#ff33cc"
+
+      Text {
+        id: specialLabel
+        anchors.centerIn: parent
+        text: root.specialWorkspaceName
+        color: "#181926"
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 13
+        font.bold: true
+        font.weight: Font.Black
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: Hyprland.dispatch("togglespecialworkspace "
+          + root.specialWorkspaceName)
       }
     }
 

@@ -23,6 +23,11 @@ Scope {
   property string weatherTooltip: "Weather unavailable"
   property string nixIcon: ""
   property string nixTooltip: "Checking for updates…"
+  property var nixUpdates: []
+  property bool nixChecking: true
+  property bool updateSelectorVisible: false
+  property bool updateMorphGentle: false
+  property string updateTargetMonitor: ""
   property bool volumeOverlayVisible: false
   property bool brightnessOverlayVisible: false
   property bool wifiSelectorVisible: false
@@ -47,11 +52,19 @@ Scope {
   property bool bluetoothSelectorRefreshSilent: false
   property string bluetoothSelectorMessage: ""
   property string bluetoothAction: ""
+  readonly property bool centerOverlayVisible: volumeOverlayVisible
+    || brightnessOverlayVisible || wifiSelectorVisible
+    || bluetoothSelectorVisible || updateSelectorVisible
+
+  onCenterOverlayVisibleChanged: setFocusedWindowBorder(centerOverlayVisible)
 
   Component.onCompleted: {
+    setFocusedWindowBorder(false);
     refreshWifiNetworks(false, true);
     refreshBluetoothSelectorDevices(false, true);
   }
+
+  Component.onDestruction: setFocusedWindowBorder(false)
 
   readonly property var bluetoothAdapter: Bluetooth.defaultAdapter
   readonly property bool bluetoothEnabled: bluetoothAdapter !== null
@@ -175,9 +188,16 @@ Scope {
     audio.volume = Math.max(0, Math.min(1, audio.volume + delta));
   }
 
+  function setFocusedWindowBorder(overlayActive) {
+    Quickshell.execDetached(["hyprctl", "keyword", "general:col.active_border",
+      overlayActive ? "rgba(888888aa)" : "rgba(33ff33ff)"]);
+  }
+
   function showVolumeOverlay() {
     wifiSelectorVisible = false;
     bluetoothSelectorVisible = false;
+    if (updateSelectorVisible)
+      hideUpdateSelector();
     brightnessOverlayVisible = false;
     brightnessOverlayTimer.stop();
     volumeOverlayVisible = true;
@@ -187,6 +207,8 @@ Scope {
   function showBrightnessOverlay() {
     wifiSelectorVisible = false;
     bluetoothSelectorVisible = false;
+    if (updateSelectorVisible)
+      hideUpdateSelector();
     volumeOverlayVisible = false;
     volumeOverlayTimer.stop();
     brightnessOverlayVisible = true;
@@ -203,6 +225,8 @@ Scope {
 
   function showWifiSelector() {
     bluetoothSelectorVisible = false;
+    if (updateSelectorVisible)
+      hideUpdateSelector();
     volumeOverlayVisible = false;
     brightnessOverlayVisible = false;
     volumeOverlayTimer.stop();
@@ -258,7 +282,7 @@ Scope {
       wifiLoading = true;
       wifiMessage = "";
     }
-    wifiScanProcess.command = ["bash", Quickshell.shellDir + "/wifi-networks.sh",
+    wifiScanProcess.command = ["bash", Quickshell.shellDir + "/scripts/wifi-networks.sh",
       forceRescan ? "yes" : "auto"];
     wifiScanProcess.running = true;
   }
@@ -272,6 +296,8 @@ Scope {
 
   function showBluetoothSelector() {
     wifiSelectorVisible = false;
+    if (updateSelectorVisible)
+      hideUpdateSelector();
     volumeOverlayVisible = false;
     brightnessOverlayVisible = false;
     volumeOverlayTimer.stop();
@@ -322,7 +348,7 @@ Scope {
       bluetoothSelectorMessage = "";
     }
     bluetoothSelectorProcess.command = ["bash",
-      Quickshell.shellDir + "/bluetooth-devices.sh", scan ? "yes" : "no"];
+      Quickshell.shellDir + "/scripts/bluetooth-devices.sh", scan ? "yes" : "no"];
     bluetoothSelectorProcess.running = true;
   }
 
@@ -388,7 +414,7 @@ Scope {
       wifiPendingNetwork = network;
       wifiMessage = "Connecting to " + network.ssid + "…";
       wifiPasswordConnectProcess.command = ["bash",
-        Quickshell.shellDir + "/wifi-connect-password.sh", network.ssid];
+        Quickshell.shellDir + "/scripts/wifi-connect-password.sh", network.ssid];
       wifiPasswordConnectProcess.running = true;
       return;
     }
@@ -421,24 +447,77 @@ Scope {
     }
   }
 
+  function toggleUpdateSelector() {
+    if (updateSelectorVisible)
+      hideUpdateSelector();
+    else
+      showUpdateSelector();
+  }
+
+  function showUpdateSelector() {
+    wifiSelectorVisible = false;
+    bluetoothSelectorVisible = false;
+    volumeOverlayVisible = false;
+    brightnessOverlayVisible = false;
+    volumeOverlayTimer.stop();
+    brightnessOverlayTimer.stop();
+    updateTargetMonitor = Hyprland.focusedMonitor !== null
+      ? Hyprland.focusedMonitor.name : "";
+    updateMorphGentle = true;
+    updateMorphTimer.restart();
+    updateSelectorVisible = true;
+  }
+
+  function hideUpdateSelector() {
+    updateMorphGentle = true;
+    updateMorphTimer.restart();
+    updateSelectorVisible = false;
+  }
+
+  function startNixUpdate() {
+    hideUpdateSelector();
+    Quickshell.execDetached(["ghostty", "-e", "quickshell-update-installer"]);
+  }
+
   function refreshNixStatus() {
     if (!nixStatusProcess.running)
       nixStatusProcess.running = true;
   }
 
   function forceNixStatus() {
-    if (!nixForceProcess.running)
+    if (!nixForceProcess.running) {
+      nixChecking = true;
       nixForceProcess.running = true;
+    }
   }
 
   function parseNixStatus(text) {
     try {
       const status = JSON.parse(text.trim());
-      root.nixIcon = status.alt === "has-updates" ? "" : "";
-      root.nixTooltip = status.tooltip || "System is up to date";
+      if (Array.isArray(status.updates)) {
+        root.nixUpdates = status.updates;
+        root.nixIcon = status.hasUpdates ? "" : "";
+        root.nixTooltip = status.hasUpdates
+          ? status.updates.map(update => update.name + ": " + update.date).join("\n")
+          : status.message || "System is up to date";
+      } else {
+        // Compatibility with the preserved Waybar helper cache format.
+        root.nixIcon = status.alt === "has-updates" ? "" : "";
+        root.nixTooltip = status.tooltip || "System is up to date";
+        const lines = status.alt === "has-updates"
+          ? root.nixTooltip.split("\n").filter(line => line.trim() !== "") : [];
+        root.nixUpdates = lines.map(line => {
+          const separator = line.lastIndexOf(": ");
+          return separator >= 0
+            ? { "name": line.slice(0, separator), "date": line.slice(separator + 2) }
+            : { "name": line, "date": "" };
+        });
+      }
     } catch (error) {
+      root.nixUpdates = [];
       root.nixTooltip = "Unable to check for updates";
     }
+    root.nixChecking = false;
   }
 
   SystemClock {
@@ -452,7 +531,7 @@ Scope {
 
   Process {
     id: systemStatsProcess
-    command: ["bash", Quickshell.shellDir + "/system-stats.sh"]
+    command: ["bash", Quickshell.shellDir + "/scripts/system-stats.sh"]
     running: true
 
     stdout: SplitParser {
@@ -476,7 +555,7 @@ Scope {
 
   Process {
     id: bluetoothSelectorProcess
-    command: ["bash", Quickshell.shellDir + "/bluetooth-devices.sh", "no"]
+    command: ["bash", Quickshell.shellDir + "/scripts/bluetooth-devices.sh", "no"]
 
     stdout: StdioCollector {
       onStreamFinished: {
@@ -509,7 +588,7 @@ Scope {
 
   Process {
     id: wifiScanProcess
-    command: ["bash", Quickshell.shellDir + "/wifi-networks.sh", "auto"]
+    command: ["bash", Quickshell.shellDir + "/scripts/wifi-networks.sh", "auto"]
 
     stdout: StdioCollector {
       onStreamFinished: {
@@ -570,8 +649,7 @@ Scope {
 
   Process {
     id: gpuProcess
-    command: ["gpu-usage-waybar"]
-    environment: ({ "LD_LIBRARY_PATH": "/run/opengl-driver/lib" })
+    command: ["quickshell-gpu-monitor"]
     running: true
 
     stdout: SplitParser {
@@ -589,7 +667,7 @@ Scope {
 
   Process {
     id: weatherProcess
-    command: ["wttrbar", "--nerd"]
+    command: ["quickshell-weather"]
     running: true
 
     stdout: StdioCollector {
@@ -618,7 +696,7 @@ Scope {
 
   Process {
     id: nixStatusProcess
-    command: ["nixos-update-checker"]
+    command: ["quickshell-update-checker"]
     running: true
     stdout: StdioCollector {
       onStreamFinished: root.parseNixStatus(text)
@@ -627,10 +705,16 @@ Scope {
 
   Process {
     id: nixForceProcess
-    command: ["nixos-update-checker", "force"]
+    command: ["quickshell-update-checker", "force"]
     stdout: StdioCollector {
       onStreamFinished: root.parseNixStatus(text)
     }
+  }
+
+  Timer {
+    id: updateMorphTimer
+    interval: 360
+    onTriggered: root.updateMorphGentle = false
   }
 
   Timer {
@@ -673,6 +757,10 @@ Scope {
 
     function toggleBluetooth() {
       root.toggleBluetoothSelector();
+    }
+
+    function toggleUpdates() {
+      root.toggleUpdateSelector();
     }
   }
 }
