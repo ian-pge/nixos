@@ -23,7 +23,6 @@
     hyprpaper
   ];
 
-  services.swayosd.enable = true;
   services.udiskie.enable = true;
   services.playerctld.enable = true;
   services.hyprpolkitagent.package = true;

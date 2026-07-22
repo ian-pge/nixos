@@ -25,7 +25,6 @@
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
       "$menu" = "vicinae toggle";
       "$editor" = "zeditor";
-      "$wifi" = "hyprctl clients | grep -q 'class: dev.me.wifi' || ghostty --class=dev.me.wifi --title=WiFi -e wlctl";
       "$bluetooth" = "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
       "$audio" = "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
       "$settings" = "cosmic-settings";
@@ -152,17 +151,17 @@
       "$mainMod" = "SUPER";
 
       binde = [
-        ",XF86AudioRaiseVolume,exec,swayosd-client --output-volume=raise"
-        ",XF86AudioLowerVolume,exec,swayosd-client --output-volume=lower"
-        ",XF86MonBrightnessUp,exec,swayosd-client --brightness=raise"
-        ",XF86MonBrightnessDown,exec,swayosd-client --brightness=lower"
+        ",XF86AudioRaiseVolume,exec,${pkgs.wireplumber}/bin/wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 2%+; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showVolume"
+        ",XF86AudioLowerVolume,exec,${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 2%-; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showVolume"
+        ",XF86MonBrightnessUp,exec,${pkgs.brightnessctl}/bin/brightnessctl set +5%; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showBrightness"
+        ",XF86MonBrightnessDown,exec,${pkgs.brightnessctl}/bin/brightnessctl set 5%-; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showBrightness"
       ];
 
       bind = [
         ",XF86AudioPlay,exec,playerctl play-pause"
         ",XF86AudioNext,exec,playerctl next"
         ",XF86AudioPrev,exec,playerctl previous"
-        ",XF86AudioMute,exec,swayosd-client --output-volume=mute-toggle"
+        ",XF86AudioMute,exec,${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showVolume"
         ",PRINT,exec,hyprshot -m region -o ~/Pictures/Screenshots"
         "$mainMod,RETURN,exec,$terminal"
         "$mainMod,W,killactive"
@@ -170,7 +169,7 @@
         "$mainMod,P,exec,ghostty --class=dev.me.pi --title=Pi -e pi"
         "$mainMod,F,exec,$fileManager"
         "$mainMod SHIFT,F,exec,$fileManagergraphic"
-        "$mainMod,N,exec,$wifi"
+        "$mainMod,N,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleWifi"
         "$mainMod,B,exec,$bluetooth"
         "$mainMod,Q,exec,zeditor /home/ian/.config/nixos"
         "$mainMod SHIFT,Q,exec,$settings"

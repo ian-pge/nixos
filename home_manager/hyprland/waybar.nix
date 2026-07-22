@@ -3,9 +3,11 @@
   config,
   ...
 }: {
+  # Kept for the helper packages and update scripts below; Quickshell now owns
+  # the complete top bar.
   programs.waybar = {
-    enable = true;
-    systemd.enable = true;
+    enable = false;
+    systemd.enable = false;
 
     ## Main bar configuration ─ straight conversion of your JSON
     settings = {
@@ -30,7 +32,8 @@
           "custom/gpu"
         ];
 
-        modules-center = ["hyprland/workspaces"];
+        # Quickshell now renders the animated workspace switcher.
+        modules-center = [];
 
         modules-right = [
           "upower"
@@ -457,8 +460,8 @@
         # 1. Overwrite the cache with "Up to date" status
         echo '{"text":"", "alt":"updated", "class":"updated", "tooltip":"Just updated"}' > /tmp/nixos-update-status.json
 
-        # 2. Signal Waybar to refresh the module immediately
-        pkill -SIGRTMIN+8 waybar
+        # 2. Ask the Quickshell top bar to refresh the update indicator.
+        qs --config top-bar ipc call topbar refreshNix || true
 
         echo "Icon refreshed."
         read -p "Press Enter to close..."
