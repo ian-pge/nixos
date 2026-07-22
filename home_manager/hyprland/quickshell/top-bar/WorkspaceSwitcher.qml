@@ -5,12 +5,20 @@ Item {
   id: root
 
   property color backgroundColor: "#181926"
+  readonly property real naturalContentWidth: {
+    let total = 0;
+    for (let workspaceId = 1; workspaceId <= 8; workspaceId++) {
+      const workspace = workspaceForId(workspaceId);
+      total += workspace !== null && workspace.focused ? 60 : 40;
+    }
+    return total;
+  }
 
   function workspaceForId(workspaceId) {
     return Hyprland.workspaces.values.find(workspace => workspace.id === workspaceId) ?? null;
   }
 
-  implicitWidth: workspaceRow.implicitWidth + 12
+  implicitWidth: naturalContentWidth + 12
   implicitHeight: 36
 
   Behavior on implicitWidth {
@@ -28,7 +36,7 @@ Item {
     Row {
       id: workspaceRow
       anchors.centerIn: parent
-      spacing: 0
+      spacing: (root.width - root.naturalContentWidth - 12) / 7
 
       Repeater {
         model: 8

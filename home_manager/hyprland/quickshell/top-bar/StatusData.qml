@@ -30,13 +30,28 @@ Scope {
   property int wifiSelectedIndex: 0
   property int wifiSelectionDirection: 1
   property bool wifiLoading: false
+  property bool wifiRefreshSilent: false
   property string wifiMessage: ""
   property string wifiTargetMonitor: ""
   property bool wifiPasswordMode: false
   property string wifiPassword: ""
   property var wifiPendingNetwork: null
+  property bool bluetoothSelectorVisible: false
+  property string bluetoothTargetMonitor: ""
+  property var bluetoothSelectorDevices: []
+  property int bluetoothTab: 0
+  property int bluetoothSelectedIndex: 0
+  property int bluetoothSelectionDirection: 1
+  property bool bluetoothSelectorLoading: false
+  property bool bluetoothSelectorScanning: false
+  property bool bluetoothSelectorRefreshSilent: false
+  property string bluetoothSelectorMessage: ""
+  property string bluetoothAction: ""
 
-  Component.onCompleted: refreshWifiNetworks()
+  Component.onCompleted: {
+    refreshWifiNetworks(false, true);
+    refreshBluetoothSelectorDevices(false, true);
+  }
 
   readonly property var bluetoothAdapter: Bluetooth.defaultAdapter
   readonly property bool bluetoothEnabled: bluetoothAdapter !== null
@@ -72,6 +87,55 @@ Scope {
 
   readonly property string timeText: Qt.formatDateTime(clock.date, "HH:mm")
   readonly property string dateText: Qt.formatDateTime(clock.date, "MMM dd yyyy")
+
+  function batteryIcon() {
+    const percentage = batteryPercent;
+    const charging = battery.state === UPowerDeviceState.Charging
+      || battery.state === UPowerDeviceState.PendingCharge;
+
+    if (battery.state === UPowerDeviceState.FullyCharged)
+      return "󰁹";
+
+    if (charging) {
+      if (percentage <= 10)
+        return "󰂄";
+      if (percentage <= 25)
+        return "󰂆";
+      if (percentage <= 35)
+        return "󰂇";
+      if (percentage <= 45)
+        return "󰂈";
+      if (percentage <= 65)
+        return "󰂉";
+      if (percentage <= 85)
+        return "󰂊";
+      if (percentage <= 95)
+        return "󰂋";
+      return "󰂅";
+    }
+
+    if (battery.state === UPowerDeviceState.Empty || percentage <= 5)
+      return "󰂃";
+    if (percentage <= 15)
+      return "󰁺";
+    if (percentage <= 25)
+      return "󰁻";
+    if (percentage <= 35)
+      return "󰁼";
+    if (percentage <= 45)
+      return "󰁽";
+    if (percentage <= 55)
+      return "󰁾";
+    if (percentage <= 65)
+      return "󰁿";
+    if (percentage <= 75)
+      return "󰂀";
+    if (percentage <= 85)
+      return "󰂁";
+    if (percentage <= 95)
+      return "󰂂";
+    return "󰁹";
+  }
 
   function audioIcon() {
     if (audioMuted)
@@ -113,6 +177,7 @@ Scope {
 
   function showVolumeOverlay() {
     wifiSelectorVisible = false;
+    bluetoothSelectorVisible = false;
     brightnessOverlayVisible = false;
     brightnessOverlayTimer.stop();
     volumeOverlayVisible = true;
@@ -121,6 +186,7 @@ Scope {
 
   function showBrightnessOverlay() {
     wifiSelectorVisible = false;
+    bluetoothSelectorVisible = false;
     volumeOverlayVisible = false;
     volumeOverlayTimer.stop();
     brightnessOverlayVisible = true;
@@ -136,6 +202,7 @@ Scope {
   }
 
   function showWifiSelector() {
+    bluetoothSelectorVisible = false;
     volumeOverlayVisible = false;
     brightnessOverlayVisible = false;
     volumeOverlayTimer.stop();
@@ -143,8 +210,9 @@ Scope {
     wifiTargetMonitor = Hyprland.focusedMonitor !== null
       ? Hyprland.focusedMonitor.name : "";
     wifiSelectorVisible = true;
+    wifiSelectedIndex = 0;
     wifiMessage = "";
-    refreshWifiNetworks();
+    refreshWifiNetworks(false, true);
   }
 
   function hideWifiSelector() {
@@ -182,14 +250,119 @@ Scope {
     wifiMessage = "";
   }
 
-  function refreshWifiNetworks(forceRescan = false) {
+  function refreshWifiNetworks(forceRescan = false, silent = false) {
     if (wifiScanProcess.running)
       return;
-    wifiLoading = true;
-    wifiMessage = "";
+    wifiRefreshSilent = silent;
+    if (!silent) {
+      wifiLoading = true;
+      wifiMessage = "";
+    }
     wifiScanProcess.command = ["bash", Quickshell.shellDir + "/wifi-networks.sh",
       forceRescan ? "yes" : "auto"];
     wifiScanProcess.running = true;
+  }
+
+  function toggleBluetoothSelector() {
+    if (bluetoothSelectorVisible)
+      hideBluetoothSelector();
+    else
+      showBluetoothSelector();
+  }
+
+  function showBluetoothSelector() {
+    wifiSelectorVisible = false;
+    volumeOverlayVisible = false;
+    brightnessOverlayVisible = false;
+    volumeOverlayTimer.stop();
+    brightnessOverlayTimer.stop();
+    bluetoothTargetMonitor = Hyprland.focusedMonitor !== null
+      ? Hyprland.focusedMonitor.name : "";
+    bluetoothSelectorVisible = true;
+    bluetoothTab = 0;
+    bluetoothSelectedIndex = 0;
+    bluetoothSelectorMessage = "";
+    refreshBluetoothSelectorDevices(false, true);
+  }
+
+  function hideBluetoothSelector() {
+    bluetoothSelectorVisible = false;
+    bluetoothSelectorMessage = "";
+  }
+
+  function currentBluetoothDevices() {
+    return bluetoothSelectorDevices.filter(device => bluetoothTab === 0
+      ? device.paired : !device.paired);
+  }
+
+  function moveBluetoothSelection(delta) {
+    const devices = currentBluetoothDevices();
+    if (devices.length === 0)
+      return;
+    bluetoothSelectionDirection = delta >= 0 ? 1 : -1;
+    bluetoothSelectedIndex = (bluetoothSelectedIndex + delta + devices.length)
+      % devices.length;
+    bluetoothSelectorMessage = "";
+  }
+
+  function switchBluetoothTab() {
+    bluetoothTab = bluetoothTab === 0 ? 1 : 0;
+    bluetoothSelectedIndex = 0;
+    bluetoothSelectorMessage = "";
+    refreshBluetoothSelectorDevices(bluetoothTab === 1, bluetoothTab === 0);
+  }
+
+  function refreshBluetoothSelectorDevices(scan, silent = false) {
+    if (bluetoothSelectorProcess.running)
+      return;
+    bluetoothSelectorRefreshSilent = silent;
+    if (!silent) {
+      bluetoothSelectorLoading = true;
+      bluetoothSelectorScanning = scan;
+      bluetoothSelectorMessage = "";
+    }
+    bluetoothSelectorProcess.command = ["bash",
+      Quickshell.shellDir + "/bluetooth-devices.sh", scan ? "yes" : "no"];
+    bluetoothSelectorProcess.running = true;
+  }
+
+  function activateSelectedBluetoothDevice() {
+    if (bluetoothActionProcess.running)
+      return;
+    const devices = currentBluetoothDevices();
+    if (devices.length === 0)
+      return;
+    const device = devices[Math.min(bluetoothSelectedIndex, devices.length - 1)];
+    const connectedNow = Bluetooth.devices.values.some(candidate =>
+      candidate.address === device.address && candidate.connected);
+    bluetoothAction = bluetoothTab === 1
+      ? "pair" : connectedNow ? "disconnect" : "connect";
+    bluetoothSelectorMessage = bluetoothAction === "pair"
+      ? "Pairing with " + device.name + "…"
+      : bluetoothAction === "connect"
+        ? "Connecting to " + device.name + "…"
+        : "Disconnecting " + device.name + "…";
+    bluetoothActionProcess.exec(["bluetoothctl", "--timeout", "20",
+      bluetoothAction, device.address]);
+  }
+
+  function finishBluetoothAction(output) {
+    const result = output.toLowerCase();
+    const failed = result.includes("failed") || result.includes("not available")
+      || result.includes("error");
+    const succeeded = !failed && (result.includes("successful")
+      || result.includes("successfully"));
+
+    if (succeeded) {
+      if (bluetoothAction === "pair") {
+        bluetoothTab = 0;
+        bluetoothSelectedIndex = 0;
+      }
+      bluetoothSelectorMessage = "";
+      refreshBluetoothSelectorDevices(false, true);
+    } else {
+      bluetoothSelectorMessage = "Bluetooth action failed";
+    }
   }
 
   function wifiIsSecured(network) {
@@ -235,7 +408,7 @@ Scope {
   function finishWifiConnection(exitCode, usedPassword) {
     if (exitCode === 0) {
       hideWifiSelector();
-      refreshWifiNetworks();
+      refreshWifiNetworks(false, true);
       return;
     }
 
@@ -302,19 +475,62 @@ Scope {
   }
 
   Process {
+    id: bluetoothSelectorProcess
+    command: ["bash", Quickshell.shellDir + "/bluetooth-devices.sh", "no"]
+
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          root.bluetoothSelectorDevices = JSON.parse(text.trim());
+          const devices = root.currentBluetoothDevices();
+          root.bluetoothSelectedIndex = Math.min(root.bluetoothSelectedIndex,
+            Math.max(0, devices.length - 1));
+        } catch (error) {
+          if (!root.bluetoothSelectorRefreshSilent) {
+            root.bluetoothSelectorDevices = [];
+            root.bluetoothSelectorMessage = "Unable to list devices";
+          }
+        }
+        root.bluetoothSelectorLoading = false;
+        root.bluetoothSelectorScanning = false;
+        root.bluetoothSelectorRefreshSilent = false;
+      }
+    }
+  }
+
+  Process {
+    id: bluetoothActionProcess
+
+    stdout: StdioCollector { id: bluetoothActionOutput }
+    stderr: StdioCollector { id: bluetoothActionError }
+    onExited: (exitCode, exitStatus) => root.finishBluetoothAction(
+      bluetoothActionOutput.text + "\n" + bluetoothActionError.text)
+  }
+
+  Process {
     id: wifiScanProcess
     command: ["bash", Quickshell.shellDir + "/wifi-networks.sh", "auto"]
 
     stdout: StdioCollector {
       onStreamFinished: {
         try {
-          root.wifiNetworks = JSON.parse(text.trim());
-          root.wifiSelectedIndex = 0;
+          const selectedSsid = root.wifiNetworks.length > 0
+            ? root.wifiNetworks[Math.min(root.wifiSelectedIndex,
+              root.wifiNetworks.length - 1)].ssid : "";
+          const networks = JSON.parse(text.trim());
+          root.wifiNetworks = networks;
+          const refreshedIndex = networks.findIndex(network =>
+            network.ssid === selectedSsid);
+          root.wifiSelectedIndex = root.wifiRefreshSilent && refreshedIndex >= 0
+            ? refreshedIndex : 0;
         } catch (error) {
-          root.wifiNetworks = [];
-          root.wifiMessage = "Unable to scan networks";
+          if (!root.wifiRefreshSilent) {
+            root.wifiNetworks = [];
+            root.wifiMessage = "Unable to scan networks";
+          }
         }
         root.wifiLoading = false;
+        root.wifiRefreshSilent = false;
       }
     }
   }
@@ -453,6 +669,10 @@ Scope {
 
     function toggleWifi() {
       root.toggleWifiSelector();
+    }
+
+    function toggleBluetooth() {
+      root.toggleBluetoothSelector();
     }
   }
 }

@@ -17,8 +17,15 @@ PanelWindow {
   property bool tooltipVisible: false
   readonly property var hyprlandMonitor: Hyprland.monitorFor(window.screen)
   readonly property bool wifiSelectorActive: statusData.wifiSelectorVisible
+  readonly property bool bluetoothSelectorActive: statusData.bluetoothSelectorVisible
+  readonly property bool wifiSelectorKeyboardActive: wifiSelectorActive
     && hyprlandMonitor !== null
     && hyprlandMonitor.name === statusData.wifiTargetMonitor
+  readonly property bool bluetoothSelectorKeyboardActive: bluetoothSelectorActive
+    && hyprlandMonitor !== null
+    && hyprlandMonitor.name === statusData.bluetoothTargetMonitor
+  readonly property bool keyboardSelectorActive: wifiSelectorKeyboardActive
+    || bluetoothSelectorKeyboardActive
 
   screen: modelData
 
@@ -39,7 +46,7 @@ PanelWindow {
   exclusionMode: ExclusionMode.Auto
   aboveWindows: true
   WlrLayershell.namespace: "quickshell-top-bar"
-  WlrLayershell.keyboardFocus: wifiSelectorActive
+  WlrLayershell.keyboardFocus: keyboardSelectorActive
     ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
   Component.onCompleted: entered = true
@@ -118,7 +125,8 @@ PanelWindow {
       accent: "#8aadf4"
       tooltipText: statusData.bluetoothTooltip
       tooltipHost: window
-      leftCommand: "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui"
+      interactive: true
+      onLeftClicked: statusData.toggleBluetoothSelector()
     }
 
     Pill {
@@ -152,10 +160,12 @@ PanelWindow {
     id: centerMorph
     readonly property bool overlayVisible: statusData.volumeOverlayVisible
       || statusData.brightnessOverlayVisible || window.wifiSelectorActive
+      || window.bluetoothSelectorActive
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.verticalCenter: parent.verticalCenter
     width: window.wifiSelectorActive ? wifiSelector.implicitWidth
+      : window.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
       : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
     height: 36
     radius: 18
@@ -174,9 +184,9 @@ PanelWindow {
 
     Behavior on width {
       NumberAnimation {
-        duration: 480
+        duration: 300
         easing.type: Easing.OutBack
-        easing.overshoot: 0.8
+        easing.overshoot: 5.5
       }
     }
 
@@ -189,7 +199,6 @@ PanelWindow {
       opacity: centerMorph.overlayVisible ? 0 : 1
       enabled: !centerMorph.overlayVisible
 
-      Behavior on opacity { NumberAnimation { duration: 180 } }
     }
 
     VolumeIndicator {
@@ -199,7 +208,6 @@ PanelWindow {
       opacity: statusData.volumeOverlayVisible ? 1 : 0
       enabled: statusData.volumeOverlayVisible
 
-      Behavior on opacity { NumberAnimation { duration: 180 } }
     }
 
     BrightnessIndicator {
@@ -209,7 +217,6 @@ PanelWindow {
       opacity: statusData.brightnessOverlayVisible ? 1 : 0
       enabled: statusData.brightnessOverlayVisible
 
-      Behavior on opacity { NumberAnimation { duration: 180 } }
     }
 
     WifiSelector {
@@ -217,9 +224,17 @@ PanelWindow {
       anchors.fill: parent
       statusData: window.statusData
       opacity: window.wifiSelectorActive ? 1 : 0
-      enabled: window.wifiSelectorActive
+      enabled: window.wifiSelectorKeyboardActive
 
-      Behavior on opacity { NumberAnimation { duration: 180 } }
+    }
+
+    BluetoothSelector {
+      id: bluetoothSelector
+      anchors.fill: parent
+      statusData: window.statusData
+      opacity: window.bluetoothSelectorActive ? 1 : 0
+      enabled: window.bluetoothSelectorKeyboardActive
+
     }
   }
 
@@ -242,7 +257,7 @@ PanelWindow {
 
     Pill {
       visible: statusData.batteryAvailable
-      text: " " + statusData.batteryPercent + "%"
+      text: statusData.batteryIcon() + " " + statusData.batteryPercent + "%"
       accent: "#f4dbd6"
     }
 

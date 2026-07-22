@@ -25,7 +25,6 @@
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
       "$menu" = "vicinae toggle";
       "$editor" = "zeditor";
-      "$bluetooth" = "pgrep -x bluetui >/dev/null 2>&1 || ghostty --class=dev.me.bluetooth --title=Bluetooth -e bluetui";
       "$audio" = "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
       "$settings" = "cosmic-settings";
 
@@ -170,7 +169,7 @@
         "$mainMod,F,exec,$fileManager"
         "$mainMod SHIFT,F,exec,$fileManagergraphic"
         "$mainMod,N,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleWifi"
-        "$mainMod,B,exec,$bluetooth"
+        "$mainMod,B,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleBluetooth"
         "$mainMod,Q,exec,zeditor /home/ian/.config/nixos"
         "$mainMod SHIFT,Q,exec,$settings"
         "$mainMod,R,exec,$audio"
