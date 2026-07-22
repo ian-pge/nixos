@@ -1,0 +1,8 @@
+## Review
+- **Correct:** Same-mode deduplication generally works through `StatusData.qml:497-511`; repeated volume, brightness, media, launcher, or update events do not increment the transition serial.
+- **Correct:** Ordinary transitions overlap source and destination during progress `0.18–0.48` (`Bar.qml:250-268`).
+- **Correct:** Cross-monitor localization maps non-local overlays to workspaces (`Bar.qml:231-234`), producing an exit on the old monitor and entry on the new monitor.
+- **Correct:** Equal-height modes use direction `0`, preserving a zero offset while still cross-fading (`Bar.qml:322-329`).
+- **Blocker:** Repeated `showWifiSelector()` and `showBluetoothSelector()` calls are not actually deduplicated. After `beginCenterTransition()` returns false for the unchanged mode, each function hides itself (`StatusData.qml:695-711`, especially line 698; `StatusData.qml:805-820`, especially line 808). The hide path then creates and finishes a transition to workspaces (`StatusData.qml:714-726`, `823-831`). The selector is subsequently made visible again without another serial change, leaving the visual transition targeting workspaces and potentially making the active selector invisible.
+- **Blocker:** Rapid sequences involving four modes can still snap a visible old layer. `startContentTransition()` retains only the single highest-opacity residual (`Bar.qml:299-315`) before replacing all three visual roles (`Bar.qml:318-321`). If two excluded prior layers still have nonzero opacity, the unselected one immediately loses every role and `contentOpacity()` returns zero. Thus sufficiently rapid `A→B→C→D` changes are not continuity-safe.
+- **Note:** No obvious QML syntax error was found by inspection, but no runtime QML load was performed.

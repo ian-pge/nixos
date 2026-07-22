@@ -130,8 +130,8 @@ Item {
 
             Behavior on scale {
               NumberAnimation {
-                duration: 220
-                easing.type: Easing.OutBack
+                duration: 180
+                easing.type: Easing.OutCubic
               }
             }
           }

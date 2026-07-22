@@ -252,6 +252,7 @@
         "llm-agents": "llm-agents",
         "nix-flatpak": "nix-flatpak",
         "nixpkgs": "nixpkgs_2",
+        "tabctl": "tabctl",
         "wlctl": "wlctl"
       }
     },
@@ -267,6 +268,22 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "tabctl": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1783746893,
+        "narHash": "sha256-ryv17YcTSTvwRwBTIv3AX1WiOnUsfO6qM8GoxklWrUs=",
+        "owner": "slastra",
+        "repo": "tabctl",
+        "rev": "2660ae01aa54fba2e0e22660b80bf05bdb380229",
+        "type": "github"
+      },
+      "original": {
+        "owner": "slastra",
+        "repo": "tabctl",
         "type": "github"
       }
     },

@@ -4,6 +4,7 @@ Rectangle {
   id: root
 
   required property var statusData
+  property string targetMonitor: ""
   readonly property real level: Math.max(0, Math.min(1, statusData.audioVolume / 100))
   property real displayedLevel: level
 
@@ -11,8 +12,6 @@ Rectangle {
   implicitHeight: 36
   radius: 18
   color: "#181926"
-
-  onLevelChanged: iconPulse.restart()
 
   Behavior on displayedLevel {
     NumberAnimation {
@@ -27,7 +26,7 @@ Rectangle {
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
     text: statusData.audioIcon()
-    color: statusData.audioMuted ? "#ed8796" : "#b7bdf8"
+    color: statusData.audioMuted ? "#ffcc33" : "#ff33cc"
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
@@ -53,7 +52,7 @@ Rectangle {
       width: track.width * root.displayedLevel
       height: parent.height
       radius: 4
-      color: statusData.audioMuted ? "#ed8796" : "#b7bdf8"
+      color: statusData.audioMuted ? "#ffcc33" : "#ff33cc"
 
       Behavior on color {
         ColorAnimation { duration: 180 }
@@ -70,24 +69,6 @@ Rectangle {
     }
   }
 
-  SequentialAnimation {
-    id: iconPulse
-    NumberAnimation {
-      target: volumeIcon
-      property: "scale"
-      to: 1.22
-      duration: 90
-      easing.type: Easing.OutCubic
-    }
-    NumberAnimation {
-      target: volumeIcon
-      property: "scale"
-      to: 1
-      duration: 150
-      easing.type: Easing.OutBack
-    }
-  }
-
   MouseArea {
     anchors.fill: parent
     onWheel: wheel => {
@@ -95,7 +76,7 @@ Rectangle {
         statusData.setVolume(0.02);
       else if (wheel.angleDelta.y < 0)
         statusData.setVolume(-0.02);
-      statusData.showVolumeOverlay();
+      statusData.showVolumeOverlay(root.targetMonitor);
     }
   }
 }

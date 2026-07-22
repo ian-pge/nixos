@@ -1,0 +1,128 @@
+{
+  "runId": "58cd7ed4",
+  "agent": "reviewer",
+  "task": "READ-ONLY final focused validation after fixes. Inspect current Bar.qml and StatusData.qml. Verify: all overlays except workspaces render only on their target monitor; keyboard and per-monitor click/wheel activation choose the correct monitor; moving open Wi-Fi/Bluetooth to another monitor performs full cleanup while preserving in-flight Bluetooth native action state; deferred Wi-Fi scans cannot resurrect; all widget show functions end mutually exclusive; top anchoring prevents tall→short content drift. Do not edit. Report blockers/medium issues only, or CLEAN.",
+  "exitCode": 0,
+  "usage": {
+    "input": 34534,
+    "output": 2619,
+    "cacheRead": 29184,
+    "cacheWrite": 0,
+    "cost": 0.26583199999999996,
+    "turns": 4
+  },
+  "model": "openai-codex/gpt-5.6-sol:xhigh",
+  "attemptedModels": [
+    "openai-codex/gpt-5.6-sol:xhigh"
+  ],
+  "modelAttempts": [
+    {
+      "model": "openai-codex/gpt-5.6-sol:xhigh",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 34534,
+        "output": 2619,
+        "cacheRead": 29184,
+        "cacheWrite": 0,
+        "cost": 0.26583199999999996,
+        "turns": 4
+      }
+    }
+  ],
+  "durationMs": 57828,
+  "toolCount": 9,
+  "acceptance": {
+    "status": "attested",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "attested",
+      "explicit": false,
+      "inferredReason": [
+        "read-only/reviewer-style agent"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Return concrete findings with file paths and severity when applicable",
+          "evidence": [
+            "review-findings",
+            "residual-risks"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "review-findings",
+        "residual-risks"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "read-only/reviewer-style agent"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Return concrete findings with file paths and severity when applicable",
+        "evidence": [
+          "review-findings",
+          "residual-risks"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Bar.qml:19-42,185-340 scopes rendering and keyboard focus by target monitor; StatusData.qml:460-725 provides monitor resolution, mutual exclusion, Wi-Fi cleanup/generation guards, and Bluetooth action preservation."
+        }
+      ],
+      "changedFiles": [],
+      "testsAddedOrUpdated": [],
+      "commandsRun": [
+        {
+          "command": "git status --short; git diff HEAD -- Bar.qml StatusData.qml",
+          "result": "passed",
+          "summary": "Inspected repository state and complete focused diff."
+        },
+        {
+          "command": "nl -ba Bar.qml StatusData.qml with focused ranges",
+          "result": "passed",
+          "summary": "Verified monitor predicates, activation paths, cleanup, mutual exclusion, and top anchors."
+        },
+        {
+          "command": "qmllint Bar.qml StatusData.qml",
+          "result": "failed",
+          "summary": "qmllint was unavailable in the environment."
+        }
+      ],
+      "validationOutput": [
+        "Bar.qml:22-42 gates every non-workspace overlay and exclusive keyboard focus by its target monitor.",
+        "Bar.qml:121-154 and 397-413 pass the originating monitor for per-monitor clicks and wheel events.",
+        "StatusData.qml:460-467 resolves keyboard/IPC calls to the focused monitor.",
+        "StatusData.qml:610-703 fully resets Wi-Fi state and uses visibility plus generation checks to prevent deferred scan resurrection.",
+        "StatusData.qml:713-733 cleans up Bluetooth presentation/discovery while retaining bluetoothActionDevice, bluetoothAction, and its timer.",
+        "StatusData.qml:477-492, 497-507, 567-600, 610-624, 713-726, and 899-908 preserve overlay mutual exclusion.",
+        "Bar.qml:202-205 and 237-340 top-anchor the morph container and all content, preventing tall-to-short vertical drift."
+      ],
+      "residualRisks": [
+        "No live multi-monitor Quickshell session was available; validation was static.",
+        "QML linting could not run because qmllint was unavailable."
+      ],
+      "noStagedFiles": false,
+      "diffSummary": "Read-only focused validation of current Bar.qml and StatusData.qml; no files changed.",
+      "reviewFindings": [
+        "no blockers or medium issues"
+      ],
+      "manualNotes": "Repository already contains staged and unstaged changes unrelated to this read-only review."
+    }
+  },
+  "transcriptPath": "/home/ian/.config/nixos/.pi-subagents/artifacts/58cd7ed4_reviewer_0_transcript.jsonl",
+  "timestamp": 1784744085857
+}

@@ -1,0 +1,5 @@
+## Review
+- **Medium:** `StatusData.qml:602-623` — moving an open Wi‑Fi selector to another monitor calls `showWifiSelector()` without `hideWifiSelector()`. Selection and message reset, but password mode, entered password, pending network, and connection timer remain (`StatusData.qml:625-633`). This can associate an old password/pending operation with the newly selected SSID or leave the moved selector apparently idle but unable to connect.
+- **Medium:** `StatusData.qml:704-723` — moving an open Bluetooth selector to another monitor also bypasses `hideBluetoothSelector()`. If the old selector is on the Nearby tab, `bluetoothTab` resets to paired devices while discovery continues invisibly until its timer expires. The relevant cleanup exists at `StatusData.qml:726-755`. Ongoing native connect/pair/disconnect actions are correctly preserved by that cleanup.
+
+No blockers found.

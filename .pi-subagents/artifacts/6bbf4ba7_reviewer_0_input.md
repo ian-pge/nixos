@@ -1,0 +1,3 @@
+# Task for reviewer
+
+Read-only re-review after fixing the interrupted-animation issue in /home/ian/.config/nixos/home_manager/hyprland/quickshell/top-bar/Bar.qml. Verify the fixed 8px two-stage width/height bounce is lifecycle-safe, handles rapid/equal target changes, yields exactly target +/- 8px in direction of movement on both opening and closing, and avoids the previous proportional app-launcher collapse. Also check DESIGN_GUIDE matches. Do not edit or stage files. Report only remaining concrete issues; if none, say none.

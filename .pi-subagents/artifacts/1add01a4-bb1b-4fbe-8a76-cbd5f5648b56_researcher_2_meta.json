@@ -1,0 +1,108 @@
+{
+  "runId": "1add01a4-bb1b-4fbe-8a76-cbd5f5648b56",
+  "agent": "researcher",
+  "task": "Compare Hyprland v0.55.4 specialWorkspace slidevert animation implementation/timing with Qt Quick client-side animation. Inspect exact source paths for render offset updates and compositor scheduling. Explain why compositor-native motion may look smoother and which aspects can/cannot be replicated in Quickshell. Return GitHub permalinks and practical implications; do not edit files.\n\n---\n**Output:**\nWrite your findings to exactly this path: /home/ian/.config/nixos/.pi-subagents/artifacts/outputs/1add01a4-bb1b-4fbe-8a76-cbd5f5648b56/hyprland-animation-research.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: attested\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Return concrete findings with file paths and severity when applicable\n\nRequired evidence: review-findings, residual-risks\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.\n`commandsRun[].result` must be exactly one of: passed, failed, not-run.\n`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "openai-codex/gpt-5.6-sol:medium",
+  "attemptedModels": [
+    "openai-codex/gpt-5.6-sol:medium"
+  ],
+  "modelAttempts": [
+    {
+      "model": "openai-codex/gpt-5.6-sol:medium",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 103682,
+        "output": 6827,
+        "cacheRead": 778752,
+        "cacheWrite": 0,
+        "cost": 1.1125960000000001,
+        "turns": 14
+      }
+    }
+  ],
+  "acceptance": {
+    "status": "attested",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "attested",
+      "explicit": false,
+      "inferredReason": [
+        "read-only/reviewer-style agent"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Return concrete findings with file paths and severity when applicable",
+          "evidence": [
+            "review-findings",
+            "residual-risks"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "review-findings",
+        "residual-risks"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "read-only/reviewer-style agent"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Return concrete findings with file paths and severity when applicable",
+        "evidence": [
+          "review-findings",
+          "residual-risks"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Concrete severity-tagged findings identify src/managers/animation/DesktopAnimationManager.cpp, src/managers/animation/AnimationManager.cpp, src/desktop/Workspace.cpp, src/render/Renderer.cpp, and src/helpers/MonitorFrameScheduler.cpp with immutable GitHub permalinks; residual risks are explicitly listed."
+        }
+      ],
+      "changedFiles": [],
+      "testsAddedOrUpdated": [],
+      "commandsRun": [
+        {
+          "command": "read-only source inspection of Hyprland v0.55.4 tag and authoritative Qt/Quickshell documentation",
+          "result": "passed",
+          "summary": "Resolved v0.55.4 to immutable commit a0136d8c04687bb36eb8a28eb9d1ff92aea99704 and inspected animation, renderer, and scheduler paths."
+        }
+      ],
+      "validationOutput": [
+        "Verified v0.55.4 tag SHA via GitHub API.",
+        "Verified slidevert endpoints, special-workspace alpha, animated-variable update path, damage/frame request, render-time offset consumption, and monitor frame scheduling in tagged source.",
+        "Verified Qt threaded/basic animation-driver behavior and multi-window fallback in official Qt documentation."
+      ],
+      "residualRisks": [
+        "User-specific animation leaf speed and Bézier were not provided.",
+        "No empirical frame-time benchmark was run on the target GPU/monitor topology.",
+        "Exact pinned hyprutils getCurveStep implementation was not line-inspected."
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "Research-only output; no repository files were edited.",
+      "reviewFindings": [
+        "high capability boundary: Quickshell cannot atomically transform arbitrary workspace clients or control Hyprland output scheduling.",
+        "medium practical mismatch: client rendering/Wayland commit adds a scheduling boundary and Qt may use timer-driven animation with multiple QQuickWindows.",
+        "no blockers in the inspected Hyprland implementation; limitations are architectural rather than a source defect."
+      ],
+      "manualNotes": "The requested research artifact was written to the runtime-authoritative output path; the NixOS repository itself was not modified."
+    }
+  },
+  "transcriptPath": "/home/ian/.config/nixos/.pi-subagents/artifacts/1add01a4-bb1b-4fbe-8a76-cbd5f5648b56_researcher_2_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1784753997606
+}

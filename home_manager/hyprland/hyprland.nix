@@ -23,7 +23,7 @@
       "$fileManager" = "ghostty --class=dev.me.file --title=File -e /home/ian/.nix-profile/bin/yazi-open";
       "$fileManagergraphic" = "nautilus";
       "$calculator" = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
-      "$menu" = "vicinae toggle";
+      "$menu" = "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleLauncher";
       "$editor" = "zeditor";
       "$audio" = "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
       "$settings" = "cosmic-settings";
@@ -175,7 +175,7 @@
         "$mainMod SHIFT,Q,exec,$settings"
         "$mainMod,R,exec,$audio"
         "$mainMod,A,exec,$menu"
-        "$mainMod,code:47,exec,vicinae deeplink vicinae://launch/browser-extension/browse-tabs?toggle=true"
+        "$mainMod,code:47,exec,${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleChromeTabs"
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,layoutmsg,togglesplit"
         "$mainMod,G,exec,$browser"

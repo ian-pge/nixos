@@ -1,0 +1,111 @@
+{
+  "runId": "efca6e0c-3844-412a-808d-0ff3a47d848f",
+  "agent": "researcher",
+  "task": "Research direct, Vicinae-free ways for a Linux desktop/Quickshell launcher to enumerate and activate tabs in a running Google Chrome. Compare official Chrome extension tabs API + native messaging, Chrome DevTools Protocol/remote debugging (including Chrome 136+ default-profile restrictions), session/profile file parsing, accessibility/window APIs, and any supported desktop interfaces. Prioritize official Chrome/Chromium docs and current 2025-2026 behavior. Return a recommendation, security/deployment tradeoffs, and source URLs. Do not edit files.\n\n---\n**Output:**\nWrite your findings to exactly this path: /home/ian/.config/nixos/.pi-subagents/artifacts/outputs/efca6e0c-3844-412a-808d-0ff3a47d848f/chrome-tabs-direct-research.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: attested\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Return concrete findings with file paths and severity when applicable\n\nRequired evidence: review-findings, residual-risks\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.\n`commandsRun[].result` must be exactly one of: passed, failed, not-run.\n`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "openai-codex/gpt-5.6-sol:medium",
+  "attemptedModels": [
+    "openai-codex/gpt-5.6-sol:medium"
+  ],
+  "modelAttempts": [
+    {
+      "model": "openai-codex/gpt-5.6-sol:medium",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 67744,
+        "output": 7356,
+        "cacheRead": 368640,
+        "cacheWrite": 0,
+        "cost": 0.7437200000000002,
+        "turns": 13
+      }
+    }
+  ],
+  "acceptance": {
+    "status": "attested",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "attested",
+      "explicit": false,
+      "inferredReason": [
+        "read-only/reviewer-style agent"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Return concrete findings with file paths and severity when applicable",
+          "evidence": [
+            "review-findings",
+            "residual-risks"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "review-findings",
+        "residual-risks"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "read-only/reviewer-style agent"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Return concrete findings with file paths and severity when applicable",
+        "evidence": [
+          "review-findings",
+          "residual-risks"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Concrete review findings include severity and affected paths (`<profile>/Sessions`, `EncryptedSessions`, the native-host manifest, and `$XDG_RUNTIME_DIR/chrome-tabs.sock`); residual risks are listed under Gaps and residual risks."
+        }
+      ],
+      "changedFiles": [
+        "/home/ian/.config/nixos/.pi-subagents/artifacts/outputs/efca6e0c-3844-412a-808d-0ff3a47d848f/chrome-tabs-direct-research.md"
+      ],
+      "testsAddedOrUpdated": [],
+      "commandsRun": [
+        {
+          "command": "Focused web research against Chrome for Developers, Chromium source, Chrome DevTools Protocol, GNOME AT-SPI, and freedesktop EWMH documentation",
+          "result": "passed",
+          "summary": "Primary sources were searched and the most relevant full documents were inspected; no repository commands or tests were run."
+        }
+      ],
+      "validationOutput": [
+        "Compared extension/native messaging, CDP including Chrome 136+ and 144+ behavior, session files, AT-SPI/window APIs, and desktop interfaces.",
+        "Included recommendation, security/deployment tradeoffs, source URLs, severity/path findings, and residual risks."
+      ],
+      "residualRisks": [
+        "AT-SPI tab-strip behavior requires build-specific manual validation.",
+        "Chrome 144 auto-connect is documented for DevTools MCP, not a stable generic launcher transport.",
+        "Encrypted-session rollout and multi-profile/incognito coordination vary by build and configuration."
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "Created only the required research artifact; no NixOS or project source files were edited.",
+      "reviewFindings": [
+        "high: <profile>/Sessions or <profile>/EncryptedSessions - unsupported periodic/versioned data and no supported live activation mapping",
+        "high: Chrome launch configuration - Chrome 136+ blocks remote-debugging switches for the default data directory; a custom debug profile has broad takeover risk",
+        "medium: ~/.config/google-chrome/NativeMessagingHosts/<host>.json - pin allowed_origins and an immutable absolute executable path",
+        "medium: $XDG_RUNTIME_DIR/chrome-tabs.sock - require mode 0600, same-UID checks, bounded frames, and a narrow command allowlist",
+        "low: extension service worker - reconnect and re-query because cached tab IDs/state are session-local"
+      ],
+      "manualNotes": "Recommendation: Manifest V3 tabs API plus a native-messaging broker over a private Unix socket; use CDP only for an explicitly dedicated debug profile."
+    }
+  },
+  "transcriptPath": "/home/ian/.config/nixos/.pi-subagents/artifacts/efca6e0c-3844-412a-808d-0ff3a47d848f_researcher_0_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1784756326231
+}

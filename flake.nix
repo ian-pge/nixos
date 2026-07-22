@@ -29,6 +29,10 @@
       url = "github:Zeus-Deus/gazelle-tui";
       flake = false;
     };
+    tabctl = {
+      url = "github:slastra/tabctl";
+      flake = false;
+    };
   };
 
   outputs = inputs @ {

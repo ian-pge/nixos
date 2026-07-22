@@ -1,0 +1,108 @@
+{
+  "runId": "1add01a4-bb1b-4fbe-8a76-cbd5f5648b56",
+  "agent": "researcher",
+  "task": "Investigate Qt 6 / Qt Quick animation frame pacing on Wayland, especially multiple windows on mixed-refresh monitors (120 Hz + 165 Hz), QML NumberAnimation/Behavior, threaded render loop, animation driver, and known causes of apparent low FPS versus compositor-native animations. Prioritize Qt official docs, bug reports, source code, Quickshell documentation/issues. Return evidence-backed likely causes, diagnostic environment variables, and fixes/workarounds with URLs. Do not edit files.\n\n---\n**Output:**\nWrite your findings to exactly this path: /home/ian/.config/nixos/.pi-subagents/artifacts/outputs/1add01a4-bb1b-4fbe-8a76-cbd5f5648b56/qt-frame-pacing-research.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: attested\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Return concrete findings with file paths and severity when applicable\n\nRequired evidence: review-findings, residual-risks\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.\n`commandsRun[].result` must be exactly one of: passed, failed, not-run.\n`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "openai-codex/gpt-5.6-sol:medium",
+  "attemptedModels": [
+    "openai-codex/gpt-5.6-sol:medium"
+  ],
+  "modelAttempts": [
+    {
+      "model": "openai-codex/gpt-5.6-sol:medium",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 90329,
+        "output": 7850,
+        "cacheRead": 396800,
+        "cacheWrite": 0,
+        "cost": 0.885545,
+        "turns": 10
+      }
+    }
+  ],
+  "acceptance": {
+    "status": "attested",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "attested",
+      "explicit": false,
+      "inferredReason": [
+        "read-only/reviewer-style agent"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Return concrete findings with file paths and severity when applicable",
+          "evidence": [
+            "review-findings",
+            "residual-risks"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "review-findings",
+        "residual-risks"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "read-only/reviewer-style agent"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Return concrete findings with file paths and severity when applicable",
+        "evidence": [
+          "review-findings",
+          "residual-risks"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Artifact contains severity-ranked findings with upstream file paths, official Qt/Wayland/Quickshell citations, diagnostics, workarounds, and residual risks."
+        }
+      ],
+      "changedFiles": [],
+      "testsAddedOrUpdated": [],
+      "commandsRun": [
+        {
+          "command": "No shell commands run (web/source research only)",
+          "result": "not-run",
+          "summary": "Cross-checked official documentation, current upstream source, bug reports, and Quickshell resources."
+        }
+      ],
+      "validationOutput": [
+        "Confirmed Qt's multi-QQuickWindow timer fallback against official documentation and qtdeclarative source.",
+        "Confirmed Quickshell per-screen window pattern and maintainer guidance against project documentation/issues."
+      ],
+      "residualRisks": [
+        "No trace or reproducer from the target 120 Hz + 165 Hz system was available.",
+        "Exact behavior depends on Qt version, compositor, RHI/GPU driver, VRR, primary output, and visible-window count."
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "No repository files edited; research artifact only.",
+      "reviewFindings": [
+        "critical: Multiple visible QQuickWindows cause ordinary QML animations to fall back to an approximately 16 ms timer, producing apparent ~60 FPS motion.",
+        "high: qtdeclarative/src/quick/scenegraph/qsgcontext.cpp derives the default driver interval from the primary screen.",
+        "high: Quickshell commonly creates one PanelWindow per screen, activating Qt's multi-window path.",
+        "high: Quickshell maintainer confirms dynamic native-window resizing causes stutter.",
+        "medium: Per-window Wayland frame callbacks create pacing differences from compositor-native transforms."
+      ],
+      "manualNotes": "The output artifact is outside the reviewed NixOS source tree."
+    }
+  },
+  "transcriptPath": "/home/ian/.config/nixos/.pi-subagents/artifacts/1add01a4-bb1b-4fbe-8a76-cbd5f5648b56_researcher_0_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1784754029848
+}

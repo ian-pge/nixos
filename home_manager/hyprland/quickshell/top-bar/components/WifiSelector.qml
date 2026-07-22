@@ -137,7 +137,7 @@ FocusScope {
         return root.signalIcon(root.selectedNetwork.strength);
       return "󰤭";
     }
-    color: "#ee99a0"
+    color: "#ff33cc"
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
@@ -161,7 +161,7 @@ FocusScope {
     height: 7
     radius: 3.5
     color: root.selectedNetwork !== null && root.selectedNetwork.active
-      ? "#a6da95" : "#6e738d"
+      ? "#ffcc33" : "#6e738d"
   }
 
   Item {

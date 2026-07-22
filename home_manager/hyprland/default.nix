@@ -7,6 +7,7 @@
     ./gtk.nix
     ./additional_packages.nix
     ./quickshell.nix
+    ./tabctl.nix
     ./hyprpaper.nix
     ./ghostty.nix
     ./catppuccin.nix

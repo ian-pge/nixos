@@ -6,36 +6,12 @@ FocusScope {
   required property var statusData
   readonly property var updates: statusData.nixUpdates
   readonly property int rowCount: Math.max(1, updates.length)
-  property bool presented: false
-  property real contentOffset: 0
-
   implicitWidth: 480
   implicitHeight: 52 + rowCount * 30 + 10
 
   onEnabledChanged: {
     if (enabled)
       Qt.callLater(() => root.forceActiveFocus());
-  }
-
-  onPresentedChanged: {
-    if (presented) {
-      contentOffset = -18;
-      contentBounce.restart();
-    } else {
-      contentBounce.stop();
-      contentOffset = 0;
-    }
-  }
-
-  NumberAnimation {
-    id: contentBounce
-    target: root
-    property: "contentOffset"
-    from: -18
-    to: 0
-    duration: 300
-    easing.type: Easing.OutBack
-    easing.overshoot: 1.8
   }
 
   Keys.onPressed: event => {
@@ -52,11 +28,7 @@ FocusScope {
   }
 
   Item {
-    id: animatedContent
     anchors.fill: parent
-    transform: Translate {
-      y: root.contentOffset
-    }
 
     Text {
       id: updateIcon
@@ -68,7 +40,8 @@ FocusScope {
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: statusData.nixChecking ? "󰑐" : updates.length > 0 ? "" : ""
-      color: updates.length > 0 ? "#f0c6c6" : "#a6da95"
+      color: statusData.nixChecking ? "#ffcc33"
+        : updates.length > 0 ? "#ff33cc" : "#ffcc33"
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
@@ -104,8 +77,8 @@ FocusScope {
       verticalAlignment: Text.AlignVCenter
       text: statusData.nixChecking ? "CHECKING"
         : updates.length > 0 ? updates.length + " AVAILABLE" : "UP TO DATE"
-      color: statusData.nixChecking ? "#eed49f"
-        : updates.length > 0 ? "#f0c6c6" : "#a6da95"
+      color: statusData.nixChecking ? "#ffcc33"
+        : updates.length > 0 ? "#ff33cc" : "#ffcc33"
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 11
       font.bold: true
@@ -195,7 +168,7 @@ FocusScope {
           : statusData.nixTooltip === "Unable to check for updates"
             ? statusData.nixTooltip : "System is up to date"
         color: statusData.nixTooltip === "Unable to check for updates"
-          ? "#ed8796" : "#939ab7"
+          ? "#ff33cc" : "#939ab7"
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 13
         font.bold: true

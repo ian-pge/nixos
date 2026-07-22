@@ -104,7 +104,7 @@ FocusScope {
     anchors.verticalCenter: parent.verticalCenter
     text: statusData.bluetoothSelectorScanning ? "󰑐"
       : root.selectedDeviceConnected ? "󰂯" : "󰂲"
-    color: "#8aadf4"
+    color: "#ff33cc"
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
@@ -127,8 +127,8 @@ FocusScope {
     width: 7
     height: 7
     radius: 3.5
-    color: root.selectedDeviceConnected ? "#a6da95"
-      : root.selectedDevice !== null && root.selectedDevice.paired ? "#8aadf4" : "#6e738d"
+    color: root.selectedDeviceConnected ? "#ffcc33"
+      : root.selectedDevice !== null && root.selectedDevice.paired ? "#ff33cc" : "#6e738d"
   }
 
   Item {
@@ -201,7 +201,7 @@ FocusScope {
       text: statusData.bluetoothTab === 0 ? "PAIRED" : "NEARBY"
       height: 18
       verticalAlignment: Text.AlignVCenter
-      color: statusData.bluetoothTab === 0 ? "#8aadf4" : "#c6a0f6"
+      color: statusData.bluetoothTab === 0 ? "#ff33cc" : "#ffcc33"
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 11
       font.bold: true

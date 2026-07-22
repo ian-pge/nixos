@@ -8,12 +8,12 @@ La barre doit donner l’impression d’être un seul système animé, pas une c
 
 Principes fondamentaux :
 
-- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, luminosité, média MPRIS, Wi-Fi, Bluetooth et mises à jour.
-- Les changements de taille utilisent un rebond court et visible.
-- Le contenu change instantanément : **pas de fondu entre les widgets**.
+- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, luminosité, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth et mises à jour.
+- Les changements de taille utilisent une interpolation monotone sans rebond.
+- Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
-- Les indicateurs temporaires sont visibles sur tous les écrans, mais un seul écran reçoit le focus clavier.
-- Le style reste Catppuccin sombre, avec un accent rose néon commun aux workspaces et au liseré d’activité.
+- Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
+- Le style conserve les neutres sombres de Catppuccin, mais la capsule centrale utilise exclusivement les accents rose néon et jaune néon des workspaces.
 
 ## 2. Architecture à préserver
 
@@ -24,22 +24,25 @@ Principes fondamentaux :
 - `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
-- `../components/NowPlayingIndicator.qml` : média MPRIS, pochette et métadonnées.
+- `../components/NowPlayingIndicator.qml` : média MPRIS et métadonnées textuelles.
+- `../components/AppLauncher.qml` : lanceur natif, icônes et recherche fuzzy.
 - `../components/WifiSelector.qml` / `BluetoothSelector.qml` : sélecteurs clavier.
 - `../components/UpdateSelector.qml` : liste des mises à jour.
 - `../components/Pill.qml` : capsule générique des modules latéraux.
 - `../scripts/system-stats.py` : télémétrie persistante CPU, mémoire, disque et luminosité.
 - `../../helpers/` : paquets Nix optimisés et nommés pour Quickshell.
 
-### État partagé, rendu multi-écran
+### État partagé, rendu ciblé par écran
 
-`StatusData` est unique pour toute la session. Chaque écran possède son propre `Bar`, mais tous lisent le même état.
+`StatusData` est unique pour toute la session. Chaque écran possède son propre `Bar`, mais tous lisent le même état et comparent leur `monitorName` à la cible de l’overlay.
 
 Conséquences :
 
-- Wi-Fi, Bluetooth, volume, luminosité, média et updates apparaissent sur **tous les écrans**.
-- Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor` et `updateTargetMonitor` désignent uniquement l’écran qui reçoit le focus clavier.
-- Ne jamais limiter l’affichage au moniteur ciblé. Limiter uniquement `enabled` et `WlrLayershell.keyboardFocus`.
+- Wi-Fi, Bluetooth, volume, luminosité, média, lanceur et updates apparaissent uniquement sur leur moniteur cible.
+- Les autres écrans continuent d’afficher leur `WorkspaceSwitcher` et ne transforment pas leur capsule centrale.
+- Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor`, `appLauncherTargetMonitor`, `updateTargetMonitor`, `volumeTargetMonitor`, `brightnessTargetMonitor` et `mediaTargetMonitor` pilotent à la fois le rendu et, pour les sélecteurs interactifs, le focus clavier.
+- Un clic sur une capsule latérale transmet toujours le nom du moniteur de cette barre. Un raccourci IPC sans cible utilise le moniteur Hyprland actuellement focalisé.
+- Activer un overlay déjà ouvert depuis un autre écran le déplace vers ce nouvel écran ; l’activer à nouveau sur son écran courant le ferme.
 
 ## 3. Géométrie canonique
 
@@ -52,8 +55,10 @@ Conséquences :
 | Espacement entre modules latéraux | `10px` |
 | Largeur volume/luminosité | `280px` |
 | Largeur Wi-Fi/Bluetooth | `400px` |
-| Largeur updates | `480px` |
+| Largeur média / updates / lanceur | `480px` |
+| Hauteur lanceur | `398px` |
 | Hauteur d’une ligne update | `30px` |
+| Hauteur d’une ligne application | `42px` |
 
 ### Surface layer-shell fixe
 
@@ -83,21 +88,27 @@ Ainsi, le widget update grandit uniquement vers le bas, jamais vers le haut.
 
 ## 4. Palette visuelle
 
-Couleurs de référence :
+Couleurs de référence de la capsule centrale :
 
 | Usage | Couleur |
 |---|---|
 | Fond principal | `#181926` |
 | Surface secondaire | `#363a4f` |
+| Surface tertiaire | `#24273a` / `#494d64` |
 | Texte principal | `#cad3f5` |
 | Texte secondaire / compteurs / cadenas | `#939ab7` |
-| Rose néon workspaces et liseré | `#ff33cc` |
-| Vert connecté / succès | `#a6da95` |
-| Bleu Bluetooth | `#8aadf4` |
-| Rouge/rose Wi-Fi | `#ee99a0` |
-| Jaune luminosité / vérification | `#eed49f` |
-| Mauve secondaire | `#c6a0f6` |
-| Erreur | `#ed8796` |
+| Élément neutre discret | `#6e738d` |
+| Rose néon, accent principal | `#ff33cc` |
+| Jaune néon, accent secondaire | `#ffcc33` |
+
+La capsule centrale suit une palette volontairement bi-accent :
+
+- le rose identifie les actions, la sélection, les éléments disponibles et les erreurs ;
+- le jaune indique les états connectés, actifs ou en cours, et sert d’accent secondaire ;
+- les nuances neutres Catppuccin restent autorisées pour les fonds, le texte, les séparateurs et les états inactifs ;
+- aucun autre accent Catppuccin (bleu, vert, rouge saumon, mauve, etc.) ne doit être introduit dans les workspaces, volume, luminosité, média, Wi-Fi, Bluetooth, updates ou lanceur.
+
+Cette restriction concerne la capsule centrale. Les capsules latérales conservent pour l’instant leurs accents propres.
 
 Police : `Ubuntu Nerd Font`.
 
@@ -107,63 +118,61 @@ Les libellés importants sont en gras. Le nom d’un special workspace utilise `
 
 ### Transformation générale
 
-Dans `Bar.qml` :
+La largeur et la hauteur de `centerMorph` suivent directement leur cible avec une interpolation monotone, dans le même esprit que les animations `popin`, slide et fade de Hyprland : mouvement rapide au départ, décélération propre, aucun dépassement puis retour arrière.
 
-- durée de largeur : `300ms`
-- easing : `Easing.OutBack`
-- overshoot normal : `5.5`
-- durée de hauteur : `300ms`
-- overshoot de hauteur : `1.8`
+Pour chaque changement de géométrie, à l’ouverture comme à la fermeture :
 
-Le gros overshoot `5.5` donne le caractère très marqué demandé pour les transformations compactes.
+- `Behavior on width` et `Behavior on height` indépendants ;
+- durée `360ms` ;
+- `Easing.OutCubic` ;
+- aucun overshoot, rebond, ressort ou phase de stabilisation ;
+- si la cible change en cours de mouvement, Qt repart automatiquement de la valeur actuellement affichée.
 
-### Cas particulier du widget update
+Une dimension qui ne change pas ne doit pas être animée. La capsule ne doit jamais franchir sa cible avant de revenir.
 
-L’écran interne ne laisse que peu d’espace entre le widget update et les modules latéraux. Un overshoot horizontal de `5.5` faisait temporairement recouvrir les modules de gauche et de droite.
+### Convention unique pour tous les widgets
 
-Pendant une transition impliquant les updates :
+Cette interpolation monotone est commune aux transformations entre workspaces, volume, luminosité, média, Wi-Fi, Bluetooth, updates et lanceur d’applications.
 
-- `StatusData.updateMorphGentle` est activé **avant** de modifier `updateSelectorVisible` ;
-- la largeur utilise toujours `OutBack`, mais avec un overshoot contrôlé de `1.8` ;
-- la durée reste `300ms`, identique à la hauteur ;
-- `updateMorphTimer` libère ce mode après `360ms`.
+Ne pas réintroduire :
 
-L’ordre des mutations est important. Si `updateMorphGentle` est activé après `updateSelectorVisible`, l’animation peut démarrer avec l’overshoot `5.5` et recouvrir le reste de la barre.
+- `Easing.OutBack`, `SpringAnimation` ou une propriété `overshoot` ;
+- une cible intermédiaire au-delà de la géométrie finale ;
+- une séquence aller-retour pour simuler un rebond ;
+- un état ou timer temporaire tel que `updateMorphGentle` / `updateMorphTimer`.
 
-### Pas de fade entre contenus
+Les animations secondaires suivent la même règle : le hover et les interactions internes peuvent translater, redimensionner ou changer d’opacité, mais toujours avec une courbe monotone. Les pulses de scale sur les icônes volume et luminosité ont été supprimés. Le contenu central utilise une seule animation partagée, calculée depuis le widget source et le widget destination ; chaque composant ne relance jamais sa propre animation `presented`.
 
-Les opacités des composants changent instantanément. Ne pas réintroduire de `Behavior on opacity` entre workspaces et overlays.
+### Transition de contenu à deux couches
 
-Le rebond provient de la géométrie, pas d’un fondu.
+Les composants source et destination restent rendus simultanément pendant une courte fenêtre. Leurs opacités et translations sont calculées depuis un unique `transitionProgress` de `0` à `1`; aucun composant ne possède son propre `Behavior on opacity` ou timer d’entrée.
 
-## 6. Animation du contenu update
+Le conteneur, le clipping et la bordure restent persistants. Seuls les contenus se croisent à l’intérieur, comme dans une container transform. Une répétition du même mode sur le même moniteur ne redémarre pas la transition. En cas d’interruption, les opacités et offsets actuellement rendus des huit modes sont capturés dans des tables ; la nouvelle destination continue depuis sa valeur courante et toutes les autres couches encore visibles terminent leur fade au lieu de disparaître brutalement. Cette règle reste valable même pour une séquence très rapide A → B → C → D.
 
-Tout le contenu update doit participer :
+## 6. Animation contextuelle du contenu central
 
-- icône ;
-- titre ;
-- compteur ;
-- séparateur ;
-- noms des inputs ;
-- dates.
+`StatusData` décrit chaque transaction avec le mode et le moniteur source, puis le mode et le moniteur destination. Le serial n’est incrémenté qu’après la fermeture propre de l’ancien état et l’ouverture du nouveau ; les états intermédiaires `workspaces` produits par les booléens ne doivent jamais devenir la source logique d’une transition directe.
 
-`UpdateSelector.qml` utilise un bloc `animatedContent` avec `contentOffset` :
+Chaque `Bar` ramène un mode situé sur l’autre moniteur à `workspaces`, puis anime pendant les mêmes `360ms` que la géométrie :
 
-- départ à `-18px` ;
-- arrivée à `0px` ;
-- durée `300ms` ;
-- `Easing.OutBack` ;
-- overshoot `1.8`.
+- contenu source : opacité `1 → 0` entre `0 %` et `48 %`, déplacement de `0 → 8px` dans le sens du changement de hauteur ;
+- contenu destination : opacité `0 → 1` entre `18 %` et `78 %`, déplacement de `10px → 0` dans ce même sens visuel ;
+- destination plus haute : flux vers le bas ;
+- destination plus basse : flux vers le haut ;
+- hauteurs égales : aucune translation verticale, seulement la transition croisée et la mise en page liée à la largeur ;
+- courbes d’opacité `smoothstep`, translations `OutCubic`, sans overshoot.
 
-Le contenu commence donc légèrement au-dessus, descend dans le même sens que l’ouverture du widget, dépasse légèrement sa position finale, puis remonte pour se stabiliser.
+Ainsi launcher → updates conserve brièvement les applications pendant que la capsule rétrécit et les masque, puis le header et les lignes updates apparaissent en remontant légèrement. La transition inverse suit le mouvement descendant. Les composants gardent leur hauteur naturelle, restent top-alignés et le `clip: true` révèle ou masque le reste.
 
-La liste est placée dans un viewport découpé. Les lignes gardent toujours leur espacement de `30px` et sont révélées progressivement par la croissance du widget.
+Ce système est une container transform à deux couches, pas encore un morphing élément-par-élément : les éléments partagés ne sont pas appariés individuellement.
 
 À ne pas refaire :
 
-- espacement négatif entre les lignes ; cela superpose les textes ;
-- faire remonter la liste depuis le bas ; le mouvement paraît opposé à l’ouverture ;
-- animer seulement la liste en laissant le header immobile.
+- animation `presented` locale ignorant le widget source ;
+- passage artificiel par `workspaces` dans les métadonnées d’une transition overlay → overlay ;
+- grand déplacement proportionnel à toute la différence de hauteur ;
+- fades indépendants non synchronisés, rebond ou translation dépassant les `360ms` de géométrie ;
+- remise de `transitionProgress` à zéro sans capturer les opacités/offsets rendus lors d’une interruption.
 
 ## 7. Liseré rose d’activité
 
@@ -174,27 +183,29 @@ Le liseré apparaît lorsque `centerMorph.overlayVisible` est vrai, donc pour :
 - Wi-Fi ;
 - Bluetooth ;
 - média MPRIS ;
+- lanceur d’applications ;
 - updates.
 
 Il disparaît uniquement quand la capsule redevient le widget des workspaces.
 
 ### Rendu actuel
 
-Le liseré n’utilise pas un `Canvas` avec un dash animé. Cette approche produisait des disparitions et des saccades sur certaines portions du contour.
+Le liseré n’utilise ni `Canvas`, ni `Repeater` de petits rectangles, ni gradient conique. Le `Repeater` demandait jusqu’à plus de mille mises à jour QML par frame sur deux écrans ; le gradient conique était plus léger mais accélérait visuellement dans les coins parce qu’un angle constant ne correspond pas à une distance constante sur un rectangle.
 
-La version stable utilise :
+La version actuelle utilise un unique `ShaderEffect` et `shaders/activity-border.frag` :
 
-- un chemin mathématique de rectangle arrondi ;
-- `220` petits points de `2px` ;
-- un segment couvrant `50 %` du périmètre ;
-- couleur `#ff33cc` ;
-- une opacité arrière progressive : `Math.pow(1 - trailPosition, 1.35)` ;
-- un `FrameAnimation` synchronisé sur les frames ;
-- une phase qui augmente continuellement avec `phase += delta / 1.6`.
+- shader Qt 6 compilé en `.qsb` par `quickshell.nix` avec `qtshadertools` ;
+- rectangle arrondi de rayon extérieur `18px` ;
+- anneau intérieur de `2px` calculé par signed-distance field ;
+- position exacte sur le périmètre calculée avec les longueurs des quatre segments et des quatre quarts de cercle ;
+- traînée couvrant `50 %` du périmètre ;
+- couleur de tête `#ff33cc` ;
+- opacité `Math.pow(1 - behindHead / 0.5, 1.35)` ;
+- phase de `0` à `1` en `1600ms`.
 
-La phase n’est jamais remise à zéro et n’utilise pas de boucle `NumberAnimation`. Il ne doit donc y avoir ni pause, ni redémarrage visible, ni notion perceptible de « tour ».
+Les états `0` et `1` sont identiques et la coupure opaque-vers-transparent reste placée à la tête. QML ne met à jour qu’un uniforme `phase` par frame ; la géométrie, la position sur le chemin, l’anticrénelage et le dégradé sont calculés en parallèle sur le GPU. La sortie du fragment shader est prémultipliée pour respecter le blending du scene graph Qt Quick.
 
-Le point de tête reste opaque ; l’arrière forme une traînée dégradée sans coupure nette.
+Le mouvement doit conserver une vitesse linéaire perceptuelle identique sur les segments et dans les coins, quelle que soit la largeur de la capsule.
 
 ## 8. Bordure Hyprland pendant un overlay
 
@@ -226,7 +237,7 @@ Cela évite de laisser Hyprland en gris après un redémarrage de Quickshell.
 - Slot actif rose néon `#ff33cc` avec texte sombre.
 - Les workspaces occupés utilisent le jaune ; les vides utilisent une couleur discrète.
 
-Quand la capsule change de largeur, l’espacement entre les slots dépend de la largeur disponible. Les icônes participent donc au rebond au lieu de rester figées au centre.
+Quand la capsule change de largeur, l’espacement entre les slots dépend de la largeur disponible. Les icônes suivent donc l’interpolation de largeur au lieu de rester figées au centre.
 
 ### Special workspace
 
@@ -272,12 +283,30 @@ Un vrai spinner est réservé à :
 
 ### Couleurs d’état
 
-- connecté : point vert `#a6da95` ;
-- Bluetooth appairé mais déconnecté : bleu `#8aadf4` ;
+- connecté : point jaune néon `#ffcc33` ;
+- Bluetooth appairé mais déconnecté : rose néon `#ff33cc` ;
 - Bluetooth non appairé : gris ;
+- icônes Wi-Fi et Bluetooth : rose néon `#ff33cc` ;
+- onglet Bluetooth `PAIRED` : rose néon, onglet `NEARBY` : jaune néon ;
 - cadenas Wi-Fi : même gris que le compteur (`#939ab7`).
 
-## 11. Volume et luminosité
+## 11. Lanceur d’applications
+
+Le raccourci `Super+A` et le logo Nix à gauche ouvrent `AppLauncher.qml` dans la capsule centrale. Le lanceur utilise exclusivement `DesktopEntries.applications` et `DesktopEntry.execute()` : ne pas réintroduire Fuzzel ou une analyse périodique des fichiers `.desktop`.
+
+Conventions :
+
+- largeur `480px`, hauteur `398px` et huit lignes visibles ;
+- toutes les applications non marquées `NoDisplay` restent accessibles avec une icône issue du thème ;
+- le catalogue normalisé est construit une seule fois, puis la recherche fuzzy s’effectue en mémoire ;
+- le `ListView` virtualise les lignes pour ne charger que les icônes visibles ;
+- haut/bas, `Ctrl+n/p`, PageUp/PageDown et molette naviguent ;
+- un point jaune néon `#ffcc33` indique qu’au moins une fenêtre correspondante est déjà ouverte ;
+- `Enter` active la fenêtre ouverte la plus récemment utilisée, sinon lance l’application ;
+- `Shift+Enter` lance toujours une nouvelle instance et `Esc` ferme ;
+- le texte saisi doit toujours rester du texte de recherche : ne pas réserver `j`, `k` ou `q`.
+
+## 12. Volume et luminosité
 
 - Largeur `280px`, hauteur `36px`.
 - Aucun pourcentage dans le widget central.
@@ -285,9 +314,11 @@ Un vrai spinner est réservé à :
 - La barre de progression anime sa largeur en `140ms`.
 - Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
 - La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif.
-- Les indicateurs centraux sont partagés sur tous les écrans.
+- Le volume utilise le rose néon `#ff33cc`, ou le jaune néon `#ffcc33` lorsqu’il est muet.
+- La luminosité utilise le jaune néon `#ffcc33`.
+- Chaque indicateur central apparaît uniquement sur le moniteur qui a reçu la touche ou le geste de molette.
 
-## 12. Contrôles média MPRIS
+## 13. Contrôles média MPRIS
 
 Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `playerctl`.
 
@@ -295,24 +326,37 @@ Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `p
 
 Les raccourcis Hyprland appellent les méthodes IPC `mediaPlayPause`, `mediaNext` et `mediaPrevious`. Chaque méthode vérifie les capacités du lecteur avant l’action.
 
-`NowPlayingIndicator.qml` occupe `300px`, affiche quatre petites barres d’égaliseur animées, la pochette, le titre, l’artiste et l’état play/pause. Les barres restent basses lorsque le lecteur est en pause et s’animent indépendamment pendant la lecture. Le widget reste visible `4000ms` après une action média ou un changement de piste. Un changement automatique de piste ne doit jamais interrompre un sélecteur interactif Wi-Fi, Bluetooth ou updates.
+`NowPlayingIndicator.qml` occupe `480px`, comme le lanceur d’applications. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’état play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres restent basses lorsque le lecteur est en pause et s’animent indépendamment pendant la lecture. L’icône de lecture est jaune néon `#ffcc33` et l’icône de pause rose néon `#ff33cc`. Le widget reste visible `4000ms` après une action média ou un changement de piste. Un changement automatique de piste ne doit jamais interrompre un sélecteur interactif Wi-Fi, Bluetooth, lanceur ou updates.
 
-## 13. Exclusivité entre overlays
+## 14. Exclusivité entre overlays
 
 Un seul mode central peut être actif à la fois.
 
 Lors de l’ouverture d’un overlay :
 
-- fermer Wi-Fi/Bluetooth si nécessaire ;
-- arrêter les timers volume/luminosité correspondants ;
-- fermer updates via `hideUpdateSelector()` afin de conserver la convention `updateMorphGentle` ;
-- ne pas affecter le rendu multi-écran.
+- fermer le lanceur via `hideAppLauncher()` ;
+- fermer Wi-Fi/Bluetooth via leurs fonctions `hide*`, jamais par mutation directe des booléens ;
+- arrêter les timers volume/luminosité via `hideVolumeOverlay()` et `hideBrightnessOverlay()` ;
+- fermer updates via `hideUpdateSelector()` ;
+- résoudre et enregistrer le moniteur cible avant de rendre le nouvel overlay visible ;
+- laisser les workspaces inchangés sur les autres écrans.
 
-Éviter les mutations directes de `updateSelectorVisible = false` pendant une autre transition. Passer par `hideUpdateSelector()`.
+Le nettoyage Wi-Fi annule aussi le scan différé, le timer de connexion, le mot de passe et le réseau pending. Une génération de scan empêche un ancien `Qt.callLater` de réactiver le scanner après fermeture.
 
-## 14. Raccourcis et contrôles
+Une action Bluetooth native déjà lancée continue lorsque le sélecteur est masqué. Son timer et son message restent associés à l’action afin qu’une réouverture puisse afficher son état ; seule la découverte est arrêtée.
+
+## 15. Raccourcis et contrôles
 
 `Cmd` dans les demandes utilisateur correspond à `SUPER` dans Hyprland.
+
+### Applications — `Super+A`
+
+- saisir directement pour filtrer en fuzzy
+- haut/bas ou `Ctrl+n/p` : navigation
+- PageUp/PageDown : saut de huit résultats
+- `Enter` : activer l’instance ouverte, sinon lancer
+- `Shift+Enter` : lancer une nouvelle instance
+- `Esc` : fermeture
 
 ### Wi-Fi — `Super+N`
 
@@ -340,31 +384,41 @@ Lors de l’ouverture d’un overlay :
 
 Ne pas tester `Enter` automatiquement : cela lance réellement `nix flake update` puis `nh os switch`.
 
-## 15. Pièges connus
+## 16. Pièges connus
 
 1. **Animer la hauteur du `PanelWindow`** : provoque un glitch vertical du reste de la barre.
-2. **Overshoot update à `5.5`** : recouvre les modules latéraux sur l’écran interne.
-3. **Déclencher le mode doux trop tard** : l’animation capture le mauvais overshoot.
+2. **Toute courbe `OutBack`, spring ou overshoot** : franchit la cible puis inverse brièvement le mouvement, contrairement au contrat monotone inspiré de Hyprland.
+3. **Séquence géométrique aller-retour** : réintroduit un rebond même si chaque phase utilise séparément une courbe monotone.
 4. **Canvas + line dash animé** : le liseré peut disparaître ou sauter selon sa position.
-5. **Boucle `NumberAnimation` pour le liseré** : crée une notion de fin de tour.
-6. **Espacement négatif des lignes update** : superpose les textes.
-7. **Liste update montant depuis le bas** : direction visuellement incohérente.
-8. **Fade entre widgets** : contraire à la convention actuelle ; les contenus changent instantanément.
-9. **Focus clavier sur tous les panels** : plusieurs surfaces se disputent le clavier.
-10. **Rendu uniquement sur le moniteur ciblé** : contraire à la convention multi-écran.
-11. **Mot de passe Wi-Fi dans les arguments de commande** : interdit ; utiliser directement `WifiNetwork.connectWithPsk()`.
-12. **Oublier de restaurer la bordure Hyprland** : laisse les fenêtres avec une bordure grise.
+5. **`Repeater` de points proportionnel au périmètre** : multiplie les objets et les calculs JavaScript par frame sur les grands overlays et sur chaque écran.
+6. **`ConicalGradient` sur le rectangle** : sa vitesse angulaire constante accélère visuellement à l’approche des coins.
+7. **Committer le `.qsb` généré** : le shader binaire doit rester un produit du build Nix ; seule la source `.frag` est versionnée.
+8. **Espacement négatif des lignes update** : superpose les textes.
+9. **Liste update montant depuis le bas** : direction visuellement incohérente.
+10. **Fades indépendants par widget** : désynchronisent les couches ; toutes les opacités doivent dépendre du `transitionProgress` partagé.
+11. **Focus clavier sur tous les panels** : plusieurs surfaces se disputent le clavier.
+12. **Rendre un overlay sur tous les moniteurs** : masque inutilement les workspaces des écrans qui ne l’ont pas activé.
+13. **Muter directement `wifiSelectorVisible` ou `bluetoothSelectorVisible`** : contourne le nettoyage des scans, timers et états interactifs ; utiliser les fonctions `hide*`.
+14. **Mot de passe Wi-Fi dans les arguments de commande** : interdit ; utiliser directement `WifiNetwork.connectWithPsk()`.
+15. **Oublier de restaurer la bordure Hyprland** : laisse les fenêtres avec une bordure grise.
 
-## 16. Procédure de validation
+## 17. Procédure de validation
 
 ### Vérification QML rapide
 
 ```bash
-timeout --signal=TERM 5s qs --no-color \
-  -p "$PWD/home_manager/hyprland/quickshell/top-bar"
+test_config=$(mktemp -d)
+cp -R "$PWD/home_manager/hyprland/quickshell/top-bar/." "$test_config/"
+nix shell \
+  '.#nixosConfigurations.nixos.pkgs.qt6Packages.qtshadertools' \
+  -c qsb --qt6 \
+  -o "$test_config/shaders/activity-border.frag.qsb" \
+  "$test_config/shaders/activity-border.frag"
+timeout --signal=TERM 5s qs --no-color -p "$test_config"
+rm -rf "$test_config"
 ```
 
-Le code doit afficher `Configuration Loaded` sans erreur QML. L’avertissement de portail `org.quickshell` est connu et non bloquant.
+Le code doit afficher `Configuration Loaded` sans erreur QML ou shader. L’avertissement de portail `org.quickshell` est connu et non bloquant.
 
 ### Vérification Nix
 
@@ -400,6 +454,7 @@ qs --config top-bar ipc call topbar showBrightness
 qs --config top-bar ipc call topbar toggleWifi
 qs --config top-bar ipc call topbar toggleBluetooth
 qs --config top-bar ipc call topbar toggleUpdates
+qs --config top-bar ipc call topbar toggleLauncher
 ```
 
 ### Invariants à contrôler après une animation
@@ -411,15 +466,15 @@ hyprctl getoption general:col.active_border -j
 
 La réserve supérieure doit rester `[0,46,0,0]`. Hors overlay, la bordure active doit être revenue à `ff33ff33`.
 
-## 17. Règle finale pour une future IA
+## 18. Règle finale pour une future IA
 
 Avant toute modification visuelle, identifier clairement :
 
 1. la géométrie qui doit bouger ;
 2. le contenu qui doit suivre cette géométrie ;
-3. le moniteur qui reçoit le clavier ;
-4. les autres écrans qui doivent reproduire l’animation ;
+3. le moniteur qui reçoit le rendu et le clavier ;
+4. les autres écrans qui doivent conserver leurs workspaces sans reproduire l’animation ;
 5. les limites physiques imposées par les modules latéraux ;
 6. la restauration de l’état Hyprland après fermeture.
 
-Tester l’ouverture, le milieu du mouvement, l’overshoot et la fermeture. Une capture finale seule ne suffit pas pour valider une animation.
+Tester l’ouverture, le milieu du mouvement, l’arrivée monotone et la fermeture. Vérifier image par image que la géométrie ne franchit jamais sa cible ; une capture finale seule ne suffit pas pour valider une animation.

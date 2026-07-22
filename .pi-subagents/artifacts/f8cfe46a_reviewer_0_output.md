@@ -1,0 +1,6 @@
+## Review
+
+- **Blocker:** `home_manager/hyprland/quickshell/top-bar/Bar.qml:218-224` does not stop `widthBounce` when the new target already equals `animatedWidth`. During an app-launcher → updates transition, staged `StatusData.qml:890-903` first hides the launcher, starting a bounce toward the workspace width, then enables updates at the same `480px` width. The equality branch returns without cancelling the first animation, so the capsule continues collapsing toward `workspaceSwitcher.implicitWidth - 8` before returning to `480px`. The reverse updates → launcher sequence at `StatusData.qml:463-479` has the same defect. This directly violates the no-collapse requirement and the guide’s contract at `docs/DESIGN_GUIDE.md:115-124`.
+  - **Suggested fix:** stop the active animation before assigning and returning from the equality branch, e.g. `widthBounce.stop(); animatedWidth = targetWidth;`. Apply the equivalent fix to `heightBounce` at `Bar.qml:230-236` for rapid height-target changes. Alternatively, stop each animation before evaluating whether a restart is necessary.
+
+- **Note:** No QML animation test or runtime visual validation was added. `qmllint` is unavailable in the environment; only diff integrity and static control-flow inspection were possible.

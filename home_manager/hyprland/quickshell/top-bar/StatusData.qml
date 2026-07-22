@@ -25,18 +25,36 @@ Scope {
   property var nixUpdates: []
   property bool nixChecking: true
   property bool updateSelectorVisible: false
+  property bool appLauncherVisible: false
+  property string appLauncherTargetMonitor: ""
+  property string appLauncherQuery: ""
+  property int appLauncherSelectedIndex: 0
+  property int appToplevelRevision: 0
+  property var appCatalog: []
+  property var appLauncherResults: []
+  property bool chromeTabsVisible: false
+  property string chromeTabsTargetMonitor: ""
+  property string chromeTabsQuery: ""
+  property int chromeTabsSelectedIndex: 0
+  property bool chromeTabsLoading: false
+  property string chromeTabsMessage: ""
+  property var chromeTabCatalog: []
+  property var chromeTabResults: []
   property bool mediaOverlayVisible: false
+  property string mediaTargetMonitor: ""
   property bool mprisInitialized: false
-  property bool updateMorphGentle: false
   property string updateTargetMonitor: ""
   property bool volumeOverlayVisible: false
+  property string volumeTargetMonitor: ""
   property bool brightnessOverlayVisible: false
+  property string brightnessTargetMonitor: ""
   property bool wifiSelectorVisible: false
   property int wifiSelectedIndex: 0
   property string wifiSelectedSsid: ""
   property int wifiSelectionDirection: 1
   property bool wifiLoading: false
   property bool wifiRefreshSilent: false
+  property int wifiScanGeneration: 0
   property string wifiMessage: ""
   property string wifiTargetMonitor: ""
   property bool wifiPasswordMode: false
@@ -56,12 +74,24 @@ Scope {
   property var bluetoothActionDevice: null
   property bool bluetoothStartedDiscovery: false
   readonly property bool centerOverlayVisible: volumeOverlayVisible
-    || brightnessOverlayVisible || mediaOverlayVisible || wifiSelectorVisible
-    || bluetoothSelectorVisible || updateSelectorVisible
+    || brightnessOverlayVisible || mediaOverlayVisible || appLauncherVisible
+    || chromeTabsVisible || wifiSelectorVisible || bluetoothSelectorVisible
+    || updateSelectorVisible
+  property int centerTransitionSerial: 0
+  property bool centerTransitionPending: false
+  property string centerTransitionSourceMode: "workspaces"
+  property string centerTransitionSourceMonitor: ""
+  property string centerTransitionTargetMode: "workspaces"
+  property string centerTransitionTargetMonitor: ""
 
+  onAppLauncherQueryChanged: refreshAppLauncherResults()
+  onChromeTabsQueryChanged: refreshChromeTabResults()
   onCenterOverlayVisibleChanged: setFocusedWindowBorder(centerOverlayVisible)
 
-  Component.onCompleted: setFocusedWindowBorder(false)
+  Component.onCompleted: {
+    rebuildAppCatalog();
+    setFocusedWindowBorder(false);
+  }
 
   Component.onDestruction: setFocusedWindowBorder(false)
 
@@ -260,21 +290,433 @@ Scope {
     return "󰤨";
   }
 
-  function showMediaOverlay() {
-    if (mprisPlayer === null || wifiSelectorVisible
-        || bluetoothSelectorVisible || updateSelectorVisible)
+  function normalizeAppText(value) {
+    const lowered = (value ?? "").toString().toLowerCase();
+    try {
+      return lowered.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    } catch (error) {
+      return lowered;
+    }
+  }
+
+  function rebuildAppCatalog() {
+    const catalog = [];
+    const applications = DesktopEntries.applications.values;
+    for (let index = 0; index < applications.length; ++index) {
+      const entry = applications[index];
+      if (entry.noDisplay || entry.name === "")
+        continue;
+      const keywords = entry.keywords !== undefined
+        ? entry.keywords.join(" ") : "";
+      const normalizedName = normalizeAppText(entry.name);
+      catalog.push({
+        "entry": entry,
+        "normalizedName": normalizedName,
+        "searchText": normalizeAppText(entry.name + " " + entry.genericName
+          + " " + keywords + " " + entry.comment)
+      });
+    }
+    catalog.sort((left, right) => left.entry.name.localeCompare(right.entry.name));
+    appCatalog = catalog;
+    refreshAppLauncherResults();
+  }
+
+  function appFuzzyScore(candidate, query) {
+    const name = candidate.normalizedName;
+    const text = candidate.searchText;
+    if (name === query)
+      return 10000;
+
+    let score = name.startsWith(query) ? 1200
+      : name.includes(query) ? 700 : 0;
+    let previous = -1;
+    let streak = 0;
+    let gaps = 0;
+
+    for (let index = 0; index < query.length; ++index) {
+      const position = text.indexOf(query[index], previous + 1);
+      if (position < 0)
+        return -1;
+      const gap = previous < 0 ? position : position - previous - 1;
+      gaps += gap;
+      streak = gap === 0 ? streak + 1 : 0;
+      score += 20 + streak * 14;
+      if (position === 0 || " -_./".includes(text[position - 1]))
+        score += 45;
+      previous = position;
+    }
+
+    score -= gaps * 3;
+    score -= Math.max(0, name.length - query.length) * 0.2;
+    return score;
+  }
+
+  function refreshAppLauncherResults() {
+    const query = normalizeAppText(appLauncherQuery.trim());
+    if (query === "") {
+      appLauncherResults = appCatalog.slice();
+    } else {
+      const ranked = [];
+      for (let index = 0; index < appCatalog.length; ++index) {
+        const candidate = appCatalog[index];
+        const score = appFuzzyScore(candidate, query);
+        if (score >= 0)
+          ranked.push({ "candidate": candidate, "score": score });
+      }
+      ranked.sort((left, right) => right.score - left.score
+        || left.candidate.entry.name.localeCompare(right.candidate.entry.name));
+      appLauncherResults = ranked.map(result => result.candidate);
+    }
+    appLauncherSelectedIndex = 0;
+  }
+
+  function setAppLauncherQuery(query) {
+    appLauncherQuery = query;
+  }
+
+  function moveAppLauncherSelection(delta) {
+    if (appLauncherResults.length === 0)
       return;
-    volumeOverlayVisible = false;
-    brightnessOverlayVisible = false;
-    volumeOverlayTimer.stop();
-    brightnessOverlayTimer.stop();
+    appLauncherSelectedIndex = (appLauncherSelectedIndex + delta
+      + appLauncherResults.length) % appLauncherResults.length;
+  }
+
+  function normalizeAppIdentity(value) {
+    return normalizeAppText(value).trim().replace(/\.desktop$/, "");
+  }
+
+  function appIdentityAliases(value) {
+    const identity = normalizeAppIdentity(value);
+    if (identity === "")
+      return [];
+    const aliases = [identity];
+    let match = identity.match(/^chrome-([a-z]+)-default$/);
+    if (match !== null)
+      aliases.push("crx_" + match[1]);
+    match = identity.match(/^crx_([a-z]+)$/);
+    if (match !== null)
+      aliases.push("chrome-" + match[1] + "-default");
+    return aliases;
+  }
+
+  function appToplevelFor(entry) {
+    const appIdentities = [];
+    [entry.id, entry.startupClass, entry.icon].forEach(value => {
+      appIdentityAliases(value).forEach(identity => {
+        if (!appIdentities.includes(identity))
+          appIdentities.push(identity);
+      });
+    });
+    if (appIdentities.length === 0)
+      return null;
+
+    let best = null;
+    let bestHistory = Number.MAX_SAFE_INTEGER;
+    const toplevels = Hyprland.toplevels.values;
+    for (let index = 0; index < toplevels.length; ++index) {
+      const toplevel = toplevels[index];
+      const ipc = toplevel.lastIpcObject ?? {};
+      const windowIdentities = [];
+      [ipc["class"], ipc.initialClass,
+        toplevel.wayland !== null ? toplevel.wayland.appId : ""].forEach(value => {
+        appIdentityAliases(value).forEach(identity => {
+          if (!windowIdentities.includes(identity))
+            windowIdentities.push(identity);
+        });
+      });
+      if (!windowIdentities.some(identity => appIdentities.includes(identity)))
+        continue;
+      if (toplevel.activated)
+        return toplevel;
+      const focusHistory = ipc.focusHistoryID !== undefined
+        ? Number(ipc.focusHistoryID) : Number.MAX_SAFE_INTEGER;
+      if (best === null || focusHistory < bestHistory) {
+        best = toplevel;
+        bestHistory = focusHistory;
+      }
+    }
+    return best;
+  }
+
+  function launchNewAppInstance(entry) {
+    const newWindowAction = entry.actions.find(action => {
+      const id = normalizeAppIdentity(action.id);
+      const name = normalizeAppText(action.name).trim();
+      return id === "new-window" || id === "newwindow"
+        || name === "new window" || name === "nouvelle fenetre";
+    });
+    if (newWindowAction !== undefined)
+      newWindowAction.execute();
+    else
+      entry.execute();
+  }
+
+  function launchSelectedApp(index = appLauncherSelectedIndex, forceNew = false) {
+    if (appLauncherResults.length === 0)
+      return;
+    const boundedIndex = Math.max(0, Math.min(index,
+      appLauncherResults.length - 1));
+    const entry = appLauncherResults[boundedIndex].entry;
+    const runningToplevel = forceNew ? null : appToplevelFor(entry);
+    hideAppLauncher();
+    if (runningToplevel !== null) {
+      if (runningToplevel.address !== "") {
+        const address = runningToplevel.address.startsWith("0x")
+          ? runningToplevel.address : "0x" + runningToplevel.address;
+        Hyprland.dispatch("focuswindow address:" + address);
+      } else if (runningToplevel.wayland !== null)
+        runningToplevel.wayland.activate();
+    } else if (forceNew) {
+      launchNewAppInstance(entry);
+    } else {
+      entry.execute();
+    }
+  }
+
+  function refreshChromeTabResults() {
+    const query = normalizeAppText(chromeTabsQuery.trim());
+    if (query === "") {
+      chromeTabResults = chromeTabCatalog.slice();
+    } else {
+      const ranked = [];
+      for (let index = 0; index < chromeTabCatalog.length; ++index) {
+        const candidate = chromeTabCatalog[index];
+        const score = appFuzzyScore(candidate, query);
+        if (score >= 0)
+          ranked.push({ "candidate": candidate, "score": score });
+      }
+      ranked.sort((left, right) => right.score - left.score
+        || left.candidate.tab.title.localeCompare(right.candidate.tab.title));
+      chromeTabResults = ranked.map(result => result.candidate);
+    }
+    chromeTabsSelectedIndex = 0;
+  }
+
+  function parseChromeTabsResponse(text) {
+    chromeTabsLoading = false;
+    try {
+      const response = JSON.parse(text.trim());
+      if (!response.ok) {
+        chromeTabCatalog = [];
+        chromeTabsMessage = response.error || "Unable to contact Chrome";
+        refreshChromeTabResults();
+        return;
+      }
+
+      const tabs = Array.isArray(response.tabs) ? response.tabs : [];
+      chromeTabCatalog = tabs.filter(tab => tab.id !== undefined)
+        .map(tab => {
+          const title = (tab.title || tab.url || "Untitled tab").toString();
+          const url = (tab.url || "").toString();
+          return {
+            "tab": tab,
+            "normalizedName": normalizeAppText(title),
+            "searchText": normalizeAppText(title + " " + url)
+          };
+        });
+      chromeTabsMessage = "";
+      refreshChromeTabResults();
+    } catch (error) {
+      chromeTabCatalog = [];
+      chromeTabsMessage = "Unable to read Chrome tabs";
+      refreshChromeTabResults();
+    }
+  }
+
+  function requestChromeTabs() {
+    if (chromeTabsProcess.running)
+      return;
+    chromeTabsLoading = true;
+    chromeTabsMessage = "";
+    chromeTabsProcess.running = true;
+  }
+
+  function setChromeTabsQuery(query) {
+    chromeTabsQuery = query;
+  }
+
+  function moveChromeTabsSelection(delta) {
+    if (chromeTabResults.length === 0)
+      return;
+    chromeTabsSelectedIndex = (chromeTabsSelectedIndex + delta
+      + chromeTabResults.length) % chromeTabResults.length;
+  }
+
+  function activateSelectedChromeTab(index = chromeTabsSelectedIndex) {
+    if (chromeTabResults.length === 0)
+      return;
+    const boundedIndex = Math.max(0, Math.min(index,
+      chromeTabResults.length - 1));
+    const tabId = chromeTabResults[boundedIndex].tab.id;
+    hideChromeTabs();
+    Quickshell.execDetached(["quickshell-chrome-tabs", "activate", tabId]);
+  }
+
+  function closeSelectedChromeTab(index = chromeTabsSelectedIndex) {
+    if (chromeTabResults.length === 0)
+      return;
+    const boundedIndex = Math.max(0, Math.min(index,
+      chromeTabResults.length - 1));
+    const tabId = chromeTabResults[boundedIndex].tab.id;
+    chromeTabCatalog = chromeTabCatalog.filter(candidate =>
+      candidate.tab.id !== tabId);
+    refreshChromeTabResults();
+    if (chromeTabResults.length > 0)
+      chromeTabsSelectedIndex = Math.min(boundedIndex,
+        chromeTabResults.length - 1);
+    Quickshell.execDetached(["quickshell-chrome-tabs", "close", tabId]);
+  }
+
+  function resolveTargetMonitor(targetMonitor = "") {
+    if (targetMonitor !== "")
+      return targetMonitor;
+    if (Hyprland.focusedMonitor !== null)
+      return Hyprland.focusedMonitor.name;
+    return Hyprland.monitors.values.length > 0
+      ? Hyprland.monitors.values[0].name : "";
+  }
+
+  function visibleCenterMode() {
+    if (appLauncherVisible) return "launcher";
+    if (chromeTabsVisible) return "tabs";
+    if (updateSelectorVisible) return "updates";
+    if (wifiSelectorVisible) return "wifi";
+    if (bluetoothSelectorVisible) return "bluetooth";
+    if (mediaOverlayVisible) return "media";
+    if (volumeOverlayVisible) return "volume";
+    if (brightnessOverlayVisible) return "brightness";
+    return "workspaces";
+  }
+
+  function monitorForCenterMode(mode) {
+    if (mode === "launcher") return appLauncherTargetMonitor;
+    if (mode === "tabs") return chromeTabsTargetMonitor;
+    if (mode === "updates") return updateTargetMonitor;
+    if (mode === "wifi") return wifiTargetMonitor;
+    if (mode === "bluetooth") return bluetoothTargetMonitor;
+    if (mode === "media") return mediaTargetMonitor;
+    if (mode === "volume") return volumeTargetMonitor;
+    if (mode === "brightness") return brightnessTargetMonitor;
+    return "";
+  }
+
+  function beginCenterTransition(targetMode, targetMonitor = "") {
+    if (centerTransitionPending)
+      return false;
+    const sourceMode = visibleCenterMode();
+    const sourceMonitor = monitorForCenterMode(sourceMode);
+    const resolvedTargetMonitor = targetMode === "workspaces"
+      ? "" : resolveTargetMonitor(targetMonitor);
+    if (sourceMode === targetMode && sourceMonitor === resolvedTargetMonitor)
+      return false;
+    centerTransitionSourceMode = sourceMode;
+    centerTransitionSourceMonitor = sourceMonitor;
+    centerTransitionTargetMode = targetMode;
+    centerTransitionTargetMonitor = resolvedTargetMonitor;
+    centerTransitionPending = true;
+    return true;
+  }
+
+  function finishCenterTransition(ownedTransition) {
+    if (!ownedTransition)
+      return;
+    centerTransitionPending = false;
+    centerTransitionSerial++;
+  }
+
+  function toggleAppLauncher(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (appLauncherVisible && appLauncherTargetMonitor === resolvedTarget)
+      hideAppLauncher();
+    else
+      showAppLauncher(resolvedTarget);
+  }
+
+  function showAppLauncher(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const preserveQuery = appLauncherVisible;
+    const ownsTransition = beginCenterTransition("launcher", resolvedTarget);
+    hideMediaOverlay();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    hideChromeTabs();
+    appLauncherTargetMonitor = resolvedTarget;
+    if (!preserveQuery)
+      appLauncherQuery = "";
+    refreshAppLauncherResults();
+    appLauncherVisible = true;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function hideAppLauncher() {
+    if (!appLauncherVisible)
+      return;
+    const ownsTransition = beginCenterTransition("workspaces");
+    appLauncherVisible = false;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function toggleChromeTabs(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (chromeTabsVisible && chromeTabsTargetMonitor === resolvedTarget)
+      hideChromeTabs();
+    else
+      showChromeTabs(resolvedTarget);
+  }
+
+  function showChromeTabs(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const ownsTransition = beginCenterTransition("tabs", resolvedTarget);
+    hideAppLauncher();
+    hideMediaOverlay();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    chromeTabsTargetMonitor = resolvedTarget;
+    chromeTabsQuery = "";
+    chromeTabsSelectedIndex = 0;
+    chromeTabsVisible = true;
+    requestChromeTabs();
+    finishCenterTransition(ownsTransition);
+  }
+
+  function hideChromeTabs() {
+    if (!chromeTabsVisible)
+      return;
+    const ownsTransition = beginCenterTransition("workspaces");
+    chromeTabsVisible = false;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function showMediaOverlay(targetMonitor = "") {
+    if (mprisPlayer === null || appLauncherVisible || chromeTabsVisible
+        || wifiSelectorVisible || bluetoothSelectorVisible
+        || updateSelectorVisible)
+      return;
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const ownsTransition = beginCenterTransition("media", resolvedTarget);
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    mediaTargetMonitor = resolvedTarget;
     mediaOverlayVisible = true;
     mediaOverlayTimer.restart();
+    finishCenterTransition(ownsTransition);
   }
 
   function hideMediaOverlay() {
+    if (!mediaOverlayVisible) {
+      mediaOverlayTimer.stop();
+      return;
+    }
+    const ownsTransition = beginCenterTransition("workspaces");
     mediaOverlayVisible = false;
     mediaOverlayTimer.stop();
+    finishCenterTransition(ownsTransition);
   }
 
   function mediaPlayPause() {
@@ -331,62 +773,96 @@ Scope {
       overlayActive ? "rgba(888888aa)" : "rgba(33ff33ff)"]);
   }
 
-  function showVolumeOverlay() {
+  function showVolumeOverlay(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const ownsTransition = beginCenterTransition("volume", resolvedTarget);
+    hideAppLauncher();
     hideMediaOverlay();
-    wifiSelectorVisible = false;
-    stopWifiScan();
-    bluetoothSelectorVisible = false;
-    stopBluetoothDiscovery();
-    if (updateSelectorVisible)
-      hideUpdateSelector();
-    brightnessOverlayVisible = false;
-    brightnessOverlayTimer.stop();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideBrightnessOverlay();
+    hideChromeTabs();
+    volumeTargetMonitor = resolvedTarget;
     volumeOverlayVisible = true;
     volumeOverlayTimer.restart();
+    finishCenterTransition(ownsTransition);
   }
 
-  function showBrightnessOverlay() {
-    hideMediaOverlay();
-    wifiSelectorVisible = false;
-    stopWifiScan();
-    bluetoothSelectorVisible = false;
-    stopBluetoothDiscovery();
-    if (updateSelectorVisible)
-      hideUpdateSelector();
+  function hideVolumeOverlay() {
+    if (!volumeOverlayVisible) {
+      volumeOverlayTimer.stop();
+      return;
+    }
+    const ownsTransition = beginCenterTransition("workspaces");
     volumeOverlayVisible = false;
     volumeOverlayTimer.stop();
+    finishCenterTransition(ownsTransition);
+  }
+
+  function showBrightnessOverlay(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const ownsTransition = beginCenterTransition("brightness", resolvedTarget);
+    hideAppLauncher();
+    hideMediaOverlay();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideChromeTabs();
+    brightnessTargetMonitor = resolvedTarget;
     brightnessOverlayVisible = true;
     brightnessOverlayTimer.restart();
     brightnessRefreshProcess.exec(["brightnessctl", "-m"]);
+    finishCenterTransition(ownsTransition);
   }
 
-  function toggleWifiSelector() {
-    if (wifiSelectorVisible)
+  function hideBrightnessOverlay() {
+    if (!brightnessOverlayVisible) {
+      brightnessOverlayTimer.stop();
+      return;
+    }
+    const ownsTransition = beginCenterTransition("workspaces");
+    brightnessOverlayVisible = false;
+    brightnessOverlayTimer.stop();
+    finishCenterTransition(ownsTransition);
+  }
+
+  function toggleWifiSelector(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (wifiSelectorVisible && wifiTargetMonitor === resolvedTarget)
       hideWifiSelector();
     else
-      showWifiSelector();
+      showWifiSelector(resolvedTarget);
   }
 
-  function showWifiSelector() {
+  function showWifiSelector(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (wifiSelectorVisible && wifiTargetMonitor === resolvedTarget)
+      return;
+    const ownsTransition = beginCenterTransition("wifi", resolvedTarget);
+    if (wifiSelectorVisible)
+      hideWifiSelector();
+    hideAppLauncher();
     hideMediaOverlay();
-    bluetoothSelectorVisible = false;
-    stopBluetoothDiscovery();
-    if (updateSelectorVisible)
-      hideUpdateSelector();
-    volumeOverlayVisible = false;
-    brightnessOverlayVisible = false;
-    volumeOverlayTimer.stop();
-    brightnessOverlayTimer.stop();
-    wifiTargetMonitor = Hyprland.focusedMonitor !== null
-      ? Hyprland.focusedMonitor.name : "";
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    hideChromeTabs();
+    wifiTargetMonitor = resolvedTarget;
     wifiSelectorVisible = true;
     wifiSelectedIndex = 0;
     wifiSelectedSsid = wifiNetworks.length > 0 ? wifiNetworks[0].ssid : "";
     wifiMessage = "";
     refreshWifiNetworks(false, true);
+    finishCenterTransition(ownsTransition);
   }
 
   function hideWifiSelector() {
+    const wasVisible = wifiSelectorVisible;
+    const ownsTransition = wasVisible
+      ? beginCenterTransition("workspaces") : false;
     wifiSelectorVisible = false;
     wifiPasswordMode = false;
     wifiPassword = "";
@@ -395,6 +871,7 @@ Scope {
     wifiConnectionUsedPassword = false;
     wifiMessage = "";
     stopWifiScan();
+    finishCenterTransition(ownsTransition);
   }
 
   function cancelWifiPassword() {
@@ -432,6 +909,7 @@ Scope {
   }
 
   function stopWifiScan() {
+    wifiScanGeneration++;
     wifiScanTimer.stop();
     if (wifiDevice !== null && wifiDevice.scannerEnabled)
       wifiDevice.scannerEnabled = false;
@@ -440,6 +918,7 @@ Scope {
   }
 
   function refreshWifiNetworks(forceRescan = false, silent = false) {
+    const scanGeneration = ++wifiScanGeneration;
     if (wifiDevice === null) {
       if (!silent)
         wifiMessage = "Wi-Fi device unavailable";
@@ -455,43 +934,53 @@ Scope {
     if (wifiDevice.scannerEnabled)
       wifiDevice.scannerEnabled = false;
     Qt.callLater(() => {
-      if (root.wifiDevice === null)
+      if (!root.wifiSelectorVisible || root.wifiDevice === null
+          || scanGeneration !== root.wifiScanGeneration)
         return;
       root.wifiDevice.scannerEnabled = true;
       wifiScanTimer.restart();
     });
   }
 
-  function toggleBluetoothSelector() {
-    if (bluetoothSelectorVisible)
+  function toggleBluetoothSelector(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (bluetoothSelectorVisible && bluetoothTargetMonitor === resolvedTarget)
       hideBluetoothSelector();
     else
-      showBluetoothSelector();
+      showBluetoothSelector(resolvedTarget);
   }
 
-  function showBluetoothSelector() {
+  function showBluetoothSelector(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (bluetoothSelectorVisible && bluetoothTargetMonitor === resolvedTarget)
+      return;
+    const ownsTransition = beginCenterTransition("bluetooth", resolvedTarget);
+    if (bluetoothSelectorVisible)
+      hideBluetoothSelector();
+    hideAppLauncher();
     hideMediaOverlay();
-    wifiSelectorVisible = false;
-    stopWifiScan();
-    if (updateSelectorVisible)
-      hideUpdateSelector();
-    volumeOverlayVisible = false;
-    brightnessOverlayVisible = false;
-    volumeOverlayTimer.stop();
-    brightnessOverlayTimer.stop();
-    bluetoothTargetMonitor = Hyprland.focusedMonitor !== null
-      ? Hyprland.focusedMonitor.name : "";
+    hideWifiSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    hideChromeTabs();
+    bluetoothTargetMonitor = resolvedTarget;
     bluetoothSelectorVisible = true;
     bluetoothTab = 0;
     bluetoothSelectedIndex = 0;
-    bluetoothSelectorMessage = "";
     refreshBluetoothSelectorDevices(false, true);
+    finishCenterTransition(ownsTransition);
   }
 
   function hideBluetoothSelector() {
+    const wasVisible = bluetoothSelectorVisible;
+    const ownsTransition = wasVisible
+      ? beginCenterTransition("workspaces") : false;
     bluetoothSelectorVisible = false;
-    bluetoothSelectorMessage = "";
+    if (bluetoothActionDevice === null)
+      bluetoothSelectorMessage = "";
     stopBluetoothDiscovery();
+    finishCenterTransition(ownsTransition);
   }
 
   function currentBluetoothDevices() {
@@ -650,34 +1139,35 @@ Scope {
     wifiConnectionUsedPassword = false;
   }
 
-  function toggleUpdateSelector() {
-    if (updateSelectorVisible)
+  function toggleUpdateSelector(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (updateSelectorVisible && updateTargetMonitor === resolvedTarget)
       hideUpdateSelector();
     else
-      showUpdateSelector();
+      showUpdateSelector(resolvedTarget);
   }
 
-  function showUpdateSelector() {
+  function showUpdateSelector(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const ownsTransition = beginCenterTransition("updates", resolvedTarget);
+    hideAppLauncher();
     hideMediaOverlay();
-    wifiSelectorVisible = false;
-    stopWifiScan();
-    bluetoothSelectorVisible = false;
-    stopBluetoothDiscovery();
-    volumeOverlayVisible = false;
-    brightnessOverlayVisible = false;
-    volumeOverlayTimer.stop();
-    brightnessOverlayTimer.stop();
-    updateTargetMonitor = Hyprland.focusedMonitor !== null
-      ? Hyprland.focusedMonitor.name : "";
-    updateMorphGentle = true;
-    updateMorphTimer.restart();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    hideChromeTabs();
+    updateTargetMonitor = resolvedTarget;
     updateSelectorVisible = true;
+    finishCenterTransition(ownsTransition);
   }
 
   function hideUpdateSelector() {
-    updateMorphGentle = true;
-    updateMorphTimer.restart();
+    if (!updateSelectorVisible)
+      return;
+    const ownsTransition = beginCenterTransition("workspaces");
     updateSelectorVisible = false;
+    finishCenterTransition(ownsTransition);
   }
 
   function startNixUpdate() {
@@ -761,6 +1251,22 @@ Scope {
   }
 
   Connections {
+    target: DesktopEntries.applications
+
+    function onValuesChanged() {
+      root.rebuildAppCatalog();
+    }
+  }
+
+  Connections {
+    target: Hyprland.toplevels
+
+    function onValuesChanged() {
+      root.appToplevelRevision++;
+    }
+  }
+
+  Connections {
     target: root.mprisPlayer
 
     function onPostTrackChanged() {
@@ -830,6 +1336,15 @@ Scope {
     id: bluetoothActionTimer
     interval: 20000
     onTriggered: root.finishBluetoothAction(false)
+  }
+
+  Process {
+    id: chromeTabsProcess
+    command: ["quickshell-chrome-tabs", "list"]
+
+    stdout: StdioCollector {
+      onStreamFinished: root.parseChromeTabsResponse(text)
+    }
   }
 
   Process {
@@ -917,25 +1432,19 @@ Scope {
   Timer {
     id: mediaOverlayTimer
     interval: 4000
-    onTriggered: root.mediaOverlayVisible = false
-  }
-
-  Timer {
-    id: updateMorphTimer
-    interval: 360
-    onTriggered: root.updateMorphGentle = false
+    onTriggered: root.hideMediaOverlay()
   }
 
   Timer {
     id: volumeOverlayTimer
     interval: 2000
-    onTriggered: root.volumeOverlayVisible = false
+    onTriggered: root.hideVolumeOverlay()
   }
 
   Timer {
     id: brightnessOverlayTimer
     interval: 2000
-    onTriggered: root.brightnessOverlayVisible = false
+    onTriggered: root.hideBrightnessOverlay()
   }
 
   Timer {
@@ -994,6 +1503,14 @@ Scope {
 
     function toggleUpdates() {
       root.toggleUpdateSelector();
+    }
+
+    function toggleLauncher() {
+      root.toggleAppLauncher();
+    }
+
+    function toggleChromeTabs() {
+      root.toggleChromeTabs();
     }
   }
 }

@@ -8,13 +8,13 @@ Item {
   readonly property var player: statusData.mprisPlayer
   readonly property bool playing: player !== null && player.isPlaying
 
-  implicitWidth: 300
+  implicitWidth: 480
   implicitHeight: 36
 
   Item {
     id: equalizer
     anchors.left: parent.left
-    anchors.leftMargin: 10
+    anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
     width: 18
     height: 20
@@ -76,80 +76,37 @@ Item {
     }
   }
 
-  Rectangle {
-    id: artworkFrame
-    anchors.left: equalizer.right
-    anchors.leftMargin: 8
-    anchors.verticalCenter: parent.verticalCenter
-    width: 28
-    height: 28
-    radius: 7
-    color: "#363a4f"
-    clip: true
-
-    Image {
-      id: artwork
-      anchors.fill: parent
-      source: root.player !== null ? root.player.trackArtUrl : ""
-      fillMode: Image.PreserveAspectCrop
-      asynchronous: true
-      cache: true
-    }
-
-    Text {
-      visible: artwork.status !== Image.Ready
-      anchors.centerIn: parent
-      text: "󰎈"
-      color: "#ff33cc"
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 15
-      font.bold: true
-    }
-  }
-
   Text {
     id: playbackIcon
     anchors.right: parent.right
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
     text: root.player !== null && root.player.isPlaying ? "󰏤" : "󰐊"
-    color: root.player !== null && root.player.isPlaying ? "#a6da95" : "#ff33cc"
+    color: root.player !== null && root.player.isPlaying ? "#ffcc33" : "#ff33cc"
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16
     font.bold: true
   }
 
   Text {
-    anchors.left: artworkFrame.right
+    anchors.left: equalizer.right
     anchors.leftMargin: 10
     anchors.right: playbackIcon.left
     anchors.rightMargin: 12
-    y: 3
-    height: 16
+    anchors.verticalCenter: parent.verticalCenter
+    horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
-    text: root.player !== null && root.player.trackTitle !== ""
-      ? root.player.trackTitle : "Unknown track"
+    text: {
+      const title = root.player !== null && root.player.trackTitle !== ""
+        ? root.player.trackTitle : "Unknown track";
+      const artist = root.player !== null && root.player.trackArtist !== ""
+        ? root.player.trackArtist : root.player !== null ? root.player.identity : "";
+      return artist !== "" ? title + "  •  " + artist : title;
+    }
     color: "#cad3f5"
     elide: Text.ElideRight
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 13
-    font.bold: true
-  }
-
-  Text {
-    anchors.left: artworkFrame.right
-    anchors.leftMargin: 10
-    anchors.right: playbackIcon.left
-    anchors.rightMargin: 12
-    y: 18
-    height: 14
-    verticalAlignment: Text.AlignVCenter
-    text: root.player !== null && root.player.trackArtist !== ""
-      ? root.player.trackArtist : root.player !== null ? root.player.identity : ""
-    color: "#939ab7"
-    elide: Text.ElideRight
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 11
+    font.pixelSize: 16
     font.bold: true
   }
 }

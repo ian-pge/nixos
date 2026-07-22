@@ -17,21 +17,32 @@ PanelWindow {
   property string pendingTooltipText: ""
   property bool tooltipVisible: false
   readonly property var hyprlandMonitor: Hyprland.monitorFor(window.screen)
-  readonly property bool wifiSelectorActive: statusData.wifiSelectorVisible
-  readonly property bool bluetoothSelectorActive: statusData.bluetoothSelectorVisible
-  readonly property bool updateSelectorActive: statusData.updateSelectorVisible
+  readonly property string monitorName: hyprlandMonitor !== null
+    ? hyprlandMonitor.name : ""
+  readonly property bool volumeOverlayActive: statusData.volumeOverlayVisible
+    && monitorName === statusData.volumeTargetMonitor
+  readonly property bool brightnessOverlayActive: statusData.brightnessOverlayVisible
+    && monitorName === statusData.brightnessTargetMonitor
   readonly property bool mediaOverlayActive: statusData.mediaOverlayVisible
+    && monitorName === statusData.mediaTargetMonitor
+  readonly property bool wifiSelectorActive: statusData.wifiSelectorVisible
+    && monitorName === statusData.wifiTargetMonitor
+  readonly property bool bluetoothSelectorActive: statusData.bluetoothSelectorVisible
+    && monitorName === statusData.bluetoothTargetMonitor
+  readonly property bool updateSelectorActive: statusData.updateSelectorVisible
+    && monitorName === statusData.updateTargetMonitor
+  readonly property bool appLauncherActive: statusData.appLauncherVisible
+    && monitorName === statusData.appLauncherTargetMonitor
+  readonly property bool chromeTabsActive: statusData.chromeTabsVisible
+    && monitorName === statusData.chromeTabsTargetMonitor
   readonly property bool wifiSelectorKeyboardActive: wifiSelectorActive
-    && hyprlandMonitor !== null
-    && hyprlandMonitor.name === statusData.wifiTargetMonitor
   readonly property bool bluetoothSelectorKeyboardActive: bluetoothSelectorActive
-    && hyprlandMonitor !== null
-    && hyprlandMonitor.name === statusData.bluetoothTargetMonitor
   readonly property bool updateSelectorKeyboardActive: updateSelectorActive
-    && hyprlandMonitor !== null
-    && hyprlandMonitor.name === statusData.updateTargetMonitor
+  readonly property bool appLauncherKeyboardActive: appLauncherActive
+  readonly property bool chromeTabsKeyboardActive: chromeTabsActive
   readonly property bool keyboardSelectorActive: wifiSelectorKeyboardActive
     || bluetoothSelectorKeyboardActive || updateSelectorKeyboardActive
+    || appLauncherKeyboardActive || chromeTabsKeyboardActive
 
   screen: modelData
 
@@ -113,7 +124,10 @@ PanelWindow {
     Pill {
       text: ""
       accent: "#7dc4e4"
-      leftCommand: "pgrep -x fuzzel >/dev/null 2>&1 || fuzzel"
+      tooltipText: "Applications"
+      tooltipHost: window
+      interactive: true
+      onLeftClicked: statusData.toggleAppLauncher(window.monitorName)
     }
 
     Pill {
@@ -122,7 +136,7 @@ PanelWindow {
       tooltipText: statusData.nixTooltip
       tooltipHost: window
       interactive: true
-      onLeftClicked: statusData.toggleUpdateSelector()
+      onLeftClicked: statusData.toggleUpdateSelector(window.monitorName)
       onRightClicked: statusData.forceNixStatus()
     }
 
@@ -132,7 +146,7 @@ PanelWindow {
       tooltipText: statusData.networkName
       tooltipHost: window
       interactive: true
-      onLeftClicked: statusData.toggleWifiSelector()
+      onLeftClicked: statusData.toggleWifiSelector(window.monitorName)
     }
 
     Pill {
@@ -141,7 +155,7 @@ PanelWindow {
       tooltipText: statusData.bluetoothTooltip
       tooltipHost: window
       interactive: true
-      onLeftClicked: statusData.toggleBluetoothSelector()
+      onLeftClicked: statusData.toggleBluetoothSelector(window.monitorName)
     }
 
     Pill {
@@ -173,46 +187,180 @@ PanelWindow {
 
   Rectangle {
     id: centerMorph
-    readonly property bool overlayVisible: statusData.volumeOverlayVisible
-      || statusData.brightnessOverlayVisible || window.mediaOverlayActive
+    readonly property bool overlayVisible: window.volumeOverlayActive
+      || window.brightnessOverlayActive || window.mediaOverlayActive
+      || window.appLauncherActive || window.chromeTabsActive
       || window.wifiSelectorActive || window.bluetoothSelectorActive
       || window.updateSelectorActive
-
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.top: parent.top
-    width: window.updateSelectorActive ? updateSelector.implicitWidth
+    readonly property string targetMode: window.appLauncherActive
+      ? "launcher" : window.chromeTabsActive ? "tabs"
+      : window.updateSelectorActive ? "updates"
+      : window.wifiSelectorActive ? "wifi"
+      : window.bluetoothSelectorActive ? "bluetooth"
+      : window.mediaOverlayActive ? "media"
+      : window.volumeOverlayActive ? "volume"
+      : window.brightnessOverlayActive ? "brightness" : "workspaces"
+    readonly property real targetWidth: window.appLauncherActive
+      ? appLauncher.implicitWidth
+      : window.chromeTabsActive ? chromeTabsLauncher.implicitWidth
+      : window.updateSelectorActive ? updateSelector.implicitWidth
       : window.wifiSelectorActive ? wifiSelector.implicitWidth
       : window.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
       : window.mediaOverlayActive ? nowPlayingIndicator.implicitWidth
       : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
-    height: window.updateSelectorActive ? updateSelector.implicitHeight : 36
+    readonly property real targetHeight: window.appLauncherActive
+      ? appLauncher.implicitHeight
+      : window.chromeTabsActive ? chromeTabsLauncher.implicitHeight
+      : window.updateSelectorActive ? updateSelector.implicitHeight : 36
+    readonly property var contentModes: ["workspaces", "volume",
+      "brightness", "media", "wifi", "bluetooth", "launcher", "tabs",
+      "updates"]
+    property string visualSourceMode: "workspaces"
+    property string visualTargetMode: "workspaces"
+    property real transitionProgress: 1
+    property real transitionDirection: 0
+    property var startOpacities: ({ "workspaces": 1 })
+    property var startOffsets: ({})
+
+    function modeHeight(mode) {
+      if (mode === "launcher") return appLauncher.implicitHeight;
+      if (mode === "tabs") return chromeTabsLauncher.implicitHeight;
+      if (mode === "updates") return updateSelector.implicitHeight;
+      if (mode === "wifi") return wifiSelector.implicitHeight;
+      if (mode === "bluetooth") return bluetoothSelector.implicitHeight;
+      if (mode === "media") return nowPlayingIndicator.implicitHeight;
+      if (mode === "volume") return volumeIndicator.implicitHeight;
+      if (mode === "brightness") return brightnessIndicator.implicitHeight;
+      return workspaceSwitcher.implicitHeight;
+    }
+
+    function localTransitionMode(mode, targetMonitor) {
+      return mode === "workspaces" || targetMonitor === window.monitorName
+        ? mode : "workspaces";
+    }
+
+    function clamp01(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function smoothSegment(start, end, value) {
+      const progress = clamp01((value - start) / (end - start));
+      return progress * progress * (3 - 2 * progress);
+    }
+
+    function easeOutCubic(value) {
+      const progress = clamp01(value);
+      return 1 - Math.pow(1 - progress, 3);
+    }
+
+    function contentOpacity(mode) {
+      const startOpacity = startOpacities[mode] === undefined
+        ? 0 : startOpacities[mode];
+      if (mode === visualTargetMode) {
+        const entryProgress = smoothSegment(0.18, 0.78,
+          transitionProgress);
+        return startOpacity + (1 - startOpacity) * entryProgress;
+      }
+      const fadeEnd = mode === visualSourceMode ? 0.48 : 0.42;
+      return startOpacity
+        * (1 - smoothSegment(0, fadeEnd, transitionProgress));
+    }
+
+    function contentOffset(mode) {
+      const startOffset = startOffsets[mode] === undefined
+        ? 0 : startOffsets[mode];
+      if (mode === visualSourceMode) {
+        const exitProgress = easeOutCubic(transitionProgress / 0.58);
+        const exitOffset = transitionDirection * 8;
+        return startOffset + (exitOffset - startOffset) * exitProgress;
+      }
+      if (mode === visualTargetMode) {
+        const entryProgress = easeOutCubic(
+          (transitionProgress - 0.14) / 0.86);
+        return startOffset * (1 - entryProgress);
+      }
+      return startOffset;
+    }
+
+    function startContentTransition(sourceMode, targetMode) {
+      if (sourceMode === targetMode)
+        return;
+
+      const capturedOpacities = {};
+      const capturedOffsets = {};
+      for (let index = 0; index < contentModes.length; index++) {
+        const mode = contentModes[index];
+        capturedOpacities[mode] = contentOpacity(mode);
+        capturedOffsets[mode] = contentOffset(mode);
+      }
+
+      contentTransition.stop();
+      visualSourceMode = sourceMode;
+      visualTargetMode = targetMode;
+      const heightDelta = modeHeight(targetMode) - modeHeight(sourceMode);
+      transitionDirection = heightDelta > 0 ? 1 : heightDelta < 0 ? -1 : 0;
+      if (capturedOpacities[targetMode] <= 0.001)
+        capturedOffsets[targetMode] = -transitionDirection * 10;
+      startOpacities = capturedOpacities;
+      startOffsets = capturedOffsets;
+      transitionProgress = 0;
+      contentTransition.restart();
+    }
+
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: parent.top
+    width: targetWidth
+    height: targetHeight
     radius: 18
     color: "#181926"
     clip: true
     opacity: window.entered ? 1 : 0
-    transform: Translate {
-      y: window.entered ? 0 : -12
-      Behavior on y {
-        NumberAnimation {
-          duration: 450
-          easing.type: Easing.OutBack
-        }
-      }
-    }
 
     Behavior on width {
       NumberAnimation {
-        duration: 300
-        easing.type: Easing.OutBack
-        easing.overshoot: statusData.updateMorphGentle ? 1.8 : 5.5
+        duration: 360
+        easing.type: Easing.OutCubic
       }
     }
 
     Behavior on height {
       NumberAnimation {
-        duration: 300
-        easing.type: Easing.OutBack
-        easing.overshoot: 1.8
+        duration: 360
+        easing.type: Easing.OutCubic
+      }
+    }
+
+    NumberAnimation {
+      id: contentTransition
+      target: centerMorph
+      property: "transitionProgress"
+      from: 0
+      to: 1
+      duration: 360
+      easing.type: Easing.Linear
+    }
+
+    Connections {
+      target: window.statusData
+
+      function onCenterTransitionSerialChanged() {
+        const sourceMode = centerMorph.localTransitionMode(
+          window.statusData.centerTransitionSourceMode,
+          window.statusData.centerTransitionSourceMonitor);
+        const targetMode = centerMorph.localTransitionMode(
+          window.statusData.centerTransitionTargetMode,
+          window.statusData.centerTransitionTargetMonitor);
+        centerMorph.startContentTransition(sourceMode, targetMode);
+      }
+    }
+
+    transform: Translate {
+      y: window.entered ? 0 : -12
+      Behavior on y {
+        NumberAnimation {
+          duration: 420
+          easing.type: Easing.OutCubic
+        }
       }
     }
 
@@ -220,161 +368,152 @@ PanelWindow {
 
     WorkspaceSwitcher {
       id: workspaceSwitcher
-      anchors.fill: parent
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("workspaces") }
       backgroundColor: "transparent"
-      monitorName: window.hyprlandMonitor !== null
-        ? window.hyprlandMonitor.name : ""
-      opacity: centerMorph.overlayVisible ? 0 : 1
+      monitorName: window.monitorName
+      opacity: centerMorph.contentOpacity("workspaces")
       enabled: !centerMorph.overlayVisible
-
     }
 
     VolumeIndicator {
-      anchors.fill: parent
+      id: volumeIndicator
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("volume") }
       statusData: window.statusData
+      targetMonitor: window.monitorName
       color: "transparent"
-      opacity: statusData.volumeOverlayVisible ? 1 : 0
-      enabled: statusData.volumeOverlayVisible
-
+      opacity: centerMorph.contentOpacity("volume")
+      enabled: window.volumeOverlayActive
     }
 
     BrightnessIndicator {
-      anchors.fill: parent
+      id: brightnessIndicator
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("brightness") }
       statusData: window.statusData
+      targetMonitor: window.monitorName
       color: "transparent"
-      opacity: statusData.brightnessOverlayVisible ? 1 : 0
-      enabled: statusData.brightnessOverlayVisible
-
+      opacity: centerMorph.contentOpacity("brightness")
+      enabled: window.brightnessOverlayActive
     }
 
     NowPlayingIndicator {
       id: nowPlayingIndicator
-      anchors.fill: parent
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("media") }
       statusData: window.statusData
-      opacity: window.mediaOverlayActive ? 1 : 0
+      opacity: centerMorph.contentOpacity("media")
       enabled: window.mediaOverlayActive
     }
 
     WifiSelector {
       id: wifiSelector
-      anchors.fill: parent
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("wifi") }
       statusData: window.statusData
-      opacity: window.wifiSelectorActive ? 1 : 0
+      opacity: centerMorph.contentOpacity("wifi")
       enabled: window.wifiSelectorKeyboardActive
-
     }
 
     BluetoothSelector {
       id: bluetoothSelector
-      anchors.fill: parent
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("bluetooth") }
       statusData: window.statusData
-      opacity: window.bluetoothSelectorActive ? 1 : 0
+      opacity: centerMorph.contentOpacity("bluetooth")
       enabled: window.bluetoothSelectorKeyboardActive
+    }
 
+    AppLauncher {
+      id: appLauncher
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("launcher") }
+      statusData: window.statusData
+      opacity: centerMorph.contentOpacity("launcher")
+      enabled: window.appLauncherKeyboardActive
+    }
+
+    ChromeTabsLauncher {
+      id: chromeTabsLauncher
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("tabs") }
+      statusData: window.statusData
+      opacity: centerMorph.contentOpacity("tabs")
+      enabled: window.chromeTabsKeyboardActive
     }
 
     UpdateSelector {
       id: updateSelector
-      anchors.fill: parent
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("updates") }
       statusData: window.statusData
-      presented: window.updateSelectorActive
-      opacity: window.updateSelectorActive ? 1 : 0
+      opacity: centerMorph.contentOpacity("updates")
       enabled: window.updateSelectorKeyboardActive
     }
 
-    Item {
+    ShaderEffect {
       id: activityBorder
       anchors.fill: parent
       visible: centerMorph.overlayVisible
       z: 100
 
+      property size itemSize: Qt.size(width, height)
       property real phase: 0
-      readonly property real inset: 1
-      readonly property real pathRadius: Math.min(17,
-        Math.max(0, width / 2 - inset), Math.max(0, height / 2 - inset))
-      readonly property real horizontalLength: Math.max(0,
-        width - inset * 2 - pathRadius * 2)
-      readonly property real verticalLength: Math.max(0,
-        height - inset * 2 - pathRadius * 2)
-      readonly property real arcLength: Math.PI * pathRadius / 2
-      readonly property real perimeter: Math.max(1,
-        horizontalLength * 2 + verticalLength * 2 + arcLength * 4)
+      fragmentShader: Qt.resolvedUrl(
+        "shaders/activity-border.frag.qsb")
 
-      function pointAt(normalizedPosition) {
-        let distance = (normalizedPosition - Math.floor(normalizedPosition))
-          * perimeter;
-        const radius = Math.max(0.001, pathRadius);
-        let angle = 0;
-
-        if (distance <= horizontalLength)
-          return { "x": inset + pathRadius + distance, "y": inset };
-        distance -= horizontalLength;
-
-        if (distance <= arcLength) {
-          angle = -Math.PI / 2 + distance / radius;
-          return { "x": width - inset - pathRadius + Math.cos(angle) * radius,
-            "y": inset + pathRadius + Math.sin(angle) * radius };
-        }
-        distance -= arcLength;
-
-        if (distance <= verticalLength)
-          return { "x": width - inset,
-            "y": inset + pathRadius + distance };
-        distance -= verticalLength;
-
-        if (distance <= arcLength) {
-          angle = distance / radius;
-          return { "x": width - inset - pathRadius + Math.cos(angle) * radius,
-            "y": height - inset - pathRadius + Math.sin(angle) * radius };
-        }
-        distance -= arcLength;
-
-        if (distance <= horizontalLength)
-          return { "x": width - inset - pathRadius - distance,
-            "y": height - inset };
-        distance -= horizontalLength;
-
-        if (distance <= arcLength) {
-          angle = Math.PI / 2 + distance / radius;
-          return { "x": inset + pathRadius + Math.cos(angle) * radius,
-            "y": height - inset - pathRadius + Math.sin(angle) * radius };
-        }
-        distance -= arcLength;
-
-        if (distance <= verticalLength)
-          return { "x": inset,
-            "y": height - inset - pathRadius - distance };
-        distance -= verticalLength;
-
-        angle = Math.PI + distance / radius;
-        return { "x": inset + pathRadius + Math.cos(angle) * radius,
-          "y": inset + pathRadius + Math.sin(angle) * radius };
-      }
-
-      Repeater {
-        model: 220
-
-        Rectangle {
-          readonly property real trailPosition: index / 219
-          readonly property var pathPoint: activityBorder.pointAt(
-            activityBorder.phase - trailPosition * 0.50)
-
-          x: pathPoint.x - width / 2
-          y: pathPoint.y - height / 2
-          width: 2
-          height: 2
-          radius: 1
-          color: "#ff33cc"
-          opacity: Math.pow(1 - trailPosition, 1.35)
-        }
-      }
-
-      FrameAnimation {
+      NumberAnimation on phase {
+        from: 0
+        to: 1
+        duration: 1600
+        loops: Animation.Infinite
         running: activityBorder.visible
-        onTriggered: {
-          const delta = Math.min(frameTime, 0.05);
-          activityBorder.phase += delta / 1.6;
-        }
       }
     }
   }
@@ -411,11 +550,11 @@ PanelWindow {
       interactive: true
       onWheelUp: {
         statusData.setVolume(0.02);
-        statusData.showVolumeOverlay();
+        statusData.showVolumeOverlay(window.monitorName);
       }
       onWheelDown: {
         statusData.setVolume(-0.02);
-        statusData.showVolumeOverlay();
+        statusData.showVolumeOverlay(window.monitorName);
       }
     }
 
@@ -424,8 +563,8 @@ PanelWindow {
       accent: "#eed49f"
       wheelUpCommand: "brightnessctl set +5%"
       wheelDownCommand: "brightnessctl set 5%-"
-      onWheelUp: statusData.showBrightnessOverlay()
-      onWheelDown: statusData.showBrightnessOverlay()
+      onWheelUp: statusData.showBrightnessOverlay(window.monitorName)
+      onWheelDown: statusData.showBrightnessOverlay(window.monitorName)
     }
 
     Pill {
