@@ -1,4 +1,5 @@
 import QtQuick
+import "Theme.js" as Theme
 
 Rectangle {
   id: root
@@ -11,7 +12,7 @@ Rectangle {
   implicitWidth: 280
   implicitHeight: 36
   radius: 18
-  color: "#181926"
+  color: Theme.background
 
   Behavior on displayedLevel {
     NumberAnimation {
@@ -26,14 +27,10 @@ Rectangle {
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
     text: statusData.audioIcon()
-    color: statusData.audioMuted ? "#ffcc33" : "#ff33cc"
+    color: Theme.action
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
-
-    Behavior on color {
-      ColorAnimation { duration: 180 }
-    }
   }
 
   Rectangle {
@@ -45,27 +42,14 @@ Rectangle {
     anchors.verticalCenter: parent.verticalCenter
     height: 8
     radius: 4
-    color: "#363a4f"
+    color: Theme.surfaceRaised
 
     Rectangle {
       id: fill
       width: track.width * root.displayedLevel
       height: parent.height
       radius: 4
-      color: statusData.audioMuted ? "#ffcc33" : "#ff33cc"
-
-      Behavior on color {
-        ColorAnimation { duration: 180 }
-      }
-    }
-
-    Rectangle {
-      anchors.verticalCenter: parent.verticalCenter
-      x: Math.max(0, Math.min(track.width - width, fill.width - width / 2))
-      width: 12
-      height: 12
-      radius: 6
-      color: "#cad3f5"
+      color: Theme.action
     }
   }
 

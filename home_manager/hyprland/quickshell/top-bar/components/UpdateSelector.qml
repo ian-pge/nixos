@@ -1,4 +1,5 @@
 import QtQuick
+import "Theme.js" as Theme
 
 FocusScope {
   id: root
@@ -40,8 +41,8 @@ FocusScope {
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: statusData.nixChecking ? "󰑐" : updates.length > 0 ? "" : ""
-      color: statusData.nixChecking ? "#ffcc33"
-        : updates.length > 0 ? "#ff33cc" : "#ffcc33"
+      color: statusData.nixChecking ? Theme.state
+        : updates.length > 0 ? Theme.action : Theme.inactive
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
@@ -63,7 +64,7 @@ FocusScope {
       height: 22
       verticalAlignment: Text.AlignVCenter
       text: statusData.nixChecking ? "Checking for updates…" : "NixOS updates"
-      color: "#cad3f5"
+      color: Theme.foreground
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
       font.bold: true
@@ -77,8 +78,8 @@ FocusScope {
       verticalAlignment: Text.AlignVCenter
       text: statusData.nixChecking ? "CHECKING"
         : updates.length > 0 ? updates.length + " AVAILABLE" : "UP TO DATE"
-      color: statusData.nixChecking ? "#ffcc33"
-        : updates.length > 0 ? "#ff33cc" : "#ffcc33"
+      color: statusData.nixChecking || updates.length > 0
+        ? Theme.state : Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 11
       font.bold: true
@@ -91,7 +92,7 @@ FocusScope {
       anchors.rightMargin: 14
       y: 40
       height: 1
-      color: "#363a4f"
+      color: Theme.surfaceRaised
     }
 
     Item {
@@ -125,7 +126,7 @@ FocusScope {
               width: 7
               height: 7
               radius: 3.5
-              color: "#ff33cc"
+              color: Theme.state
             }
 
             Text {
@@ -135,7 +136,7 @@ FocusScope {
               anchors.rightMargin: 16
               anchors.verticalCenter: parent.verticalCenter
               text: modelData.name
-              color: "#cad3f5"
+              color: Theme.foreground
               elide: Text.ElideRight
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 13
@@ -147,7 +148,7 @@ FocusScope {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               text: modelData.date
-              color: "#939ab7"
+              color: Theme.secondary
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 12
               font.bold: true
@@ -168,7 +169,7 @@ FocusScope {
           : statusData.nixTooltip === "Unable to check for updates"
             ? statusData.nixTooltip : "System is up to date"
         color: statusData.nixTooltip === "Unable to check for updates"
-          ? "#ff33cc" : "#939ab7"
+          ? Theme.error : Theme.secondary
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 13
         font.bold: true

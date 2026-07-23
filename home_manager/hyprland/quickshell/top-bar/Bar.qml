@@ -3,6 +3,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
 import "components"
+import "components/Theme.js" as Theme
 
 PanelWindow {
   id: window
@@ -40,6 +41,7 @@ PanelWindow {
   readonly property bool updateSelectorKeyboardActive: updateSelectorActive
   readonly property bool appLauncherKeyboardActive: appLauncherActive
   readonly property bool chromeTabsKeyboardActive: chromeTabsActive
+    && !statusData.chromeTabsActionPending
   readonly property bool keyboardSelectorActive: wifiSelectorKeyboardActive
     || bluetoothSelectorKeyboardActive || updateSelectorKeyboardActive
     || appLauncherKeyboardActive || chromeTabsKeyboardActive
@@ -123,7 +125,7 @@ PanelWindow {
 
     Pill {
       text: ""
-      accent: "#7dc4e4"
+      accent: Theme.sideApplications
       tooltipText: "Applications"
       tooltipHost: window
       interactive: true
@@ -132,7 +134,7 @@ PanelWindow {
 
     Pill {
       text: statusData.nixIcon
-      accent: "#f0c6c6"
+      accent: Theme.sideUpdates
       tooltipText: statusData.nixTooltip
       tooltipHost: window
       interactive: true
@@ -142,7 +144,7 @@ PanelWindow {
 
     Pill {
       text: statusData.networkIcon()
-      accent: "#ee99a0"
+      accent: Theme.sideNetwork
       tooltipText: statusData.networkName
       tooltipHost: window
       interactive: true
@@ -151,7 +153,7 @@ PanelWindow {
 
     Pill {
       text: statusData.bluetoothConnected ? "󰂯" : "󰂲"
-      accent: "#8aadf4"
+      accent: Theme.sideBluetooth
       tooltipText: statusData.bluetoothTooltip
       tooltipHost: window
       interactive: true
@@ -160,25 +162,25 @@ PanelWindow {
 
     Pill {
       text: " " + statusData.diskUsage + "%"
-      accent: "#f5a97f"
+      accent: Theme.sideDisk
       leftCommand: "ghostty -e ncdu"
     }
 
     Pill {
       text: " " + statusData.cpuUsage + "%"
-      accent: "#91d7e3"
+      accent: Theme.sideCpu
       leftCommand: "ghostty -e htop"
     }
 
     Pill {
       text: "  " + statusData.memoryUsage + "%"
-      accent: "#c6a0f6"
+      accent: Theme.sideMemory
       leftCommand: "ghostty -e htop"
     }
 
     Pill {
       text: " " + statusData.gpuText
-      accent: "#a6da95"
+      accent: Theme.sideGpu
       tooltipText: statusData.gpuTooltip
       tooltipHost: window
       leftCommand: "ghostty -e nvtop"
@@ -312,7 +314,7 @@ PanelWindow {
     width: targetWidth
     height: targetHeight
     radius: 18
-    color: "#181926"
+    color: Theme.background
     clip: true
     opacity: window.entered ? 1 : 0
 
@@ -538,14 +540,14 @@ PanelWindow {
     Pill {
       visible: statusData.batteryAvailable
       text: statusData.batteryIcon() + " " + statusData.batteryPercent + "%"
-      accent: "#f4dbd6"
+      accent: Theme.sideBattery
     }
 
     Pill {
       text: statusData.audioMuted
         ? "󰖁"
         : statusData.audioIcon() + " " + statusData.audioVolume + "%"
-      accent: "#b7bdf8"
+      accent: Theme.sideVolume
       leftCommand: "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer"
       interactive: true
       onWheelUp: {
@@ -560,7 +562,7 @@ PanelWindow {
 
     Pill {
       text: statusData.brightnessIcon() + " " + statusData.brightness + "%"
-      accent: "#eed49f"
+      accent: Theme.sideBrightness
       wheelUpCommand: "brightnessctl set +5%"
       wheelDownCommand: "brightnessctl set 5%-"
       onWheelUp: statusData.showBrightnessOverlay(window.monitorName)
@@ -569,19 +571,19 @@ PanelWindow {
 
     Pill {
       text: statusData.weatherText
-      accent: "#f5bde6"
+      accent: Theme.sideWeather
       tooltipText: statusData.weatherTooltip
       tooltipHost: window
     }
 
     Pill {
       text: " " + statusData.dateText
-      accent: "#8bd5ca"
+      accent: Theme.sideDate
     }
 
     Pill {
       text: " " + statusData.timeText
-      accent: "#ed8796"
+      accent: Theme.sideTime
     }
   }
 
@@ -606,7 +608,7 @@ PanelWindow {
     Rectangle {
       anchors.fill: parent
       radius: 14
-      color: "#363a4f"
+      color: Theme.surfaceRaised
 
       Text {
         id: tooltipLabel
@@ -615,7 +617,7 @@ PanelWindow {
         anchors.top: parent.top
         anchors.margins: 10
         text: window.tooltipText
-        color: "#cad3f5"
+        color: Theme.foreground
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 14
         font.bold: true

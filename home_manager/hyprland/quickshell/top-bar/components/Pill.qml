@@ -1,11 +1,12 @@
 import Quickshell
 import QtQuick
+import "Theme.js" as Theme
 
 Rectangle {
   id: root
 
   property string text: ""
-  property color accent: "#cad3f5"
+  property color accent: Theme.foreground
   property string tooltipText: ""
   property var tooltipHost: null
   property string leftCommand: ""
@@ -23,7 +24,7 @@ Rectangle {
   implicitWidth: label.implicitWidth + 20
   implicitHeight: 36
   radius: 18
-  color: pointer.containsMouse ? accent : "#181926"
+  color: pointer.containsMouse ? accent : Theme.background
 
   function run(command) {
     if (command !== "")
@@ -38,7 +39,7 @@ Rectangle {
     id: label
     anchors.centerIn: parent
     text: root.text
-    color: pointer.containsMouse ? "#181926" : root.accent
+    color: pointer.containsMouse ? Theme.background : root.accent
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16
     font.bold: true

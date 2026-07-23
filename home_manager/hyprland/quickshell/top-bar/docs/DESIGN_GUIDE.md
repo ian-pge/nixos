@@ -13,7 +13,7 @@ Principes fondamentaux :
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
 - Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
-- Le style conserve les neutres sombres de Catppuccin, mais la capsule centrale utilise exclusivement les accents rose néon et jaune néon des workspaces.
+- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, tandis que les capsules latérales statiques gardent leurs accents Catppuccin historiques.
 
 ## 2. Architecture à préserver
 
@@ -23,9 +23,11 @@ Principes fondamentaux :
 - `../StatusData.qml` : source d’état globale, processus externes, timers, IPC et exclusivité entre overlays.
 - `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
+- `../components/Theme.js` : source unique des couleurs QML, y compris les accents fixes des capsules latérales.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
 - `../components/NowPlayingIndicator.qml` : média MPRIS et métadonnées textuelles.
 - `../components/AppLauncher.qml` : lanceur natif, icônes et recherche fuzzy.
+- `../components/ChromeTabsLauncher.qml` : recherche et activation des onglets Chrome via TabCtl.
 - `../components/WifiSelector.qml` / `BluetoothSelector.qml` : sélecteurs clavier.
 - `../components/UpdateSelector.qml` : liste des mises à jour.
 - `../components/Pill.qml` : capsule générique des modules latéraux.
@@ -38,9 +40,9 @@ Principes fondamentaux :
 
 Conséquences :
 
-- Wi-Fi, Bluetooth, volume, luminosité, média, lanceur et updates apparaissent uniquement sur leur moniteur cible.
+- Wi-Fi, Bluetooth, volume, luminosité, média, lanceur, onglets Chrome et updates apparaissent uniquement sur leur moniteur cible.
 - Les autres écrans continuent d’afficher leur `WorkspaceSwitcher` et ne transforment pas leur capsule centrale.
-- Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor`, `appLauncherTargetMonitor`, `updateTargetMonitor`, `volumeTargetMonitor`, `brightnessTargetMonitor` et `mediaTargetMonitor` pilotent à la fois le rendu et, pour les sélecteurs interactifs, le focus clavier.
+- Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor`, `appLauncherTargetMonitor`, `chromeTabsTargetMonitor`, `updateTargetMonitor`, `volumeTargetMonitor`, `brightnessTargetMonitor` et `mediaTargetMonitor` pilotent à la fois le rendu et, pour les sélecteurs interactifs, le focus clavier.
 - Un clic sur une capsule latérale transmet toujours le nom du moniteur de cette barre. Un raccourci IPC sans cible utilise le moniteur Hyprland actuellement focalisé.
 - Activer un overlay déjà ouvert depuis un autre écran le déplace vers ce nouvel écran ; l’activer à nouveau sur son écran courant le ferme.
 
@@ -55,8 +57,8 @@ Conséquences :
 | Espacement entre modules latéraux | `10px` |
 | Largeur volume/luminosité | `280px` |
 | Largeur Wi-Fi/Bluetooth | `400px` |
-| Largeur média / updates / lanceur | `480px` |
-| Hauteur lanceur | `398px` |
+| Largeur média / updates / lanceurs | `480px` |
+| Hauteur lanceur applications / onglets | `398px` |
 | Hauteur d’une ligne update | `30px` |
 | Hauteur d’une ligne application | `42px` |
 
@@ -88,27 +90,51 @@ Ainsi, le widget update grandit uniquement vers le bas, jamais vers le haut.
 
 ## 4. Palette visuelle
 
-Couleurs de référence de la capsule centrale :
+`components/Theme.js` est l’unique source des couleurs QML de la barre :
 
-| Usage | Couleur |
-|---|---|
-| Fond principal | `#181926` |
-| Surface secondaire | `#363a4f` |
-| Surface tertiaire | `#24273a` / `#494d64` |
-| Texte principal | `#cad3f5` |
-| Texte secondaire / compteurs / cadenas | `#939ab7` |
-| Élément neutre discret | `#6e738d` |
-| Rose néon, accent principal | `#ff33cc` |
-| Jaune néon, accent secondaire | `#ffcc33` |
+| Token | Couleur | Signification |
+|---|---|---|
+| `Theme.action` | `#ff33cc` | action, sélection, focus et valeur manipulée |
+| `Theme.state` | `#ffcc33` | état persistant, connecté, occupé, actif ou opération en cours |
+| `Theme.error` | `#ed8796` | erreur uniquement |
+| `Theme.foreground` | `#cad3f5` | texte principal |
+| `Theme.selectedForeground` | `#ffffff` | texte principal sur une ligne sélectionnée |
+| `Theme.secondary` | `#939ab7` | métadonnée, compteur ou information secondaire |
+| `Theme.inactive` | `#6e738d` | état inactif ou vide |
+| `Theme.background` | `#181926` | fond principal |
+| `Theme.surface` | `#24273a` | surface secondaire |
+| `Theme.surfaceRaised` | `#363a4f` | séparateur, piste ou survol |
+| `Theme.surfaceSelected` | `#494d64` | surface interne sélectionnée |
 
-La capsule centrale suit une palette volontairement bi-accent :
+Règle sémantique de la capsule centrale :
 
-- le rose identifie les actions, la sélection, les éléments disponibles et les erreurs ;
-- le jaune indique les états connectés, actifs ou en cours, et sert d’accent secondaire ;
-- les nuances neutres Catppuccin restent autorisées pour les fonds, le texte, les séparateurs et les états inactifs ;
-- aucun autre accent Catppuccin (bleu, vert, rouge saumon, mauve, etc.) ne doit être introduit dans les workspaces, volume, luminosité, média, Wi-Fi, Bluetooth, updates ou lanceur.
+- **rose** : ce que l’utilisateur contrôle maintenant — workspace affiché, ligne sélectionnée, champ de recherche, action Enter, volume et luminosité ;
+- **jaune** : ce qui existe ou fonctionne indépendamment de la sélection — workspace occupé, application déjà ouverte, onglet Chrome actif ou épinglé, connexion réseau/Bluetooth, lecture et traitement en cours ;
+- **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
+- **rouge** : échec explicite uniquement, jamais une action normale.
 
-Cette restriction concerne la capsule centrale. Les capsules latérales conservent pour l’instant leurs accents propres.
+Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
+
+Les capsules latérales sont une exception volontaire : elles ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js` :
+
+| Capsule | Token | Couleur |
+|---|---|---|
+| Applications | `Theme.sideApplications` | `#7dc4e4` |
+| Updates | `Theme.sideUpdates` | `#f0c6c6` |
+| Réseau | `Theme.sideNetwork` | `#ee99a0` |
+| Bluetooth | `Theme.sideBluetooth` | `#8aadf4` |
+| Disque | `Theme.sideDisk` | `#f5a97f` |
+| CPU | `Theme.sideCpu` | `#91d7e3` |
+| Mémoire | `Theme.sideMemory` | `#c6a0f6` |
+| GPU | `Theme.sideGpu` | `#a6da95` |
+| Batterie | `Theme.sideBattery` | `#f4dbd6` |
+| Volume | `Theme.sideVolume` | `#b7bdf8` |
+| Luminosité | `Theme.sideBrightness` | `#eed49f` |
+| Météo | `Theme.sideWeather` | `#f5bde6` |
+| Date | `Theme.sideDate` | `#8bd5ca` |
+| Heure | `Theme.sideTime` | `#ed8796` |
+
+Ne pas écrire de nouveau littéral hexadécimal dans un fichier QML : ajouter ou réutiliser un token de `Theme.js`. Le shader du liseré et les couleurs de bordure Hyprland sont des systèmes séparés.
 
 Police : `Ubuntu Nerd Font`.
 
@@ -132,7 +158,7 @@ Une dimension qui ne change pas ne doit pas être animée. La capsule ne doit ja
 
 ### Convention unique pour tous les widgets
 
-Cette interpolation monotone est commune aux transformations entre workspaces, volume, luminosité, média, Wi-Fi, Bluetooth, updates et lanceur d’applications.
+Cette interpolation monotone est commune aux transformations entre workspaces, volume, luminosité, média, Wi-Fi, Bluetooth, updates, lanceur d’applications et onglets Chrome.
 
 Ne pas réintroduire :
 
@@ -147,7 +173,7 @@ Les animations secondaires suivent la même règle : le hover et les interaction
 
 Les composants source et destination restent rendus simultanément pendant une courte fenêtre. Leurs opacités et translations sont calculées depuis un unique `transitionProgress` de `0` à `1`; aucun composant ne possède son propre `Behavior on opacity` ou timer d’entrée.
 
-Le conteneur, le clipping et la bordure restent persistants. Seuls les contenus se croisent à l’intérieur, comme dans une container transform. Une répétition du même mode sur le même moniteur ne redémarre pas la transition. En cas d’interruption, les opacités et offsets actuellement rendus des huit modes sont capturés dans des tables ; la nouvelle destination continue depuis sa valeur courante et toutes les autres couches encore visibles terminent leur fade au lieu de disparaître brutalement. Cette règle reste valable même pour une séquence très rapide A → B → C → D.
+Le conteneur, le clipping et la bordure restent persistants. Seuls les contenus se croisent à l’intérieur, comme dans une container transform. Une répétition du même mode sur le même moniteur ne redémarre pas la transition. En cas d’interruption, les opacités et offsets actuellement rendus des neuf modes sont capturés dans des tables ; la nouvelle destination continue depuis sa valeur courante et toutes les autres couches encore visibles terminent leur fade au lieu de disparaître brutalement. Cette règle reste valable même pour une séquence très rapide A → B → C → D.
 
 ## 6. Animation contextuelle du contenu central
 
@@ -184,6 +210,7 @@ Le liseré apparaît lorsque `centerMorph.overlayVisible` est vrai, donc pour :
 - Bluetooth ;
 - média MPRIS ;
 - lanceur d’applications ;
+- onglets Chrome ;
 - updates.
 
 Il disparaît uniquement quand la capsule redevient le widget des workspaces.
@@ -284,10 +311,9 @@ Un vrai spinner est réservé à :
 ### Couleurs d’état
 
 - connecté : point jaune néon `#ffcc33` ;
-- Bluetooth appairé mais déconnecté : rose néon `#ff33cc` ;
-- Bluetooth non appairé : gris ;
+- tout appareil Bluetooth non connecté, appairé ou non : gris ;
 - icônes Wi-Fi et Bluetooth : rose néon `#ff33cc` ;
-- onglet Bluetooth `PAIRED` : rose néon, onglet `NEARBY` : jaune néon ;
+- onglets Bluetooth `PAIRED` et `NEARBY` : rose, car ils décrivent le filtre actuellement manipulé ;
 - cadenas Wi-Fi : même gris que le compteur (`#939ab7`).
 
 ## 11. Lanceur d’applications
@@ -300,11 +326,24 @@ Conventions :
 - toutes les applications non marquées `NoDisplay` restent accessibles avec une icône issue du thème ;
 - le catalogue normalisé est construit une seule fois, puis la recherche fuzzy s’effectue en mémoire ;
 - le `ListView` virtualise les lignes pour ne charger que les icônes visibles ;
-- haut/bas, `Ctrl+n/p`, PageUp/PageDown et molette naviguent ;
+- haut/bas, `Ctrl+n/p`, `Ctrl+j/k`, PageUp/PageDown et molette naviguent ;
 - un point jaune néon `#ffcc33` indique qu’au moins une fenêtre correspondante est déjà ouverte ;
 - `Enter` active la fenêtre ouverte la plus récemment utilisée, sinon lance l’application ;
-- `Shift+Enter` lance toujours une nouvelle instance et `Esc` ferme ;
+- `Ctrl+Enter` lance toujours une nouvelle instance et `Esc` ferme ;
 - le texte saisi doit toujours rester du texte de recherche : ne pas réserver `j`, `k` ou `q`.
+
+### Onglets Chrome
+
+`Super+;` ouvre `ChromeTabsLauncher.qml` avec la même géométrie et les mêmes conventions de recherche que le lanceur d’applications. La liste provient exclusivement de TabCtl 2 via son extension Chrome Manifest V3, Native Messaging puis D-Bus ; aucune API ou extension Vicinae ne participe à ce chemin.
+
+- `tabctl --format json list` est encapsulé par `quickshell-chrome-tabs` afin que QML reçoive toujours un objet JSON, y compris lorsque Chrome est fermé ou que l’extension n’est pas encore connectée ;
+- le catalogue contient le titre, l’URL, la fenêtre, l’index et les états actif/épinglé ;
+- les favicons sont extraits localement du SQLite `Default/Favicons` de Chrome vers `$XDG_CACHE_HOME/quickshell/chrome-favicons`, sans requête réseau ; si l’icône manque, le logo Chrome est gris pour un onglet inactif et jaune pour l’onglet actif ;
+- la recherche fuzzy porte sur le titre et l’URL ;
+- `Enter` appelle `tabctl activate --focused`, `Ctrl+W` ferme l’onglet, `Ctrl+R` recharge la liste et `Esc` ferme le widget ;
+- clic gauche : activation ; clic droit : fermeture ;
+- huit lignes complètes sont visibles et le `ListView` reste virtualisé ;
+- l’extension TabCtl est installée manuellement depuis le Chrome Web Store ; seul le manifeste `tabctl_mediator.json` est géré par Home Manager, donc ne jamais exécuter `tabctl install` manuellement.
 
 ## 12. Volume et luminosité
 
@@ -314,8 +353,8 @@ Conventions :
 - La barre de progression anime sa largeur en `140ms`.
 - Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
 - La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif.
-- Le volume utilise le rose néon `#ff33cc`, ou le jaune néon `#ffcc33` lorsqu’il est muet.
-- La luminosité utilise le jaune néon `#ffcc33`.
+- Le volume et la luminosité utilisent exclusivement le rose néon `#ff33cc`, icône et remplissage compris.
+- Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage rose indique le niveau.
 - Chaque indicateur central apparaît uniquement sur le moniteur qui a reçu la touche ou le geste de molette.
 
 ## 13. Contrôles média MPRIS
@@ -326,7 +365,7 @@ Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `p
 
 Les raccourcis Hyprland appellent les méthodes IPC `mediaPlayPause`, `mediaNext` et `mediaPrevious`. Chaque méthode vérifie les capacités du lecteur avant l’action.
 
-`NowPlayingIndicator.qml` occupe `480px`, comme le lanceur d’applications. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’état play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres restent basses lorsque le lecteur est en pause et s’animent indépendamment pendant la lecture. L’icône de lecture est jaune néon `#ffcc33` et l’icône de pause rose néon `#ff33cc`. Le widget reste visible `4000ms` après une action média ou un changement de piste. Un changement automatique de piste ne doit jamais interrompre un sélecteur interactif Wi-Fi, Bluetooth, lanceur ou updates.
+`NowPlayingIndicator.qml` occupe `480px`, comme le lanceur d’applications. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média ou un changement de piste. Un changement automatique de piste ne doit jamais interrompre un sélecteur interactif Wi-Fi, Bluetooth, lanceur d’applications, onglets Chrome ou updates.
 
 ## 14. Exclusivité entre overlays
 
@@ -334,7 +373,7 @@ Un seul mode central peut être actif à la fois.
 
 Lors de l’ouverture d’un overlay :
 
-- fermer le lanceur via `hideAppLauncher()` ;
+- fermer les lanceurs via `hideAppLauncher()` et `hideChromeTabs()` ;
 - fermer Wi-Fi/Bluetooth via leurs fonctions `hide*`, jamais par mutation directe des booléens ;
 - arrêter les timers volume/luminosité via `hideVolumeOverlay()` et `hideBrightnessOverlay()` ;
 - fermer updates via `hideUpdateSelector()` ;
@@ -352,10 +391,21 @@ Une action Bluetooth native déjà lancée continue lorsque le sélecteur est ma
 ### Applications — `Super+A`
 
 - saisir directement pour filtrer en fuzzy
-- haut/bas ou `Ctrl+n/p` : navigation
+- haut/bas, `Ctrl+n/p` ou `Ctrl+j/k` : navigation
 - PageUp/PageDown : saut de huit résultats
 - `Enter` : activer l’instance ouverte, sinon lancer
-- `Shift+Enter` : lancer une nouvelle instance
+- `Ctrl+Enter` : lancer une nouvelle instance
+- `Esc` : fermeture
+
+### Onglets Chrome — `Super+;`
+
+- saisir directement pour filtrer titre et URL
+- haut/bas, `Ctrl+n/p` ou `Ctrl+j/k` : navigation
+- PageUp/PageDown : saut de huit résultats
+- `Enter` : activer l’onglet et focaliser sa fenêtre Chrome
+- `Ctrl+W` : fermer l’onglet sélectionné
+- `Ctrl+R` : recharger la liste
+- clic droit : fermer l’onglet
 - `Esc` : fermeture
 
 ### Wi-Fi — `Super+N`
@@ -455,7 +505,18 @@ qs --config top-bar ipc call topbar toggleWifi
 qs --config top-bar ipc call topbar toggleBluetooth
 qs --config top-bar ipc call topbar toggleUpdates
 qs --config top-bar ipc call topbar toggleLauncher
+qs --config top-bar ipc call topbar toggleChromeTabs
 ```
+
+### Validation TabCtl
+
+```bash
+tabctl status
+quickshell-chrome-tabs list | jq '{ok, count: (.tabs | length), error}'
+pgrep -af tabctl-mediator
+```
+
+`tabctl status` doit annoncer la même version de protocole pour le médiateur et l’extension. Tester manuellement `Enter`, `Ctrl+W`, `Ctrl+R`, le clic droit et le déplacement de l’overlay entre les deux moniteurs ; ne jamais fermer automatiquement un onglet utilisateur pendant une validation.
 
 ### Invariants à contrôler après une animation
 

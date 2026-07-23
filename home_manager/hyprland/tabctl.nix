@@ -7,10 +7,19 @@
     src = inputs.tabctl;
   };
 
+  chromeTabFavicons = pkgs.writeShellApplication {
+    name = "quickshell-chrome-tab-favicons";
+    runtimeInputs = [pkgs.python3];
+    text = ''
+      exec python3 ${./quickshell/helpers/chrome-tab-favicons.py}
+    '';
+  };
+
   chromeTabs = pkgs.writeShellApplication {
     name = "quickshell-chrome-tabs";
     runtimeInputs = [
       tabctl
+      chromeTabFavicons
       pkgs.jq
     ];
     text = ''
@@ -18,18 +27,27 @@
       case "$command" in
         list)
           if output="$(tabctl --format json list 2>&1)"; then
-            jq -cn --argjson tabs "$output" '{ok: true, tabs: $tabs}'
+            printf '%s' "$output" | quickshell-chrome-tab-favicons
           else
-            jq -cn --arg error "$output" '{ok: false, tabs: [], error: $error}'
+            error="''${output%%$'\n'*}"
+            error="''${error#Error: }"
+            jq -cn --arg error "$error" '{ok: false, tabs: [], error: $error}'
           fi
           ;;
-        activate)
+        activate|close)
           tab_id="''${2:?missing tab id}"
-          exec tabctl activate --focused "$tab_id"
-          ;;
-        close)
-          tab_id="''${2:?missing tab id}"
-          exec tabctl close "$tab_id"
+          if [[ "$command" == "activate" ]]; then
+            action=(tabctl activate --focused "$tab_id")
+          else
+            action=(tabctl close "$tab_id")
+          fi
+          if output="$("''${action[@]}" 2>&1)"; then
+            jq -cn '{ok: true}'
+          else
+            error="''${output%%$'\n'*}"
+            error="''${error#Error: }"
+            jq -cn --arg error "$error" '{ok: false, error: $error}'
+          fi
           ;;
         status)
           exec tabctl status

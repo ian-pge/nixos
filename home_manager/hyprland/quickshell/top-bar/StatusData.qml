@@ -38,6 +38,9 @@ Scope {
   property int chromeTabsSelectedIndex: 0
   property bool chromeTabsLoading: false
   property string chromeTabsMessage: ""
+  property string chromeTabsAction: ""
+  property string chromeTabsActionTabId: ""
+  readonly property bool chromeTabsActionPending: chromeTabsAction !== ""
   property var chromeTabCatalog: []
   property var chromeTabResults: []
   property bool mediaOverlayVisible: false
@@ -185,7 +188,6 @@ Scope {
   readonly property int batteryPercent: batteryAvailable
     ? Math.round(battery.percentage * 100)
     : 0
-
   readonly property var mprisPlayer: {
     const players = Mpris.players.values.filter(player => player.canControl);
     return players.find(player => player.dbusName.includes("playerctld"))
@@ -528,6 +530,8 @@ Scope {
       return;
     chromeTabsLoading = true;
     chromeTabsMessage = "";
+    chromeTabCatalog = [];
+    refreshChromeTabResults();
     chromeTabsProcess.running = true;
   }
 
@@ -542,29 +546,63 @@ Scope {
       + chromeTabResults.length) % chromeTabResults.length;
   }
 
+  function runChromeTabAction(action, tabId) {
+    if (chromeTabsActionPending)
+      return;
+    chromeTabsAction = action;
+    chromeTabsActionTabId = tabId;
+    chromeTabsMessage = "";
+    if (action === "activate")
+      chromeTabsActivationDelay.restart();
+    else
+      chromeTabsActionProcess.exec(["quickshell-chrome-tabs", action, tabId]);
+  }
+
   function activateSelectedChromeTab(index = chromeTabsSelectedIndex) {
-    if (chromeTabResults.length === 0)
+    if (chromeTabsLoading || chromeTabResults.length === 0)
       return;
     const boundedIndex = Math.max(0, Math.min(index,
       chromeTabResults.length - 1));
-    const tabId = chromeTabResults[boundedIndex].tab.id;
-    hideChromeTabs();
-    Quickshell.execDetached(["quickshell-chrome-tabs", "activate", tabId]);
+    runChromeTabAction("activate", chromeTabResults[boundedIndex].tab.id);
   }
 
   function closeSelectedChromeTab(index = chromeTabsSelectedIndex) {
-    if (chromeTabResults.length === 0)
+    if (chromeTabsLoading || chromeTabResults.length === 0)
       return;
     const boundedIndex = Math.max(0, Math.min(index,
       chromeTabResults.length - 1));
-    const tabId = chromeTabResults[boundedIndex].tab.id;
-    chromeTabCatalog = chromeTabCatalog.filter(candidate =>
-      candidate.tab.id !== tabId);
-    refreshChromeTabResults();
-    if (chromeTabResults.length > 0)
-      chromeTabsSelectedIndex = Math.min(boundedIndex,
-        chromeTabResults.length - 1);
-    Quickshell.execDetached(["quickshell-chrome-tabs", "close", tabId]);
+    runChromeTabAction("close", chromeTabResults[boundedIndex].tab.id);
+  }
+
+  function parseChromeTabActionResponse(text) {
+    const action = chromeTabsAction;
+    const tabId = chromeTabsActionTabId;
+    chromeTabsAction = "";
+    chromeTabsActionTabId = "";
+    try {
+      const response = JSON.parse(text.trim());
+      if (!response.ok) {
+        chromeTabCatalog = [];
+        chromeTabsMessage = response.error || "Chrome tab action failed";
+        refreshChromeTabResults();
+        return;
+      }
+      if (action === "activate") {
+        hideChromeTabs();
+      } else if (action === "close") {
+        const previousIndex = chromeTabsSelectedIndex;
+        chromeTabCatalog = chromeTabCatalog.filter(candidate =>
+          candidate.tab.id !== tabId);
+        refreshChromeTabResults();
+        if (chromeTabResults.length > 0)
+          chromeTabsSelectedIndex = Math.min(previousIndex,
+            chromeTabResults.length - 1);
+      }
+    } catch (error) {
+      chromeTabCatalog = [];
+      chromeTabsMessage = "Unable to complete Chrome tab action";
+      refreshChromeTabResults();
+    }
   }
 
   function resolveTargetMonitor(targetMonitor = "") {
@@ -1344,6 +1382,26 @@ Scope {
 
     stdout: StdioCollector {
       onStreamFinished: root.parseChromeTabsResponse(text)
+    }
+  }
+
+  // Give the compositor one frame to release the layer-shell exclusive
+  // keyboard grab before Chrome requests focus for the selected window.
+  Timer {
+    id: chromeTabsActivationDelay
+    interval: 50
+    repeat: false
+    onTriggered: chromeTabsActionProcess.exec([
+      "quickshell-chrome-tabs", root.chromeTabsAction,
+      root.chromeTabsActionTabId
+    ])
+  }
+
+  Process {
+    id: chromeTabsActionProcess
+
+    stdout: StdioCollector {
+      onStreamFinished: root.parseChromeTabActionResponse(text)
     }
   }
 

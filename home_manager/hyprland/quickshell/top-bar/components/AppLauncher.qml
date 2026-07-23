@@ -1,5 +1,6 @@
 import Quickshell
 import QtQuick
+import "Theme.js" as Theme
 
 FocusScope {
   id: root
@@ -61,7 +62,7 @@ FocusScope {
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: "󰍉"
-      color: "#ff33cc"
+      color: Theme.action
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
@@ -76,9 +77,9 @@ FocusScope {
       y: 7
       height: 28
       verticalAlignment: TextInput.AlignVCenter
-      color: "#cad3f5"
-      selectionColor: "#ff33cc"
-      selectedTextColor: "#181926"
+      color: Theme.foreground
+      selectionColor: Theme.action
+      selectedTextColor: Theme.background
       clip: true
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -89,11 +90,13 @@ FocusScope {
 
       Keys.onPressed: event => {
         const control = event.modifiers & Qt.ControlModifier;
-        if (event.key === Qt.Key_Down || (control && event.key === Qt.Key_N)
+        if (event.key === Qt.Key_Down
+            || (control && (event.key === Qt.Key_N || event.key === Qt.Key_J))
             || event.key === Qt.Key_Tab) {
           statusData.moveAppLauncherSelection(1);
           event.accepted = true;
-        } else if (event.key === Qt.Key_Up || (control && event.key === Qt.Key_P)
+        } else if (event.key === Qt.Key_Up
+            || (control && (event.key === Qt.Key_P || event.key === Qt.Key_K))
             || (event.key === Qt.Key_Backtab)) {
           statusData.moveAppLauncherSelection(-1);
           event.accepted = true;
@@ -113,7 +116,7 @@ FocusScope {
           event.accepted = true;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
           statusData.launchSelectedApp(statusData.appLauncherSelectedIndex,
-            (event.modifiers & Qt.ShiftModifier) !== 0);
+            control !== 0);
           event.accepted = true;
         } else if (event.key === Qt.Key_Escape) {
           statusData.hideAppLauncher();
@@ -130,7 +133,7 @@ FocusScope {
       visible: searchInput.text === ""
       verticalAlignment: Text.AlignVCenter
       text: "Search applications…"
-      color: "#6e738d"
+      color: Theme.inactive
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
       font.bold: true
@@ -146,7 +149,7 @@ FocusScope {
       horizontalAlignment: Text.AlignRight
       verticalAlignment: Text.AlignVCenter
       text: results.length + (results.length === 1 ? " APP" : " APPS")
-      color: results.length > 0 ? "#ffcc33" : "#ff33cc"
+      color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 10
       font.bold: true
@@ -159,7 +162,7 @@ FocusScope {
       anchors.rightMargin: 14
       y: 41
       height: 1
-      color: "#363a4f"
+      color: Theme.surfaceRaised
     }
 
     ListView {
@@ -197,7 +200,7 @@ FocusScope {
           anchors.topMargin: 2
           anchors.bottomMargin: 2
           radius: 10
-          color: appRow.selected ? "#363a4f" : "transparent"
+          color: appRow.selected ? Theme.surfaceRaised : "transparent"
 
           Behavior on color { ColorAnimation { duration: 90 } }
         }
@@ -210,7 +213,7 @@ FocusScope {
           width: 30
           height: 30
           radius: 8
-          color: appRow.selected ? "#494d64" : "#24273a"
+          color: appRow.selected ? Theme.surfaceSelected : Theme.surface
 
           Image {
             id: appIcon
@@ -229,7 +232,7 @@ FocusScope {
             visible: appIcon.status === Image.Error
             anchors.centerIn: parent
             text: "󰀻"
-            color: "#ff33cc"
+            color: appRow.selected ? Theme.action : Theme.inactive
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 15
             font.bold: true
@@ -245,7 +248,7 @@ FocusScope {
           height: 18
           verticalAlignment: Text.AlignVCenter
           text: appRow.entry.name
-          color: appRow.selected ? "#ffffff" : "#cad3f5"
+          color: appRow.selected ? Theme.selectedForeground : Theme.foreground
           elide: Text.ElideRight
           font.family: "Ubuntu Nerd Font"
           font.pixelSize: 13
@@ -262,7 +265,7 @@ FocusScope {
           verticalAlignment: Text.AlignVCenter
           text: appRow.entry.genericName !== "" ? appRow.entry.genericName
             : appRow.entry.comment
-          color: "#939ab7"
+          color: Theme.secondary
           elide: Text.ElideRight
           font.family: "Ubuntu Nerd Font"
           font.pixelSize: 10
@@ -277,7 +280,7 @@ FocusScope {
           height: 7
           radius: 3.5
           visible: appRow.runningToplevel !== null
-          color: "#ffcc33"
+          color: Theme.state
         }
 
         Text {
@@ -288,7 +291,7 @@ FocusScope {
           width: 24
           horizontalAlignment: Text.AlignHCenter
           text: appRow.selected ? "󰌑" : ""
-          color: "#ff33cc"
+          color: Theme.action
           font.family: "Ubuntu Nerd Font"
           font.pixelSize: 14
           font.bold: true
@@ -321,7 +324,7 @@ FocusScope {
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: "No matching applications"
-      color: "#939ab7"
+      color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 13
       font.bold: true

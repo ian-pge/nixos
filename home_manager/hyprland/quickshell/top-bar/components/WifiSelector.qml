@@ -1,4 +1,5 @@
 import QtQuick
+import "Theme.js" as Theme
 
 FocusScope {
   id: root
@@ -137,7 +138,7 @@ FocusScope {
         return root.signalIcon(root.selectedNetwork.strength);
       return "󰤭";
     }
-    color: "#ff33cc"
+    color: Theme.action
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
@@ -161,7 +162,7 @@ FocusScope {
     height: 7
     radius: 3.5
     color: root.selectedNetwork !== null && root.selectedNetwork.active
-      ? "#ffcc33" : "#6e738d"
+      ? Theme.state : Theme.inactive
   }
 
   Item {
@@ -180,7 +181,7 @@ FocusScope {
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
       transform: Translate { id: outgoingSlide }
-      color: "#cad3f5"
+      color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -192,7 +193,7 @@ FocusScope {
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
       transform: Translate { id: incomingSlide }
-      color: "#cad3f5"
+      color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -236,7 +237,7 @@ FocusScope {
         && root.selectedNetwork.security !== "--" ? "󰌾" : ""
       height: 18
       verticalAlignment: Text.AlignVCenter
-      color: "#939ab7"
+      color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 13
     }
@@ -248,7 +249,7 @@ FocusScope {
           : "0/0"
       height: 18
       verticalAlignment: Text.AlignVCenter
-      color: "#939ab7"
+      color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 12
       font.bold: true

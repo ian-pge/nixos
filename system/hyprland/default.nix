@@ -3,7 +3,6 @@
     inputs.catppuccin.nixosModules.catppuccin
 
     ./home_manager.nix
-    ./chrome-extensions.nix
     ./nvidia.nix
     ./bluetooth.nix
     ./keyring.nix

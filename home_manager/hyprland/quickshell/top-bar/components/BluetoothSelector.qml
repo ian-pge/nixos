@@ -1,5 +1,6 @@
 import Quickshell.Bluetooth
 import QtQuick
+import "Theme.js" as Theme
 
 FocusScope {
   id: root
@@ -104,7 +105,7 @@ FocusScope {
     anchors.verticalCenter: parent.verticalCenter
     text: statusData.bluetoothSelectorScanning ? "󰑐"
       : root.selectedDeviceConnected ? "󰂯" : "󰂲"
-    color: "#ff33cc"
+    color: Theme.action
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
@@ -127,8 +128,7 @@ FocusScope {
     width: 7
     height: 7
     radius: 3.5
-    color: root.selectedDeviceConnected ? "#ffcc33"
-      : root.selectedDevice !== null && root.selectedDevice.paired ? "#ff33cc" : "#6e738d"
+    color: root.selectedDeviceConnected ? Theme.state : Theme.inactive
   }
 
   Item {
@@ -147,7 +147,7 @@ FocusScope {
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
       transform: Translate { id: outgoingSlide }
-      color: "#cad3f5"
+      color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -159,7 +159,7 @@ FocusScope {
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
       transform: Translate { id: incomingSlide }
-      color: "#cad3f5"
+      color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -201,7 +201,7 @@ FocusScope {
       text: statusData.bluetoothTab === 0 ? "PAIRED" : "NEARBY"
       height: 18
       verticalAlignment: Text.AlignVCenter
-      color: statusData.bluetoothTab === 0 ? "#ff33cc" : "#ffcc33"
+      color: Theme.action
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 11
       font.bold: true
@@ -212,7 +212,7 @@ FocusScope {
         ? (statusData.bluetoothSelectedIndex + 1) + "/" + root.devices.length : "0/0"
       height: 18
       verticalAlignment: Text.AlignVCenter
-      color: "#939ab7"
+      color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 12
       font.bold: true

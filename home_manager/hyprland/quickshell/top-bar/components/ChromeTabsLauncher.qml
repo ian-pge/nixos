@@ -1,4 +1,5 @@
 import QtQuick
+import "Theme.js" as Theme
 
 FocusScope {
   id: root
@@ -70,7 +71,7 @@ FocusScope {
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: "󰍉"
-      color: "#ff33cc"
+      color: Theme.action
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
@@ -85,9 +86,9 @@ FocusScope {
       y: 7
       height: 28
       verticalAlignment: TextInput.AlignVCenter
-      color: "#cad3f5"
-      selectionColor: "#ff33cc"
-      selectedTextColor: "#181926"
+      color: Theme.foreground
+      selectionColor: Theme.action
+      selectedTextColor: Theme.background
       clip: true
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -98,11 +99,13 @@ FocusScope {
 
       Keys.onPressed: event => {
         const control = event.modifiers & Qt.ControlModifier;
-        if (event.key === Qt.Key_Down || (control && event.key === Qt.Key_N)
+        if (event.key === Qt.Key_Down
+            || (control && (event.key === Qt.Key_N || event.key === Qt.Key_J))
             || event.key === Qt.Key_Tab) {
           statusData.moveChromeTabsSelection(1);
           event.accepted = true;
-        } else if (event.key === Qt.Key_Up || (control && event.key === Qt.Key_P)
+        } else if (event.key === Qt.Key_Up
+            || (control && (event.key === Qt.Key_P || event.key === Qt.Key_K))
             || event.key === Qt.Key_Backtab) {
           statusData.moveChromeTabsSelection(-1);
           event.accepted = true;
@@ -143,7 +146,7 @@ FocusScope {
       visible: searchInput.text === ""
       verticalAlignment: Text.AlignVCenter
       text: "Search Chrome tabs…"
-      color: "#6e738d"
+      color: Theme.inactive
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
       font.bold: true
@@ -159,8 +162,11 @@ FocusScope {
       horizontalAlignment: Text.AlignRight
       verticalAlignment: Text.AlignVCenter
       text: statusData.chromeTabsLoading ? "LOADING"
+        : statusData.chromeTabsActionPending ? "WORKING"
         : results.length + (results.length === 1 ? " TAB" : " TABS")
-      color: statusData.chromeTabsMessage !== "" ? "#ed8796" : "#a6da95"
+      color: statusData.chromeTabsMessage !== "" ? Theme.error
+        : statusData.chromeTabsLoading || statusData.chromeTabsActionPending
+          ? Theme.state : Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 10
       font.bold: true
@@ -173,7 +179,7 @@ FocusScope {
       anchors.rightMargin: 14
       y: 41
       height: 1
-      color: "#363a4f"
+      color: Theme.surfaceRaised
     }
 
     ListView {
@@ -206,7 +212,7 @@ FocusScope {
           anchors.topMargin: 2
           anchors.bottomMargin: 2
           radius: 10
-          color: tabRow.selected ? "#363a4f" : "transparent"
+          color: tabRow.selected ? Theme.surfaceRaised : "transparent"
 
           Behavior on color { ColorAnimation { duration: 90 } }
         }
@@ -219,12 +225,24 @@ FocusScope {
           width: 30
           height: 30
           radius: 8
-          color: tabRow.selected ? "#494d64" : "#24273a"
+          color: tabRow.selected ? Theme.surfaceSelected : Theme.surface
+
+          Image {
+            id: favicon
+            anchors.fill: parent
+            anchors.margins: 4
+            source: tabRow.tab.iconPath
+              ? "file://" + tabRow.tab.iconPath : ""
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            cache: true
+          }
 
           Text {
             anchors.centerIn: parent
+            visible: !tabRow.tab.iconPath || favicon.status === Image.Error
             text: ""
-            color: tabRow.tab.active ? "#a6da95" : "#8aadf4"
+            color: tabRow.tab.active ? Theme.state : Theme.inactive
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 17
             font.bold: true
@@ -240,7 +258,7 @@ FocusScope {
           height: 18
           verticalAlignment: Text.AlignVCenter
           text: tabRow.tab.title || "Untitled tab"
-          color: tabRow.selected ? "#ffffff" : "#cad3f5"
+          color: tabRow.selected ? Theme.selectedForeground : Theme.foreground
           elide: Text.ElideRight
           font.family: "Ubuntu Nerd Font"
           font.pixelSize: 13
@@ -256,7 +274,7 @@ FocusScope {
           height: 15
           verticalAlignment: Text.AlignVCenter
           text: root.urlLabel(tabRow.tab.url)
-          color: "#939ab7"
+          color: Theme.secondary
           elide: Text.ElideRight
           font.family: "Ubuntu Nerd Font"
           font.pixelSize: 10
@@ -273,7 +291,7 @@ FocusScope {
           Text {
             visible: tabRow.tab.pinned
             text: "󰐃"
-            color: "#f5a97f"
+            color: Theme.state
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 12
             font.bold: true
@@ -285,7 +303,7 @@ FocusScope {
             width: 7
             height: 7
             radius: 3.5
-            color: "#a6da95"
+            color: Theme.state
           }
         }
 
@@ -297,7 +315,7 @@ FocusScope {
           width: 24
           horizontalAlignment: Text.AlignHCenter
           text: tabRow.selected ? "󰌑" : ""
-          color: "#ff33cc"
+          color: Theme.action
           font.family: "Ubuntu Nerd Font"
           font.pixelSize: 14
           font.bold: true
@@ -341,7 +359,7 @@ FocusScope {
           : statusData.chromeTabCatalog.length === 0
             ? "No Chrome tabs found"
             : "No matching Chrome tabs"
-      color: statusData.chromeTabsMessage !== "" ? "#ed8796" : "#939ab7"
+      color: statusData.chromeTabsMessage !== "" ? Theme.error : Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 13
       font.bold: true

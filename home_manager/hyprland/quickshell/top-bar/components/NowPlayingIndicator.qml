@@ -1,5 +1,6 @@
 import Quickshell.Services.Mpris
 import QtQuick
+import "Theme.js" as Theme
 
 Item {
   id: root
@@ -32,7 +33,7 @@ Item {
         width: 3
         height: level
         radius: 1.5
-        color: "#ff33cc"
+        color: root.playing ? Theme.state : Theme.inactive
 
         SequentialAnimation {
           id: barAnimation
@@ -82,7 +83,7 @@ Item {
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
     text: root.player !== null && root.player.isPlaying ? "󰏤" : "󰐊"
-    color: root.player !== null && root.player.isPlaying ? "#ffcc33" : "#ff33cc"
+    color: Theme.action
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16
     font.bold: true
@@ -103,7 +104,7 @@ Item {
         ? root.player.trackArtist : root.player !== null ? root.player.identity : "";
       return artist !== "" ? title + "  •  " + artist : title;
     }
-    color: "#cad3f5"
+    color: Theme.foreground
     elide: Text.ElideRight
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16

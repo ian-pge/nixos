@@ -1,10 +1,11 @@
 import Quickshell.Hyprland
 import QtQuick
+import "Theme.js" as Theme
 
 Item {
   id: root
 
-  property color backgroundColor: "#181926"
+  property color backgroundColor: Theme.background
   property string monitorName: ""
   property string activeSpecialWorkspace: ""
   readonly property bool specialWorkspaceVisible: activeSpecialWorkspace !== ""
@@ -95,8 +96,8 @@ Item {
           height: 24
           radius: 16
           color: active
-            ? "#ff33cc"
-            : hovered ? "#363a4f" : "transparent"
+            ? Theme.action
+            : hovered ? Theme.surfaceRaised : "transparent"
 
           Behavior on width {
             NumberAnimation {
@@ -115,10 +116,10 @@ Item {
               ? "󰮯"
               : workspaceButton.occupied ? "󰊠" : ""
             color: workspaceButton.active
-              ? "#181926"
+              ? Theme.background
               : workspaceButton.hovered
-                ? "#ff33cc"
-                : workspaceButton.occupied ? "#ffcc33" : "#6e738d"
+                ? Theme.action
+                : workspaceButton.occupied ? Theme.state : Theme.inactive
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 16
             font.bold: true
@@ -157,13 +158,13 @@ Item {
       width: root.specialSlotWidth
       height: 24
       radius: 12
-      color: "#ff33cc"
+      color: Theme.action
 
       Text {
         id: specialLabel
         anchors.centerIn: parent
         text: root.specialWorkspaceName
-        color: "#181926"
+        color: Theme.background
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 13
         font.bold: true
