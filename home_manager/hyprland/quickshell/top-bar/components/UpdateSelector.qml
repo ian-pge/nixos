@@ -31,29 +31,45 @@ FocusScope {
   Item {
     anchors.fill: parent
 
-    Text {
+    Item {
       id: updateIcon
       anchors.left: parent.left
       anchors.leftMargin: 16
       y: 9
       width: 20
       height: 20
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: statusData.nixChecking ? "󰑐" : updates.length > 0 ? "" : ""
-      color: statusData.nixChecking ? Theme.state
-        : updates.length > 0 ? Theme.action : Theme.inactive
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 17
-      font.bold: true
 
-      RotationAnimator on rotation {
-        running: statusData.nixChecking
-        from: 0
-        to: 360
-        duration: 900
-        loops: Animation.Infinite
-        onStopped: updateIcon.rotation = 0
+      Text {
+        id: checkingIcon
+        anchors.fill: parent
+        visible: statusData.nixChecking
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        text: "󰑐"
+        color: Theme.action
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 17
+        font.bold: true
+
+        RotationAnimator on rotation {
+          running: statusData.nixChecking
+          from: 0
+          to: 360
+          duration: 900
+          loops: Animation.Infinite
+        }
+      }
+
+      Text {
+        anchors.fill: parent
+        visible: !statusData.nixChecking
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        text: updates.length > 0 ? "" : ""
+        color: Theme.action
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 17
+        font.bold: true
       }
     }
 

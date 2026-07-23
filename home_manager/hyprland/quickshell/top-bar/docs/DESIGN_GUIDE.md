@@ -280,6 +280,14 @@ Conventions :
 
 Le slot n’apparaît que sur le moniteur où le special workspace est actif.
 
+Son ouverture et sa fermeture utilisent la même timeline de `360ms` que les
+autres transformations Quickshell : la largeur de la capsule suit
+`Easing.OutCubic`, l’entrée du slot passe de `0 → 1` entre `18 %` et `78 %`, et
+sa sortie de `1 → 0` entre `0 %` et `48 %`. Comme la hauteur reste identique,
+il n’y a pas de translation verticale. Les huit slots normaux restent stables
+pendant l’élargissement, le nom du special workspace reste rendu jusqu’à la fin
+du fade de sortie, et une interruption repart de l’opacité courante.
+
 ## 10. Wi-Fi et Bluetooth
 
 ### Géométrie et animation de navigation

@@ -61,7 +61,8 @@
         specialArgs = {inherit inputs overlays;};
 
         modules = [
-          ./system/specialisation.nix
+          ./system/shared
+          ./system/hyprland
         ];
       };
     };

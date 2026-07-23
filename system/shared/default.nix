@@ -1,6 +1,5 @@
 {inputs, overlays, ...}: {
-  # Apply local package overlays anywhere the shared system module is imported,
-  # including specialisations with inheritParentConfig = false.
+  # Apply local package overlays to the system configuration.
   nixpkgs.overlays = builtins.attrValues overlays;
 
   imports = [

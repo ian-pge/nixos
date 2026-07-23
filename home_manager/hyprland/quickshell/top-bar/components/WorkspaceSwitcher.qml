@@ -8,9 +8,15 @@ Item {
   property color backgroundColor: Theme.background
   property string monitorName: ""
   property string activeSpecialWorkspace: ""
+  property string presentedSpecialWorkspace: ""
+  property bool specialTransitionTargetVisible: false
+  property bool specialWorkspaceInitialized: false
+  property real specialTransitionProgress: 1
+  property real specialTransitionStartOpacity: 0
   readonly property bool specialWorkspaceVisible: activeSpecialWorkspace !== ""
-  readonly property string specialWorkspaceName: activeSpecialWorkspace.startsWith("special:")
-    ? activeSpecialWorkspace.slice(8) : activeSpecialWorkspace
+  readonly property bool specialSlotRendered: presentedSpecialWorkspace !== ""
+  readonly property string specialSlotName: presentedSpecialWorkspace.startsWith("special:")
+    ? presentedSpecialWorkspace.slice(8) : presentedSpecialWorkspace
   readonly property real specialSlotWidth: Math.max(70, specialLabel.implicitWidth + 24)
   readonly property real specialExtraWidth: specialWorkspaceVisible
     ? specialSlotWidth + 12 : 0
@@ -23,30 +29,99 @@ Item {
     return total;
   }
 
+  function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+  }
+
+  function smoothSegment(start, end, value) {
+    const progress = clamp01((value - start) / (end - start));
+    return progress * progress * (3 - 2 * progress);
+  }
+
+  function specialSlotOpacity() {
+    if (specialTransitionTargetVisible) {
+      const entryProgress = smoothSegment(0.18, 0.78,
+        specialTransitionProgress);
+      return specialTransitionStartOpacity
+        + (1 - specialTransitionStartOpacity) * entryProgress;
+    }
+    return specialTransitionStartOpacity
+      * (1 - smoothSegment(0, 0.48, specialTransitionProgress));
+  }
+
+  function setSpecialWorkspace(workspaceName, animate = true) {
+    if (specialWorkspaceInitialized
+        && workspaceName === activeSpecialWorkspace)
+      return;
+
+    const targetVisible = workspaceName !== "";
+    if (!specialWorkspaceInitialized || !animate) {
+      specialTransition.stop();
+      activeSpecialWorkspace = workspaceName;
+      presentedSpecialWorkspace = workspaceName;
+      specialTransitionTargetVisible = targetVisible;
+      specialTransitionStartOpacity = targetVisible ? 1 : 0;
+      specialTransitionProgress = 1;
+      specialWorkspaceInitialized = true;
+      return;
+    }
+
+    if (targetVisible && specialTransitionTargetVisible
+        && activeSpecialWorkspace !== "") {
+      activeSpecialWorkspace = workspaceName;
+      presentedSpecialWorkspace = workspaceName;
+      return;
+    }
+
+    const currentOpacity = specialSlotOpacity();
+    specialTransition.stop();
+    activeSpecialWorkspace = workspaceName;
+    if (targetVisible)
+      presentedSpecialWorkspace = workspaceName;
+    specialTransitionTargetVisible = targetVisible;
+    specialTransitionStartOpacity = currentOpacity;
+    specialTransitionProgress = 0;
+    specialTransition.restart();
+  }
+
   function workspaceForId(workspaceId) {
     return Hyprland.workspaces.values.find(workspace => workspace.id === workspaceId) ?? null;
   }
 
-  function syncSpecialWorkspace() {
+  function syncSpecialWorkspace(animate = true) {
     const monitor = Hyprland.monitors.values.find(candidate =>
       candidate.name === monitorName);
     if (monitor === undefined || monitor.lastIpcObject === undefined)
       return;
     const special = monitor.lastIpcObject.specialWorkspace;
-    activeSpecialWorkspace = special !== undefined && special.id < 0
-      ? special.name : "";
+    setSpecialWorkspace(special !== undefined && special.id < 0
+      ? special.name : "", animate);
   }
 
   readonly property real baseImplicitWidth: naturalContentWidth + 12
   implicitWidth: baseImplicitWidth + specialExtraWidth
   implicitHeight: 36
 
-  Component.onCompleted: Qt.callLater(syncSpecialWorkspace)
+  Component.onCompleted: Qt.callLater(() => syncSpecialWorkspace(false))
 
   Timer {
     interval: 200
     running: true
-    onTriggered: root.syncSpecialWorkspace()
+    onTriggered: root.syncSpecialWorkspace(false)
+  }
+
+  NumberAnimation {
+    id: specialTransition
+    target: root
+    property: "specialTransitionProgress"
+    from: 0
+    to: 1
+    duration: 360
+    easing.type: Easing.Linear
+    onFinished: {
+      if (!root.specialTransitionTargetVisible)
+        root.presentedSpecialWorkspace = "";
+    }
   }
 
   Connections {
@@ -58,7 +133,7 @@ Item {
       const separator = event.data.lastIndexOf(",");
       if (separator < 0 || event.data.slice(separator + 1) !== root.monitorName)
         return;
-      root.activeSpecialWorkspace = event.data.slice(0, separator);
+      root.setSpecialWorkspace(event.data.slice(0, separator));
     }
   }
 
@@ -72,7 +147,7 @@ Item {
       anchors.left: parent.left
       anchors.top: parent.top
       anchors.bottom: parent.bottom
-      width: Math.max(12, parent.width - root.specialExtraWidth)
+      width: Math.min(root.baseImplicitWidth, parent.width)
 
       Row {
         id: workspaceRow
@@ -151,7 +226,8 @@ Item {
 
     Rectangle {
       id: specialSlot
-      visible: root.specialWorkspaceVisible
+      visible: root.specialSlotRendered
+      opacity: root.specialSlotOpacity()
       anchors.right: parent.right
       anchors.rightMargin: 6
       anchors.verticalCenter: parent.verticalCenter
@@ -163,7 +239,7 @@ Item {
       Text {
         id: specialLabel
         anchors.centerIn: parent
-        text: root.specialWorkspaceName
+        text: root.specialSlotName
         color: Theme.background
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 13
@@ -175,8 +251,9 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        enabled: root.specialWorkspaceVisible
         onClicked: Hyprland.dispatch("togglespecialworkspace "
-          + root.specialWorkspaceName)
+          + root.specialSlotName)
       }
     }
 
