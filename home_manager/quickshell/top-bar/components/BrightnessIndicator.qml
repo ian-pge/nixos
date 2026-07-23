@@ -1,3 +1,4 @@
+import Quickshell.Io
 import QtQuick
 import "Theme.js" as Theme
 
@@ -6,7 +7,7 @@ Rectangle {
 
   required property var statusData
   property string targetMonitor: ""
-  readonly property real level: Math.max(0, Math.min(1, statusData.audioVolume / 100))
+  readonly property real level: Math.max(0, Math.min(1, statusData.brightness / 100))
   property real displayedLevel: level
 
   implicitWidth: 280
@@ -22,12 +23,12 @@ Rectangle {
   }
 
   Text {
-    id: volumeIcon
+    id: brightnessIcon
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: statusData.audioIcon()
-    color: Theme.action
+    text: statusData.brightnessIcon()
+    color: Theme.sideBrightness
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
@@ -35,7 +36,7 @@ Rectangle {
 
   Rectangle {
     id: track
-    anchors.left: volumeIcon.right
+    anchors.left: brightnessIcon.right
     anchors.leftMargin: 13
     anchors.right: parent.right
     anchors.rightMargin: 15
@@ -49,7 +50,7 @@ Rectangle {
       width: track.width * root.displayedLevel
       height: parent.height
       radius: 4
-      color: Theme.action
+      color: Theme.sideBrightness
     }
   }
 
@@ -57,10 +58,20 @@ Rectangle {
     anchors.fill: parent
     onWheel: wheel => {
       if (wheel.angleDelta.y > 0)
-        statusData.setVolume(0.02);
+        brightnessUp.startDetached();
       else if (wheel.angleDelta.y < 0)
-        statusData.setVolume(-0.02);
-      statusData.showVolumeOverlay(root.targetMonitor);
+        brightnessDown.startDetached();
+      statusData.showBrightnessOverlay(root.targetMonitor);
     }
+  }
+
+  Process {
+    id: brightnessUp
+    command: ["brightnessctl", "set", "+5%"]
+  }
+
+  Process {
+    id: brightnessDown
+    command: ["brightnessctl", "set", "5%-"]
   }
 }

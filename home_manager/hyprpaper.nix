@@ -3,13 +3,13 @@
 #     enable = true;
 #     settings = {
 #       ipc = "off";
-#       preload = ["${../../material/wallpaper.png}"];
-#       wallpaper = [",${../../material/wallpaper.png}"]; # apply to all monitors
+#       preload = ["${../material/wallpaper.png}"];
+#       wallpaper = [",${../material/wallpaper.png}"]; # apply to all monitors
 #     };
 #   };
 # }
 {lib, ...}: let
-  wp = "${../../material/wallpaper.png}";
+  wp = "${../material/wallpaper.png}";
 in {
   services.hyprpaper.enable = true;
 

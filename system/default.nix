@@ -9,6 +9,7 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.default
     inputs.nix-flatpak.nixosModules.nix-flatpak
+    inputs.catppuccin.nixosModules.catppuccin
 
     ./hardware-configuration.nix
     ./boot.nix
@@ -27,5 +28,24 @@
     ./flatpak.nix
     ./appimage.nix
     ./razer.nix
+    ./home_manager.nix
+    ./nvidia.nix
+    ./bluetooth.nix
+    ./keyring.nix
+    ./udisks2.nix
+    ./pipewire.nix
+    ./greetd.nix
+    ./network_manager.nix
+    # ./zsh.nix
+    ./avahi.nix
+    ./fish.nix
+    ./hyprland.nix
+    ./fonts.nix
+    ./catppuccin.nix
+    ./xdg_portal.nix
+    ./nautilus.nix
+    ./upower.nix
+    ./xdg_mime.nix
+    # ./typing_booster.nix
   ];
 }

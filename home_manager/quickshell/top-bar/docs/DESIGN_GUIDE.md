@@ -13,7 +13,7 @@ Principes fondamentaux :
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
 - Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
-- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, tandis que les capsules latérales statiques gardent leurs accents Catppuccin historiques.
+- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui reprennent l’accent de leur capsule latérale. Le liseré animé reste rose.
 
 ## 2. Architecture à préserver
 
@@ -23,7 +23,7 @@ Principes fondamentaux :
 - `../StatusData.qml` : source d’état globale, processus externes, timers, IPC et exclusivité entre overlays.
 - `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
-- `../components/Theme.js` : source unique des couleurs QML, y compris les accents fixes des capsules latérales.
+- `../components/Theme.js` : source unique des couleurs QML, y compris les accents partagés entre capsules latérales et widgets centraux correspondants.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
 - `../components/NowPlayingIndicator.qml` : média MPRIS et métadonnées textuelles.
 - `../components/AppLauncher.qml` : lanceur natif, icônes et recherche fuzzy.
@@ -108,14 +108,16 @@ Ainsi, le widget update grandit uniquement vers le bas, jamais vers le haut.
 
 Règle sémantique de la capsule centrale :
 
-- **rose** : ce que l’utilisateur contrôle maintenant — workspace affiché, ligne sélectionnée, champ de recherche, action Enter, volume et luminosité ;
-- **jaune** : ce qui existe ou fonctionne indépendamment de la sélection — workspace occupé, application déjà ouverte, onglet Chrome actif ou épinglé, connexion réseau/Bluetooth, lecture et traitement en cours ;
+- **rose** : ce que l’utilisateur contrôle maintenant — workspace affiché, ligne sélectionnée, champ de recherche et action Enter ;
+- **jaune** : ce qui existe ou fonctionne indépendamment de la sélection — workspace occupé, application déjà ouverte, onglet Chrome actif ou épinglé, lecture et traitement en cours ;
 - **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
 - **rouge** : échec explicite uniquement, jamais une action normale.
 
+Les widgets centraux updates, Wi-Fi, Bluetooth, volume et luminosité sont des exceptions contextuelles : leurs accents reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume` et `Theme.sideBrightness`, y compris les icônes, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose.
+
 Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
 
-Les capsules latérales sont une exception volontaire : elles ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js` :
+Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les cinq accents contextuels ci-dessus sont partagés avec leur widget central correspondant :
 
 | Capsule | Token | Couleur |
 |---|---|---|
@@ -318,11 +320,11 @@ Un vrai spinner est réservé à :
 
 ### Couleurs d’état
 
-- connecté : point jaune néon `#ffcc33` ;
-- tout appareil Bluetooth non connecté, appairé ou non : gris ;
-- icônes Wi-Fi et Bluetooth : rose néon `#ff33cc` ;
-- onglets Bluetooth `PAIRED` et `NEARBY` : rose, car ils décrivent le filtre actuellement manipulé ;
-- cadenas Wi-Fi : même gris que le compteur (`#939ab7`).
+- Wi-Fi : icône et point de connexion utilisent `Theme.sideNetwork` ;
+- Bluetooth : icône, point de connexion et onglets `PAIRED` / `NEARBY` utilisent `Theme.sideBluetooth` ;
+- tout appareil ou réseau non connecté reste gris ;
+- cadenas Wi-Fi : même gris que le compteur (`#939ab7`) ;
+- le liseré animé autour de la capsule reste rose, indépendamment du widget affiché.
 
 ## 11. Lanceur d’applications
 
@@ -361,8 +363,9 @@ Conventions :
 - La barre de progression anime sa largeur en `140ms`.
 - Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
 - La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif.
-- Le volume et la luminosité utilisent exclusivement le rose néon `#ff33cc`, icône et remplissage compris.
-- Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage rose indique le niveau.
+- Le volume utilise `Theme.sideVolume` pour son icône et son remplissage.
+- La luminosité utilise `Theme.sideBrightness` pour son icône et son remplissage.
+- Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage coloré indique le niveau.
 - Chaque indicateur central apparaît uniquement sur le moniteur qui a reçu la touche ou le geste de molette.
 
 ## 13. Contrôles média MPRIS
@@ -436,6 +439,8 @@ Une action Bluetooth native déjà lancée continue lorsque le sélecteur est ma
 
 ### Updates — `Super+U`
 
+Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHECKING` / `AVAILABLE` et les points de chaque ligne. `UP TO DATE`, les dates et les états vides restent gris ; le liseré animé autour de la capsule reste rose.
+
 - `r` : vérification forcée
 - `Enter` : lance `quickshell-update-installer` dans Ghostty
 - `q/Esc` : fermeture
@@ -466,7 +471,7 @@ Ne pas tester `Enter` automatiquement : cela lance réellement `nix flake update
 
 ```bash
 test_config=$(mktemp -d)
-cp -R "$PWD/home_manager/hyprland/quickshell/top-bar/." "$test_config/"
+cp -R "$PWD/home_manager/quickshell/top-bar/." "$test_config/"
 nix shell \
   '.#nixosConfigurations.nixos.pkgs.qt6Packages.qtshadertools' \
   -c qsb --qt6 \
@@ -481,7 +486,7 @@ Le code doit afficher `Configuration Loaded` sans erreur QML ou shader. L’aver
 ### Vérification Nix
 
 ```bash
-nix-instantiate --parse home_manager/hyprland/hyprland.nix >/dev/null
+nix-instantiate --parse home_manager/hyprland.nix >/dev/null
 git diff --check
 git diff --cached --check
 ```

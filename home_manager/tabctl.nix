@@ -3,7 +3,7 @@
   pkgs,
   ...
 }: let
-  tabctl = pkgs.callPackage ../../packages/tabctl.nix {
+  tabctl = pkgs.callPackage ../packages/tabctl.nix {
     src = inputs.tabctl;
   };
 

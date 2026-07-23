@@ -61,8 +61,7 @@
         specialArgs = {inherit inputs overlays;};
 
         modules = [
-          ./system/shared
-          ./system/hyprland
+          ./system
         ];
       };
     };

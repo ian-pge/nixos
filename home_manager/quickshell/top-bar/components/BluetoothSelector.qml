@@ -1,3 +1,4 @@
+import Quickshell.Bluetooth
 import QtQuick
 import "Theme.js" as Theme
 
@@ -5,32 +6,28 @@ FocusScope {
   id: root
 
   required property var statusData
-  readonly property var selectedNetwork: statusData.wifiNetworks.length > 0
-    ? statusData.wifiNetworks[Math.min(statusData.wifiSelectedIndex,
-        statusData.wifiNetworks.length - 1)]
+  readonly property var devices: statusData.bluetoothSelectorDevices.filter(device =>
+    statusData.bluetoothTab === 0 ? device.paired : !device.paired)
+  readonly property var selectedDevice: devices.length > 0
+    ? devices[Math.min(statusData.bluetoothSelectedIndex, devices.length - 1)]
     : null
+  readonly property bool selectedDeviceConnected: selectedDevice !== null
+    && Bluetooth.devices.values.some(device => device.address === selectedDevice.address
+      && device.connected)
   readonly property string desiredLabelText: {
-    if (statusData.wifiMessage !== "") return statusData.wifiMessage;
-    if (statusData.wifiPasswordMode) {
-      if (statusData.wifiPassword.length === 0) return "Type password…";
-      return "•".repeat(statusData.wifiPassword.length) + " ▏";
-    }
-    if (statusData.wifiLoading) return "Scanning for networks…";
-    return selectedNetwork !== null ? selectedNetwork.ssid : "No networks found";
+    if (statusData.bluetoothSelectorMessage !== "")
+      return statusData.bluetoothSelectorMessage;
+    if (statusData.bluetoothSelectorLoading)
+      return statusData.bluetoothTab === 0 ? "Loading paired devices…" : "Scanning nearby devices…";
+    return selectedDevice !== null ? selectedDevice.name : "No devices found";
   }
+
   property string displayedLabelText: ""
   property bool componentReady: false
   property bool wheelNavigationPending: false
 
   implicitWidth: 400
   implicitHeight: 36
-
-  function signalIcon(strength) {
-    if (strength < 26) return "󰤟";
-    if (strength < 51) return "󰤢";
-    if (strength < 76) return "󰤥";
-    return "󰤨";
-  }
 
   function syncLabel() {
     selectionWheel.stop();
@@ -45,7 +42,7 @@ FocusScope {
       return;
     selectionWheel.stop();
     outgoingSlide.y = 0;
-    incomingSlide.y = statusData.wifiSelectionDirection > 0 ? 40 : -40;
+    incomingSlide.y = statusData.bluetoothSelectionDirection > 0 ? 40 : -40;
     outgoingLabel.text = displayedLabelText;
     outgoingLabel.visible = true;
     incomingLabel.text = desiredLabelText;
@@ -61,8 +58,8 @@ FocusScope {
   onDesiredLabelTextChanged: {
     if (!componentReady)
       return;
-    if (!wheelNavigationPending || !enabled || statusData.wifiPasswordMode
-        || statusData.wifiLoading || statusData.wifiMessage !== "")
+    if (!wheelNavigationPending || !enabled || statusData.bluetoothSelectorLoading
+        || statusData.bluetoothSelectorMessage !== "")
       syncLabel();
     else
       animateLabel();
@@ -74,102 +71,71 @@ FocusScope {
   }
 
   Keys.onPressed: event => {
-    if (statusData.wifiPasswordMode) {
-      if (event.key === Qt.Key_Escape) {
-        statusData.cancelWifiPassword();
-      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-        statusData.connectSelectedWifi();
-      } else if (event.key === Qt.Key_Backspace) {
-        statusData.eraseWifiPassword();
-      } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
-        statusData.wifiPassword = "";
-        statusData.wifiMessage = "";
-      } else if (event.text.length > 0
-          && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
-        statusData.appendWifiPassword(event.text);
-      }
+    if (event.key === Qt.Key_Tab) {
+      statusData.switchBluetoothTab();
       event.accepted = true;
-      return;
-    }
-
-    if (event.key === Qt.Key_J || event.key === Qt.Key_Down
+    } else if (event.key === Qt.Key_J || event.key === Qt.Key_Down
         || event.key === Qt.Key_L || event.key === Qt.Key_Right) {
       wheelNavigationPending = true;
-      statusData.moveWifiSelection(1);
+      statusData.moveBluetoothSelection(1);
       wheelNavigationPending = false;
       event.accepted = true;
     } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up
         || event.key === Qt.Key_H || event.key === Qt.Key_Left) {
       wheelNavigationPending = true;
-      statusData.moveWifiSelection(-1);
-      wheelNavigationPending = false;
-      event.accepted = true;
-    } else if (event.key === Qt.Key_G && !(event.modifiers & Qt.ShiftModifier)) {
-      wheelNavigationPending = true;
-      statusData.setWifiSelection(0, -1);
-      wheelNavigationPending = false;
-      event.accepted = true;
-    } else if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
-      wheelNavigationPending = true;
-      statusData.setWifiSelection(
-        Math.max(0, statusData.wifiNetworks.length - 1), 1);
+      statusData.moveBluetoothSelection(-1);
       wheelNavigationPending = false;
       event.accepted = true;
     } else if (event.key === Qt.Key_R) {
-      statusData.refreshWifiNetworks(true);
+      statusData.refreshBluetoothSelectorDevices(statusData.bluetoothTab === 1);
       event.accepted = true;
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-      statusData.connectSelectedWifi();
+      statusData.activateSelectedBluetoothDevice();
       event.accepted = true;
     } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
-      statusData.hideWifiSelector();
+      statusData.hideBluetoothSelector();
       event.accepted = true;
     }
   }
 
   Text {
-    id: wifiIcon
+    id: bluetoothIcon
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: {
-      if (statusData.wifiLoading) return "󰑐";
-      if (root.selectedNetwork !== null)
-        return root.signalIcon(root.selectedNetwork.strength);
-      return "󰤭";
-    }
-    color: Theme.action
+    text: statusData.bluetoothSelectorScanning ? "󰑐"
+      : root.selectedDeviceConnected ? "󰂯" : "󰂲"
+    color: Theme.sideBluetooth
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
 
     RotationAnimator on rotation {
-      running: statusData.wifiLoading
+      running: statusData.bluetoothSelectorScanning
       from: 0
       to: 360
       duration: 900
       loops: Animation.Infinite
-      onStopped: wifiIcon.rotation = 0
+      onStopped: bluetoothIcon.rotation = 0
     }
   }
 
   Rectangle {
     id: activeDot
-    anchors.left: wifiIcon.right
+    anchors.left: bluetoothIcon.right
     anchors.leftMargin: 13
     anchors.verticalCenter: parent.verticalCenter
     width: 7
     height: 7
     radius: 3.5
-    color: root.selectedNetwork !== null && root.selectedNetwork.active
-      ? Theme.state : Theme.inactive
+    color: root.selectedDeviceConnected ? Theme.sideBluetooth : Theme.inactive
   }
 
   Item {
     id: labelViewport
     anchors.left: activeDot.right
     anchors.leftMargin: 8
-    anchors.right: wifiStatus.left
+    anchors.right: bluetoothStatus.left
     anchors.rightMargin: 12
     anchors.top: parent.top
     anchors.bottom: parent.bottom
@@ -209,7 +175,7 @@ FocusScope {
       target: outgoingSlide
       property: "y"
       from: 0
-      to: statusData.wifiSelectionDirection > 0 ? -40 : 40
+      to: statusData.bluetoothSelectionDirection > 0 ? -40 : 40
       duration: 150
       easing.type: Easing.InOutCubic
     }
@@ -217,7 +183,7 @@ FocusScope {
     NumberAnimation {
       target: incomingSlide
       property: "y"
-      from: statusData.wifiSelectionDirection > 0 ? 40 : -40
+      from: statusData.bluetoothSelectionDirection > 0 ? 40 : -40
       to: 0
       duration: 150
       easing.type: Easing.InOutCubic
@@ -225,28 +191,25 @@ FocusScope {
   }
 
   Row {
-    id: wifiStatus
+    id: bluetoothStatus
     anchors.right: parent.right
     anchors.rightMargin: 15
     anchors.verticalCenter: parent.verticalCenter
     spacing: 8
 
     Text {
-      text: !statusData.wifiPasswordMode && root.selectedNetwork !== null
-        && root.selectedNetwork.security !== ""
-        && root.selectedNetwork.security !== "--" ? "󰌾" : ""
+      text: statusData.bluetoothTab === 0 ? "PAIRED" : "NEARBY"
       height: 18
       verticalAlignment: Text.AlignVCenter
-      color: Theme.secondary
+      color: Theme.sideBluetooth
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 13
+      font.pixelSize: 11
+      font.bold: true
     }
 
     Text {
-      text: statusData.wifiPasswordMode ? "󰌾"
-        : statusData.wifiNetworks.length > 0
-          ? (statusData.wifiSelectedIndex + 1) + "/" + statusData.wifiNetworks.length
-          : "0/0"
+      text: root.devices.length > 0
+        ? (statusData.bluetoothSelectedIndex + 1) + "/" + root.devices.length : "0/0"
       height: 18
       verticalAlignment: Text.AlignVCenter
       color: Theme.secondary

@@ -46,7 +46,7 @@ FocusScope {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         text: "󰑐"
-        color: Theme.action
+        color: Theme.sideUpdates
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 17
         font.bold: true
@@ -66,7 +66,7 @@ FocusScope {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         text: updates.length > 0 ? "" : ""
-        color: Theme.action
+        color: Theme.sideUpdates
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 17
         font.bold: true
@@ -95,7 +95,7 @@ FocusScope {
       text: statusData.nixChecking ? "CHECKING"
         : updates.length > 0 ? updates.length + " AVAILABLE" : "UP TO DATE"
       color: statusData.nixChecking || updates.length > 0
-        ? Theme.state : Theme.secondary
+        ? Theme.sideUpdates : Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 11
       font.bold: true
@@ -142,7 +142,7 @@ FocusScope {
               width: 7
               height: 7
               radius: 3.5
-              color: Theme.state
+              color: Theme.sideUpdates
             }
 
             Text {

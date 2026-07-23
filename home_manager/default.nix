@@ -1,11 +1,18 @@
 {inputs, ...}: {
   imports = [
+    inputs.nix-flatpak.homeManagerModules.nix-flatpak
     inputs.catppuccin.homeModules.catppuccin
     # inputs.hyprpanel.homeManagerModules.hyprpanel
 
-    ../shared
-    ./gtk.nix
+    ./home_manager.nix
+    ./chezmoi.nix
+    ./git.nix
     ./additional_packages.nix
+    ./desktop_packages.nix
+    ./paper-desktop.nix
+    # ./mime_apps.nix
+    ./zed.nix
+    ./gtk.nix
     ./quickshell.nix
     ./tabctl.nix
     ./hyprpaper.nix

@@ -15,6 +15,8 @@ Rectangle {
   property string wheelDownCommand: ""
   property bool interactive: leftCommand !== "" || rightCommand !== ""
     || wheelUpCommand !== "" || wheelDownCommand !== ""
+  property bool forceHovered: false
+  readonly property bool hovered: forceHovered || pointer.containsMouse
 
   signal leftClicked()
   signal rightClicked()
@@ -24,7 +26,7 @@ Rectangle {
   implicitWidth: label.implicitWidth + 20
   implicitHeight: 36
   radius: 18
-  color: pointer.containsMouse ? accent : Theme.background
+  color: root.hovered ? accent : Theme.background
 
   function run(command) {
     if (command !== "")
@@ -39,7 +41,7 @@ Rectangle {
     id: label
     anchors.centerIn: parent
     text: root.text
-    color: pointer.containsMouse ? Theme.background : root.accent
+    color: root.hovered ? Theme.background : root.accent
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16
     font.bold: true

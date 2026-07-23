@@ -15,7 +15,7 @@ var surface = "#24273a";
 var surfaceRaised = "#363a4f";
 var surfaceSelected = "#494d64";
 
-// Fixed Catppuccin accents for the static side capsules.
+// Fixed Catppuccin accents shared by side capsules and paired central controls.
 var sideApplications = "#7dc4e4";
 var sideUpdates = "#f0c6c6";
 var sideNetwork = "#ee99a0";
