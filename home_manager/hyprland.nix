@@ -1,4 +1,22 @@
-{pkgs, ...}: {
+{pkgs, ...}: let
+  pwaAppIds = {
+    whatsapp = "hnpfjngllnobngcgfapefoaidbinmjnm";
+    mattermost = "gfmnkppamilfcoccbhdopgejmlnkacno";
+    mattermostAlternate = "ahmbjkliphjpohbabaafnfneglmmoghh";
+    messenger = "bbdeiblfgdokhlblpgeaokenkfknecgl";
+    instagram = "akpamiohjfcnimfljfndmaldlcfphjmp";
+    telegram = "ibblmnobmgdmpoeblocemifbpglakpoi";
+    spotify = "pjibgclleladliembfgfagdaldikeohf";
+    chatgpt = "cadlkienfkclaiaibeoongdcgmdikeeg";
+    gemini = "mhpcpiccfiaoabcaedpafgjabjjheekk";
+    claude = "fmpnliohjhemenmnlpbfagaolkdacoja";
+    keep = "eilembjdkfgodjkcjnpgpaenohkicgjd";
+    calendar = "kjbdgfilnfhdoflbpgamdcdgpehopbep";
+  };
+  pwaClass = appId: "chrome-${appId}-Default";
+  pwaWorkspaceRule = workspace: appId:
+    "match:class ^(${pwaClass appId})$, workspace special:${workspace}";
+in {
   wayland.windowManager.hyprland = {
     enable = true;
     configType = "hyprlang";
@@ -45,6 +63,9 @@
         "2, monitor:DP-2, persistent:true"
         "3, monitor:DP-2, persistent:true"
         "4, monitor:DP-2, persistent:true"
+        "special:Agenda, on-created-empty:google-chrome-stable --profile-directory=Default --app-id=${pwaAppIds.calendar}"
+        "special:Music, on-created-empty:google-chrome-stable --profile-directory=Default --app-id=${pwaAppIds.spotify}"
+        "special:Notes, on-created-empty:google-chrome-stable --profile-directory=Default --app-id=${pwaAppIds.keep}"
       ];
 
       ### ENVIRONMENT ###
@@ -179,6 +200,7 @@
         "$mainMod,E,exec,$editor"
         "$mainMod,Z,layoutmsg,togglesplit"
         "$mainMod,G,exec,$browser"
+        "$mainMod,M,togglespecialworkspace,Agenda"
         "$mainMod,X,exec,$calculator"
         "$mainMod,H,movefocus,l"
         "$mainMod,L,movefocus,r"
@@ -214,8 +236,8 @@
         "$mainMod SHIFT,S,movetoworkspace,special:LLM"
         "$mainMod,D,togglespecialworkspace,Chat"
         "$mainMod SHIFT,D,movetoworkspace,special:Chat"
-        "$mainMod,C,togglespecialworkspace,Media"
-        "$mainMod SHIFT,C,movetoworkspace,special:Media"
+        "$mainMod,C,togglespecialworkspace,Music"
+        "$mainMod SHIFT,C,movetoworkspace,special:Music"
         "$mainMod,V,togglespecialworkspace,Notes"
         "$mainMod SHIFT,V,movetoworkspace,special:Notes"
         "$mainMod,ESCAPE,exec,hyprlock"
@@ -231,17 +253,19 @@
       # NOTE: effects like float/center require `on`
       windowrule = [
         # Special workspaces (NO "silent" so it switches/focuses immediately)
-        "match:title ^(WhatsApp Web)$, workspace special:Chat"
-        "match:title ^(Mattermost)$, workspace special:Chat"
-        "match:title ^(Messenger)$, workspace special:Chat"
-        "match:title ^(Instagram)$, workspace special:Chat"
-        "match:title ^(Telegram Web - Telegram)$, workspace special:Chat"
+        (pwaWorkspaceRule "Chat" pwaAppIds.whatsapp)
+        (pwaWorkspaceRule "Chat" pwaAppIds.mattermost)
+        (pwaWorkspaceRule "Chat" pwaAppIds.mattermostAlternate)
+        (pwaWorkspaceRule "Chat" pwaAppIds.messenger)
+        (pwaWorkspaceRule "Chat" pwaAppIds.instagram)
+        (pwaWorkspaceRule "Chat" pwaAppIds.telegram)
 
-        "match:title .*Spotify.* , workspace special:Media"
-        "match:title .*ChatGPT.* , workspace special:LLM"
-        "match:title .*Gemini.* , workspace special:LLM"
-        "match:title .*Claude.* , workspace special:LLM"
-        "match:title .*Google Keep.* , workspace special:Notes"
+        (pwaWorkspaceRule "Music" pwaAppIds.spotify)
+        (pwaWorkspaceRule "LLM" pwaAppIds.chatgpt)
+        (pwaWorkspaceRule "LLM" pwaAppIds.gemini)
+        (pwaWorkspaceRule "LLM" pwaAppIds.claude)
+        (pwaWorkspaceRule "Notes" pwaAppIds.keep)
+        (pwaWorkspaceRule "Agenda" pwaAppIds.calendar)
 
         # Floating Rules
         "match:class ^(dev\\.me\\.calc)$, float on"
@@ -268,7 +292,6 @@
       # New syntax: match first
       layerrule = [
         "match:namespace launcher, dim_around on"
-        "match:namespace vicinae, dim_around on"
       ];
     };
   };

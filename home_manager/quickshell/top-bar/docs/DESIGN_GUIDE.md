@@ -13,7 +13,7 @@ Principes fondamentaux :
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
 - Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
-- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui reprennent l’accent de leur capsule latérale. Le liseré animé reste rose.
+- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui reprennent l’accent de leur capsule latérale. Le liseré animé reste rose.
 
 ## 2. Architecture à préserver
 
@@ -45,6 +45,7 @@ Conséquences :
 - Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor`, `appLauncherTargetMonitor`, `chromeTabsTargetMonitor`, `updateTargetMonitor`, `volumeTargetMonitor`, `brightnessTargetMonitor` et `mediaTargetMonitor` pilotent à la fois le rendu et, pour les sélecteurs interactifs, le focus clavier.
 - Un clic sur une capsule latérale transmet toujours le nom du moniteur de cette barre. Un raccourci IPC sans cible utilise le moniteur Hyprland actuellement focalisé.
 - Activer un overlay déjà ouvert depuis un autre écran le déplace vers ce nouvel écran ; l’activer à nouveau sur son écran courant le ferme.
+- Tant qu’un widget central applications, updates, Wi-Fi, Bluetooth, volume ou luminosité est visible, sa capsule latérale correspondante adopte visuellement son état hover sur le même moniteur.
 
 ## 3. Géométrie canonique
 
@@ -108,16 +109,16 @@ Ainsi, le widget update grandit uniquement vers le bas, jamais vers le haut.
 
 Règle sémantique de la capsule centrale :
 
-- **rose** : ce que l’utilisateur contrôle maintenant — workspace affiché, ligne sélectionnée, champ de recherche et action Enter ;
-- **jaune** : ce qui existe ou fonctionne indépendamment de la sélection — workspace occupé, application déjà ouverte, onglet Chrome actif ou épinglé, lecture et traitement en cours ;
+- **rose** : ce que l’utilisateur contrôle maintenant — workspace affiché, ligne sélectionnée et action Enter hors exceptions contextuelles ;
+- **jaune** : ce qui existe ou fonctionne indépendamment de la sélection — workspace occupé, lecture et traitement en cours hors exceptions contextuelles ;
 - **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
 - **rouge** : échec explicite uniquement, jamais une action normale.
 
-Les widgets centraux updates, Wi-Fi, Bluetooth, volume et luminosité sont des exceptions contextuelles : leurs accents reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume` et `Theme.sideBrightness`, y compris les icônes, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose.
+Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume et luminosité sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume` et `Theme.sideBrightness`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose.
 
 Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
 
-Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les cinq accents contextuels ci-dessus sont partagés avec leur widget central correspondant :
+Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les six accents contextuels ci-dessus sont partagés avec leur widget central correspondant. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert, sans afficher artificiellement son tooltip :
 
 | Capsule | Token | Couleur |
 |---|---|---|
@@ -337,18 +338,21 @@ Conventions :
 - le catalogue normalisé est construit une seule fois, puis la recherche fuzzy s’effectue en mémoire ;
 - le `ListView` virtualise les lignes pour ne charger que les icônes visibles ;
 - haut/bas, `Ctrl+n/p`, `Ctrl+j/k`, PageUp/PageDown et molette naviguent ;
-- un point jaune néon `#ffcc33` indique qu’au moins une fenêtre correspondante est déjà ouverte ;
+- l’icône de recherche, la sélection de texte et le point d’une application déjà ouverte utilisent `Theme.sideApplications` ;
+- aucune flèche d’action n’est affichée sur la ligne sélectionnée ;
 - `Enter` active la fenêtre ouverte la plus récemment utilisée, sinon lance l’application ;
 - `Ctrl+Enter` lance toujours une nouvelle instance et `Esc` ferme ;
 - le texte saisi doit toujours rester du texte de recherche : ne pas réserver `j`, `k` ou `q`.
 
 ### Onglets Chrome
 
-`Super+;` ouvre `ChromeTabsLauncher.qml` avec la même géométrie et les mêmes conventions de recherche que le lanceur d’applications. La liste provient exclusivement de TabCtl 2 via son extension Chrome Manifest V3, Native Messaging puis D-Bus ; aucune API ou extension Vicinae ne participe à ce chemin.
+`Super+;` ouvre `ChromeTabsLauncher.qml` avec la même géométrie et les mêmes conventions de recherche que le lanceur d’applications. La liste provient de TabCtl 2 via son extension Chrome Manifest V3, Native Messaging puis D-Bus.
 
 - `tabctl --format json list` est encapsulé par `quickshell-chrome-tabs` afin que QML reçoive toujours un objet JSON, y compris lorsque Chrome est fermé ou que l’extension n’est pas encore connectée ;
 - le catalogue contient le titre, l’URL, la fenêtre, l’index et les états actif/épinglé ;
-- les favicons sont extraits localement du SQLite `Default/Favicons` de Chrome vers `$XDG_CACHE_HOME/quickshell/chrome-favicons`, sans requête réseau ; si l’icône manque, le logo Chrome est gris pour un onglet inactif et jaune pour l’onglet actif ;
+- les favicons sont extraits localement du SQLite `Default/Favicons` de Chrome vers `$XDG_CACHE_HOME/quickshell/chrome-favicons`, sans requête réseau ; si l’icône manque, le logo Chrome est gris pour un onglet inactif et `Theme.sideApplications` pour l’onglet actif ;
+- l’icône de recherche, la sélection de texte, l’épingle et le point d’onglet actif utilisent aussi `Theme.sideApplications`, comme le lanceur d’applications ;
+- aucune flèche d’action n’est affichée sur la ligne sélectionnée ;
 - la recherche fuzzy porte sur le titre et l’URL ;
 - `Enter` appelle `tabctl activate --focused`, `Ctrl+W` ferme l’onglet, `Ctrl+R` recharge la liste et `Esc` ferme le widget ;
 - clic gauche : activation ; clic droit : fermeture ;

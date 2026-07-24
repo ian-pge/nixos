@@ -1,12 +1,15 @@
-# Task for researcher
+# Task for reviewer
 
-Investigate Qt 6 / Qt Quick animation frame pacing on Wayland, especially multiple windows on mixed-refresh monitors (120 Hz + 165 Hz), QML NumberAnimation/Behavior, threaded render loop, animation driver, and known causes of apparent low FPS versus compositor-native animations. Prioritize Qt official docs, bug reports, source code, Quickshell documentation/issues. Return evidence-backed likely causes, diagnostic environment variables, and fixes/workarounds with URLs. Do not edit files.
+You are reviving a previous subagent conversation.
 
----
-**Output:**
-Write your findings to exactly this path: /home/ian/.config/nixos/.pi-subagents/artifacts/outputs/1add01a4-bb1b-4fbe-8a76-cbd5f5648b56/qt-frame-pacing-research.md
-This path is authoritative for this run.
-Ignore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.
+Original run: a44f06f8
+Original agent: reviewer
+Original session file: /home/ian/.pi/agent/sessions/--home-ian-.config-nixos--/2026-07-24T03-52-40-555Z_019f9240-fd6b-7528-ad16-7d56b62bdd4b/a44f06f8/run-0/session.jsonl
+
+Use the stored session context as background. Answer the orchestrator's follow-up below. Do not assume the original child process is still alive.
+
+Follow-up:
+Re-review the two blockers after the parent fixes. Current StatusData.qml now has syncNetworkSelection() that exits password mode and clears credentials when the stable selected key disappears, and connectSelectedWifi() resolves the entry then closes active Ethernet/Wi-Fi before checking wifiPendingNetwork. New runtime evidence is /tmp/quickshell-network-edge-probe/output.log (passwordSafe=true, ethernetCloseSafe=true) and the build passes. Inspect the actual current diff; do not edit files. Report whether either blocker remains and any new blocker.
 
 ## Acceptance Contract
 Acceptance level: attested

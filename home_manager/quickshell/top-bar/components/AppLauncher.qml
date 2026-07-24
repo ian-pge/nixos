@@ -62,7 +62,7 @@ FocusScope {
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: "󰍉"
-      color: Theme.action
+      color: Theme.sideApplications
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
@@ -78,7 +78,7 @@ FocusScope {
       height: 28
       verticalAlignment: TextInput.AlignVCenter
       color: Theme.foreground
-      selectionColor: Theme.action
+      selectionColor: Theme.sideApplications
       selectedTextColor: Theme.background
       clip: true
       font.family: "Ubuntu Nerd Font"
@@ -232,7 +232,7 @@ FocusScope {
             visible: appIcon.status === Image.Error
             anchors.centerIn: parent
             text: "󰀻"
-            color: appRow.selected ? Theme.action : Theme.inactive
+            color: appRow.selected ? Theme.sideApplications : Theme.inactive
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 15
             font.bold: true
@@ -242,7 +242,7 @@ FocusScope {
         Text {
           anchors.left: iconFrame.right
           anchors.leftMargin: 11
-          anchors.right: launchHint.left
+          anchors.right: runningDot.left
           anchors.rightMargin: 12
           y: 4
           height: 18
@@ -258,7 +258,7 @@ FocusScope {
         Text {
           anchors.left: iconFrame.right
           anchors.leftMargin: 11
-          anchors.right: launchHint.left
+          anchors.right: runningDot.left
           anchors.rightMargin: 12
           y: 21
           height: 15
@@ -273,28 +273,15 @@ FocusScope {
         }
 
         Rectangle {
-          anchors.right: launchHint.left
-          anchors.rightMargin: 5
+          id: runningDot
+          anchors.right: parent.right
+          anchors.rightMargin: 21
           anchors.verticalCenter: parent.verticalCenter
           width: 7
           height: 7
           radius: 3.5
           visible: appRow.runningToplevel !== null
-          color: Theme.state
-        }
-
-        Text {
-          id: launchHint
-          anchors.right: parent.right
-          anchors.rightMargin: 18
-          anchors.verticalCenter: parent.verticalCenter
-          width: 24
-          horizontalAlignment: Text.AlignHCenter
-          text: appRow.selected ? "󰌑" : ""
-          color: Theme.action
-          font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 14
-          font.bold: true
+          color: Theme.sideApplications
         }
 
         MouseArea {

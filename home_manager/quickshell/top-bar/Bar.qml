@@ -126,6 +126,7 @@ PanelWindow {
     Pill {
       text: ""
       accent: Theme.sideApplications
+      forceHovered: window.appLauncherActive
       tooltipText: "Applications"
       tooltipHost: window
       interactive: true
@@ -135,6 +136,7 @@ PanelWindow {
     Pill {
       text: statusData.nixIcon
       accent: Theme.sideUpdates
+      forceHovered: window.updateSelectorActive
       tooltipText: statusData.nixTooltip
       tooltipHost: window
       interactive: true
@@ -145,6 +147,7 @@ PanelWindow {
     Pill {
       text: statusData.networkIcon()
       accent: Theme.sideNetwork
+      forceHovered: window.wifiSelectorActive
       tooltipText: statusData.networkName
       tooltipHost: window
       interactive: true
@@ -154,6 +157,7 @@ PanelWindow {
     Pill {
       text: statusData.bluetoothConnected ? "󰂯" : "󰂲"
       accent: Theme.sideBluetooth
+      forceHovered: window.bluetoothSelectorActive
       tooltipText: statusData.bluetoothTooltip
       tooltipHost: window
       interactive: true
@@ -548,6 +552,7 @@ PanelWindow {
         ? "󰖁"
         : statusData.audioIcon() + " " + statusData.audioVolume + "%"
       accent: Theme.sideVolume
+      forceHovered: window.volumeOverlayActive
       leftCommand: "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer"
       interactive: true
       onWheelUp: {
@@ -563,6 +568,7 @@ PanelWindow {
     Pill {
       text: statusData.brightnessIcon() + " " + statusData.brightness + "%"
       accent: Theme.sideBrightness
+      forceHovered: window.brightnessOverlayActive
       wheelUpCommand: "brightnessctl set +5%"
       wheelDownCommand: "brightnessctl set 5%-"
       onWheelUp: statusData.showBrightnessOverlay(window.monitorName)

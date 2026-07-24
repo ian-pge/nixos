@@ -5,9 +5,9 @@ FocusScope {
   id: root
 
   required property var statusData
-  readonly property var selectedNetwork: statusData.wifiNetworks.length > 0
-    ? statusData.wifiNetworks[Math.min(statusData.wifiSelectedIndex,
-        statusData.wifiNetworks.length - 1)]
+  readonly property var selectedNetwork: statusData.networkSelectorEntries.length > 0
+    ? statusData.networkSelectorEntries[Math.min(statusData.wifiSelectedIndex,
+        statusData.networkSelectorEntries.length - 1)]
     : null
   readonly property string desiredLabelText: {
     if (statusData.wifiMessage !== "") return statusData.wifiMessage;
@@ -16,7 +16,7 @@ FocusScope {
       return "•".repeat(statusData.wifiPassword.length) + " ▏";
     }
     if (statusData.wifiLoading) return "Scanning for networks…";
-    return selectedNetwork !== null ? selectedNetwork.ssid : "No networks found";
+    return selectedNetwork !== null ? selectedNetwork.label : "No networks found";
   }
   property string displayedLabelText: ""
   property bool componentReady: false
@@ -112,11 +112,11 @@ FocusScope {
     } else if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
       wheelNavigationPending = true;
       statusData.setWifiSelection(
-        Math.max(0, statusData.wifiNetworks.length - 1), 1);
+        Math.max(0, statusData.networkSelectorEntries.length - 1), 1);
       wheelNavigationPending = false;
       event.accepted = true;
     } else if (event.key === Qt.Key_R) {
-      statusData.refreshWifiNetworks(true);
+      statusData.refreshWifiNetworks();
       event.accepted = true;
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       statusData.connectSelectedWifi();
@@ -134,6 +134,9 @@ FocusScope {
     anchors.verticalCenter: parent.verticalCenter
     text: {
       if (statusData.wifiLoading) return "󰑐";
+      if (root.selectedNetwork !== null
+          && root.selectedNetwork.type === "ethernet")
+        return "󰈀";
       if (root.selectedNetwork !== null)
         return root.signalIcon(root.selectedNetwork.strength);
       return "󰤭";
@@ -233,6 +236,7 @@ FocusScope {
 
     Text {
       text: !statusData.wifiPasswordMode && root.selectedNetwork !== null
+        && root.selectedNetwork.type === "wifi"
         && root.selectedNetwork.security !== ""
         && root.selectedNetwork.security !== "--" ? "󰌾" : ""
       height: 18
@@ -244,8 +248,9 @@ FocusScope {
 
     Text {
       text: statusData.wifiPasswordMode ? "󰌾"
-        : statusData.wifiNetworks.length > 0
-          ? (statusData.wifiSelectedIndex + 1) + "/" + statusData.wifiNetworks.length
+        : statusData.networkSelectorEntries.length > 0
+          ? (statusData.wifiSelectedIndex + 1) + "/"
+            + statusData.networkSelectorEntries.length
           : "0/0"
       height: 18
       verticalAlignment: Text.AlignVCenter

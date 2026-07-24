@@ -71,7 +71,7 @@ FocusScope {
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: "󰍉"
-      color: Theme.action
+      color: Theme.sideApplications
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
@@ -87,7 +87,7 @@ FocusScope {
       height: 28
       verticalAlignment: TextInput.AlignVCenter
       color: Theme.foreground
-      selectionColor: Theme.action
+      selectionColor: Theme.sideApplications
       selectedTextColor: Theme.background
       clip: true
       font.family: "Ubuntu Nerd Font"
@@ -166,7 +166,7 @@ FocusScope {
         : results.length + (results.length === 1 ? " TAB" : " TABS")
       color: statusData.chromeTabsMessage !== "" ? Theme.error
         : statusData.chromeTabsLoading || statusData.chromeTabsActionPending
-          ? Theme.state : Theme.secondary
+          ? Theme.sideApplications : Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 10
       font.bold: true
@@ -242,7 +242,7 @@ FocusScope {
             anchors.centerIn: parent
             visible: !tabRow.tab.iconPath || favicon.status === Image.Error
             text: ""
-            color: tabRow.tab.active ? Theme.state : Theme.inactive
+            color: tabRow.tab.active ? Theme.sideApplications : Theme.inactive
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 17
             font.bold: true
@@ -283,15 +283,15 @@ FocusScope {
 
         Row {
           id: stateIcons
-          anchors.right: launchHint.left
-          anchors.rightMargin: 6
+          anchors.right: parent.right
+          anchors.rightMargin: 18
           anchors.verticalCenter: parent.verticalCenter
           spacing: 6
 
           Text {
             visible: tabRow.tab.pinned
             text: "󰐃"
-            color: Theme.state
+            color: Theme.sideApplications
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 12
             font.bold: true
@@ -303,22 +303,8 @@ FocusScope {
             width: 7
             height: 7
             radius: 3.5
-            color: Theme.state
+            color: Theme.sideApplications
           }
-        }
-
-        Text {
-          id: launchHint
-          anchors.right: parent.right
-          anchors.rightMargin: 18
-          anchors.verticalCenter: parent.verticalCenter
-          width: 24
-          horizontalAlignment: Text.AlignHCenter
-          text: tabRow.selected ? "󰌑" : ""
-          color: Theme.action
-          font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 14
-          font.bold: true
         }
 
         MouseArea {

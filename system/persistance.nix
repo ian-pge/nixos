@@ -44,7 +44,6 @@
 
         ".config/nixos"
         ".local/share/zed"
-        ".local/share/vicinae"
         ".ssh"
         ".devpod"
         ".runpod"
@@ -77,7 +76,6 @@
         ".config/gazelle"
         ".config/chezmoi"
         ".local/state/wireplumber"
-        ".local/state/vicinae"
         ".config/gcloud"
         ".config/Antigravity"
         ".config/discord"
