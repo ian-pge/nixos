@@ -62,6 +62,17 @@ Scope {
   property string wifiPassword: ""
   property var wifiPendingNetwork: null
   property bool wifiConnectionUsedPassword: false
+  property bool wifiSpeedTestExpanded: false
+  property bool wifiSpeedTestRunning: false
+  property bool wifiSpeedTestHasResult: false
+  property string wifiSpeedTestMessage: ""
+  property string wifiSpeedTestPing: "--"
+  property string wifiSpeedTestDownload: "--"
+  property string wifiSpeedTestUpload: "--"
+  property string wifiSpeedTestPhase: ""
+  property string wifiSpeedTestLiveValue: ""
+  property real wifiSpeedTestProgress: 0
+  property int wifiSpeedTestGeneration: 0
   property bool bluetoothSelectorVisible: false
   property string bluetoothTargetMonitor: ""
   property int bluetoothTab: 0
@@ -914,6 +925,7 @@ Scope {
     wifiPendingNetwork = null;
     wifiConnectionUsedPassword = false;
     wifiMessage = "";
+    cancelWifiSpeedTest();
     stopWifiScan();
     finishCenterTransition(ownsTransition);
   }
@@ -1010,6 +1022,134 @@ Scope {
     if (!wifiDevice.scannerEnabled)
       wifiDevice.scannerEnabled = true;
     wifiScanTimer.restart();
+  }
+
+  function resetWifiSpeedTestValues() {
+    wifiSpeedTestHasResult = false;
+    wifiSpeedTestPing = "--";
+    wifiSpeedTestDownload = "--";
+    wifiSpeedTestUpload = "--";
+    wifiSpeedTestPhase = "";
+    wifiSpeedTestLiveValue = "";
+    wifiSpeedTestProgress = 0;
+  }
+
+  function startWifiSpeedTest() {
+    if (wifiSpeedTestRunning)
+      return;
+
+    wifiSpeedTestExpanded = true;
+    wifiSpeedTestMessage = "";
+    resetWifiSpeedTestValues();
+    if (networkType === "disabled" || networkType === "disconnected") {
+      wifiSpeedTestMessage = "No active connection";
+      return;
+    }
+
+    const generation = ++wifiSpeedTestGeneration;
+    wifiSpeedTestPhase = "STARTING";
+    wifiSpeedTestRunning = true;
+    wifiSpeedTestTimer.restart();
+    wifiSpeedTestProcess.exec([
+      "quickshell-speedtest", generation.toString()
+    ]);
+  }
+
+  function cancelWifiSpeedTest() {
+    wifiSpeedTestGeneration++;
+    wifiSpeedTestExpanded = false;
+    wifiSpeedTestRunning = false;
+    wifiSpeedTestMessage = "";
+    wifiSpeedTestTimer.stop();
+    if (wifiSpeedTestProcess.running)
+      wifiSpeedTestProcess.running = false;
+    resetWifiSpeedTestValues();
+  }
+
+  function failWifiSpeedTest(message = "Speed test failed") {
+    wifiSpeedTestTimer.stop();
+    wifiSpeedTestRunning = false;
+    wifiSpeedTestMessage = message;
+    resetWifiSpeedTestValues();
+  }
+
+  function setWifiSpeedTestProgress(phase, stageProgress, start, span,
+      liveValue = "") {
+    const parsedProgress = Number(stageProgress);
+    const progress = Number.isFinite(parsedProgress)
+      ? Math.max(0, Math.min(1, parsedProgress)) : 0;
+    wifiSpeedTestPhase = phase;
+    wifiSpeedTestProgress = start + progress * span;
+    wifiSpeedTestLiveValue = liveValue;
+  }
+
+  function parseWifiSpeedTestEvent(text) {
+    const responseText = text.trim();
+    if (responseText === "")
+      return;
+
+    try {
+      const response = JSON.parse(responseText);
+      if (response.generation.toString() !== wifiSpeedTestGeneration.toString())
+        return;
+      if (response.type === "error" || response.error !== undefined) {
+        console.warn("Speed test failed:", response.error);
+        failWifiSpeedTest();
+        return;
+      }
+
+      if (response.type === "testStart") {
+        wifiSpeedTestPhase = "PING";
+        wifiSpeedTestProgress = 0;
+        wifiSpeedTestLiveValue = "";
+      } else if (response.type === "ping") {
+        const latency = Number(response.ping?.latency);
+        setWifiSpeedTestProgress("PING", response.ping?.progress, 0, 0.15,
+          Number.isFinite(latency) ? latency.toFixed(1) + " ms" : "");
+      } else if (response.type === "download") {
+        const speed = Number(response.download?.bandwidth) * 8 / 1000000;
+        setWifiSpeedTestProgress("DOWNLOAD", response.download?.progress,
+          0.15, 0.45,
+          Number.isFinite(speed) ? speed.toFixed(1) + " Mb/s" : "");
+      } else if (response.type === "upload") {
+        const speed = Number(response.upload?.bandwidth) * 8 / 1000000;
+        setWifiSpeedTestProgress("UPLOAD", response.upload?.progress,
+          0.60, 0.35,
+          Number.isFinite(speed) ? speed.toFixed(1) + " Mb/s" : "");
+      } else if (response.type === "packetLoss") {
+        wifiSpeedTestPhase = "FINALIZING";
+        wifiSpeedTestProgress = 0.95;
+        wifiSpeedTestLiveValue = "";
+      } else if (response.type === "result") {
+        const ping = Number(response.ping?.latency);
+        const download = Number(response.download?.bandwidth) * 8 / 1000000;
+        const upload = Number(response.upload?.bandwidth) * 8 / 1000000;
+        if (!Number.isFinite(ping) || !Number.isFinite(download)
+            || !Number.isFinite(upload))
+          throw new Error("Missing speed test metrics");
+
+        wifiSpeedTestTimer.stop();
+        wifiSpeedTestPing = ping.toFixed(1);
+        wifiSpeedTestDownload = download.toFixed(1);
+        wifiSpeedTestUpload = upload.toFixed(1);
+        wifiSpeedTestProgress = 1;
+        wifiSpeedTestHasResult = true;
+        wifiSpeedTestRunning = false;
+        wifiSpeedTestMessage = "";
+      }
+    } catch (error) {
+      console.warn("Unable to parse speed test event:", error);
+      failWifiSpeedTest();
+    }
+  }
+
+  function timeoutWifiSpeedTest() {
+    if (!wifiSpeedTestRunning)
+      return;
+    wifiSpeedTestGeneration++;
+    if (wifiSpeedTestProcess.running)
+      wifiSpeedTestProcess.running = false;
+    failWifiSpeedTest("Speed test timed out");
   }
 
   function toggleBluetoothSelector(targetMonitor = "") {
@@ -1418,6 +1558,28 @@ Scope {
     id: wifiConnectionTimer
     interval: 20000
     onTriggered: root.failWifiConnection()
+  }
+
+  Timer {
+    id: wifiSpeedTestTimer
+    interval: 90000
+    onTriggered: root.timeoutWifiSpeedTest()
+  }
+
+  Process {
+    id: wifiSpeedTestProcess
+
+    stdout: SplitParser {
+      onRead: data => root.parseWifiSpeedTestEvent(data)
+    }
+
+    onExited: (exitCode, exitStatus) => {
+      Qt.callLater(() => {
+        if (root.wifiSpeedTestExpanded && root.wifiSpeedTestRunning
+            && !wifiSpeedTestProcess.running)
+          root.failWifiSpeedTest();
+      });
+    }
   }
 
   Timer {

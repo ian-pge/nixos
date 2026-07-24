@@ -217,7 +217,8 @@ PanelWindow {
     readonly property real targetHeight: window.appLauncherActive
       ? appLauncher.implicitHeight
       : window.chromeTabsActive ? chromeTabsLauncher.implicitHeight
-      : window.updateSelectorActive ? updateSelector.implicitHeight : 36
+      : window.updateSelectorActive ? updateSelector.implicitHeight
+      : window.wifiSelectorActive ? wifiSelector.implicitHeight : 36
     readonly property var contentModes: ["workspaces", "volume",
       "brightness", "media", "wifi", "bluetooth", "launcher", "tabs",
       "updates"]

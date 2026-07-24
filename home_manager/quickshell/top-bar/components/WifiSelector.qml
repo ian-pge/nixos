@@ -23,7 +23,7 @@ FocusScope {
   property bool wheelNavigationPending: false
 
   implicitWidth: 400
-  implicitHeight: 36
+  implicitHeight: statusData.wifiSpeedTestExpanded ? 94 : 36
 
   function signalIcon(strength) {
     if (strength < 26) return "󰤟";
@@ -115,6 +115,9 @@ FocusScope {
         Math.max(0, statusData.networkSelectorEntries.length - 1), 1);
       wheelNavigationPending = false;
       event.accepted = true;
+    } else if (event.key === Qt.Key_T) {
+      statusData.startWifiSpeedTest();
+      event.accepted = true;
     } else if (event.key === Qt.Key_R) {
       statusData.refreshWifiNetworks();
       event.accepted = true;
@@ -126,6 +129,13 @@ FocusScope {
       event.accepted = true;
     }
   }
+
+  Item {
+    id: networkRow
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 36
 
   Text {
     id: wifiIcon
@@ -255,6 +265,173 @@ FocusScope {
       height: 18
       verticalAlignment: Text.AlignVCenter
       color: Theme.secondary
+      font.family: "Ubuntu Nerd Font"
+      font.pixelSize: 12
+      font.bold: true
+    }
+  }
+  }
+
+  Item {
+    id: speedTestPanel
+    anchors.top: networkRow.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: Math.max(0, root.height - networkRow.height)
+    visible: statusData.wifiSpeedTestExpanded
+    opacity: visible ? 1 : 0
+
+    Behavior on opacity { NumberAnimation { duration: 180 } }
+
+    Rectangle {
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.leftMargin: 14
+      anchors.rightMargin: 14
+      height: 1
+      color: Theme.surfaceRaised
+    }
+
+    Item {
+      visible: statusData.wifiSpeedTestRunning
+      anchors.fill: parent
+
+      Text {
+        id: speedTestSpinner
+        anchors.left: parent.left
+        anchors.leftMargin: 15
+        y: 8
+        text: "󰑐"
+        color: Theme.sideNetwork
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 15
+        font.bold: true
+
+        RotationAnimator on rotation {
+          running: statusData.wifiSpeedTestRunning
+          from: 0
+          to: 360
+          duration: 900
+          loops: Animation.Infinite
+          onStopped: speedTestSpinner.rotation = 0
+        }
+      }
+
+      Text {
+        anchors.left: speedTestSpinner.right
+        anchors.leftMargin: 8
+        y: 8
+        text: statusData.wifiSpeedTestPhase
+        color: Theme.secondary
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 11
+        font.bold: true
+      }
+
+      Text {
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: 8
+        text: statusData.wifiSpeedTestLiveValue
+        color: Theme.sideNetwork
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 11
+        font.bold: true
+      }
+
+      Text {
+        anchors.right: parent.right
+        anchors.rightMargin: 15
+        y: 8
+        text: Math.round(statusData.wifiSpeedTestProgress * 100) + "%"
+        color: Theme.secondary
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 11
+        font.bold: true
+      }
+
+      Rectangle {
+        id: speedTestProgressTrack
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 15
+        anchors.rightMargin: 15
+        y: 35
+        height: 5
+        radius: 2.5
+        color: Theme.surfaceRaised
+
+        Rectangle {
+          width: parent.width * statusData.wifiSpeedTestProgress
+          height: parent.height
+          radius: parent.radius
+          color: Theme.sideNetwork
+
+          Behavior on width {
+            NumberAnimation {
+              duration: 180
+              easing.type: Easing.OutCubic
+            }
+          }
+        }
+      }
+    }
+
+    Row {
+      id: speedMetrics
+      visible: statusData.wifiSpeedTestHasResult
+        && !statusData.wifiSpeedTestRunning
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.leftMargin: 14
+      anchors.rightMargin: 14
+
+      Repeater {
+        model: [
+          { "label": "PING", "value": statusData.wifiSpeedTestPing,
+            "unit": "ms" },
+          { "label": "DOWN", "value": statusData.wifiSpeedTestDownload,
+            "unit": "Mb/s" },
+          { "label": "UP", "value": statusData.wifiSpeedTestUpload,
+            "unit": "Mb/s" }
+        ]
+
+        Item {
+          required property var modelData
+          width: speedMetrics.width / 3
+          height: speedMetrics.height
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 8
+            text: modelData.label
+            color: Theme.secondary
+            font.family: "Ubuntu Nerd Font"
+            font.pixelSize: 10
+            font.bold: true
+          }
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 25
+            text: modelData.value + " " + modelData.unit
+            color: Theme.sideNetwork
+            font.family: "Ubuntu Nerd Font"
+            font.pixelSize: 12
+            font.bold: true
+          }
+        }
+      }
+    }
+
+    Text {
+      visible: !statusData.wifiSpeedTestRunning
+        && !statusData.wifiSpeedTestHasResult
+      anchors.centerIn: parent
+      text: statusData.wifiSpeedTestMessage
+      color: Theme.error
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 12
       font.bold: true

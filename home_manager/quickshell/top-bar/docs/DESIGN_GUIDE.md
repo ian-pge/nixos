@@ -298,7 +298,7 @@ du fade de sortie, et une interruption repart de l’opacité courante.
 Les deux sélecteurs doivent rester visuellement parallèles :
 
 - largeur `400px` ;
-- hauteur `36px` ;
+- hauteur `36px`, étendue à `94px` pendant un speed test ;
 - compteur aligné sur une hauteur fixe de `18px` ;
 - animation de roue verticale en `150ms` ;
 - déplacement de `40px` hors du viewport découpé ;
@@ -312,12 +312,15 @@ Le Wi-Fi utilise exclusivement `Quickshell.Networking` : devices NetworkManager,
 
 Le Bluetooth utilise exclusivement `Quickshell.Bluetooth` : découverte BlueZ, appareils, appairage, connexion et déconnexion. Aucun helper `bluetoothctl` ne doit être réintroduit.
 
-À l’ouverture, les modèles natifs déjà chargés s’affichent immédiatement. Le rafraîchissement silencieux active temporairement `WifiDevice.scannerEnabled` sans spinner.
+À l’ouverture, les modèles natifs déjà chargés s’affichent immédiatement. `WifiDevice.scannerEnabled` reste actif pendant toute la durée de vie du sélecteur, car Quickshell masque les réseaux inconnus dès que le scanner est désactivé. Le timer de rafraîchissement arrête uniquement le spinner ; la fermeture du sélecteur arrête réellement le scanner.
 
 Un vrai spinner est réservé à :
 
 - `r` pour un scan Wi-Fi explicite ;
+- `t` pendant l’exécution explicite du client Ookla ;
 - l’onglet Bluetooth `NEARBY`, via `BluetoothAdapter.discovering`.
+
+Le speed test n’est jamais automatique. `t` étend la capsule vers le bas et lance `quickshell-speedtest`, wrapper du client officiel `ookla-speedtest`. Son flux JSON progressif met à jour en direct la phase (`PING`, `DOWNLOAD`, `UPLOAD`), la valeur courante, le pourcentage global monotone et une barre de progression, puis affiche le résultat final. Une fermeture du sélecteur interrompt tout le groupe de processus et un timeout de `90s` empêche tout processus bloqué.
 
 ### Couleurs d’état
 
@@ -395,7 +398,7 @@ Lors de l’ouverture d’un overlay :
 - résoudre et enregistrer le moniteur cible avant de rendre le nouvel overlay visible ;
 - laisser les workspaces inchangés sur les autres écrans.
 
-Le nettoyage Wi-Fi annule aussi le scan différé, le timer de connexion, le mot de passe et le réseau pending. Une génération de scan empêche un ancien `Qt.callLater` de réactiver le scanner après fermeture.
+Le nettoyage Wi-Fi arrête le scanner, le timer de connexion, le speed test Ookla, le mot de passe et le réseau pending. Une génération identifie chaque speed test afin qu’une sortie tardive d’un processus annulé ne puisse jamais remplacer un résultat plus récent.
 
 Une action Bluetooth native déjà lancée continue lorsque le sélecteur est masqué. Son timer et son message restent associés à l’action afin qu’une réouverture puisse afficher son état ; seule la découverte est arrêtée.
 
@@ -429,6 +432,7 @@ Une action Bluetooth native déjà lancée continue lorsque le sélecteur est ma
 - `k/h` ou haut/gauche : précédent
 - `g/G` : début/fin
 - `r` : rescan
+- `t` : lancer ou relancer le speed test Ookla
 - `Enter` : connexion
 - `q/Esc` : fermeture
 
