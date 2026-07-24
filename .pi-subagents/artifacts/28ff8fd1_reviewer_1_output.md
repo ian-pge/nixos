@@ -1,0 +1,6 @@
+## Review
+- **Blocker:** None verified in the inspected changes.
+- **Optional:** `home_manager/quickshell/top-bar/StatusData.qml` (`changeBrightness`) queues rapid wheel deltas correctly, but does not optimistically update `brightness`; the pill/overlay can display the old value until `brightnessctl` completes.
+- **Optional:** `Bar.qml` and `components/BrightnessIndicator.qml` reduce each wheel event to its sign, ignoring `angleDelta` magnitude. High-resolution or multi-notch events may feel under-responsive, though repeated events are accumulated.
+- **Correct:** `StatusData.qml` prevents telemetry from overwriting brightness while the overlay is visible and serializes brightness writes through `pendingBrightnessDelta`.
+- **Residual risk:** The `StatusData.qml` read was truncated before the relevant `Process` exit handlers and polling `Timer`; therefore final stdout/exit ordering and the exact 30-minute timer behavior could not be attested. Requested `plan.md` and `progress.md` were absent.
