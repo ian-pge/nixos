@@ -570,10 +570,9 @@ PanelWindow {
       text: statusData.brightnessIcon() + " " + statusData.brightness + "%"
       accent: Theme.sideBrightness
       forceHovered: window.brightnessOverlayActive
-      wheelUpCommand: "brightnessctl set +5%"
-      wheelDownCommand: "brightnessctl set 5%-"
-      onWheelUp: statusData.showBrightnessOverlay(window.monitorName)
-      onWheelDown: statusData.showBrightnessOverlay(window.monitorName)
+      interactive: true
+      onWheelUp: statusData.changeBrightness(5, window.monitorName)
+      onWheelDown: statusData.changeBrightness(-5, window.monitorName)
     }
 
     Pill {

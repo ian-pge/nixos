@@ -8,7 +8,9 @@
 - `helpers/` — Nix-packaged commands used by the active shell.
   - `quickshell-update-checker`
   - `quickshell-update-installer`
+  - `quickshell-system-stats`
   - `quickshell-gpu-monitor`
   - `quickshell-weather`
+  - `quickshell-speedtest`
 
 The old helper definitions remain in `../waybar.nix` for compatibility, but are only installed when Waybar is enabled. Waybar itself remains disabled.

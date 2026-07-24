@@ -65,8 +65,9 @@ FocusScope {
         visible: !statusData.nixChecking
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        text: updates.length > 0 ? "" : ""
-        color: Theme.sideUpdates
+        text: statusData.nixCheckFailed ? ""
+          : updates.length > 0 ? "" : ""
+        color: statusData.nixCheckFailed ? Theme.error : Theme.sideUpdates
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 17
         font.bold: true
@@ -79,7 +80,8 @@ FocusScope {
       y: 8
       height: 22
       verticalAlignment: Text.AlignVCenter
-      text: statusData.nixChecking ? "Checking for updates…" : "NixOS updates"
+      text: statusData.nixChecking ? "Checking for updates…"
+        : statusData.nixCheckFailed ? "Update check failed" : "NixOS updates"
       color: Theme.foreground
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -93,9 +95,11 @@ FocusScope {
       height: 20
       verticalAlignment: Text.AlignVCenter
       text: statusData.nixChecking ? "CHECKING"
+        : statusData.nixCheckFailed ? "ERROR"
         : updates.length > 0 ? updates.length + " AVAILABLE" : "UP TO DATE"
-      color: statusData.nixChecking || updates.length > 0
-        ? Theme.sideUpdates : Theme.secondary
+      color: statusData.nixCheckFailed ? Theme.error
+        : statusData.nixChecking || updates.length > 0
+          ? Theme.sideUpdates : Theme.secondary
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 11
       font.bold: true
@@ -182,10 +186,9 @@ FocusScope {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         text: statusData.nixChecking ? "Refreshing the cached update list…"
-          : statusData.nixTooltip === "Unable to check for updates"
+          : statusData.nixCheckFailed
             ? statusData.nixTooltip : "System is up to date"
-        color: statusData.nixTooltip === "Unable to check for updates"
-          ? Theme.error : Theme.secondary
+        color: statusData.nixCheckFailed ? Theme.error : Theme.secondary
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 13
         font.bold: true

@@ -369,7 +369,7 @@ Conventions :
 - Timeout de visibilité : `2000ms`.
 - La barre de progression anime sa largeur en `140ms`.
 - Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
-- La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif.
+- La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif. Tous les gestes passent par `StatusData.changeBrightness()`, qui sérialise les changements et lit la valeur machine-readable renvoyée par la commande ; aucun composant ne lance son propre processus de luminosité.
 - Le volume utilise `Theme.sideVolume` pour son icône et son remplissage.
 - La luminosité utilise `Theme.sideBrightness` pour son icône et son remplissage.
 - Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage coloré indique le niveau.
@@ -447,7 +447,9 @@ Une action Bluetooth native déjà lancée continue lorsque le sélecteur est ma
 
 ### Updates — `Super+U`
 
-Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHECKING` / `AVAILABLE` et les points de chaque ligne. `UP TO DATE`, les dates et les états vides restent gris ; le liseré animé autour de la capsule reste rose.
+Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHECKING` / `AVAILABLE` et les points de chaque ligne. `UP TO DATE`, les dates et les états vides restent gris ; `ERROR` utilise `Theme.error` et ne doit jamais être présenté comme un système à jour. Le liseré animé autour de la capsule reste rose.
+
+Le checker compare les anciens et nouveaux `flake.lock` comme JSON, sans analyser la sortie humaine de Nix. Il s'exécute au démarrage, toutes les 30 minutes et après une demande explicite ; l'installateur partage son verrou et restaure le lockfile précédent si le rebuild échoue.
 
 - `r` : vérification forcée
 - `Enter` : lance `quickshell-update-installer` dans Ghostty

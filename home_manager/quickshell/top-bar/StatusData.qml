@@ -15,6 +15,7 @@ Scope {
   property int memoryUsage: 0
   property int diskUsage: 0
   property int brightness: 0
+  property int pendingBrightnessDelta: 0
 
   property string gpuText: "--"
   property string gpuTooltip: "GPU data unavailable"
@@ -24,6 +25,7 @@ Scope {
   property string nixTooltip: "Checking for updates…"
   property var nixUpdates: []
   property bool nixChecking: true
+  property bool nixCheckFailed: false
   property bool updateSelectorVisible: false
   property bool appLauncherVisible: false
   property string appLauncherTargetMonitor: ""
@@ -854,7 +856,37 @@ Scope {
     finishCenterTransition(ownsTransition);
   }
 
-  function showBrightnessOverlay(targetMonitor = "") {
+  function parseBrightnessStatus(text) {
+    const fields = text.trim().split(",");
+    if (fields.length < 4)
+      return;
+    const value = parseInt(fields[3].replace("%", ""), 10);
+    if (!isNaN(value))
+      brightness = value;
+  }
+
+  function applyPendingBrightnessChange() {
+    if (brightnessChangeProcess.running || pendingBrightnessDelta === 0)
+      return;
+    const delta = pendingBrightnessDelta;
+    pendingBrightnessDelta = 0;
+    const adjustment = delta > 0 ? "+" + delta + "%" : -delta + "%-";
+    brightnessChangeProcess.exec([
+      "brightnessctl", "-m", "set", adjustment
+    ]);
+  }
+
+  function changeBrightness(delta, targetMonitor = "") {
+    if (delta === 0)
+      return;
+    pendingBrightnessDelta += Math.round(delta);
+    if (brightnessRefreshProcess.running)
+      brightnessRefreshProcess.running = false;
+    showBrightnessOverlay(targetMonitor, false);
+    applyPendingBrightnessChange();
+  }
+
+  function showBrightnessOverlay(targetMonitor = "", refreshValue = true) {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("brightness", resolvedTarget);
     hideAppLauncher();
@@ -867,7 +899,9 @@ Scope {
     brightnessTargetMonitor = resolvedTarget;
     brightnessOverlayVisible = true;
     brightnessOverlayTimer.restart();
-    brightnessRefreshProcess.exec(["brightnessctl", "-m"]);
+    if (refreshValue && !brightnessChangeProcess.running
+        && !brightnessRefreshProcess.running)
+      brightnessRefreshProcess.exec(["brightnessctl", "-m"]);
     finishCenterTransition(ownsTransition);
   }
 
@@ -1417,6 +1451,7 @@ Scope {
   function forceNixStatus() {
     if (!nixForceProcess.running) {
       nixChecking = true;
+      nixCheckFailed = false;
       nixForceProcess.running = true;
     }
   }
@@ -1425,13 +1460,16 @@ Scope {
     try {
       const status = JSON.parse(text.trim());
       if (Array.isArray(status.updates)) {
+        root.nixCheckFailed = status.state === "error";
         root.nixUpdates = status.updates;
-        root.nixIcon = status.hasUpdates ? "" : "";
+        root.nixIcon = root.nixCheckFailed ? ""
+          : status.hasUpdates ? "" : "";
         root.nixTooltip = status.hasUpdates
           ? status.updates.map(update => update.name + ": " + update.date).join("\n")
           : status.message || "System is up to date";
       } else {
         // Compatibility with the preserved Waybar helper cache format.
+        root.nixCheckFailed = false;
         root.nixIcon = status.alt === "has-updates" ? "" : "";
         root.nixTooltip = status.tooltip || "System is up to date";
         const lines = status.alt === "has-updates"
@@ -1444,6 +1482,8 @@ Scope {
         });
       }
     } catch (error) {
+      root.nixCheckFailed = true;
+      root.nixIcon = "";
       root.nixUpdates = [];
       root.nixTooltip = "Unable to check for updates";
     }
@@ -1628,9 +1668,25 @@ Scope {
 
     stdout: StdioCollector {
       onStreamFinished: {
-        const fields = text.trim().split(",");
-        if (fields.length >= 4)
-          root.brightness = parseInt(fields[3].replace("%", ""), 10);
+        if (!brightnessChangeProcess.running
+            && root.pendingBrightnessDelta === 0)
+          root.parseBrightnessStatus(text);
+      }
+    }
+  }
+
+  Process {
+    id: brightnessChangeProcess
+
+    stdout: StdioCollector {
+      onStreamFinished: root.parseBrightnessStatus(text)
+    }
+
+    onExited: (exitCode, exitStatus) => {
+      if (root.pendingBrightnessDelta !== 0) {
+        Qt.callLater(() => root.applyPendingBrightnessChange());
+      } else if (exitCode !== 0 && !brightnessRefreshProcess.running) {
+        brightnessRefreshProcess.exec(["brightnessctl", "-m"]);
       }
     }
   }
@@ -1724,7 +1780,7 @@ Scope {
   }
 
   Timer {
-    interval: 10000
+    interval: 1800000
     running: true
     repeat: true
     onTriggered: root.refreshNixStatus()

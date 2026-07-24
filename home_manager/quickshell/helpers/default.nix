@@ -18,8 +18,6 @@
     name = "quickshell-update-checker";
     runtimeInputs = with pkgs; [
       coreutils
-      gawk
-      gnugrep
       jq
       nix
       util-linux
@@ -35,6 +33,7 @@
       nh
       nix
       quickshell
+      util-linux
     ];
     text = builtins.readFile ./update-installer.sh;
   };

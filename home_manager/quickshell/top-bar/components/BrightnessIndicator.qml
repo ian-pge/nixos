@@ -1,4 +1,3 @@
-import Quickshell.Io
 import QtQuick
 import "Theme.js" as Theme
 
@@ -58,20 +57,9 @@ Rectangle {
     anchors.fill: parent
     onWheel: wheel => {
       if (wheel.angleDelta.y > 0)
-        brightnessUp.startDetached();
+        statusData.changeBrightness(5, root.targetMonitor);
       else if (wheel.angleDelta.y < 0)
-        brightnessDown.startDetached();
-      statusData.showBrightnessOverlay(root.targetMonitor);
+        statusData.changeBrightness(-5, root.targetMonitor);
     }
-  }
-
-  Process {
-    id: brightnessUp
-    command: ["brightnessctl", "set", "+5%"]
-  }
-
-  Process {
-    id: brightnessDown
-    command: ["brightnessctl", "set", "5%-"]
   }
 }
