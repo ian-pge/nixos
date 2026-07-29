@@ -1,7 +1,4 @@
-{inputs, overlays, ...}: {
-  # Apply local package overlays to the system configuration.
-  nixpkgs.overlays = builtins.attrValues overlays;
-
+{inputs, ...}: {
   imports = [
     (import ./disko.nix {device = "/dev/nvme0n1";})
 
@@ -26,7 +23,6 @@
     ./virtualisation.nix
     ./tailscale.nix
     ./flatpak.nix
-    ./appimage.nix
     ./razer.nix
     ./home_manager.nix
     ./nvidia.nix

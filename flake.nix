@@ -36,29 +36,15 @@
   };
 
   outputs = inputs @ {
-    self,
     nixpkgs,
     ...
   }: let
     inherit (nixpkgs) lib;
-
-    # Overlays are defined once and exported; they can be reused by other flakes via `inputs.self.overlays`
-    overlays = {
-      paper-desktop = import ./overlays/paper-desktop.nix;
-      # gazelle-tui = final: prev: {
-      #   gazelle-tui = (import ./overlays/gazelle-tui.nix final prev).gazelle-tui.overrideAttrs (old: {
-      #     src = inputs.gazelle-tui;
-      # });
-      # };
-    };
   in {
-    inherit overlays;
-
     nixosConfigurations = {
       nixos = lib.nixosSystem {
         system = "x86_64-linux";
-        # Expose the flake inputs and local overlays to all modules.
-        specialArgs = {inherit inputs overlays;};
+        specialArgs = {inherit inputs;};
 
         modules = [
           ./system

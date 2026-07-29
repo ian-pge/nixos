@@ -24,10 +24,10 @@
     devpod
     devcontainer
     orca-slicer
-    (bambu-studio.override {
-      withNvidiaGLWorkaround = true;
-    })
-    # bambuddy
+    # (bambu-studio.override {
+    #   withNvidiaGLWorkaround = true;
+    # })
+    herdr
     kalker
     google-chrome
     blender

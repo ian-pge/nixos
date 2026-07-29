@@ -9,7 +9,6 @@
     ./git.nix
     ./additional_packages.nix
     ./desktop_packages.nix
-    ./paper-desktop.nix
     # ./mime_apps.nix
     ./zed.nix
     ./gtk.nix

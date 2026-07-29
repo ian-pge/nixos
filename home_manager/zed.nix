@@ -114,8 +114,9 @@
 
       terminal = {
         font_family = "JetBrainsMono Nerd Font";
+        font_fallbacks = ["Maple Mono NF"];
         dock = "right";
-        font_size = 16;
+        font_size = 14;
         blinking = "on";
         line_height = "standard";
         toolbar = {
