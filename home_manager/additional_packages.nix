@@ -52,9 +52,9 @@
     # f3d # disabled: pulls vtk -> pdal -> gdal-minimal, currently failing GDAL tests
     discord
     krabby
-    t3code
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli
     nodejs_latest
     (symlinkJoin {

@@ -8,8 +8,10 @@
     ./chezmoi.nix
     ./git.nix
     ./additional_packages.nix
+    ./t3code.nix
     ./desktop_packages.nix
     # ./mime_apps.nix
+    ./gh.nix
     ./zed.nix
     ./gtk.nix
     ./quickshell.nix

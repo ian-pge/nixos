@@ -23,6 +23,7 @@
     ./virtualisation.nix
     ./tailscale.nix
     ./flatpak.nix
+    ./appimage.nix
     ./razer.nix
     ./home_manager.nix
     ./nvidia.nix
