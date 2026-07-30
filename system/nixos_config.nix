@@ -12,6 +12,10 @@
 
   nixpkgs.config.allowUnfree = true;
 
+  # Allow generic dynamically linked Linux binaries, such as Zed-downloaded
+  # external agents, to run on NixOS.
+  programs.nix-ld.enable = true;
+
   time.timeZone = "Europe/Paris";
 
   users.users."ian" = {

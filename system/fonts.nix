@@ -4,5 +4,6 @@
     nerd-fonts.hack
     nerd-fonts.ubuntu
     maple-mono.NF
+    iosevka
   ];
 }

@@ -5,7 +5,7 @@
 
     # This whole block is rendered to ~/.config/zed/settings.json
     userSettings = {
-      disable_ai = true;
+      disable_ai = false;
       dev_container_suggest_dismissed = true;
       cli_default_open_behavior = "new_window";
 
@@ -26,8 +26,22 @@
       ];
 
       agent = {
-        enabled = false;
-        button = false;
+        enabled = true;
+        button = true;
+        commit_message_model = {
+          provider = "openai-subscribed";
+          model = "gpt-5.4-mini";
+        };
+      };
+
+      # Install Claude Agent and Codex from Zed's ACP registry.
+      agent_servers = {
+        "claude-acp" = {
+          type = "registry";
+        };
+        "codex-acp" = {
+          type = "registry";
+        };
       };
 
       inlay_hints = {
@@ -80,6 +94,16 @@
       };
 
       show_edit_predictions = true;
+      cursor_blink = true;
+      theme_overrides = {
+        "Catppuccin Macchiato (sapphire)" = {
+          players = [
+            {
+              cursor = "#ffcc33";
+            }
+          ];
+        };
+      };
       vim_mode = true;
       vim = {
         cursor_shape = {
@@ -96,15 +120,16 @@
       # };
 
       project_panel = {
-        dock = "left";
+        dock = "right";
       };
 
       git_panel = {
-        dock = "left";
+        dock = "right";
       };
 
       outline_panel = {
         dock = "left";
+        button = false;
       };
 
       collaboration_panel = {
@@ -114,7 +139,7 @@
 
       terminal = {
         font_family = "JetBrainsMono Nerd Font";
-        font_fallbacks = ["Maple Mono NF"];
+        font_fallbacks = ["Iosevka"];
         dock = "right";
         font_size = 14;
         blinking = "on";
@@ -124,19 +149,12 @@
         };
       };
 
-      # Zed draws this active pane border with the global theme token
-      # "border.selected". The terminal panel is implemented as the same kind of
-      # pane group as editor panes, so Zed currently cannot color only terminal
-      # panes differently from code panes through settings.json.
-      active_pane_modifiers = {
-        border_size = 2.0;
-        inactive_opacity = 1.0;
-      };
-
       buffer_font_family = "JetBrainsMono Nerd Font";
+      buffer_font_fallbacks = ["Iosevka"];
       buffer_font_size = 16;
 
       ui_font_family = "Ubuntu Nerd Font";
+      ui_font_fallbacks = ["Iosevka"];
       ui_font_size = 16;
     };
     userKeymaps = [
