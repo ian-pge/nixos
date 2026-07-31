@@ -56,7 +56,10 @@
         "action::Sequence"
         [
           "git::ExpandCommitEditor"
-          "git::GenerateCommitMessage"
+          [
+            "workspace::SendKeystrokes"
+            "alt-l"
+          ]
         ]
       ];
       "shift-space g m" = "git::GenerateCommitMessage";
@@ -66,6 +69,12 @@
   }
   {
     context = "CommitEditor > Editor";
+    bindings = {
+      "ctrl-enter" = "git::Commit";
+    };
+  }
+  {
+    context = "GitCommit > Editor";
     bindings = {
       "ctrl-enter" = "git::Commit";
     };
