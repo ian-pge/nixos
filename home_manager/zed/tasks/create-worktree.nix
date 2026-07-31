@@ -5,6 +5,7 @@
       pkgs.coreutils
       pkgs.git
       pkgs.gnused
+      pkgs.zed-editor
     ];
     text = ''
       set -uo pipefail
@@ -12,6 +13,14 @@
       fail() {
         printf 'create_worktree: erreur: %s\n' "$*" >&2
         exit 1
+      }
+
+      open_agent_thread() {
+        # Zed handles this URL asynchronously: the CLI returns first, allowing
+        # this successful task terminal to close, then Zed waits for the new
+        # workspace's panels and focuses a fresh thread in the Agent Panel.
+        zeditor 'zed://agent' \
+          || fail "impossible d'ouvrir le nouveau thread Agent"
       }
 
       [[ -n "''${ZED_WORKTREE_ROOT:-}" ]] || fail "ZED_WORKTREE_ROOT n'est pas défini"
@@ -27,6 +36,7 @@
 
       # Zed may already have created a branch. Only repair detached worktrees.
       if git -C "$worktree_root" symbolic-ref --quiet HEAD >/dev/null 2>&1; then
+        open_agent_thread
         exit 0
       fi
 
@@ -72,6 +82,7 @@
 
         if git -C "$worktree_root" switch --create "$branch" "$base_commit"; then
           printf 'create_worktree: branche %s créée depuis %s\n' "$branch" "$base_commit"
+          open_agent_thread
           exit 0
         fi
 
@@ -89,7 +100,7 @@
     '';
   };
 in {
-  label = "Create agent branch for detached worktree";
+  label = "Create agent branch and open thread";
   command = "${createWorktreeHook}/bin/zed-create-worktree-hook";
   cwd = "$ZED_WORKTREE_ROOT";
   hooks = ["create_worktree"];

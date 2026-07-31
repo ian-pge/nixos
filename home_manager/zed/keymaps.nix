@@ -5,8 +5,7 @@
     bindings = {
       "ctrl-space" = "workspace::ToggleZoom";
       "shift-space a a" = "agent::ToggleFocus";
-      "shift-space a t" = "multi_workspace::ToggleWorkspaceSidebar";
-      "shift-space a f" = "multi_workspace::FocusWorkspaceSidebar";
+      "shift-space a t" = "multi_workspace::FocusWorkspaceSidebar";
       "shift-space a w c" = [
         "action::Sequence"
         [
