@@ -4,43 +4,25 @@
     # action key. This keeps the leader available in every Zed surface.
     bindings = {
       "ctrl-space" = "workspace::ToggleZoom";
+      "ctrl-e" = "project_panel::ToggleFocus";
       "shift-space a a" = "agent::ToggleFocus";
       "shift-space a t" = "multi_workspace::FocusWorkspaceSidebar";
       "shift-space a f" = [
-        "task::Spawn"
-        {task_name = "Apply agent worktree";}
-      ];
-      "shift-space a w c" = [
         "action::Sequence"
         [
+          "workspace::FocusCenterPane"
           [
-            "agent::SelectAgent"
-            {agent = "claude-acp";}
-          ]
-          [
-            "git::CreateWorktree"
-            {
-              worktree_name = null;
-              branch_target.kind = "current_branch";
-            }
+            "task::Spawn"
+            {task_name = "Apply agent worktree";}
           ]
         ]
       ];
-      "shift-space a w x" = [
-        "action::Sequence"
-        [
-          [
-            "agent::SelectAgent"
-            {agent = "codex-acp";}
-          ]
-          [
-            "git::CreateWorktree"
-            {
-              worktree_name = null;
-              branch_target.kind = "current_branch";
-            }
-          ]
-        ]
+      "shift-space a w" = [
+        "git::CreateWorktree"
+        {
+          worktree_name = null;
+          branch_target.kind = "current_branch";
+        }
       ];
       "shift-space a c" = [
         "agent::NewExternalAgentThread"
@@ -235,7 +217,6 @@
     bindings = {
       "ctrl-n" = "workspace::NewTerminal";
       "ctrl-y" = "terminal::ScrollLineUp";
-      "ctrl-e" = "terminal::ScrollLineDown";
       "ctrl-u" = "terminal::ScrollPageUp";
       "ctrl-d" = "terminal::ScrollPageDown";
       "ctrl-h" = "workspace::ActivatePaneLeft";

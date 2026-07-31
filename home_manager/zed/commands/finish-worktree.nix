@@ -123,5 +123,7 @@ in
 
       printf 'zed-finish-worktree: succès: %s intégré dans %s; worktree et branche supprimés\n' \
         "$agent_branch" "$main_branch"
+      zeditor --reuse "$main_root" \
+        || fail "l'intégration a réussi, mais Zed n'a pas pu réutiliser la fenêtre pour le worktree principal: $main_root"
     '';
   }
