@@ -70,7 +70,6 @@
     })
     runpodctl
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode
-    chromium
     chezmoi
     ookla-speedtest
   ];

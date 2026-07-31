@@ -53,7 +53,6 @@
         ".ssh"
         ".devpod"
         ".runpod"
-        ".config/chromium"
         ".config/google-chrome"
         ".local/share/applications"
         ".local/share/icons"

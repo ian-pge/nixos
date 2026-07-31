@@ -2,6 +2,9 @@
   programs.zed-editor = {
     enable = true;
     mutableUserSettings = false;
+    # Keep keymap.json declarative too; mutable mode merges old entries and
+    # leaves removed shortcuts active in text-input contexts.
+    mutableUserKeymaps = false;
 
     # This whole block is rendered to ~/.config/zed/settings.json
     userSettings = {
@@ -28,9 +31,28 @@
       agent = {
         enabled = true;
         button = true;
+        # Keep the Agent Panel next to the Threads Sidebar.
+        dock = "left";
+        sidebar_side = "left";
+        # Let conversations follow the full width of the Agent Panel.
+        limit_content_width = false;
+        # Keep reasoning, file edits, and terminal output compact by default.
+        thinking_display = "preview";
+        expand_edit_card = false;
+        expand_terminal_card = false;
+        show_turn_stats = true;
+        # Notify when an agent finishes or needs input, and make the
+        # notification audible even when Zed is in the background.
+        notify_when_agent_waiting = "primary_screen";
+        play_sound_when_agent_done = "always";
+        # Do not add Zed-side confirmation prompts on top of the external
+        # agents' own permission modes.
+        tool_permissions = {
+          default = "allow";
+        };
         commit_message_model = {
           provider = "openai-subscribed";
-          model = "gpt-5.4-mini";
+          model = "gpt-5.6-luna";
         };
       };
 
@@ -38,9 +60,16 @@
       agent_servers = {
         "claude-acp" = {
           type = "registry";
+          default_mode = "bypassPermissions";
         };
         "codex-acp" = {
           type = "registry";
+          # Apply full access both through Zed's ACP session selection and at
+          # Codex ACP process startup, so every new thread begins in this mode.
+          default_mode = "agent-full-access";
+          env = {
+            INITIAL_AGENT_MODE = "agent-full-access";
+          };
         };
       };
 
@@ -57,7 +86,26 @@
       edit_predictions = {
         provider = "zed";
       };
-      restore_on_startup = "none";
+      # Panel visibility is stored with the session, so restore it when Zed
+      # starts instead of recreating an empty layout with closed panels.
+      restore_on_startup = "last_session";
+
+      tabs = {
+        git_status = true;
+        file_icons = true;
+      };
+
+      title_bar = {
+        show_branch_status_icon = true;
+      };
+
+      search = {
+        button = false;
+      };
+
+      status_bar = {
+        show_active_file = true;
+      };
 
       tab_size = 2;
 
@@ -125,10 +173,13 @@
 
       git_panel = {
         dock = "right";
+        file_icons = true;
       };
 
       outline_panel = {
-        dock = "left";
+        # This completes Zed's agentic layout: agent surfaces on the left,
+        # editor-oriented panels on the right.
+        dock = "right";
         button = false;
       };
 
@@ -143,6 +194,8 @@
         dock = "right";
         font_size = 14;
         blinking = "on";
+        show_count_badge = true;
+        copy_on_select = true;
         line_height = "standard";
         toolbar = {
           breadcrumbs = true;
@@ -159,10 +212,35 @@
     };
     userKeymaps = [
       {
-        # Global workspace shortcuts: Ctrl+Space toggles pane zoom,
-        # Ctrl+Enter opens a terminal tab, and Ctrl+T shows/hides the terminal.
+        # Global Agent workspace shortcuts: Shift+Space, then A, then the
+        # action key. This keeps the leader available in every Zed surface.
         bindings = {
           "ctrl-space" = "workspace::ToggleZoom";
+          "shift-space a a" = "agent::ToggleFocus";
+          "shift-space a t" = "multi_workspace::ToggleWorkspaceSidebar";
+          "shift-space a f" = "multi_workspace::FocusWorkspaceSidebar";
+          "shift-space a w" = [
+            "git::CreateWorktree"
+            {
+              worktree_name = null;
+              branch_target.kind = "current_branch";
+            }
+          ];
+          "shift-space a c" = [
+            "agent::NewExternalAgentThread"
+            {agent = "claude-acp";}
+          ];
+          "shift-space a x" = [
+            "agent::NewExternalAgentThread"
+            {agent = "codex-acp";}
+          ];
+          "shift-space a enter" = "agent::NewTerminalThread";
+          # Git workflow: Shift+Space, then G, then the action key.
+          "shift-space g g" = "git_panel::ToggleFocus";
+          "shift-space g s" = "git::StageAll";
+          "shift-space g p" = "git::Push";
+          "shift-space g c" = "git::ExpandCommitEditor";
+          "shift-space g m" = "git::GenerateCommitMessage";
           "ctrl-enter" = "workspace::NewTerminal";
           "ctrl-t" = "terminal_panel::Toggle";
           "shift-escape" = null;
@@ -185,13 +263,39 @@
         };
       }
       {
+        context = "AcpThread";
+        bindings = {
+          # Scroll the active Agent response by three lines.
+          "ctrl-j" = "agent::ScrollOutputLineDown";
+          "ctrl-k" = "agent::ScrollOutputLineUp";
+        };
+      }
+      {
+        # VimControl only exists in normal, visual, and operator modes.
         context = "VimControl && !menu";
         bindings = {
           "ctrl-h" = "workspace::ActivatePaneLeft";
           "ctrl-j" = "workspace::ActivatePaneDown";
           "ctrl-k" = "workspace::ActivatePaneUp";
           "ctrl-l" = "workspace::ActivatePaneRight";
-
+        };
+      }
+      {
+        # Insert and replace modes do not expose VimControl, so target their
+        # vim_mode value directly to keep pane navigation available while typing.
+        context = "Editor && (vim_mode == insert || vim_mode == replace) && !menu";
+        bindings = {
+          "ctrl-h" = "workspace::ActivatePaneLeft";
+          "ctrl-j" = "workspace::ActivatePaneDown";
+          "ctrl-k" = "workspace::ActivatePaneUp";
+          "ctrl-l" = "workspace::ActivatePaneRight";
+        };
+      }
+      {
+        # Space-based leaders stay limited to normal mode so an ordinary
+        # space never starts a shortcut while typing.
+        context = "VimControl && vim_mode == normal && !menu";
+        bindings = {
           # Vim-style leader bindings for Zed's fuzzy finders.
           # <space><space> / <space>ff: find files by name.
           # <space>/ / <space>sg: find text across the project.
@@ -202,6 +306,15 @@
           "space s g" = "text_finder::Toggle";
           "space s s" = "buffer_search::Deploy";
           "space s r" = "buffer_search::DeployReplace";
+        };
+      }
+      {
+        # In an Agent message editor, Ctrl+j/k always scroll the conversation,
+        # regardless of the current Vim mode.
+        context = "AcpThread > MessageEditor > Editor && !menu";
+        bindings = {
+          "ctrl-j" = "agent::ScrollOutputLineDown";
+          "ctrl-k" = "agent::ScrollOutputLineUp";
         };
       }
       {
@@ -255,12 +368,31 @@
         };
       }
       {
-        context = "Dock";
+        # Threads Sidebar is not a regular dock, so include its context
+        # explicitly to make Ctrl+l return to the workspace.
+        context = "Dock || ThreadsSidebar";
         bindings = {
           "ctrl-h" = "workspace::ActivatePaneLeft";
           "ctrl-j" = "workspace::ActivatePaneDown";
           "ctrl-k" = "workspace::ActivatePaneUp";
           "ctrl-l" = "workspace::ActivatePaneRight";
+        };
+      }
+      {
+        context = "ThreadsSidebar";
+        bindings = {
+          # Native context-sensitive action: archive an agent thread or close
+          # a terminal thread, depending on the selected sidebar entry.
+          "ctrl-w" = "agent::ArchiveSelectedThread";
+          # Keep the native Shift+Backspace archive shortcut disabled to avoid
+          # accidental archiving.
+          "shift-backspace" = null;
+        };
+      }
+      {
+        context = "ThreadsArchiveView";
+        bindings = {
+          "shift-backspace" = null;
         };
       }
       {

@@ -29,7 +29,11 @@
 
       functions -q prompt_newline; and prompt_newline >/dev/null
 
+      # Fish owns command-line Vi editing in every terminal, including Zed.
+      # Zed's native terminal Vi mode only navigates terminal scrollback and
+      # cannot replace Fish's normal/insert modes.
       fish_vi_key_bindings
+
       bind yy fish_clipboard_copy
       bind -M visual y fish_clipboard_copy
       # bind -M default p forward-char-passive fish_clipboard_paste backward-char-passive
