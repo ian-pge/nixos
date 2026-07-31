@@ -12,7 +12,7 @@
     ./desktop_packages.nix
     # ./mime_apps.nix
     ./gh.nix
-    ./zed.nix
+    ./zed
     ./gtk.nix
     ./quickshell.nix
     ./tabctl.nix
