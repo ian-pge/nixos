@@ -6,6 +6,10 @@
       "ctrl-space" = "workspace::ToggleZoom";
       "shift-space a a" = "agent::ToggleFocus";
       "shift-space a t" = "multi_workspace::FocusWorkspaceSidebar";
+      "shift-space a f" = [
+        "task::Spawn"
+        {task_name = "Apply agent worktree";}
+      ];
       "shift-space a w c" = [
         "action::Sequence"
         [
@@ -47,6 +51,9 @@
         {agent = "codex-acp";}
       ];
       "shift-space a enter" = "agent::NewTerminalThread";
+      # Fuzzy finders: Shift+Space, F, then Space or Slash.
+      "shift-space f space" = "file_finder::Toggle";
+      "shift-space f /" = "text_finder::Toggle";
       # Git workflow: Shift+Space, then G, then the action key.
       "shift-space g g" = "git_panel::ToggleFocus";
       "shift-space g s" = "git::StageAll";
@@ -129,12 +136,10 @@
     context = "VimControl && vim_mode == normal && !menu";
     bindings = {
       # Vim-style leader bindings for Zed's fuzzy finders.
-      # <space><space> / <space>ff: find files by name.
-      # <space>/ / <space>sg: find text across the project.
+      # <space>ff: find files by name.
+      # <space>sg: find text across the project.
       # <space>ss: find text in the current buffer.
-      "space space" = "file_finder::Toggle";
       "space f f" = "file_finder::Toggle";
-      "space /" = "text_finder::Toggle";
       "space s g" = "text_finder::Toggle";
       "space s s" = "buffer_search::Deploy";
       "space s r" = "buffer_search::DeployReplace";
@@ -153,9 +158,7 @@
     # Keep the same leader finders available from an empty Zed pane.
     context = "EmptyPane || SharedScreen";
     bindings = {
-      "space space" = "file_finder::Toggle";
       "space f f" = "file_finder::Toggle";
-      "space /" = "text_finder::Toggle";
       "space s g" = "text_finder::Toggle";
     };
   }

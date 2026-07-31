@@ -68,6 +68,11 @@
     enabled = true;
   };
 
+  # Let rendered Markdown previews use the full width of their pane.
+  markdown_preview = {
+    limit_content_width = false;
+  };
+
   session = {
     trust_all_worktrees = true;
   };
