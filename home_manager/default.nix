@@ -19,7 +19,7 @@
     ./hyprpaper.nix
     ./ghostty.nix
     ./catppuccin.nix
-    ./hyprland.nix
+    ./hyprland
     ./fzf.nix
     # ./zsh.nix
     ./fish.nix
