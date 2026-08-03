@@ -1,10 +1,6 @@
-{
-  lib,
-  pkgs,
-  ...
-}: let
+{pkgs, ...}: let
   createWorktreeTask = import ./tasks/create-worktree.nix {inherit pkgs;};
-  finishWorktreeCommand = import ./commands/finish-worktree.nix {inherit lib pkgs;};
+  finishWorktreeCommand = import ./commands/finish-worktree.nix {inherit pkgs;};
   applyWorktreeTask = import ./tasks/apply-worktree.nix {inherit finishWorktreeCommand;};
 in {
   home.packages = [finishWorktreeCommand];

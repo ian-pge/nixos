@@ -22,6 +22,8 @@
   agent = {
     enabled = true;
     button = true;
+    # Surface Zed's native agent action whenever Git reports conflicts.
+    show_merge_conflict_indicator = true;
     # Keep the Agent Panel next to the Threads Sidebar.
     dock = "left";
     sidebar_side = "left";
