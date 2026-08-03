@@ -56,6 +56,15 @@
     };
   }
   {
+    # The Git Panel has its own contextual Ctrl+Enter binding, which takes
+    # precedence over the global terminal shortcut. Override it here while
+    # leaving the more specific commit-editor contexts below untouched.
+    context = "GitPanel";
+    bindings = {
+      "ctrl-enter" = "terminal_panel::ToggleFocus";
+    };
+  }
+  {
     context = "CommitEditor > Editor";
     bindings = {
       "ctrl-enter" = "git::Commit";
