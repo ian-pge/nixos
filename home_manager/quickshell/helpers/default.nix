@@ -25,6 +25,26 @@
     text = builtins.readFile ./update-checker.sh;
   };
 
+  updateDiff = pkgs.writeShellApplication {
+    name = "quickshell-update-diff";
+    runtimeInputs = with pkgs; [
+      nix
+      python3
+    ];
+    text = ''
+      exec python3 ${./update-diff.py} "$@"
+    '';
+  };
+
+  updateActivator = pkgs.writeShellApplication {
+    name = "quickshell-update-activator";
+    runtimeInputs = with pkgs; [
+      coreutils
+      nix
+    ];
+    text = builtins.readFile ./activate-system.sh;
+  };
+
   updateInstaller = pkgs.writeShellApplication {
     name = "quickshell-update-installer";
     runtimeInputs = with pkgs; [
@@ -33,9 +53,28 @@
       nh
       nix
       quickshell
+      updateDiff
       util-linux
     ];
-    text = builtins.readFile ./update-installer.sh;
+    text = ''
+      export QS_UPDATE_ACTIVATOR=${updateActivator}/bin/quickshell-update-activator
+      export QS_UPDATE_ELEVATOR=${pkgs.systemd}/bin/run0
+      ${builtins.readFile ./update-installer.sh}
+    '';
+  };
+
+  nixCleaner = pkgs.writeShellApplication {
+    name = "quickshell-nix-cleaner";
+    runtimeInputs = with pkgs; [
+      coreutils
+      jq
+      nh
+      util-linux
+    ];
+    text = ''
+      export QS_CLEAN_ELEVATOR=${pkgs.systemd}/bin/run0
+      ${builtins.readFile ./clean-installer.sh}
+    '';
   };
 
   systemStats = pkgs.writeShellApplication {
@@ -124,7 +163,9 @@
 in {
   home.packages = [
     updateChecker
+    updateDiff
     updateInstaller
+    nixCleaner
     systemStats
     gpuMonitor
     weather

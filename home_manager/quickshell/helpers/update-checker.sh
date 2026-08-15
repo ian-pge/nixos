@@ -4,9 +4,40 @@ flake_dir="${NIXOS_FLAKE_DIR:-$HOME/.config/nixos}"
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/quickshell/top-bar"
 cache_file="$cache_dir/updates.json"
 lock_file="$cache_dir/updates.lock"
+candidate_lock="$cache_dir/update-candidate.lock"
+candidate_meta="$cache_dir/update-candidate.json"
 max_age=1800
 
 mkdir -p "$cache_dir"
+
+flake_state_hash() {
+  local flake_hash lock_hash="missing"
+  flake_hash="$(sha256sum "$flake_dir/flake.nix" | cut -d' ' -f1)"
+  if [[ -f "$flake_dir/flake.lock" ]]; then
+    lock_hash="$(sha256sum "$flake_dir/flake.lock" | cut -d' ' -f1)"
+  fi
+  printf 'flake.nix=%s\nflake.lock=%s\n' "$flake_hash" "$lock_hash" \
+    | sha256sum | cut -d' ' -f1
+}
+
+clear_candidate() {
+  rm -f "$candidate_lock" "$candidate_meta"
+}
+
+store_candidate() {
+  local source_lock=$1 base_hash=$2 lock_hash temporary_lock temporary_meta
+  lock_hash="$(sha256sum "$source_lock" | cut -d' ' -f1)"
+  temporary_lock="$(mktemp "$cache_dir/update-candidate.lock.XXXXXX")"
+  temporary_meta="$(mktemp "$cache_dir/update-candidate.json.XXXXXX")"
+  cp "$source_lock" "$temporary_lock"
+  jq -cn \
+    --arg baseHash "$base_hash" \
+    --arg candidateHash "$lock_hash" \
+    '{version: 1, baseHash: $baseHash, candidateHash: $candidateHash,
+      checkedAt: (now | floor)}' >"$temporary_meta"
+  mv "$temporary_lock" "$candidate_lock"
+  mv "$temporary_meta" "$candidate_meta"
+}
 
 write_status() {
   local updates_json=$1
@@ -26,14 +57,17 @@ write_status() {
 }
 
 check_updates() (
-  local temporary_dir before_lock updates_json count
+  local temporary_dir before_lock updates_json count base_hash
   temporary_dir=$(mktemp -d)
   trap 'rm -rf "$temporary_dir"' EXIT
 
   if [[ ! -f "$flake_dir/flake.nix" ]]; then
+    clear_candidate
     write_status '[]' "Unable to check for updates" error
     return
   fi
+
+  base_hash="$(flake_state_hash)"
 
   cp "$flake_dir/flake.nix" "$temporary_dir/"
   before_lock="$temporary_dir/before.lock"
@@ -46,18 +80,21 @@ check_updates() (
 
   if ! jq -e '.nodes | type == "object"' "$before_lock" \
     >/dev/null 2>&1; then
+    clear_candidate
     write_status '[]' "Unable to check for updates" error
     return
   fi
 
   if ! nix flake update --flake "$temporary_dir" \
     >"$temporary_dir/update.log" 2>&1; then
+    clear_candidate
     write_status '[]' "Unable to check for updates" error
     return
   fi
 
   if ! jq -e '.nodes | type == "object"' "$temporary_dir/flake.lock" \
     >/dev/null 2>&1; then
+    clear_candidate
     write_status '[]' "Unable to check for updates" error
     return
   fi
@@ -96,14 +133,17 @@ check_updates() (
         ]
       | sort_by(.name)
     '); then
+    clear_candidate
     write_status '[]' "Unable to check for updates" error
     return
   fi
   count=$(jq 'length' <<<"$updates_json")
 
   if ((count > 0)); then
+    store_candidate "$temporary_dir/flake.lock" "$base_hash"
     write_status "$updates_json" "$count update(s) available"
   else
+    clear_candidate
     write_status '[]' "System is up to date"
   fi
 )

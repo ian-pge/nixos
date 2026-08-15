@@ -62,7 +62,7 @@ PanelWindow {
 
   // Keep the layer surface geometry fixed so expanding the update card cannot
   // nudge the other bar modules. The mask leaves the unused area click-through.
-  implicitHeight: 600
+  implicitHeight: 850
   color: "transparent"
   exclusionMode: ExclusionMode.Normal
   exclusiveZone: 36
@@ -134,10 +134,11 @@ PanelWindow {
     }
 
     Pill {
-      text: statusData.nixIcon
+      text: statusData.displayedNixIcon
       accent: Theme.sideUpdates
-      forceHovered: window.updateSelectorActive
-      tooltipText: statusData.nixTooltip
+      forceHovered: window.updateSelectorActive || statusData.nixUpdateBusy
+        || statusData.nixUpdatePhase === "awaitingActivation"
+      tooltipText: statusData.displayedNixTooltip
       tooltipHost: window
       interactive: true
       onLeftClicked: statusData.toggleUpdateSelector(window.monitorName)
@@ -557,11 +558,11 @@ PanelWindow {
       leftCommand: "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer"
       interactive: true
       onWheelUp: {
-        statusData.setVolume(0.02);
+        statusData.setVolume(statusData.volumeStep);
         statusData.showVolumeOverlay(window.monitorName);
       }
       onWheelDown: {
-        statusData.setVolume(-0.02);
+        statusData.setVolume(-statusData.volumeStep);
         statusData.showVolumeOverlay(window.monitorName);
       }
     }

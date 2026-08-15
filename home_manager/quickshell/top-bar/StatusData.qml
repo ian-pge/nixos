@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Networking
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
+import Quickshell.Services.Polkit
 import Quickshell.Services.UPower
 import QtQuick
 
@@ -16,6 +17,7 @@ Scope {
   property int diskUsage: 0
   property int brightness: 0
   property int pendingBrightnessDelta: 0
+  readonly property real volumeStep: 0.05
 
   property string gpuText: "--"
   property string gpuTooltip: "GPU data unavailable"
@@ -26,6 +28,38 @@ Scope {
   property var nixUpdates: []
   property bool nixChecking: true
   property bool nixCheckFailed: false
+  property string nixUpdatePhase: "idle"
+  property string nixUpdateMessage: ""
+  property string nixOperation: "update"
+  property string nixUpdateLog: ""
+  property var nixUpdateChanges: []
+  property var nixUpdateCounts: ({})
+  property bool nixUpdateSummaryReady: false
+  property bool nixUpdateAwaitingPolkit: false
+  readonly property bool nixUpdateBusy: nixUpdatePhase === "updating"
+    || nixUpdatePhase === "building" || nixUpdatePhase === "preparingAuth"
+    || nixUpdatePhase === "activating" || nixUpdatePhase === "cleaning"
+  readonly property string displayedNixIcon: nixUpdateBusy ? "󰑐"
+    : nixUpdatePhase === "awaitingActivation" ? "󰌾"
+    : nixUpdatePhase === "error" ? "" : nixIcon
+  readonly property string displayedNixTooltip: nixUpdatePhase !== "idle"
+    ? (nixUpdateMessage || "NixOS update") : nixTooltip
+  property string polkitInput: ""
+  property bool polkitRequestBelongsToUpdate: false
+  property string polkitPreviousMode: "workspaces"
+  property string polkitPreviousMonitor: ""
+  readonly property bool polkitActive: polkitAgent.isActive
+    && polkitAgent.flow !== null
+  readonly property string polkitMessage: polkitActive
+    ? (polkitAgent.flow.message || "Authentication required") : ""
+  readonly property string polkitPrompt: polkitActive
+    ? (polkitAgent.flow.inputPrompt || "Password") : "Password"
+  readonly property string polkitSupplementaryMessage: polkitActive
+    ? (polkitAgent.flow.supplementaryMessage || "") : ""
+  readonly property bool polkitSupplementaryIsError: polkitActive
+    && polkitAgent.flow.supplementaryIsError
+  readonly property bool polkitResponseVisible: polkitActive
+    && polkitAgent.flow.responseVisible
   property bool updateSelectorVisible: false
   property bool appLauncherVisible: false
   property string appLauncherTargetMonitor: ""
@@ -47,7 +81,6 @@ Scope {
   property var chromeTabResults: []
   property bool mediaOverlayVisible: false
   property string mediaTargetMonitor: ""
-  property bool mprisInitialized: false
   property string updateTargetMonitor: ""
   property bool volumeOverlayVisible: false
   property string volumeTargetMonitor: ""
@@ -102,6 +135,10 @@ Scope {
   onAppLauncherQueryChanged: refreshAppLauncherResults()
   onChromeTabsQueryChanged: refreshChromeTabResults()
   onCenterOverlayVisibleChanged: setFocusedWindowBorder(centerOverlayVisible)
+  onPolkitActiveChanged: {
+    if (!polkitActive)
+      finishPolkitRequest();
+  }
 
   Component.onCompleted: {
     rebuildAppCatalog();
@@ -808,12 +845,12 @@ Scope {
   }
 
   function volumeUp() {
-    setVolume(0.02);
+    setVolume(volumeStep);
     showVolumeOverlay();
   }
 
   function volumeDown() {
-    setVolume(-0.02);
+    setVolume(-volumeStep);
     showVolumeOverlay();
   }
 
@@ -1438,9 +1475,170 @@ Scope {
     finishCenterTransition(ownsTransition);
   }
 
+  function sanitizeUpdateOutput(text) {
+    return text
+      .replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, "")
+      .replace(/\r/g, "");
+  }
+
+  function appendNixUpdateLog(line) {
+    const cleaned = sanitizeUpdateOutput(line);
+    if (cleaned === "") {
+      nixUpdateLog += "\n";
+    } else {
+      nixUpdateLog += cleaned + "\n";
+    }
+    if (nixUpdateLog.length > 120000)
+      nixUpdateLog = nixUpdateLog.slice(nixUpdateLog.length - 120000);
+  }
+
+  function parseNixUpdateOutput(line) {
+    const marker = "@@QS_UPDATE@@";
+    if (!line.startsWith(marker)) {
+      appendNixUpdateLog(line);
+      return;
+    }
+
+    try {
+      const event = JSON.parse(line.slice(marker.length));
+      nixUpdatePhase = event.phase || nixUpdatePhase;
+      nixUpdateMessage = event.message || "";
+      if (Array.isArray(event.changes)) {
+        nixUpdateChanges = event.changes;
+        nixUpdateCounts = event.counts || {};
+        nixUpdateSummaryReady = true;
+      }
+      if (nixUpdatePhase === "success") {
+        nixUpdateAwaitingPolkit = false;
+        refreshNixStatus();
+      } else if (nixUpdatePhase === "error") {
+        nixUpdateAwaitingPolkit = false;
+      }
+    } catch (error) {
+      appendNixUpdateLog(line);
+      console.warn("Unable to parse update event:", error);
+    }
+  }
+
   function startNixUpdate() {
+    if (nixUpdateProcess.running || nixCleanProcess.running
+        || nixChecking || nixUpdates.length === 0)
+      return;
+    nixOperation = "update";
+    nixUpdateLog = "";
+    nixUpdateChanges = [];
+    nixUpdateCounts = {};
+    nixUpdateSummaryReady = false;
+    nixUpdateMessage = "Starting NixOS update";
+    nixUpdatePhase = "updating";
+    nixUpdateAwaitingPolkit = false;
+    showUpdateSelector(updateTargetMonitor);
+    nixUpdateProcess.exec(["quickshell-update-installer"]);
+  }
+
+  function startNixClean() {
+    if (nixUpdateProcess.running || nixCleanProcess.running || nixChecking)
+      return;
+    nixOperation = "clean";
+    nixUpdateLog = "";
+    nixUpdateChanges = [];
+    nixUpdateCounts = {};
+    nixUpdateSummaryReady = false;
+    nixUpdateMessage = "Cleaning Nix generations and store";
+    nixUpdatePhase = "cleaning";
+    nixUpdateAwaitingPolkit = true;
+    showUpdateSelector(updateTargetMonitor);
+    nixCleanProcess.exec(["quickshell-nix-cleaner"]);
+  }
+
+  function activateNixUpdate() {
+    if (!nixUpdateProcess.running
+        || nixUpdatePhase !== "awaitingActivation")
+      return;
+    nixUpdatePhase = "preparingAuth";
+    nixUpdateMessage = "Preparing authentication";
+    nixUpdateAwaitingPolkit = true;
+    nixUpdateProcess.write("activate\n");
+  }
+
+  function handleNixUpdateEnter() {
+    if (polkitActive) {
+      submitPolkitResponse();
+    } else if (nixChecking) {
+      return;
+    } else if (nixUpdatePhase === "idle") {
+      if (nixUpdates.length > 0)
+        startNixUpdate();
+      else
+        hideUpdateSelector();
+    } else if (nixUpdatePhase === "awaitingActivation") {
+      activateNixUpdate();
+    } else if (nixUpdatePhase === "success") {
+      nixUpdatePhase = "idle";
+      nixUpdateMessage = "";
+      nixOperation = "update";
+      nixUpdateLog = "";
+      nixUpdateChanges = [];
+      nixUpdateCounts = {};
+      nixUpdateSummaryReady = false;
+      hideUpdateSelector();
+    } else if (nixUpdatePhase === "error" && !nixUpdateProcess.running
+        && !nixCleanProcess.running) {
+      if (nixOperation === "clean")
+        startNixClean();
+      else
+        startNixUpdate();
+    }
+  }
+
+  function appendPolkitInput(text) {
+    if (polkitActive && polkitAgent.flow.isResponseRequired)
+      polkitInput += text;
+  }
+
+  function erasePolkitInput() {
+    if (polkitInput.length > 0)
+      polkitInput = polkitInput.slice(0, -1);
+  }
+
+  function submitPolkitResponse() {
+    if (!polkitActive || !polkitAgent.flow.isResponseRequired)
+      return;
+    const response = polkitInput;
+    polkitInput = "";
+    polkitAgent.flow.submit(response);
+  }
+
+  function handlePolkitRequest() {
+    polkitRequestBelongsToUpdate = nixUpdateAwaitingPolkit;
+    polkitInput = "";
+    if (!polkitRequestBelongsToUpdate) {
+      polkitPreviousMode = visibleCenterMode();
+      polkitPreviousMonitor = monitorForCenterMode(polkitPreviousMode);
+    }
+    showUpdateSelector(resolveTargetMonitor());
+  }
+
+  function restorePolkitPreviousOverlay() {
+    const mode = polkitPreviousMode;
+    const monitor = polkitPreviousMonitor;
     hideUpdateSelector();
-    Quickshell.execDetached(["ghostty", "-e", "quickshell-update-installer"]);
+    if (mode === "launcher") showAppLauncher(monitor);
+    else if (mode === "tabs") showChromeTabs(monitor);
+    else if (mode === "updates") showUpdateSelector(monitor);
+    else if (mode === "wifi") showWifiSelector(monitor);
+    else if (mode === "bluetooth") showBluetoothSelector(monitor);
+    else if (mode === "media") showMediaOverlay(monitor);
+  }
+
+  function finishPolkitRequest() {
+    polkitInput = "";
+    if (polkitRequestBelongsToUpdate) {
+      nixUpdateAwaitingPolkit = false;
+    } else {
+      restorePolkitPreviousOverlay();
+    }
+    polkitRequestBelongsToUpdate = false;
   }
 
   function refreshNixStatus() {
@@ -1537,15 +1735,6 @@ Scope {
 
     function onValuesChanged() {
       root.appToplevelRevision++;
-    }
-  }
-
-  Connections {
-    target: root.mprisPlayer
-
-    function onPostTrackChanged() {
-      if (root.mprisInitialized)
-        root.showMediaOverlay();
     }
   }
 
@@ -1738,6 +1927,68 @@ Scope {
     }
   }
 
+  PolkitAgent {
+    id: polkitAgent
+
+    onAuthenticationRequestStarted: root.handlePolkitRequest()
+  }
+
+  Connections {
+    target: polkitAgent.flow
+
+    function onIsResponseRequiredChanged() {
+      root.polkitInput = "";
+    }
+
+    function onAuthenticationFailed() {
+      root.polkitInput = "";
+    }
+  }
+
+  Process {
+    id: nixUpdateProcess
+    stdinEnabled: true
+
+    stdout: SplitParser {
+      onRead: data => root.parseNixUpdateOutput(data)
+    }
+
+    onExited: (exitCode, exitStatus) => {
+      Qt.callLater(() => {
+        if (root.nixUpdatePhase !== "success"
+            && root.nixUpdatePhase !== "error") {
+          root.nixUpdatePhase = "error";
+          root.nixUpdateMessage = exitCode === 0
+            ? "The update stopped unexpectedly"
+            : "The update process exited with code " + exitCode;
+          root.nixUpdateAwaitingPolkit = false;
+        }
+      });
+    }
+  }
+
+  Process {
+    id: nixCleanProcess
+    stdinEnabled: false
+
+    stdout: SplitParser {
+      onRead: data => root.parseNixUpdateOutput(data)
+    }
+
+    onExited: (exitCode, exitStatus) => {
+      Qt.callLater(() => {
+        if (root.nixUpdatePhase !== "success"
+            && root.nixUpdatePhase !== "error") {
+          root.nixUpdatePhase = "error";
+          root.nixUpdateMessage = exitCode === 0
+            ? "The cleanup stopped unexpectedly"
+            : "The cleanup process exited with code " + exitCode;
+          root.nixUpdateAwaitingPolkit = false;
+        }
+      });
+    }
+  }
+
   Process {
     id: nixStatusProcess
     command: ["quickshell-update-checker"]
@@ -1753,12 +2004,6 @@ Scope {
     stdout: StdioCollector {
       onStreamFinished: root.parseNixStatus(text)
     }
-  }
-
-  Timer {
-    interval: 2000
-    running: true
-    onTriggered: root.mprisInitialized = true
   }
 
   Timer {

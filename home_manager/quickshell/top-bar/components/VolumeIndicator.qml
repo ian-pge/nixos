@@ -57,9 +57,9 @@ Rectangle {
     anchors.fill: parent
     onWheel: wheel => {
       if (wheel.angleDelta.y > 0)
-        statusData.setVolume(0.02);
+        statusData.setVolume(statusData.volumeStep);
       else if (wheel.angleDelta.y < 0)
-        statusData.setVolume(-0.02);
+        statusData.setVolume(-statusData.volumeStep);
       statusData.showVolumeOverlay(root.targetMonitor);
     }
   }

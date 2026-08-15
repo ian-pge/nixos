@@ -12,4 +12,12 @@ ShellRoot {
       statusData: sharedStatus
     }
   }
+
+  Variants {
+    model: Quickshell.screens
+
+    OsdOverlay {
+      statusData: sharedStatus
+    }
+  }
 }

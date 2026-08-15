@@ -26,6 +26,8 @@
     show_merge_conflict_indicator = true;
     # Keep the Agent Panel next to the Threads Sidebar.
     dock = "left";
+    # Keep the opposite horizontal docks independently resizable.
+    flexible = false;
     sidebar_side = "left";
     # Let conversations follow the full width of the Agent Panel.
     limit_content_width = false;
@@ -63,6 +65,14 @@
       env = {
         INITIAL_AGENT_MODE = "agent-full-access";
       };
+    };
+  };
+
+  # The graphical-session service owns the visible browser process. Zed
+  # forwards this native Streamable HTTP MCP endpoint to ACP agents.
+  context_servers = {
+    playwright = {
+      url = "http://localhost:8931/mcp";
     };
   };
 
@@ -175,6 +185,7 @@
     font_family = "JetBrainsMono Nerd Font";
     font_fallbacks = ["Iosevka"];
     dock = "right";
+    flexible = false;
     font_size = 14;
     blinking = "on";
     show_count_badge = true;

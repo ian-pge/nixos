@@ -367,6 +367,7 @@ Conventions :
 - Largeur `280px`, hauteur `36px`.
 - Aucun pourcentage dans le widget central.
 - Timeout de visibilité : `2000ms`.
+- Les touches multimédia et les molettes modifient le volume par pas de `5%`.
 - La barre de progression anime sa largeur en `140ms`.
 - Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
 - La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif. Tous les gestes passent par `StatusData.changeBrightness()`, qui sérialise les changements et lit la valeur machine-readable renvoyée par la commande ; aucun composant ne lance son propre processus de luminosité.
@@ -374,6 +375,7 @@ Conventions :
 - La luminosité utilise `Theme.sideBrightness` pour son icône et son remplissage.
 - Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage coloré indique le niveau.
 - Chaque indicateur central apparaît uniquement sur le moniteur qui a reçu la touche ou le geste de molette.
+- Hors plein écran, le volume et la luminosité restent dans `centerMorph` : le widget central précédent se transforme directement en indicateur, avec le même morphing et le même fondu croisé que les autres modes de la barre. Lorsqu'un workspace contient une fenêtre plein écran, un `LazyLoader` crée à la place une `PanelWindow` dédiée sur la couche Wayland native `Overlay`. La barre principale reste alors en permanence sur `Top` et ne peut jamais apparaître brièvement au début ou à la fin de l'OSD. La surface dédiée ignore les zones d'exclusion ; son contenu passe de `352px` à `280px` et descend de `8px` pendant `360ms`, puis joue le mouvement inverse à la fermeture.
 
 ## 13. Contrôles média MPRIS
 
@@ -383,7 +385,7 @@ Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `p
 
 Les raccourcis Hyprland appellent les méthodes IPC `mediaPlayPause`, `mediaNext` et `mediaPrevious`. Chaque méthode vérifie les capacités du lecteur avant l’action.
 
-`NowPlayingIndicator.qml` occupe `480px`, comme le lanceur d’applications. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média ou un changement de piste. Un changement automatique de piste ne doit jamais interrompre un sélecteur interactif Wi-Fi, Bluetooth, lanceur d’applications, onglets Chrome ou updates.
+`NowPlayingIndicator.qml` occupe `480px`, comme le lanceur d’applications. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média déclenchée par les touches Play/Pause, Suivant ou Précédent. Les signaux automatiques de changement de piste n'ouvrent jamais le widget, car les navigateurs et les applications de communication publient les vocaux et vidéos par le même protocole MPRIS que les lecteurs musicaux.
 
 ## 14. Exclusivité entre overlays
 
@@ -451,11 +453,24 @@ Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHEC
 
 Le checker compare les anciens et nouveaux `flake.lock` comme JSON, sans analyser la sortie humaine de Nix. Il s'exécute au démarrage, toutes les 30 minutes et après une demande explicite ; l'installateur partage son verrou et restaure le lockfile précédent si le rebuild échoue.
 
-- `r` : vérification forcée
-- `Enter` : lance `quickshell-update-installer` dans Ghostty
-- `q/Esc` : fermeture
+Le premier `Enter` transforme la liste en console intégrée de `750px` de haut. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, le terminal disparaît : un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant elle aussi atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit, enregistre la génération et l'active avec l'action native `switch`. L'état final `Update complete` et la vue sans mise à jour tiennent eux aussi directement dans la barre, sans ligne secondaire `System is up to date`; les états `CHECKING` et `UP TO DATE` réduisent également la capsule à `280px`. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
 
-Ne pas tester `Enter` automatiquement : cela lance réellement `nix flake update` puis `nh os switch`.
+Le processus appartient à `StatusData`, pas au composant visible. `q`, `Esc` ou un clic sur la capsule latérale ne font donc que replier l'interface ; l'update continue et un nouveau clic retrouve la sortie ou le résumé existant. Pendant l'activation, puis après succès, la liste structurée reste visible jusqu'à `Enter`. Une erreur de build reste dans la console ; une erreur après le diff conserve la liste avec un état d'erreur. `Enter` relance ensuite une nouvelle tentative.
+
+Pendant `CHECKING`, `Enter` est ignoré afin de ne pas lancer l'installer contre le verrou du checker. Dans l'état compact `UP TO DATE`, `Enter` replie simplement le widget. Si un checker détient malgré tout le verrou au démarrage de l'installation, l'installer attend sa fin au lieu d'émettre une erreur transitoire persistante.
+
+Dans la vue initiale, `C` lance le nettoyage natif `nh clean all`. Le processus partage le verrou des updates, utilise la stratégie d'élévation `run0` fournie par `nh` et affiche la demande Polkit dans la barre si elle est nécessaire. Pendant le nettoyage, une capsule compacte animée reste repliable avec `Esc`; la sortie très volumineuse de `nh` est conservée dans le journal mono-exécution `$XDG_CACHE_HOME/quickshell/top-bar/clean.log` plutôt que poussée ligne par ligne dans QML. En cas d'échec, seules ses 30 dernières lignes sont affichées. À la fin, la barre affiche l'espace réellement récupéré à partir de l'espace disponible avant/après, sans analyser une sortie privée ou instable de `nh`.
+
+`StatusData` fournit aussi l'agent Polkit de la session avec `Quickshell.Services.Polkit`. Toute demande d'une autre application utilise le même formulaire central, sans stocker la réponse dans les arguments, l'environnement, les fichiers ou les logs. Une demande externe restaure l'overlay précédent lorsqu'elle se termine.
+
+- `r` : vérification forcée
+- premier `Enter` : démarre l'update et ouvre la console intégrée
+- `j/k` : fait défiler la liste structurée des changements, sans sélection
+- `Enter` sur la liste des changements : demande le mot de passe puis active le système
+- `Enter` après succès : ferme la capsule ; après erreur : réessaie
+- `q/Esc` : replie la capsule sans interrompre l'update
+
+Ne pas tester `Enter` automatiquement : cela lance réellement `nix flake update`, `nh os build`, puis l'activation privilégiée.
 
 ## 16. Pièges connus
 

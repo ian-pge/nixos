@@ -25,7 +25,9 @@
 
   services.udiskie.enable = true;
   services.playerctld.enable = true;
-  services.hyprpolkitagent.package = true;
+  # Quickshell owns the session Polkit agent so authentication prompts can be
+  # rendered inside the central capsule.
+  services.hyprpolkitagent.enable = false;
   programs.htop.enable = true;
   programs.bat.enable = true;
   programs.fd.enable = true;

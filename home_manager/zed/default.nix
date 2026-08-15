@@ -3,6 +3,8 @@
   finishWorktreeCommand = import ./commands/finish-worktree.nix {inherit pkgs;};
   applyWorktreeTask = import ./tasks/apply-worktree.nix {inherit finishWorktreeCommand;};
 in {
+  imports = [./services/playwright-mcp.nix];
+
   home.packages = [finishWorktreeCommand];
 
   programs.zed-editor = {

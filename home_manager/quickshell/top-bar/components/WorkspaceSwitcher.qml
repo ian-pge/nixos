@@ -88,6 +88,15 @@ Item {
     return Hyprland.workspaces.values.find(workspace => workspace.id === workspaceId) ?? null;
   }
 
+  function focusWorkspace(workspaceId) {
+    Hyprland.dispatch("hl.dsp.focus({ workspace = " + workspaceId + " })");
+  }
+
+  function toggleSpecialWorkspace(workspaceName) {
+    Hyprland.dispatch("hl.dsp.workspace.toggle_special("
+      + JSON.stringify(workspaceName) + ")");
+  }
+
   function syncSpecialWorkspace(animate = true) {
     const monitor = Hyprland.monitors.values.find(candidate =>
       candidate.name === monitorName);
@@ -217,7 +226,7 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: Hyprland.dispatch("workspace " + workspaceButton.workspaceId)
+            onClicked: root.focusWorkspace(workspaceButton.workspaceId)
           }
         }
       }
@@ -252,19 +261,9 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         enabled: root.specialWorkspaceVisible
-        onClicked: Hyprland.dispatch("togglespecialworkspace "
-          + root.specialSlotName)
+        onClicked: root.toggleSpecialWorkspace(root.specialSlotName)
       }
     }
 
-    WheelHandler {
-      acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-      onWheel: event => {
-        if (event.angleDelta.y < 0)
-          Hyprland.dispatch("workspace r+1");
-        else if (event.angleDelta.y > 0)
-          Hyprland.dispatch("workspace r-1");
-      }
-    }
   }
 }
