@@ -143,7 +143,7 @@ FocusScope {
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
     text: {
-      if (statusData.wifiLoading) return "󰑐";
+      if (statusData.wifiLoading) return statusData.brailleFrame;
       if (root.selectedNetwork !== null
           && root.selectedNetwork.type === "ethernet")
         return "󰈀";
@@ -156,14 +156,6 @@ FocusScope {
     font.pixelSize: 17
     font.bold: true
 
-    RotationAnimator on rotation {
-      running: statusData.wifiLoading
-      from: 0
-      to: 360
-      duration: 900
-      loops: Animation.Infinite
-      onStopped: wifiIcon.rotation = 0
-    }
   }
 
   Rectangle {
@@ -302,20 +294,12 @@ FocusScope {
         anchors.left: parent.left
         anchors.leftMargin: 15
         y: 8
-        text: "󰑐"
+        text: statusData.brailleFrame
         color: Theme.sideNetwork
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 15
         font.bold: true
 
-        RotationAnimator on rotation {
-          running: statusData.wifiSpeedTestRunning
-          from: 0
-          to: 360
-          duration: 900
-          loops: Animation.Infinite
-          onStopped: speedTestSpinner.rotation = 0
-        }
       }
 
       Text {

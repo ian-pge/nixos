@@ -103,21 +103,13 @@ FocusScope {
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: statusData.bluetoothSelectorScanning ? "󰑐"
+    text: statusData.bluetoothSelectorScanning ? statusData.brailleFrame
       : root.selectedDeviceConnected ? "󰂯" : "󰂲"
     color: Theme.sideBluetooth
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
     font.bold: true
 
-    RotationAnimator on rotation {
-      running: statusData.bluetoothSelectorScanning
-      from: 0
-      to: 360
-      duration: 900
-      loops: Animation.Infinite
-      onStopped: bluetoothIcon.rotation = 0
-    }
   }
 
   Rectangle {

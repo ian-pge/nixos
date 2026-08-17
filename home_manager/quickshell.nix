@@ -25,7 +25,8 @@ in {
 
   # Qt otherwise selects the single-threaded basic render loop on this
   # NVIDIA/Wayland setup, making high-refresh QML animations visibly uneven.
-  systemd.user.services.quickshell.Service.Environment = [
-    "QSG_RENDER_LOOP=threaded"
-  ];
+  systemd.user.services.quickshell = {
+    Unit.X-Restart-Triggers = ["${topBarConfig}"];
+    Service.Environment = ["QSG_RENDER_LOOP=threaded"];
+  };
 }

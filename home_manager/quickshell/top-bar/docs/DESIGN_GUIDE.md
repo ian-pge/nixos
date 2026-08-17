@@ -8,7 +8,7 @@ La barre doit donner l’impression d’être un seul système animé, pas une c
 
 Principes fondamentaux :
 
-- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, luminosité, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth et mises à jour.
+- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, luminosité, dictée vocale, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth et mises à jour.
 - Les changements de taille utilisent une interpolation monotone sans rebond.
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
@@ -22,9 +22,11 @@ Principes fondamentaux :
 - `../shell.qml` : instancie un `StatusData` partagé et un `Bar` par écran.
 - `../StatusData.qml` : source d’état globale, processus externes, timers, IPC et exclusivité entre overlays.
 - `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
+- `../OsdOverlay.qml` : indicateurs temporaires au-dessus des fenêtres plein écran.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
 - `../components/Theme.js` : source unique des couleurs QML, y compris les accents partagés entre capsules latérales et widgets centraux correspondants.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
+- `../components/VoiceDictationIndicator.qml` / `VoiceWaveform.qml` : états Voxtype et rendu de l’onde vocale alimentée par le bridge audio partagé.
 - `../components/NowPlayingIndicator.qml` : média MPRIS et métadonnées textuelles.
 - `../components/AppLauncher.qml` : lanceur natif, icônes et recherche fuzzy.
 - `../components/ChromeTabsLauncher.qml` : recherche et activation des onglets Chrome via TabCtl.
@@ -40,9 +42,9 @@ Principes fondamentaux :
 
 Conséquences :
 
-- Wi-Fi, Bluetooth, volume, luminosité, média, lanceur, onglets Chrome et updates apparaissent uniquement sur leur moniteur cible.
+- Wi-Fi, Bluetooth, volume, luminosité, dictée, média, lanceur, onglets Chrome et updates apparaissent uniquement sur leur moniteur cible.
 - Les autres écrans continuent d’afficher leur `WorkspaceSwitcher` et ne transforment pas leur capsule centrale.
-- Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor`, `appLauncherTargetMonitor`, `chromeTabsTargetMonitor`, `updateTargetMonitor`, `volumeTargetMonitor`, `brightnessTargetMonitor` et `mediaTargetMonitor` pilotent à la fois le rendu et, pour les sélecteurs interactifs, le focus clavier.
+- Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor`, `appLauncherTargetMonitor`, `chromeTabsTargetMonitor`, `updateTargetMonitor`, `volumeTargetMonitor`, `brightnessTargetMonitor`, `voiceDictationTargetMonitor` et `mediaTargetMonitor` pilotent à la fois le rendu et, pour les sélecteurs interactifs, le focus clavier.
 - Un clic sur une capsule latérale transmet toujours le nom du moniteur de cette barre. Un raccourci IPC sans cible utilise le moniteur Hyprland actuellement focalisé.
 - Activer un overlay déjà ouvert depuis un autre écran le déplace vers ce nouvel écran ; l’activer à nouveau sur son écran courant le ferme.
 - Tant qu’un widget central applications, updates, Wi-Fi, Bluetooth, volume ou luminosité est visible, sa capsule latérale correspondante adopte visuellement son état hover sur le même moniteur.
@@ -56,6 +58,7 @@ Conséquences :
 | Marge supérieure du panel | `10px` |
 | Marges latérales du panel | `5px` |
 | Espacement entre modules latéraux | `10px` |
+| Largeur dictée vocale | `180px` |
 | Largeur volume/luminosité | `280px` |
 | Largeur Wi-Fi/Bluetooth | `400px` |
 | Largeur média / updates / lanceurs | `480px` |
@@ -112,7 +115,7 @@ Règle sémantique de la capsule centrale :
 - **rose** : ce que l’utilisateur contrôle maintenant — workspace affiché, ligne sélectionnée et action Enter hors exceptions contextuelles ;
 - **jaune** : ce qui existe ou fonctionne indépendamment de la sélection — workspace occupé, lecture et traitement en cours hors exceptions contextuelles ;
 - **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
-- **rouge** : échec explicite uniquement, jamais une action normale.
+- **rouge** : échec explicite, sauf l’exception volontaire du microphone pendant l’enregistrement.
 
 Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume et luminosité sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume` et `Theme.sideBrightness`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose.
 
@@ -161,7 +164,7 @@ Une dimension qui ne change pas ne doit pas être animée. La capsule ne doit ja
 
 ### Convention unique pour tous les widgets
 
-Cette interpolation monotone est commune aux transformations entre workspaces, volume, luminosité, média, Wi-Fi, Bluetooth, updates, lanceur d’applications et onglets Chrome.
+Cette interpolation monotone est commune aux transformations entre workspaces, volume, luminosité, dictée, média, Wi-Fi, Bluetooth, updates, lanceur d’applications et onglets Chrome.
 
 Ne pas réintroduire :
 
@@ -176,7 +179,7 @@ Les animations secondaires suivent la même règle : le hover et les interaction
 
 Les composants source et destination restent rendus simultanément pendant une courte fenêtre. Leurs opacités et translations sont calculées depuis un unique `transitionProgress` de `0` à `1`; aucun composant ne possède son propre `Behavior on opacity` ou timer d’entrée.
 
-Le conteneur, le clipping et la bordure restent persistants. Seuls les contenus se croisent à l’intérieur, comme dans une container transform. Une répétition du même mode sur le même moniteur ne redémarre pas la transition. En cas d’interruption, les opacités et offsets actuellement rendus des neuf modes sont capturés dans des tables ; la nouvelle destination continue depuis sa valeur courante et toutes les autres couches encore visibles terminent leur fade au lieu de disparaître brutalement. Cette règle reste valable même pour une séquence très rapide A → B → C → D.
+Le conteneur, le clipping et la bordure restent persistants. Seuls les contenus se croisent à l’intérieur, comme dans une container transform. Une répétition du même mode sur le même moniteur ne redémarre pas la transition. En cas d’interruption, les opacités et offsets actuellement rendus des dix modes sont capturés dans des tables ; la nouvelle destination continue depuis sa valeur courante et toutes les autres couches encore visibles terminent leur fade au lieu de disparaître brutalement. Cette règle reste valable même pour une séquence très rapide A → B → C → D.
 
 ## 6. Animation contextuelle du contenu central
 
@@ -209,6 +212,7 @@ Le liseré apparaît lorsque `centerMorph.overlayVisible` est vrai, donc pour :
 
 - volume ;
 - luminosité ;
+- dictée vocale ;
 - Wi-Fi ;
 - Bluetooth ;
 - média MPRIS ;
@@ -453,9 +457,9 @@ Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHEC
 
 Le checker compare les anciens et nouveaux `flake.lock` comme JSON, sans analyser la sortie humaine de Nix. Il s'exécute au démarrage, toutes les 30 minutes et après une demande explicite ; l'installateur partage son verrou et restaure le lockfile précédent si le rebuild échoue.
 
-Le premier `Enter` transforme la liste en console intégrée de `750px` de haut. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, le terminal disparaît : un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant elle aussi atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit, enregistre la génération et l'active avec l'action native `switch`. L'état final `Update complete` et la vue sans mise à jour tiennent eux aussi directement dans la barre, sans ligne secondaire `System is up to date`; les états `CHECKING` et `UP TO DATE` réduisent également la capsule à `280px`. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
+Le premier `Enter` remplace la liste par une capsule compacte de `36px` contenant uniquement le spinner Braille, le message d'étape et son état. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit, enregistre la génération et l'active avec l'action native `switch`. L'état final `Update complete` et la vue sans mise à jour tiennent eux aussi directement dans la barre, sans ligne secondaire `System is up to date`; les états `CHECKING` et `UP TO DATE` réduisent également la capsule à `280px`. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
 
-Le processus appartient à `StatusData`, pas au composant visible. `q`, `Esc` ou un clic sur la capsule latérale ne font donc que replier l'interface ; l'update continue et un nouveau clic retrouve la sortie ou le résumé existant. Pendant l'activation, puis après succès, la liste structurée reste visible jusqu'à `Enter`. Une erreur de build reste dans la console ; une erreur après le diff conserve la liste avec un état d'erreur. `Enter` relance ensuite une nouvelle tentative.
+Le processus appartient à `StatusData`, pas au composant visible. `q`, `Esc` ou un clic sur la capsule latérale ne font donc que replier l'interface ; l'update continue et un nouveau clic retrouve l'état compact ou le résumé existant. Pendant l'activation, puis après succès, la liste structurée reste visible jusqu'à `Enter`. Une erreur de build reste dans la capsule compacte avec son message structuré ; une erreur après le diff conserve la liste avec un état d'erreur. `Enter` relance ensuite une nouvelle tentative.
 
 Pendant `CHECKING`, `Enter` est ignoré afin de ne pas lancer l'installer contre le verrou du checker. Dans l'état compact `UP TO DATE`, `Enter` replie simplement le widget. Si un checker détient malgré tout le verrou au démarrage de l'installation, l'installer attend sa fin au lieu d'émettre une erreur transitoire persistante.
 
@@ -464,7 +468,7 @@ Dans la vue initiale, `C` lance le nettoyage natif `nh clean all`. Le processus 
 `StatusData` fournit aussi l'agent Polkit de la session avec `Quickshell.Services.Polkit`. Toute demande d'une autre application utilise le même formulaire central, sans stocker la réponse dans les arguments, l'environnement, les fichiers ou les logs. Une demande externe restaure l'overlay précédent lorsqu'elle se termine.
 
 - `r` : vérification forcée
-- premier `Enter` : démarre l'update et ouvre la console intégrée
+- premier `Enter` : démarre l'update et affiche la capsule compacte
 - `j/k` : fait défiler la liste structurée des changements, sans sélection
 - `Enter` sur la liste des changements : demande le mot de passe puis active le système
 - `Enter` après succès : ferme la capsule ; après erreur : réessaie

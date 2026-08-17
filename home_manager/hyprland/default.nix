@@ -1,10 +1,12 @@
 {
+  config,
   lib,
   pkgs,
   ...
 }: let
   helpers = import ./helpers.nix {inherit lib;};
   pwaAppIds = import ./pwa-apps.nix;
+  voxtypePackage = config.programs.voxtype.package;
 in {
   imports = [./uwsm-env.nix];
 
@@ -12,6 +14,10 @@ in {
     enable = true;
     configType = "lua";
     systemd.enable = false;
+
+    submaps = import ./submaps.nix {
+      inherit helpers voxtypePackage;
+    };
 
     settings = lib.mergeAttrsList [
       (import ./settings.nix {inherit helpers;})
@@ -21,6 +27,7 @@ in {
           helpers
           lib
           pkgs
+          voxtypePackage
           ;
       })
       (import ./rules.nix {inherit pwaAppIds;})

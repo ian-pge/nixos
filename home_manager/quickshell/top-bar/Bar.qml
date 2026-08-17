@@ -24,6 +24,8 @@ PanelWindow {
     && monitorName === statusData.volumeTargetMonitor
   readonly property bool brightnessOverlayActive: statusData.brightnessOverlayVisible
     && monitorName === statusData.brightnessTargetMonitor
+  readonly property bool dictationOverlayActive: statusData.voiceDictationActive
+    && monitorName === statusData.voiceDictationTargetMonitor
   readonly property bool mediaOverlayActive: statusData.mediaOverlayVisible
     && monitorName === statusData.mediaTargetMonitor
   readonly property bool wifiSelectorActive: statusData.wifiSelectorVisible
@@ -135,8 +137,11 @@ PanelWindow {
 
     Pill {
       text: statusData.displayedNixIcon
+      processing: statusData.nixUpdateBusy || statusData.nixChecking
+      processingText: statusData.brailleFrame
       accent: Theme.sideUpdates
       forceHovered: window.updateSelectorActive || statusData.nixUpdateBusy
+        || statusData.nixChecking
         || statusData.nixUpdatePhase === "awaitingActivation"
       tooltipText: statusData.displayedNixTooltip
       tooltipHost: window
@@ -198,31 +203,34 @@ PanelWindow {
       || window.brightnessOverlayActive || window.mediaOverlayActive
       || window.appLauncherActive || window.chromeTabsActive
       || window.wifiSelectorActive || window.bluetoothSelectorActive
-      || window.updateSelectorActive
-    readonly property string targetMode: window.appLauncherActive
-      ? "launcher" : window.chromeTabsActive ? "tabs"
+      || window.updateSelectorActive || window.dictationOverlayActive
+    readonly property string targetMode: window.dictationOverlayActive
+      ? "dictation" : window.appLauncherActive ? "launcher"
+      : window.chromeTabsActive ? "tabs"
       : window.updateSelectorActive ? "updates"
       : window.wifiSelectorActive ? "wifi"
       : window.bluetoothSelectorActive ? "bluetooth"
       : window.mediaOverlayActive ? "media"
       : window.volumeOverlayActive ? "volume"
       : window.brightnessOverlayActive ? "brightness" : "workspaces"
-    readonly property real targetWidth: window.appLauncherActive
-      ? appLauncher.implicitWidth
+    readonly property real targetWidth: window.dictationOverlayActive
+      ? voiceDictationIndicator.implicitWidth
+      : window.appLauncherActive ? appLauncher.implicitWidth
       : window.chromeTabsActive ? chromeTabsLauncher.implicitWidth
       : window.updateSelectorActive ? updateSelector.implicitWidth
       : window.wifiSelectorActive ? wifiSelector.implicitWidth
       : window.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
       : window.mediaOverlayActive ? nowPlayingIndicator.implicitWidth
       : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
-    readonly property real targetHeight: window.appLauncherActive
-      ? appLauncher.implicitHeight
+    readonly property real targetHeight: window.dictationOverlayActive
+      ? voiceDictationIndicator.implicitHeight
+      : window.appLauncherActive ? appLauncher.implicitHeight
       : window.chromeTabsActive ? chromeTabsLauncher.implicitHeight
       : window.updateSelectorActive ? updateSelector.implicitHeight
       : window.wifiSelectorActive ? wifiSelector.implicitHeight : 36
     readonly property var contentModes: ["workspaces", "volume",
-      "brightness", "media", "wifi", "bluetooth", "launcher", "tabs",
-      "updates"]
+      "brightness", "dictation", "media", "wifi", "bluetooth",
+      "launcher", "tabs", "updates"]
     property string visualSourceMode: "workspaces"
     property string visualTargetMode: "workspaces"
     property real transitionProgress: 1
@@ -239,6 +247,7 @@ PanelWindow {
       if (mode === "media") return nowPlayingIndicator.implicitHeight;
       if (mode === "volume") return volumeIndicator.implicitHeight;
       if (mode === "brightness") return brightnessIndicator.implicitHeight;
+      if (mode === "dictation") return voiceDictationIndicator.implicitHeight;
       return workspaceSwitcher.implicitHeight;
     }
 
@@ -419,6 +428,21 @@ PanelWindow {
       color: "transparent"
       opacity: centerMorph.contentOpacity("brightness")
       enabled: window.brightnessOverlayActive
+    }
+
+    VoiceDictationIndicator {
+      id: voiceDictationIndicator
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("dictation") }
+      statusData: window.statusData
+      color: "transparent"
+      opacity: centerMorph.contentOpacity("dictation")
+      enabled: window.dictationOverlayActive
     }
 
     NowPlayingIndicator {

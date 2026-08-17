@@ -25,6 +25,10 @@
       url = "github:aashish-thapa/wlctl";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    voxtype = {
+      url = "github:peteonrails/voxtype";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     gazelle-tui = {
       url = "github:Zeus-Deus/gazelle-tui";
       flake = false;
@@ -35,10 +39,7 @@
     };
   };
 
-  outputs = inputs @ {
-    nixpkgs,
-    ...
-  }: let
+  outputs = inputs @ {nixpkgs, ...}: let
     inherit (nixpkgs) lib;
   in {
     nixosConfigurations = {

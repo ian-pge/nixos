@@ -18,6 +18,12 @@ Scope {
   property int brightness: 0
   property int pendingBrightnessDelta: 0
   readonly property real volumeStep: 0.05
+  property int brailleFrameIndex: 0
+  readonly property var brailleFrames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+  readonly property string brailleFrame: brailleFrames[brailleFrameIndex]
+  readonly property bool brailleAnimationRunning: nixChecking || nixUpdateBusy
+    || wifiLoading || wifiSpeedTestRunning || bluetoothSelectorScanning
+    || voiceDictationTranscribing
 
   property string gpuText: "--"
   property string gpuTooltip: "GPU data unavailable"
@@ -31,7 +37,6 @@ Scope {
   property string nixUpdatePhase: "idle"
   property string nixUpdateMessage: ""
   property string nixOperation: "update"
-  property string nixUpdateLog: ""
   property var nixUpdateChanges: []
   property var nixUpdateCounts: ({})
   property bool nixUpdateSummaryReady: false
@@ -39,11 +44,15 @@ Scope {
   readonly property bool nixUpdateBusy: nixUpdatePhase === "updating"
     || nixUpdatePhase === "building" || nixUpdatePhase === "preparingAuth"
     || nixUpdatePhase === "activating" || nixUpdatePhase === "cleaning"
-  readonly property string displayedNixIcon: nixUpdateBusy ? "󰑐"
-    : nixUpdatePhase === "awaitingActivation" ? "󰌾"
+  readonly property string displayedNixIcon: nixUpdatePhase === "awaitingActivation" ? "󰌾"
     : nixUpdatePhase === "error" ? "" : nixIcon
   readonly property string displayedNixTooltip: nixUpdatePhase !== "idle"
     ? (nixUpdateMessage || "NixOS update") : nixTooltip
+
+  onBrailleAnimationRunningChanged: {
+    if (brailleAnimationRunning)
+      brailleFrameIndex = 0;
+  }
   property string polkitInput: ""
   property bool polkitRequestBelongsToUpdate: false
   property string polkitPreviousMode: "workspaces"
@@ -86,6 +95,20 @@ Scope {
   property string volumeTargetMonitor: ""
   property bool brightnessOverlayVisible: false
   property string brightnessTargetMonitor: ""
+  property string voiceDictationState: "stopped"
+  property string voiceDictationTargetMonitor: ""
+  property bool voiceDictationAudioConnected: false
+  property real voiceDictationEnergy: 0
+  property bool voiceDictationSpeechDetected: false
+  readonly property bool voiceDictationActive:
+    voiceDictationState === "recording"
+    || voiceDictationState === "streaming"
+    || voiceDictationState === "transcribing"
+  readonly property bool voiceDictationRecording:
+    voiceDictationState === "recording"
+    || voiceDictationState === "streaming"
+  readonly property bool voiceDictationTranscribing:
+    voiceDictationState === "transcribing"
   property bool wifiSelectorVisible: false
   property int wifiSelectedIndex: 0
   property string networkSelectedKey: ""
@@ -135,6 +158,10 @@ Scope {
   onAppLauncherQueryChanged: refreshAppLauncherResults()
   onChromeTabsQueryChanged: refreshChromeTabResults()
   onCenterOverlayVisibleChanged: setFocusedWindowBorder(centerOverlayVisible)
+  onVoiceDictationRecordingChanged: {
+    if (!voiceDictationRecording)
+      resetVoiceDictationAudio();
+  }
   onPolkitActiveChanged: {
     if (!polkitActive)
       finishPolkitRequest();
@@ -142,6 +169,7 @@ Scope {
 
   Component.onCompleted: {
     rebuildAppCatalog();
+    resetVoiceDictationAudio();
     setFocusedWindowBorder(false);
   }
 
@@ -669,7 +697,7 @@ Scope {
       ? Hyprland.monitors.values[0].name : "";
   }
 
-  function visibleCenterMode() {
+  function visibleCenterModeWithoutVoice() {
     if (appLauncherVisible) return "launcher";
     if (chromeTabsVisible) return "tabs";
     if (updateSelectorVisible) return "updates";
@@ -681,7 +709,13 @@ Scope {
     return "workspaces";
   }
 
+  function visibleCenterMode() {
+    return voiceDictationActive
+      ? "dictation" : visibleCenterModeWithoutVoice();
+  }
+
   function monitorForCenterMode(mode) {
+    if (mode === "dictation") return voiceDictationTargetMonitor;
     if (mode === "launcher") return appLauncherTargetMonitor;
     if (mode === "tabs") return chromeTabsTargetMonitor;
     if (mode === "updates") return updateTargetMonitor;
@@ -693,8 +727,12 @@ Scope {
     return "";
   }
 
-  function beginCenterTransition(targetMode, targetMonitor = "") {
+  function beginCenterTransition(targetMode, targetMonitor = "",
+      allowVoiceExit = false) {
     if (centerTransitionPending)
+      return false;
+    if (voiceDictationActive && targetMode !== "dictation"
+        && !allowVoiceExit)
       return false;
     const sourceMode = visibleCenterMode();
     const sourceMonitor = monitorForCenterMode(sourceMode);
@@ -715,6 +753,85 @@ Scope {
       return;
     centerTransitionPending = false;
     centerTransitionSerial++;
+  }
+
+  function setVoiceDictationState(nextState) {
+    const normalizedState = nextState === "recording"
+        || nextState === "streaming" || nextState === "transcribing"
+      ? nextState : nextState === "idle" ? "idle" : "stopped";
+    const nextActive = normalizedState === "recording"
+      || normalizedState === "streaming"
+      || normalizedState === "transcribing";
+
+    if (!voiceDictationActive && nextActive) {
+      const targetMonitor = resolveTargetMonitor();
+      const ownsTransition = beginCenterTransition(
+        "dictation", targetMonitor);
+      voiceDictationTargetMonitor = targetMonitor;
+      voiceDictationState = normalizedState;
+      finishCenterTransition(ownsTransition);
+      return;
+    }
+
+    if (voiceDictationActive && !nextActive) {
+      const targetMode = visibleCenterModeWithoutVoice();
+      const targetMonitor = monitorForCenterMode(targetMode);
+      const ownsTransition = beginCenterTransition(
+        targetMode, targetMonitor, true);
+      voiceDictationState = normalizedState;
+      voiceDictationTargetMonitor = "";
+      finishCenterTransition(ownsTransition);
+      return;
+    }
+
+    voiceDictationState = normalizedState;
+  }
+
+  function parseVoiceDictationStatus(line) {
+    try {
+      const status = JSON.parse(line);
+      setVoiceDictationState(status.alt || status.class || "stopped");
+    } catch (error) {
+      console.warn("Unable to parse VoxType status:", error);
+    }
+  }
+
+  function resetVoiceDictationAudio() {
+    voiceDictationEnergy = 0;
+    voiceDictationSpeechDetected = false;
+  }
+
+  function parseVoiceDictationAudio(line) {
+    const trimmed = (line || "").trim();
+    if (trimmed.length === 0)
+      return;
+
+    try {
+      const frame = JSON.parse(trimmed);
+      if (frame.status === "connected") {
+        voiceDictationAudioConnected = true;
+        return;
+      }
+      if (frame.status === "disconnected") {
+        voiceDictationAudioConnected = false;
+        resetVoiceDictationAudio();
+        return;
+      }
+      if (!voiceDictationRecording
+          || typeof frame.peak !== "number"
+          || typeof frame.rms !== "number"
+          || !isFinite(frame.peak)
+          || !isFinite(frame.rms))
+        return;
+
+      voiceDictationAudioConnected = true;
+      const peak = Math.max(0, Math.min(1, frame.peak));
+      const rms = Math.max(0, Math.min(1, frame.rms));
+      voiceDictationEnergy = Math.max(peak, rms);
+      voiceDictationSpeechDetected = frame.vad === 1;
+    } catch (error) {
+      console.warn("Unable to parse VoxType audio frame:", error);
+    }
   }
 
   function toggleAppLauncher(targetMonitor = "") {
@@ -1475,29 +1592,10 @@ Scope {
     finishCenterTransition(ownsTransition);
   }
 
-  function sanitizeUpdateOutput(text) {
-    return text
-      .replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, "")
-      .replace(/\r/g, "");
-  }
-
-  function appendNixUpdateLog(line) {
-    const cleaned = sanitizeUpdateOutput(line);
-    if (cleaned === "") {
-      nixUpdateLog += "\n";
-    } else {
-      nixUpdateLog += cleaned + "\n";
-    }
-    if (nixUpdateLog.length > 120000)
-      nixUpdateLog = nixUpdateLog.slice(nixUpdateLog.length - 120000);
-  }
-
   function parseNixUpdateOutput(line) {
     const marker = "@@QS_UPDATE@@";
-    if (!line.startsWith(marker)) {
-      appendNixUpdateLog(line);
+    if (!line.startsWith(marker))
       return;
-    }
 
     try {
       const event = JSON.parse(line.slice(marker.length));
@@ -1515,7 +1613,6 @@ Scope {
         nixUpdateAwaitingPolkit = false;
       }
     } catch (error) {
-      appendNixUpdateLog(line);
       console.warn("Unable to parse update event:", error);
     }
   }
@@ -1525,7 +1622,6 @@ Scope {
         || nixChecking || nixUpdates.length === 0)
       return;
     nixOperation = "update";
-    nixUpdateLog = "";
     nixUpdateChanges = [];
     nixUpdateCounts = {};
     nixUpdateSummaryReady = false;
@@ -1540,7 +1636,6 @@ Scope {
     if (nixUpdateProcess.running || nixCleanProcess.running || nixChecking)
       return;
     nixOperation = "clean";
-    nixUpdateLog = "";
     nixUpdateChanges = [];
     nixUpdateCounts = {};
     nixUpdateSummaryReady = false;
@@ -1577,7 +1672,6 @@ Scope {
       nixUpdatePhase = "idle";
       nixUpdateMessage = "";
       nixOperation = "update";
-      nixUpdateLog = "";
       nixUpdateChanges = [];
       nixUpdateCounts = {};
       nixUpdateSummaryReady = false;
@@ -1722,6 +1816,55 @@ Scope {
     }
   }
 
+  Process {
+    id: voiceDictationStatusProcess
+    command: ["voxtype", "status", "--follow", "--format", "json"]
+    running: true
+
+    stdout: SplitParser {
+      onRead: data => root.parseVoiceDictationStatus(data)
+    }
+
+    onExited: (exitCode, exitStatus) => {
+      root.setVoiceDictationState("stopped");
+      voiceDictationStatusRestart.restart();
+    }
+  }
+
+  Timer {
+    id: voiceDictationStatusRestart
+    interval: 2000
+    onTriggered: {
+      if (!voiceDictationStatusProcess.running)
+        voiceDictationStatusProcess.running = true;
+    }
+  }
+
+  Process {
+    id: voiceDictationAudioProcess
+    command: ["voxtype-audio-bridge"]
+    running: true
+
+    stdout: SplitParser {
+      onRead: data => root.parseVoiceDictationAudio(data)
+    }
+
+    onExited: (exitCode, exitStatus) => {
+      root.voiceDictationAudioConnected = false;
+      root.resetVoiceDictationAudio();
+      voiceDictationAudioRestart.restart();
+    }
+  }
+
+  Timer {
+    id: voiceDictationAudioRestart
+    interval: 1000
+    onTriggered: {
+      if (!voiceDictationAudioProcess.running)
+        voiceDictationAudioProcess.running = true;
+    }
+  }
+
   Connections {
     target: DesktopEntries.applications
 
@@ -1775,6 +1918,14 @@ Scope {
           && root.bluetoothActionDevice.paired)
         root.finishBluetoothAction(true);
     }
+  }
+
+  Timer {
+    interval: 80
+    running: root.brailleAnimationRunning
+    repeat: true
+    onTriggered: root.brailleFrameIndex = (root.brailleFrameIndex + 1)
+      % root.brailleFrames.length
   }
 
   Timer {

@@ -17,10 +17,13 @@ Scope {
     && monitorName === statusData.volumeTargetMonitor
   readonly property bool brightnessActive: statusData.brightnessOverlayVisible
     && monitorName === statusData.brightnessTargetMonitor
+  readonly property bool dictationActive: statusData.voiceDictationActive
+    && monitorName === statusData.voiceDictationTargetMonitor
   readonly property bool fullscreenActive: hyprlandMonitor !== null
     && hyprlandMonitor.activeWorkspace !== null
     && hyprlandMonitor.activeWorkspace.hasFullscreen
-  readonly property bool osdActive: (volumeActive || brightnessActive)
+  readonly property bool osdActive: (dictationActive || volumeActive
+    || brightnessActive)
     && fullscreenActive
   property bool windowLoaded: false
 
@@ -57,7 +60,7 @@ Scope {
       color: "transparent"
       exclusionMode: ExclusionMode.Ignore
       WlrLayershell.layer: WlrLayer.Overlay
-      WlrLayershell.namespace: "quickshell-volume-brightness-osd"
+      WlrLayershell.namespace: "quickshell-status-osd"
 
       mask: Region { item: osdContent }
 
@@ -87,7 +90,10 @@ Scope {
         id: osdContent
         anchors.horizontalCenter: parent.horizontalCenter
         y: window.presented ? 8 : 0
-        width: window.presented ? 280 : 352
+        width: window.presented
+          ? (root.dictationActive
+            ? voiceDictationIndicator.implicitWidth : 280)
+          : 352
         height: 36
 
         Behavior on y {
@@ -108,14 +114,21 @@ Scope {
           anchors.fill: parent
           statusData: root.statusData
           targetMonitor: root.monitorName
-          visible: root.volumeActive
+          visible: root.volumeActive && !root.dictationActive
         }
 
         BrightnessIndicator {
           anchors.fill: parent
           statusData: root.statusData
           targetMonitor: root.monitorName
-          visible: root.brightnessActive
+          visible: root.brightnessActive && !root.dictationActive
+        }
+
+        VoiceDictationIndicator {
+          id: voiceDictationIndicator
+          anchors.fill: parent
+          statusData: root.statusData
+          visible: root.dictationActive
         }
       }
     }

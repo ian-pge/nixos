@@ -18,9 +18,9 @@ FocusScope {
     && (statusData.nixChecking || updates.length === 0)
   readonly property bool changesMode: !authMode && !successMode
     && statusData.nixUpdateSummaryReady
-  readonly property bool consoleMode: !authMode && !successMode && !cleaningMode
+  readonly property bool progressMode: !authMode && !successMode && !cleaningMode
     && !listMode && !changesMode
-  readonly property bool updateSpinning: statusData.nixUpdateBusy
+  readonly property bool updateProcessing: statusData.nixUpdateBusy
   readonly property string phaseLabel: {
     if (statusData.nixUpdatePhase === "updating") return "UPDATING";
     if (statusData.nixUpdatePhase === "building") return "BUILDING";
@@ -33,11 +33,11 @@ FocusScope {
     return "UPDATE";
   }
   implicitWidth: compactStatusMode ? 280 : cleaningMode ? 360 : 480
-  implicitHeight: authMode || successMode || cleaningMode ? 36
+  implicitHeight: authMode || successMode || cleaningMode || progressMode ? 36
     : listMode ? (compactStatusMode ? 36 : 52 + rowCount * 30 + 10)
     : changesMode ? Math.min(750,
       50 + Math.max(1, statusData.nixUpdateChanges.length) * 34)
-    : 750
+    : 36
 
   function changeColor(kind) {
     if (kind === "added") return Theme.sideGpu;
@@ -143,19 +143,11 @@ FocusScope {
         visible: statusData.nixChecking
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        text: "󰑐"
+        text: statusData.brailleFrame
         color: Theme.sideUpdates
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 17
         font.bold: true
-
-        RotationAnimator on rotation {
-          running: statusData.nixChecking
-          from: 0
-          to: 360
-          duration: 900
-          loops: Animation.Infinite
-        }
       }
 
       Text {
@@ -280,12 +272,12 @@ FocusScope {
   }
 
   Item {
-    id: consoleView
+    id: progressView
     anchors.fill: parent
-    visible: root.consoleMode
+    visible: root.progressMode
 
     Text {
-      id: consoleIcon
+      id: progressIcon
       anchors.left: parent.left
       anchors.leftMargin: 16
       y: 9
@@ -293,7 +285,7 @@ FocusScope {
       height: 20
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
-      text: root.updateSpinning ? "󰑐"
+      text: root.updateProcessing ? statusData.brailleFrame
         : statusData.nixUpdatePhase === "error" ? ""
         : statusData.nixUpdatePhase === "success" ? "" : "󰆍"
       color: statusData.nixUpdatePhase === "error"
@@ -302,20 +294,12 @@ FocusScope {
       font.pixelSize: 17
       font.bold: true
 
-      RotationAnimator on rotation {
-        running: root.updateSpinning
-        from: 0
-        to: 360
-        duration: 900
-        loops: Animation.Infinite
-        onStopped: consoleIcon.rotation = 0
-      }
     }
 
     Text {
-      anchors.left: consoleIcon.right
+      anchors.left: progressIcon.right
       anchors.leftMargin: 10
-      anchors.right: consoleStatus.left
+      anchors.right: progressStatus.left
       anchors.rightMargin: 12
       y: 8
       height: 22
@@ -329,7 +313,7 @@ FocusScope {
     }
 
     Text {
-      id: consoleStatus
+      id: progressStatus
       anchors.right: parent.right
       anchors.rightMargin: 16
       y: 9
@@ -342,48 +326,6 @@ FocusScope {
       font.pixelSize: 11
       font.bold: true
     }
-
-    Rectangle {
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.leftMargin: 14
-      anchors.rightMargin: 14
-      y: 40
-      height: 1
-      color: Theme.surfaceRaised
-    }
-
-    Flickable {
-      id: consoleFlick
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.topMargin: 42
-      anchors.bottom: parent.bottom
-      anchors.bottomMargin: 8
-      clip: true
-      contentWidth: width
-      contentHeight: Math.max(height, consoleText.paintedHeight + 20)
-      boundsBehavior: Flickable.StopAtBounds
-
-      onContentHeightChanged: Qt.callLater(() => {
-        contentY = Math.max(0, contentHeight - height);
-      })
-
-      Text {
-        id: consoleText
-        x: 16
-        y: 10
-        width: consoleFlick.width - 32
-        text: statusData.nixUpdateLog
-        color: Theme.foreground
-        textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
-        font.family: "JetBrainsMono Nerd Font"
-        font.pixelSize: 11
-      }
-    }
-
   }
 
   Item {
@@ -400,23 +342,17 @@ FocusScope {
       height: 20
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
-      text: statusData.nixUpdatePhase === "success" ? ""
+      text: statusData.nixUpdatePhase === "activating"
+        ? statusData.brailleFrame
+        : statusData.nixUpdatePhase === "success" ? ""
         : statusData.nixUpdatePhase === "error" ? ""
-        : statusData.nixUpdatePhase === "activating" ? "󰑐" : ""
+        : ""
       color: statusData.nixUpdatePhase === "error"
         ? Theme.error : Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
 
-      RotationAnimator on rotation {
-        running: statusData.nixUpdatePhase === "activating"
-        from: 0
-        to: 360
-        duration: 900
-        loops: Animation.Infinite
-        onStopped: changesIcon.rotation = 0
-      }
     }
 
     Text {
@@ -573,20 +509,12 @@ FocusScope {
       height: 20
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
-      text: root.cleaningMode ? "󰔟" : ""
+      text: root.cleaningMode ? statusData.brailleFrame : ""
       color: Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 17
       font.bold: true
 
-      RotationAnimator on rotation {
-        running: root.cleaningMode
-        from: 0
-        to: 360
-        duration: 900
-        loops: Animation.Infinite
-        onStopped: completionIcon.rotation = 0
-      }
     }
 
     Text {

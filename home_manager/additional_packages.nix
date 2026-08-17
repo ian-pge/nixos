@@ -25,7 +25,7 @@
     devcontainer
     orca-slicer
     # (bambu-studio.override {
-    #   withNvidiaGLWorkaround = true;
+    # withNvidiaGLWorkaround = true;
     # })
     herdr
     kalker

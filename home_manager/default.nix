@@ -16,6 +16,7 @@
     ./gtk.nix
     ./quickshell.nix
     ./tabctl.nix
+    ./voxtype.nix
     ./hyprpaper.nix
     ./ghostty.nix
     ./catppuccin.nix

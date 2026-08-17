@@ -2,6 +2,7 @@
   helpers,
   lib,
   pkgs,
+  voxtypePackage,
 }: let
   inherit
     (helpers)
@@ -51,6 +52,41 @@
         workspace = "Notes";
       }
     ];
+
+  startVoiceDictation = ''
+    function()
+      hl.exec_cmd("${voxtypePackage}/bin/voxtype record start")
+      hl.dispatch(hl.dsp.submap("voxtype"))
+    end
+  '';
+
+  stopVoiceDictation = ''
+    function()
+      if hl.get_current_submap() ~= "voxtype" then
+        return
+      end
+
+      hl.exec_cmd("${voxtypePackage}/bin/voxtype record stop")
+      hl.dispatch(hl.dsp.submap("reset"))
+    end
+  '';
+
+  stopVoiceDictationBinds = map (key:
+    mkBind
+    (plainKey key)
+    stopVoiceDictation
+    {
+      release = true;
+      ignore_mods = true;
+      non_consuming = true;
+      transparent = true;
+    }) [
+    "SPACE"
+    "CONTROL + CONTROL_L"
+    "CONTROL + CONTROL_R"
+    "SUPER + SUPER_L"
+    "SUPER + SUPER_R"
+  ];
 in {
   terminal._var = "ghostty";
   browser._var = "google-chrome-stable";
@@ -117,6 +153,10 @@ in {
       (mkBind (mainKey "SHIFT + J") ''hl.dsp.window.move({ direction = "down" })'' {})
       (mkBind (mainKey "SPACE") ''hl.dsp.window.fullscreen({ mode = "maximized" })'' {})
       (mkBind (mainKey "SHIFT + SPACE") ''hl.dsp.window.fullscreen({ mode = "fullscreen" })'' {})
+      (mkBind
+        (mainKey "CONTROL + SPACE")
+        startVoiceDictation
+        {})
       (mkBind (mainKey "CONTROL + h") ''hl.dsp.window.resize({ x = -50, y = 0, relative = true })'' {})
       (mkBind (mainKey "CONTROL + j") ''hl.dsp.window.resize({ x = 0, y = 50, relative = true })'' {})
       (mkBind (mainKey "CONTROL + k") ''hl.dsp.window.resize({ x = 0, y = -50, relative = true })'' {})
@@ -128,5 +168,6 @@ in {
       (mkBind (mainKey "ESCAPE") (mkExec "hyprlock") {})
       (mkBind (mainKey "mouse:272") "hl.dsp.window.drag()" {mouse = true;})
       (mkBind (mainKey "mouse:273") "hl.dsp.window.resize()" {mouse = true;})
-    ];
+    ]
+    ++ stopVoiceDictationBinds;
 }
