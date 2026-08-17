@@ -1,4 +1,5 @@
 import QtQuick
+import "Layout.js" as Layout
 import "Theme.js" as Theme
 
 FocusScope {
@@ -19,11 +20,64 @@ FocusScope {
     return selectedNetwork !== null ? selectedNetwork.label : "No networks found";
   }
   property string displayedLabelText: ""
+  property string previousLabelText: ""
   property bool componentReady: false
   property bool wheelNavigationPending: false
+  readonly property string wifiIconText: {
+    if (statusData.wifiLoading) return statusData.brailleFrame;
+    if (selectedNetwork !== null && selectedNetwork.type === "ethernet")
+      return "󰈀";
+    if (selectedNetwork !== null)
+      return signalIcon(selectedNetwork.strength);
+    return "󰤭";
+  }
+  readonly property string securityIconText:
+    !statusData.wifiPasswordMode && selectedNetwork !== null
+      && selectedNetwork.type === "wifi"
+      && selectedNetwork.security !== ""
+      && selectedNetwork.security !== "--" ? "󰌾" : ""
+  readonly property string counterText: statusData.wifiPasswordMode ? "󰌾"
+    : statusData.networkSelectorEntries.length > 0
+      ? (statusData.wifiSelectedIndex + 1) + "/"
+        + statusData.networkSelectorEntries.length
+      : "0/0"
+  readonly property real collapsedContentWidth: 15
+    + wifiIconMetrics.advanceWidth(wifiIconText) + 13 + 7 + 8
+    + Layout.widestText(labelMetrics,
+      [desiredLabelText, displayedLabelText, previousLabelText])
+    + 12 + securityMetrics.advanceWidth(securityIconText) + 8
+    + counterMetrics.advanceWidth(counterText) + 15
 
-  implicitWidth: 400
+  implicitWidth: statusData.wifiSpeedTestExpanded ? 400
+    : Layout.boundedWidth(collapsedContentWidth, 0, 400)
   implicitHeight: statusData.wifiSpeedTestExpanded ? 94 : 36
+
+  FontMetrics {
+    id: wifiIconMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 17
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: labelMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 14
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: securityMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 13
+  }
+
+  FontMetrics {
+    id: counterMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 12
+    font.bold: true
+  }
 
   function signalIcon(strength) {
     if (strength < 26) return "󰤟";
@@ -34,9 +88,9 @@ FocusScope {
 
   function syncLabel() {
     selectionWheel.stop();
+    previousLabelText = "";
     outgoingLabel.visible = false;
     incomingSlide.y = 0;
-    incomingLabel.text = desiredLabelText;
     displayedLabelText = desiredLabelText;
   }
 
@@ -46,9 +100,8 @@ FocusScope {
     selectionWheel.stop();
     outgoingSlide.y = 0;
     incomingSlide.y = statusData.wifiSelectionDirection > 0 ? 40 : -40;
-    outgoingLabel.text = displayedLabelText;
+    previousLabelText = displayedLabelText;
     outgoingLabel.visible = true;
-    incomingLabel.text = desiredLabelText;
     displayedLabelText = desiredLabelText;
     selectionWheel.restart();
   }
@@ -142,15 +195,7 @@ FocusScope {
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: {
-      if (statusData.wifiLoading) return statusData.brailleFrame;
-      if (root.selectedNetwork !== null
-          && root.selectedNetwork.type === "ethernet")
-        return "󰈀";
-      if (root.selectedNetwork !== null)
-        return root.signalIcon(root.selectedNetwork.strength);
-      return "󰤭";
-    }
+    text: root.wifiIconText
     color: Theme.sideNetwork
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 17
@@ -183,11 +228,12 @@ FocusScope {
     Text {
       id: outgoingLabel
       visible: false
+      text: root.previousLabelText
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
       transform: Translate { id: outgoingSlide }
       color: Theme.foreground
-      elide: Text.ElideRight
+      elide: Text.ElideNone
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
       font.bold: true
@@ -195,11 +241,12 @@ FocusScope {
 
     Text {
       id: incomingLabel
+      text: root.displayedLabelText
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
       transform: Translate { id: incomingSlide }
       color: Theme.foreground
-      elide: Text.ElideRight
+      elide: Text.ElideNone
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
       font.bold: true
@@ -208,7 +255,10 @@ FocusScope {
 
   ParallelAnimation {
     id: selectionWheel
-    onStopped: outgoingLabel.visible = false
+    onStopped: {
+      outgoingLabel.visible = false;
+      root.previousLabelText = "";
+    }
 
     NumberAnimation {
       target: outgoingSlide
@@ -237,10 +287,7 @@ FocusScope {
     spacing: 8
 
     Text {
-      text: !statusData.wifiPasswordMode && root.selectedNetwork !== null
-        && root.selectedNetwork.type === "wifi"
-        && root.selectedNetwork.security !== ""
-        && root.selectedNetwork.security !== "--" ? "󰌾" : ""
+      text: root.securityIconText
       height: 18
       verticalAlignment: Text.AlignVCenter
       color: Theme.secondary
@@ -249,11 +296,7 @@ FocusScope {
     }
 
     Text {
-      text: statusData.wifiPasswordMode ? "󰌾"
-        : statusData.networkSelectorEntries.length > 0
-          ? (statusData.wifiSelectedIndex + 1) + "/"
-            + statusData.networkSelectorEntries.length
-          : "0/0"
+      text: root.counterText
       height: 18
       verticalAlignment: Text.AlignVCenter
       color: Theme.secondary

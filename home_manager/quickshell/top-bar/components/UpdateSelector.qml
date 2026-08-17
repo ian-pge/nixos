@@ -1,4 +1,5 @@
 import QtQuick
+import "Layout.js" as Layout
 import "Theme.js" as Theme
 
 FocusScope {
@@ -32,12 +33,130 @@ FocusScope {
     if (statusData.nixUpdatePhase === "error") return "ERROR";
     return "UPDATE";
   }
-  implicitWidth: compactStatusMode ? 280 : cleaningMode ? 360 : 480
+  readonly property string listTitleText: statusData.nixChecking
+    ? "Checking for updates…"
+    : statusData.nixCheckFailed ? "Update check failed" : "NixOS updates"
+  readonly property string listStatusText: statusData.nixChecking ? "CHECKING"
+    : statusData.nixCheckFailed ? "ERROR"
+      : updates.length > 0 ? updates.length + " AVAILABLE" : "UP TO DATE"
+  readonly property string progressTitleText:
+    statusData.nixUpdateMessage || "NixOS update"
+  readonly property string changesStatusText:
+    statusData.nixUpdateChanges.length + " CHANGES"
+  readonly property string completionTitleText:
+    cleaningMode || statusData.nixOperation === "clean"
+      ? statusData.nixUpdateMessage : "Update complete"
+  readonly property string completionStatusText: cleaningMode ? "CLEANING"
+    : statusData.nixOperation === "clean" ? "CLEANED" : "COMPLETE"
+  readonly property string authLabelText:
+    statusData.polkitSupplementaryMessage !== ""
+      ? statusData.polkitSupplementaryMessage : statusData.polkitPrompt
+
+  implicitWidth: adaptiveWidth()
   implicitHeight: authMode || successMode || cleaningMode || progressMode ? 36
     : listMode ? (compactStatusMode ? 36 : 52 + rowCount * 30 + 10)
     : changesMode ? Math.min(750,
       50 + Math.max(1, statusData.nixUpdateChanges.length) * 34)
     : 36
+
+  FontMetrics {
+    id: titleMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 14
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: rowTitleMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 13
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: dateMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 12
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: statusMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 11
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: kindMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 10
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: versionMetrics
+    font.family: "JetBrainsMono Nerd Font"
+    font.pixelSize: 10
+  }
+
+  function headerWidth(title, status) {
+    return 16 + 20 + 10 + titleMetrics.advanceWidth(title) + 12
+      + statusMetrics.advanceWidth(status) + 16;
+  }
+
+  function listContentWidth() {
+    let width = headerWidth(listTitleText, listStatusText);
+    for (let index = 0; index < updates.length; ++index) {
+      const update = updates[index];
+      width = Math.max(width, 64
+        + rowTitleMetrics.advanceWidth(update.name || "")
+        + dateMetrics.advanceWidth(update.date || ""));
+    }
+    return width;
+  }
+
+  function changesContentWidth() {
+    let width = headerWidth(changesTitle(), changesStatusText);
+    const changes = statusData.nixUpdateChanges;
+    for (let index = 0; index < changes.length; ++index) {
+      const change = changes[index];
+      const versions = versionText(change.oldVersions) + "  →  "
+        + versionText(change.newVersions);
+      width = Math.max(width, 80
+        + rowTitleMetrics.advanceWidth(change.name || "")
+        + versionMetrics.advanceWidth(versions)
+        + kindMetrics.advanceWidth((change.kind || "").toUpperCase()));
+    }
+    return width;
+  }
+
+  function adaptiveWidth() {
+    if (authMode) {
+      const authContentWidth = 16 + 20 + 10
+        + rowTitleMetrics.advanceWidth(authLabelText) + 10 + 120 + 10 + 42 + 16;
+      return Layout.boundedWidth(authContentWidth, 400, 480);
+    }
+    if (cleaningMode) {
+      return Layout.boundedWidth(
+        headerWidth(completionTitleText, completionStatusText), 280, 360);
+    }
+    if (successMode) {
+      return Layout.boundedWidth(
+        headerWidth(completionTitleText, completionStatusText), 240, 480);
+    }
+    if (listMode) {
+      return Layout.boundedWidth(listContentWidth(),
+        compactStatusMode ? 220 : 280, compactStatusMode ? 280 : 480);
+    }
+    if (changesMode)
+      return Layout.boundedWidth(changesContentWidth(), 320, 480);
+    if (progressMode) {
+      return Layout.boundedWidth(
+        headerWidth(progressTitleText, phaseLabel), 240, 480);
+    }
+    return 280;
+  }
 
   function changeColor(kind) {
     if (kind === "added") return Theme.sideGpu;
@@ -170,8 +289,7 @@ FocusScope {
       y: 8
       height: 22
       verticalAlignment: Text.AlignVCenter
-      text: statusData.nixChecking ? "Checking for updates…"
-        : statusData.nixCheckFailed ? "Update check failed" : "NixOS updates"
+      text: root.listTitleText
       color: Theme.foreground
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 14
@@ -184,9 +302,7 @@ FocusScope {
       y: 9
       height: 20
       verticalAlignment: Text.AlignVCenter
-      text: statusData.nixChecking ? "CHECKING"
-        : statusData.nixCheckFailed ? "ERROR"
-        : updates.length > 0 ? updates.length + " AVAILABLE" : "UP TO DATE"
+      text: root.listStatusText
       color: statusData.nixCheckFailed ? Theme.error
         : statusData.nixChecking || updates.length > 0
           ? Theme.sideUpdates : Theme.secondary
@@ -304,7 +420,7 @@ FocusScope {
       y: 8
       height: 22
       verticalAlignment: Text.AlignVCenter
-      text: statusData.nixUpdateMessage || "NixOS update"
+      text: root.progressTitleText
       color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
@@ -378,7 +494,7 @@ FocusScope {
       y: 9
       height: 20
       verticalAlignment: Text.AlignVCenter
-      text: statusData.nixUpdateChanges.length + " CHANGES"
+      text: root.changesStatusText
       color: statusData.nixUpdatePhase === "error"
         ? Theme.error : Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
@@ -525,8 +641,7 @@ FocusScope {
       anchors.verticalCenter: parent.verticalCenter
       height: 22
       verticalAlignment: Text.AlignVCenter
-      text: root.cleaningMode || statusData.nixOperation === "clean"
-        ? statusData.nixUpdateMessage : "Update complete"
+      text: root.completionTitleText
       color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
@@ -541,8 +656,7 @@ FocusScope {
       anchors.verticalCenter: parent.verticalCenter
       height: 20
       verticalAlignment: Text.AlignVCenter
-      text: root.cleaningMode ? "CLEANING"
-        : statusData.nixOperation === "clean" ? "CLEANED" : "COMPLETE"
+      text: root.completionStatusText
       color: Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 11
@@ -579,9 +693,7 @@ FocusScope {
       width: 138
       height: 22
       verticalAlignment: Text.AlignVCenter
-      text: statusData.polkitSupplementaryMessage !== ""
-        ? statusData.polkitSupplementaryMessage
-        : statusData.polkitPrompt
+      text: root.authLabelText
       color: statusData.polkitSupplementaryIsError
         ? Theme.error : Theme.foreground
       elide: Text.ElideRight

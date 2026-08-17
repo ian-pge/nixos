@@ -126,6 +126,7 @@ PanelWindow {
     Behavior on opacity { NumberAnimation { duration: 240 } }
 
     Pill {
+      iconOnly: true
       text: ""
       accent: Theme.sideApplications
       forceHovered: window.appLauncherActive
@@ -136,6 +137,7 @@ PanelWindow {
     }
 
     Pill {
+      iconOnly: true
       text: statusData.displayedNixIcon
       processing: statusData.nixUpdateBusy || statusData.nixChecking
       processingText: statusData.brailleFrame
@@ -151,6 +153,7 @@ PanelWindow {
     }
 
     Pill {
+      iconOnly: true
       text: statusData.networkIcon()
       accent: Theme.sideNetwork
       forceHovered: window.wifiSelectorActive
@@ -161,6 +164,7 @@ PanelWindow {
     }
 
     Pill {
+      iconOnly: true
       text: statusData.bluetoothConnected ? "󰂯" : "󰂲"
       accent: Theme.sideBluetooth
       forceHovered: window.bluetoothSelectorActive
@@ -574,6 +578,7 @@ PanelWindow {
     }
 
     Pill {
+      iconOnly: statusData.audioMuted
       text: statusData.audioMuted
         ? "󰖁"
         : statusData.audioIcon() + " " + statusData.audioVolume + "%"

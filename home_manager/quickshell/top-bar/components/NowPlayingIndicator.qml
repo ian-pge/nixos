@@ -1,5 +1,6 @@
 import Quickshell.Services.Mpris
 import QtQuick
+import "Layout.js" as Layout
 import "Theme.js" as Theme
 
 Item {
@@ -8,9 +9,34 @@ Item {
   required property var statusData
   readonly property var player: statusData.mprisPlayer
   readonly property bool playing: player !== null && player.isPlaying
+  readonly property string labelText: {
+    const title = player !== null && player.trackTitle !== ""
+      ? player.trackTitle : "Unknown track";
+    const artist = player !== null && player.trackArtist !== ""
+      ? player.trackArtist : player !== null ? player.identity : "";
+    return artist !== "" ? title + "  •  " + artist : title;
+  }
+  readonly property string playbackIconText: player !== null && player.isPlaying
+    ? "󰏤" : "󰐊"
 
-  implicitWidth: 480
+  implicitWidth: Layout.boundedWidth(15 + 18 + 10
+    + labelMetrics.advanceWidth(labelText) + 12
+    + playbackMetrics.advanceWidth(playbackIconText) + 14, 160, 480)
   implicitHeight: 36
+
+  FontMetrics {
+    id: labelMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 16
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: playbackMetrics
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 16
+    font.bold: true
+  }
 
   Item {
     id: equalizer
@@ -82,7 +108,7 @@ Item {
     anchors.right: parent.right
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
-    text: root.player !== null && root.player.isPlaying ? "󰏤" : "󰐊"
+    text: root.playbackIconText
     color: Theme.action
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16
@@ -97,13 +123,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
-    text: {
-      const title = root.player !== null && root.player.trackTitle !== ""
-        ? root.player.trackTitle : "Unknown track";
-      const artist = root.player !== null && root.player.trackArtist !== ""
-        ? root.player.trackArtist : root.player !== null ? root.player.identity : "";
-      return artist !== "" ? title + "  •  " + artist : title;
-    }
+    text: root.labelText
     color: Theme.foreground
     elide: Text.ElideRight
     font.family: "Ubuntu Nerd Font"

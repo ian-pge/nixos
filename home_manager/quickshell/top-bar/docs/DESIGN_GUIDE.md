@@ -58,13 +58,30 @@ Conséquences :
 | Marge supérieure du panel | `10px` |
 | Marges latérales du panel | `5px` |
 | Espacement entre modules latéraux | `10px` |
+| Capsule latérale avec icône seule | `36×36px` |
 | Largeur dictée vocale | `180px` |
 | Largeur volume/luminosité | `280px` |
-| Largeur Wi-Fi/Bluetooth | `400px` |
-| Largeur média / updates / lanceurs | `480px` |
+| Plafond Wi-Fi/Bluetooth | `400px` |
+| Largeur lanceurs applications / onglets | `480px` |
+| Plafond média / updates | `480px` |
 | Hauteur lanceur applications / onglets | `398px` |
 | Hauteur d’une ligne update | `30px` |
 | Hauteur d’une ligne application | `42px` |
+
+Les sélecteurs textuels, le média et les updates mesurent leur contenu avec
+`FontMetrics` et adaptent leur largeur en direct, jusqu'aux plafonds ci-dessus.
+Les lanceurs de recherche conservent `480px`. Les widgets à barre longue —
+dictée vocale, volume et luminosité — conservent eux aussi leur largeur fixe ;
+le Wi-Fi reste à `400px` pendant un speed test afin de ne pas redimensionner sa
+barre de progression.
+
+Une capsule latérale composée uniquement d'une icône est toujours un cercle
+strict de `36×36px`, indépendamment de la chasse du glyphe Nerd Font ou du
+caractère Braille affiché. Applications, updates, Wi-Fi et Bluetooth utilisent
+ce mode en permanence ; le volume l'utilise lorsqu'il est muet. Le contenu est
+centré horizontalement et verticalement dans toute la surface. Les capsules
+textuelles gardent `20px` de padding mais ne peuvent jamais mesurer moins de
+`36px` de large.
 
 ### Surface layer-shell fixe
 
@@ -301,7 +318,10 @@ du fade de sortie, et une interruption repart de l’opacité courante.
 
 Les deux sélecteurs doivent rester visuellement parallèles :
 
-- largeur `400px` ;
+- largeur minimale exacte requise par le contenu, plafonnée à `400px`, sauf
+  pendant un speed test Wi-Fi où elle reste fixée à `400px` ;
+- pendant un changement de largeur, les noms sont découpés par le viewport sans
+  afficher de points de suspension transitoires ;
 - hauteur `36px`, étendue à `94px` pendant un speed test ;
 - compteur aligné sur une hauteur fixe de `18px` ;
 - animation de roue verticale en `150ms` ;
@@ -340,7 +360,7 @@ Le raccourci `Super+A` et le logo Nix à gauche ouvrent `AppLauncher.qml` dans l
 
 Conventions :
 
-- largeur `480px`, hauteur `398px` et huit lignes visibles ;
+- largeur fixe `480px`, hauteur `398px` et huit lignes visibles ;
 - toutes les applications non marquées `NoDisplay` restent accessibles avec une icône issue du thème ;
 - le catalogue normalisé est construit une seule fois, puis la recherche fuzzy s’effectue en mémoire ;
 - le `ListView` virtualise les lignes pour ne charger que les icônes visibles ;
@@ -389,7 +409,7 @@ Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `p
 
 Les raccourcis Hyprland appellent les méthodes IPC `mediaPlayPause`, `mediaNext` et `mediaPrevious`. Chaque méthode vérifie les capacités du lecteur avant l’action.
 
-`NowPlayingIndicator.qml` occupe `480px`, comme le lanceur d’applications. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média déclenchée par les touches Play/Pause, Suivant ou Précédent. Les signaux automatiques de changement de piste n'ouvrent jamais le widget, car les navigateurs et les applications de communication publient les vocaux et vidéos par le même protocole MPRIS que les lecteurs musicaux.
+`NowPlayingIndicator.qml` ajuste sa largeur au titre et à l'artiste entre `160px` et `480px`. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média déclenchée par les touches Play/Pause, Suivant ou Précédent. Les signaux automatiques de changement de piste n'ouvrent jamais le widget, car les navigateurs et les applications de communication publient les vocaux et vidéos par le même protocole MPRIS que les lecteurs musicaux.
 
 ## 14. Exclusivité entre overlays
 
@@ -457,7 +477,7 @@ Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHEC
 
 Le checker compare les anciens et nouveaux `flake.lock` comme JSON, sans analyser la sortie humaine de Nix. Il s'exécute au démarrage, toutes les 30 minutes et après une demande explicite ; l'installateur partage son verrou et restaure le lockfile précédent si le rebuild échoue.
 
-Le premier `Enter` remplace la liste par une capsule compacte de `36px` contenant uniquement le spinner Braille, le message d'étape et son état. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit, enregistre la génération et l'active avec l'action native `switch`. L'état final `Update complete` et la vue sans mise à jour tiennent eux aussi directement dans la barre, sans ligne secondaire `System is up to date`; les états `CHECKING` et `UP TO DATE` réduisent également la capsule à `280px`. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
+Le premier `Enter` remplace la liste par une capsule compacte de `36px` contenant uniquement le spinner Braille, le message d'étape et son état. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit, enregistre la génération et l'active avec l'action native `switch`. L'état final `Update complete` et la vue sans mise à jour tiennent eux aussi directement dans la barre, sans ligne secondaire `System is up to date`. Chaque état mesure son contenu : les états compacts sont plafonnés à `280px` ou `360px`, tandis que les listes et la saisie Polkit peuvent atteindre `480px`. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
 
 Le processus appartient à `StatusData`, pas au composant visible. `q`, `Esc` ou un clic sur la capsule latérale ne font donc que replier l'interface ; l'update continue et un nouveau clic retrouve l'état compact ou le résumé existant. Pendant l'activation, puis après succès, la liste structurée reste visible jusqu'à `Enter`. Une erreur de build reste dans la capsule compacte avec son message structuré ; une erreur après le diff conserve la liste avec un état d'erreur. `Enter` relance ensuite une nouvelle tentative.
 

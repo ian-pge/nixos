@@ -13,6 +13,7 @@ Rectangle {
   property string rightCommand: ""
   property string wheelUpCommand: ""
   property string wheelDownCommand: ""
+  property bool iconOnly: false
   property bool processing: false
   property string processingText: ""
   property bool interactive: leftCommand !== "" || rightCommand !== ""
@@ -25,7 +26,7 @@ Rectangle {
   signal wheelUp()
   signal wheelDown()
 
-  implicitWidth: label.implicitWidth + 20
+  implicitWidth: iconOnly ? 36 : Math.max(36, label.implicitWidth + 20)
   implicitHeight: 36
   radius: 18
   color: root.hovered ? accent : Theme.background
@@ -41,7 +42,9 @@ Rectangle {
 
   Text {
     id: label
-    anchors.centerIn: parent
+    anchors.fill: parent
+    horizontalAlignment: Text.AlignHCenter
+    verticalAlignment: Text.AlignVCenter
     text: root.processing ? root.processingText : root.text
     color: root.hovered ? Theme.background : root.accent
     font.family: "Ubuntu Nerd Font"
