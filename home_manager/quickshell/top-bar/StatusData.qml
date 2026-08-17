@@ -100,6 +100,8 @@ Scope {
   property bool voiceDictationAudioConnected: false
   property real voiceDictationEnergy: 0
   property bool voiceDictationSpeechDetected: false
+  property bool voiceDictationMediaSessionActive: false
+  property var voiceDictationPausedPlayerNames: []
   readonly property bool voiceDictationActive:
     voiceDictationState === "recording"
     || voiceDictationState === "streaming"
@@ -159,8 +161,12 @@ Scope {
   onChromeTabsQueryChanged: refreshChromeTabResults()
   onCenterOverlayVisibleChanged: setFocusedWindowBorder(centerOverlayVisible)
   onVoiceDictationRecordingChanged: {
-    if (!voiceDictationRecording)
+    if (voiceDictationRecording) {
+      beginVoiceDictationMediaSession();
+    } else {
       resetVoiceDictationAudio();
+      finishVoiceDictationMediaSession();
+    }
   }
   onPolkitActiveChanged: {
     if (!polkitActive)
@@ -753,6 +759,70 @@ Scope {
       return;
     centerTransitionPending = false;
     centerTransitionSerial++;
+  }
+
+  function voiceDictationMediaPlayers() {
+    const controllablePlayers = Mpris.players.values.filter(player =>
+      player.canControl);
+    const directPlayers = controllablePlayers.filter(player =>
+      !player.dbusName.includes("playerctld"));
+    return directPlayers.length > 0 ? directPlayers : controllablePlayers;
+  }
+
+  function pauseVoiceDictationPlayer(player) {
+    if (player === null || !player.isPlaying)
+      return false;
+    if (player.canPause) {
+      player.pause();
+      return true;
+    }
+    if (player.canTogglePlaying) {
+      player.togglePlaying();
+      return true;
+    }
+    return false;
+  }
+
+  function beginVoiceDictationMediaSession() {
+    if (voiceDictationMediaSessionActive)
+      return;
+    voiceDictationMediaSessionActive = true;
+    const pausedNames = [];
+    const players = voiceDictationMediaPlayers();
+    for (let index = 0; index < players.length; ++index) {
+      const player = players[index];
+      if (pauseVoiceDictationPlayer(player)
+          && pausedNames.indexOf(player.dbusName) < 0)
+        pausedNames.push(player.dbusName);
+    }
+    voiceDictationPausedPlayerNames = pausedNames;
+  }
+
+  function suppressVoiceDictationMedia() {
+    if (!voiceDictationMediaSessionActive)
+      return;
+    const players = voiceDictationMediaPlayers();
+    for (let index = 0; index < players.length; ++index)
+      pauseVoiceDictationPlayer(players[index]);
+  }
+
+  function finishVoiceDictationMediaSession() {
+    if (!voiceDictationMediaSessionActive)
+      return;
+    const pausedNames = voiceDictationPausedPlayerNames.slice();
+    voiceDictationMediaSessionActive = false;
+    voiceDictationPausedPlayerNames = [];
+    const players = Mpris.players.values;
+    for (let index = 0; index < pausedNames.length; ++index) {
+      const dbusName = pausedNames[index];
+      const player = players.find(candidate => candidate.dbusName === dbusName);
+      if (player === undefined)
+        continue;
+      if (player.canPlay)
+        player.play();
+      else if (!player.isPlaying && player.canTogglePlaying)
+        player.togglePlaying();
+    }
   }
 
   function setVoiceDictationState(nextState) {
@@ -1838,6 +1908,14 @@ Scope {
       if (!voiceDictationStatusProcess.running)
         voiceDictationStatusProcess.running = true;
     }
+  }
+
+  Timer {
+    interval: 100
+    repeat: true
+    running: root.voiceDictationRecording
+      && root.voiceDictationMediaSessionActive
+    onTriggered: root.suppressVoiceDictationMedia()
   }
 
   Process {

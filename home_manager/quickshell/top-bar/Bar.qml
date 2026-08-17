@@ -139,8 +139,6 @@ PanelWindow {
     Pill {
       iconOnly: true
       text: statusData.displayedNixIcon
-      processing: statusData.nixUpdateBusy || statusData.nixChecking
-      processingText: statusData.brailleFrame
       accent: Theme.sideUpdates
       forceHovered: window.updateSelectorActive || statusData.nixUpdateBusy
         || statusData.nixChecking

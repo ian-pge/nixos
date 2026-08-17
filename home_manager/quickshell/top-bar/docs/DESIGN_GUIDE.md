@@ -76,12 +76,13 @@ le Wi-Fi reste à `400px` pendant un speed test afin de ne pas redimensionner sa
 barre de progression.
 
 Une capsule latérale composée uniquement d'une icône est toujours un cercle
-strict de `36×36px`, indépendamment de la chasse du glyphe Nerd Font ou du
-caractère Braille affiché. Applications, updates, Wi-Fi et Bluetooth utilisent
-ce mode en permanence ; le volume l'utilise lorsqu'il est muet. Le contenu est
-centré horizontalement et verticalement dans toute la surface. Les capsules
-textuelles gardent `20px` de padding mais ne peuvent jamais mesurer moins de
-`36px` de large.
+strict de `36×36px`, indépendamment de la chasse du glyphe Nerd Font.
+Applications, updates, Wi-Fi et Bluetooth utilisent ce mode en permanence ; le
+volume l'utilise lorsqu'il est muet. Le contenu est centré horizontalement et
+verticalement dans toute la surface. La capsule update latérale conserve une
+icône statique pendant les opérations : les animations Braille sont réservées
+au widget central. Les capsules textuelles gardent `20px` de padding mais ne
+peuvent jamais mesurer moins de `36px` de large.
 
 ### Surface layer-shell fixe
 
@@ -408,6 +409,16 @@ Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `p
 `StatusData.mprisPlayer` préfère le contrôleur D-Bus `playerctld`, qui conserve la notion de dernier lecteur actif lorsque plusieurs applications ou onglets publient MPRIS. En son absence, la sélection tombe sur le lecteur en cours de lecture, puis un lecteur en pause.
 
 Les raccourcis Hyprland appellent les méthodes IPC `mediaPlayPause`, `mediaNext` et `mediaPrevious`. Chaque méthode vérifie les capacités du lecteur avant l’action.
+
+Quand la dictée `Super+Tab` entre dans l'état `recording` ou `streaming`,
+`StatusData` mémorise tous les lecteurs MPRIS réellement en lecture et les met
+en pause. Un contrôle toutes les `100ms` empêche un lecteur de repartir pendant
+la capture. Dès que l'une des deux touches est relâchée et que Voxtype quitte
+l'état d'enregistrement, seuls les lecteurs mémorisés sont remis en lecture,
+sans attendre la fin de la transcription. Un lecteur déjà en pause avant la
+dictée n'est jamais démarré ; un lecteur disparu entre-temps est simplement
+ignoré. Les lecteurs directs Spotify, Chromium et autres sont préférés au proxy
+`playerctld` afin d'éviter les commandes en double.
 
 `NowPlayingIndicator.qml` ajuste sa largeur au titre et à l'artiste entre `160px` et `480px`. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média déclenchée par les touches Play/Pause, Suivant ou Précédent. Les signaux automatiques de changement de piste n'ouvrent jamais le widget, car les navigateurs et les applications de communication publient les vocaux et vidéos par le même protocole MPRIS que les lecteurs musicaux.
 

@@ -14,8 +14,6 @@ Rectangle {
   property string wheelUpCommand: ""
   property string wheelDownCommand: ""
   property bool iconOnly: false
-  property bool processing: false
-  property string processingText: ""
   property bool interactive: leftCommand !== "" || rightCommand !== ""
     || wheelUpCommand !== "" || wheelDownCommand !== ""
   property bool forceHovered: false
@@ -45,7 +43,7 @@ Rectangle {
     anchors.fill: parent
     horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
-    text: root.processing ? root.processingText : root.text
+    text: root.text
     color: root.hovered ? Theme.background : root.accent
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16
