@@ -81,9 +81,7 @@
       non_consuming = true;
       transparent = true;
     }) [
-    "SPACE"
-    "CONTROL + CONTROL_L"
-    "CONTROL + CONTROL_R"
+    "TAB"
     "SUPER + SUPER_L"
     "SUPER + SUPER_R"
   ];
@@ -154,7 +152,7 @@ in {
       (mkBind (mainKey "SPACE") ''hl.dsp.window.fullscreen({ mode = "maximized" })'' {})
       (mkBind (mainKey "SHIFT + SPACE") ''hl.dsp.window.fullscreen({ mode = "fullscreen" })'' {})
       (mkBind
-        (mainKey "CONTROL + SPACE")
+        (mainKey "TAB")
         startVoiceDictation
         {})
       (mkBind (mainKey "CONTROL + h") ''hl.dsp.window.resize({ x = -50, y = 0, relative = true })'' {})
