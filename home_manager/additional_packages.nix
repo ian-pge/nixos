@@ -23,6 +23,7 @@
     pavucontrol
     devpod
     devcontainer
+    t3code
     orca-slicer
     # (bambu-studio.override {
     # withNvidiaGLWorkaround = true;

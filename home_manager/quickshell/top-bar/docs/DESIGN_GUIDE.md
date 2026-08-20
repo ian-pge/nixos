@@ -368,7 +368,7 @@ Conventions :
 - haut/bas, `Ctrl+n/p`, `Ctrl+j/k`, PageUp/PageDown et molette naviguent ;
 - l’icône de recherche, la sélection de texte et le point d’une application déjà ouverte utilisent `Theme.sideApplications` ;
 - aucune flèche d’action n’est affichée sur la ligne sélectionnée ;
-- `Enter` active la fenêtre ouverte la plus récemment utilisée, sinon lance l’application ;
+- `Enter` active la fenêtre ouverte la plus récemment utilisée, y compris depuis un autre workspace normal ou spécial, sinon lance l’application ;
 - `Ctrl+Enter` lance toujours une nouvelle instance et `Esc` ferme ;
 - le texte saisi doit toujours rester du texte de recherche : ne pas réserver `j`, `k` ou `q`.
 
@@ -382,7 +382,7 @@ Conventions :
 - l’icône de recherche, la sélection de texte, l’épingle et le point d’onglet actif utilisent aussi `Theme.sideApplications`, comme le lanceur d’applications ;
 - aucune flèche d’action n’est affichée sur la ligne sélectionnée ;
 - la recherche fuzzy porte sur le titre et l’URL ;
-- `Enter` appelle `tabctl activate --focused`, `Ctrl+W` ferme l’onglet, `Ctrl+R` recharge la liste et `Esc` ferme le widget ;
+- `Enter` active l’onglet avec TabCtl puis focalise explicitement sa fenêtre via Hyprland, y compris depuis un autre workspace normal ou spécial ; `Ctrl+W` ferme l’onglet, `Ctrl+R` recharge la liste et `Esc` ferme le widget ;
 - clic gauche : activation ; clic droit : fermeture ;
 - huit lignes complètes sont visibles et le `ListView` reste virtualisé ;
 - l’extension TabCtl est installée manuellement depuis le Chrome Web Store ; seul le manifeste `tabctl_mediator.json` est géré par Home Manager, donc ne jamais exécuter `tabctl install` manuellement.
@@ -448,7 +448,7 @@ Une action Bluetooth native déjà lancée continue lorsque le sélecteur est ma
 - saisir directement pour filtrer en fuzzy
 - haut/bas, `Ctrl+n/p` ou `Ctrl+j/k` : navigation
 - PageUp/PageDown : saut de huit résultats
-- `Enter` : activer l’instance ouverte, sinon lancer
+- `Enter` : activer l’instance ouverte, y compris depuis un autre workspace normal ou spécial, sinon lancer
 - `Ctrl+Enter` : lancer une nouvelle instance
 - `Esc` : fermeture
 
@@ -457,7 +457,7 @@ Une action Bluetooth native déjà lancée continue lorsque le sélecteur est ma
 - saisir directement pour filtrer titre et URL
 - haut/bas, `Ctrl+n/p` ou `Ctrl+j/k` : navigation
 - PageUp/PageDown : saut de huit résultats
-- `Enter` : activer l’onglet et focaliser sa fenêtre Chrome
+- `Enter` : activer l’onglet et focaliser sa fenêtre Chrome, y compris depuis un autre workspace normal ou spécial
 - `Ctrl+W` : fermer l’onglet sélectionné
 - `Ctrl+R` : recharger la liste
 - clic droit : fermer l’onglet
@@ -546,7 +546,7 @@ Le code doit afficher `Configuration Loaded` sans erreur QML ou shader. L’aver
 ### Vérification Nix
 
 ```bash
-nix-instantiate --parse home_manager/hyprland.nix >/dev/null
+nix-instantiate --parse home_manager/hyprland/default.nix >/dev/null
 git diff --check
 git diff --cached --check
 ```

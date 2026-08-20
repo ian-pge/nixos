@@ -85,6 +85,8 @@ Scope {
   property string chromeTabsMessage: ""
   property string chromeTabsAction: ""
   property string chromeTabsActionTabId: ""
+  property var chromeTabsActionTab: null
+  property var chromeTabsActionToplevel: null
   readonly property bool chromeTabsActionPending: chromeTabsAction !== ""
   property var chromeTabCatalog: []
   property var chromeTabResults: []
@@ -529,6 +531,19 @@ Scope {
     return best;
   }
 
+  function focusHyprlandToplevel(toplevel) {
+    if (toplevel === null)
+      return;
+    if (toplevel.address !== "") {
+      const address = toplevel.address.startsWith("0x")
+        ? toplevel.address : "0x" + toplevel.address;
+      Hyprland.dispatch('hl.dsp.focus({ window = "address:'
+        + address + '" })');
+    } else if (toplevel.wayland !== null) {
+      toplevel.wayland.activate();
+    }
+  }
+
   function launchNewAppInstance(entry) {
     const newWindowAction = entry.actions.find(action => {
       const id = normalizeAppIdentity(action.id);
@@ -551,12 +566,7 @@ Scope {
     const runningToplevel = forceNew ? null : appToplevelFor(entry);
     hideAppLauncher();
     if (runningToplevel !== null) {
-      if (runningToplevel.address !== "") {
-        const address = runningToplevel.address.startsWith("0x")
-          ? runningToplevel.address : "0x" + runningToplevel.address;
-        Hyprland.dispatch("focuswindow address:" + address);
-      } else if (runningToplevel.wayland !== null)
-        runningToplevel.wayland.activate();
+      focusHyprlandToplevel(runningToplevel);
     } else if (forceNew) {
       launchNewAppInstance(entry);
     } else {
@@ -635,16 +645,103 @@ Scope {
       + chromeTabResults.length) % chromeTabResults.length;
   }
 
-  function runChromeTabAction(action, tabId) {
+  function chromeTabToplevelFor(tab) {
+    if (tab === null || tab === undefined)
+      return null;
+
+    const relatedTabs = [];
+    if (tab.windowId !== undefined) {
+      for (let index = 0; index < chromeTabCatalog.length; ++index) {
+        const candidate = chromeTabCatalog[index].tab;
+        if (candidate.id !== tab.id && candidate.active
+            && candidate.windowId === tab.windowId)
+          relatedTabs.push(candidate);
+      }
+    }
+    if (tab.active || relatedTabs.length === 0)
+      relatedTabs.push(tab);
+
+    const tabTitles = [];
+    const hostTokens = [];
+    for (let index = 0; index < relatedTabs.length; ++index) {
+      const relatedTab = relatedTabs[index];
+      const title = normalizeAppText(relatedTab.title || "").trim();
+      if (title !== "" && !tabTitles.includes(title))
+        tabTitles.push(title);
+
+      const url = (relatedTab.url || "").toString();
+      const hostname = url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+        .split(/[\/:?#]/)[0];
+      const tokens = hostname.split(".");
+      for (let tokenIndex = 0; tokenIndex < tokens.length; ++tokenIndex) {
+        const token = normalizeAppText(tokens[tokenIndex]).trim();
+        if (token.length >= 4
+            && !["www", "com", "org", "net", "app"].includes(token)
+            && !hostTokens.includes(token))
+          hostTokens.push(token);
+      }
+    }
+
+    let best = null;
+    let bestScore = -1;
+    const toplevels = Hyprland.toplevels.values;
+    for (let index = 0; index < toplevels.length; ++index) {
+      const toplevel = toplevels[index];
+      const ipc = toplevel.lastIpcObject ?? {};
+      const identity = normalizeAppText([
+        ipc["class"], ipc.initialClass,
+        toplevel.wayland !== null ? toplevel.wayland.appId : ""
+      ].join(" "));
+      if (!["chrome", "chromium", "brave", "vivaldi"].some(name =>
+          identity.includes(name)))
+        continue;
+
+      const windowTitles = [toplevel.title, ipc.title, ipc.initialTitle]
+        .map(title => normalizeAppText(title || "").trim())
+        .filter((title, titleIndex, titles) =>
+          title !== "" && titles.indexOf(title) === titleIndex);
+      let score = -1;
+      for (let titleIndex = 0; titleIndex < windowTitles.length; ++titleIndex) {
+        const windowTitle = windowTitles[titleIndex];
+        for (let tabIndex = 0; tabIndex < tabTitles.length; ++tabIndex) {
+          const tabTitle = tabTitles[tabIndex];
+          if (windowTitle === tabTitle)
+            score = Math.max(score, 1000 + tabTitle.length);
+          else if (windowTitle.includes(tabTitle))
+            score = Math.max(score, 900 + tabTitle.length);
+          else if (tabTitle.includes(windowTitle))
+            score = Math.max(score, 800 + windowTitle.length);
+        }
+        for (let tokenIndex = 0; tokenIndex < hostTokens.length; ++tokenIndex) {
+          if (windowTitle.includes(hostTokens[tokenIndex]))
+            score = Math.max(score, 500 + hostTokens[tokenIndex].length);
+        }
+      }
+      if (score > bestScore) {
+        best = toplevel;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  function runChromeTabAction(action, tab) {
     if (chromeTabsActionPending)
       return;
+    if (tab === null || tab === undefined || tab.id === undefined)
+      return;
     chromeTabsAction = action;
-    chromeTabsActionTabId = tabId;
+    chromeTabsActionTabId = tab.id.toString();
+    chromeTabsActionTab = tab;
+    chromeTabsActionToplevel = action === "activate"
+      ? chromeTabToplevelFor(tab) : null;
     chromeTabsMessage = "";
     if (action === "activate")
       chromeTabsActivationDelay.restart();
     else
-      chromeTabsActionProcess.exec(["quickshell-chrome-tabs", action, tabId]);
+      chromeTabsActionProcess.exec([
+        "quickshell-chrome-tabs", action, chromeTabsActionTabId
+      ]);
   }
 
   function activateSelectedChromeTab(index = chromeTabsSelectedIndex) {
@@ -652,7 +749,7 @@ Scope {
       return;
     const boundedIndex = Math.max(0, Math.min(index,
       chromeTabResults.length - 1));
-    runChromeTabAction("activate", chromeTabResults[boundedIndex].tab.id);
+    runChromeTabAction("activate", chromeTabResults[boundedIndex].tab);
   }
 
   function closeSelectedChromeTab(index = chromeTabsSelectedIndex) {
@@ -660,14 +757,18 @@ Scope {
       return;
     const boundedIndex = Math.max(0, Math.min(index,
       chromeTabResults.length - 1));
-    runChromeTabAction("close", chromeTabResults[boundedIndex].tab.id);
+    runChromeTabAction("close", chromeTabResults[boundedIndex].tab);
   }
 
   function parseChromeTabActionResponse(text) {
     const action = chromeTabsAction;
     const tabId = chromeTabsActionTabId;
+    const actionTab = chromeTabsActionTab;
+    const actionToplevel = chromeTabsActionToplevel;
     chromeTabsAction = "";
     chromeTabsActionTabId = "";
+    chromeTabsActionTab = null;
+    chromeTabsActionToplevel = null;
     try {
       const response = JSON.parse(text.trim());
       if (!response.ok) {
@@ -678,6 +779,11 @@ Scope {
       }
       if (action === "activate") {
         hideChromeTabs();
+        Qt.callLater(() => {
+          const target = actionToplevel !== null
+            ? actionToplevel : chromeTabToplevelFor(actionTab);
+          focusHyprlandToplevel(target);
+        });
       } else if (action === "close") {
         const previousIndex = chromeTabsSelectedIndex;
         chromeTabCatalog = chromeTabCatalog.filter(candidate =>

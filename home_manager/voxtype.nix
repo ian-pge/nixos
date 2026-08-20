@@ -27,7 +27,7 @@ in {
 
       whisper = {
         mode = "local";
-        language = "auto";
+        language = "fr";
         translate = false;
         gpu_isolation = true;
         context_window_optimization = false;

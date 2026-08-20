@@ -49,6 +49,10 @@
       provider = "openai-subscribed";
       model = "gpt-5.6-luna";
     };
+    inline_assistant_model = {
+      provider = "openai-subscribed";
+      model = "gpt-5.6-sol";
+    };
   };
 
   # Install Claude Agent and Codex from Zed's ACP registry.

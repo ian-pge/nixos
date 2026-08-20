@@ -47,7 +47,6 @@
         ".config/T3 Code (Alpha)"
         ".local/share/zed"
         ".local/share/systemd/timers"
-        ".local/share/t3code"
         ".t3"
         ".config/gh"
         ".ssh"

@@ -7,8 +7,8 @@
     ./home_manager.nix
     ./chezmoi.nix
     ./git.nix
+    ./direnv.nix
     ./additional_packages.nix
-    ./t3code.nix
     ./desktop_packages.nix
     # ./mime_apps.nix
     ./gh.nix

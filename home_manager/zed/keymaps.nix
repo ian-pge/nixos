@@ -4,8 +4,10 @@
     # action key. This keeps the leader available in every Zed surface.
     bindings = {
       "ctrl-space" = "workspace::ToggleZoom";
-      "ctrl-e" = "project_panel::ToggleFocus";
-      "shift-space a a" = "agent::ToggleFocus";
+      "ctrl-e" = "project_panel::Toggle";
+      # Invoke the Inline Assistant from every Zed surface that supports it.
+      "alt-tab" = "assistant::InlineAssist";
+      "shift-space a a" = "agent::Toggle";
       "shift-space a t" = "multi_workspace::FocusWorkspaceSidebar";
       "shift-space a f" = [
         "action::Sequence"
@@ -37,7 +39,7 @@
       "shift-space f space" = "file_finder::Toggle";
       "shift-space f /" = "text_finder::Toggle";
       # Git workflow: Shift+Space, then G, then the action key.
-      "shift-space g g" = "git_panel::ToggleFocus";
+      "shift-space g g" = "git_panel::Toggle";
       "shift-space g s" = "git::StageAll";
       "shift-space g p" = "git::Push";
       "shift-space g c" = [
@@ -51,7 +53,7 @@
         ]
       ];
       "shift-space g m" = "git::GenerateCommitMessage";
-      "ctrl-enter" = "terminal_panel::ToggleFocus";
+      "ctrl-enter" = "terminal_panel::Toggle";
       "shift-escape" = null;
     };
   }
@@ -61,7 +63,7 @@
     # leaving the more specific commit-editor contexts below untouched.
     context = "GitPanel";
     bindings = {
-      "ctrl-enter" = "terminal_panel::ToggleFocus";
+      "ctrl-enter" = "terminal_panel::Toggle";
     };
   }
   {
@@ -207,6 +209,9 @@
   {
     context = "ThreadsSidebar";
     bindings = {
+      # From elsewhere the global binding opens or focuses this sidebar;
+      # once focused, the same shortcut hides it.
+      "shift-space a t" = "multi_workspace::CloseWorkspaceSidebar";
       # Native context-sensitive action: archive an agent thread or close
       # a terminal thread, depending on the selected sidebar entry.
       "ctrl-w" = "agent::ArchiveSelectedThread";
