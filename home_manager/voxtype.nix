@@ -20,7 +20,10 @@ in {
 
       hotkey.enabled = false;
 
-      audio.feedback.enabled = false;
+      audio = {
+        pause_media = true;
+        feedback.enabled = false;
+      };
 
       # The desktop bar already renders the recording/transcription state.
       osd.enabled = false;
@@ -30,6 +33,7 @@ in {
         language = "fr";
         translate = false;
         gpu_isolation = true;
+        flash_attention = true;
         context_window_optimization = false;
       };
 
@@ -40,6 +44,7 @@ in {
           "clipboard"
         ];
         append_text = " ";
+        shift_enter_newlines = true;
 
         notification = {
           on_recording_start = false;
