@@ -1,11 +1,9 @@
 {
   pkgs,
-  config,
   inputs,
   ...
 }: {
   home.packages = with pkgs; [
-    clang-tools
     package-version-server
     nil
     nixd
@@ -21,6 +19,7 @@
     rapidraw
     vscode
     pavucontrol
+    devbox
     devpod
     devcontainer
     t3code
@@ -57,16 +56,13 @@
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli
-    nodejs_latest
     (symlinkJoin {
       name = "pi";
       paths = [inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi];
       nativeBuildInputs = [makeWrapper];
       postBuild = ''
         wrapProgram $out/bin/pi \
-          --set NPM_CONFIG_PREFIX ${config.home.homeDirectory}/.pi/agent/npm \
-          --set NPM_CONFIG_CACHE ${config.home.homeDirectory}/.cache/pi/npm \
-          --prefix PATH : ${lib.makeBinPath [nodejs_latest git]}
+          --prefix PATH : ${lib.makeBinPath [nodejs_latest]}
       '';
     })
     runpodctl

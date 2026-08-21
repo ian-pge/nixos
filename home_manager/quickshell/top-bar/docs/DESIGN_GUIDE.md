@@ -248,7 +248,7 @@ La version actuelle utilise un unique `ShaderEffect` et `shaders/activity-border
 
 - shader Qt 6 compilé en `.qsb` par `quickshell.nix` avec `qtshadertools` ;
 - rectangle arrondi de rayon extérieur `18px` ;
-- anneau intérieur de `2px` calculé par signed-distance field ;
+- anneau intérieur de `3px` calculé par signed-distance field ;
 - position exacte sur le périmètre calculée avec les longueurs des quatre segments et des quatre quarts de cercle ;
 - traînée couvrant `50 %` du périmètre ;
 - couleur de tête `#ff33cc` ;

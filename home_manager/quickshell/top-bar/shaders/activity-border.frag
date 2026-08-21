@@ -12,7 +12,7 @@ layout(std140, binding = 0) uniform buf {
 
 const float PI = 3.14159265358979323846;
 const float OUTER_RADIUS = 18.0;
-const float BORDER_WIDTH = 2.0;
+const float BORDER_WIDTH = 3.0;
 const float TRAIL_LENGTH = 0.5;
 const vec3 TRAIL_COLOR = vec3(1.0, 0.2, 0.8);
 
