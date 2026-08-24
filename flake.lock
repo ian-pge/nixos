@@ -135,11 +135,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787176219,
-        "narHash": "sha256-djoRr6jBpe35q/0JwAvXpFXg1Ktf+X54NU2RLR7wnHw=",
+        "lastModified": 1787487906,
+        "narHash": "sha256-zIdM+8teujHm5hc5MIPDnV7k2UeOOT/pFyFtWjOCwsY=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "c53d643b3737e2fcd04e6cb3b3580ef50b2087a0",
+        "rev": "cfba7ad5886b342b8dd63ba74354b3853ea4cfc9",
         "type": "github"
       },
       "original": {
@@ -199,11 +199,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1787205996,
-        "narHash": "sha256-P1/6bZ4SHjdAZ+TorVtceqI1cv6jwGeumfDwrdqjj3Q=",
+        "lastModified": 1787508742,
+        "narHash": "sha256-2AnKVZNgXcpcYV1rK9h9DILL6uzJ7PlKYdAs0FtrUS0=",
         "owner": "numtide",
         "repo": "llm-agents.nix",
-        "rev": "20766586959e0dcc2f9e7cff6d49b0c710de30d6",
+        "rev": "aa8a6076962029a05e40abc3742c000877027c60",
         "type": "github"
       },
       "original": {
@@ -246,11 +246,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1787135253,
-        "narHash": "sha256-RD2kNWCG+Bjo6h+JVjWVNntZs2GtRoeY2xHjts/FNkA=",
+        "lastModified": 1787360063,
+        "narHash": "sha256-dt4WdcvsA8/RCe+VZZwqU0X+XMM3wBbGCWA0/sFWzGo=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "ffb3c9b700e759be2ef13237c9d8f953b32a1e46",
+        "rev": "2c423e03bbafcff28bfadc6781a4a8257f205cb5",
         "type": "github"
       },
       "original": {
@@ -350,11 +350,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787024251,
-        "narHash": "sha256-DTqQzssIoII3CYIC6ASvOYS9gGmFKdvoQiRLBIKvglE=",
+        "lastModified": 1787374737,
+        "narHash": "sha256-MQUYGKxZFuhsxgIWRibC3D6YArOx/rIDJZAsh75ZxWo=",
         "owner": "peteonrails",
         "repo": "voxtype",
-        "rev": "10fb536ea8621f3cd197da6dcdffa54607277144",
+        "rev": "69221e30e2ebbf3b70fa49ce74cfb45a74bc4325",
         "type": "github"
       },
       "original": {
@@ -370,11 +370,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785518365,
-        "narHash": "sha256-fc4GhaEOFLmvasDubkHKKUJD8S/qEgI94HpnCGMKpkA=",
+        "lastModified": 1787245917,
+        "narHash": "sha256-ecjh4pYRLb0Ic/gWmfvEakzeQXhTfBe+zCFtqCsGeKw=",
         "owner": "aashish-thapa",
         "repo": "wlctl",
-        "rev": "439f3c288021707695410405abaf3f45dce48cc5",
+        "rev": "d08033112918388fab1c44ac54fcf5b53cfcc504",
         "type": "github"
       },
       "original": {

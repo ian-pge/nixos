@@ -6,7 +6,6 @@
   home.packages = with pkgs; [
     package-version-server
     nil
-    nixd
     nixpkgs-fmt
     alejandra
     texlive.combined.scheme-full
@@ -24,9 +23,15 @@
     devcontainer
     t3code
     orca-slicer
-    # (bambu-studio.override {
-    # withNvidiaGLWorkaround = true;
-    # })
+    ((bambu-studio.override {
+        withNvidiaGLWorkaround = true;
+      }).overrideAttrs (old: {
+        env =
+          (old.env or {})
+          // {
+            NIX_BUILD_CORES = "12";
+          };
+      }))
     herdr
     kalker
     google-chrome

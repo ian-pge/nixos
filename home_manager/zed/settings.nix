@@ -138,6 +138,13 @@
 
   languages = {
     Nix = {
+      # Keep one primary Nix LSP to avoid duplicate diagnostics and
+      # completions while retaining package-version-server metadata.
+      language_servers = [
+        "nil"
+        "package-version-server"
+        "!nixd"
+      ];
       format_on_save = "on";
       formatter = "language_server";
     };
@@ -171,6 +178,12 @@
   git_panel = {
     dock = "right";
     file_icons = true;
+  };
+
+  # Keep the complete agent-branch diff visible, including committed changes,
+  # until the branch is integrated into the repository's default branch.
+  git = {
+    diff_base = "default_branch";
   };
 
   outline_panel = {
