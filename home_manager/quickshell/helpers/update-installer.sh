@@ -8,6 +8,7 @@ lock_file="$cache_dir/updates.lock"
 result_link="$cache_dir/update-result"
 candidate_lock="$cache_dir/update-candidate.lock"
 candidate_meta="$cache_dir/update-candidate.json"
+pending_reboot="$cache_dir/pending-reboot.json"
 backup_dir=""
 had_lockfile=false
 rollback_pending=false
@@ -144,16 +145,16 @@ if ! changes_json="$(quickshell-update-diff /run/current-system "$result_path")"
   fail_update "The build succeeded, but its package changes could not be summarized."
 fi
 
-emit_changes_event "awaitingActivation" "Package changes" "$changes_json"
+emit_changes_event "awaitingInstall" "Package changes" "$changes_json"
 
 action=""
-while [[ "$action" != "activate" ]]; do
+while [[ "$action" != "install" ]]; do
   if ! IFS= read -r action; then
-    fail_update "The update console closed before activation."
+    fail_update "The update console closed before boot installation."
   fi
 done
 
-emit_event "activating" "Waiting for authorization"
+emit_event "installing" "Waiting for authorization"
 printf '\n🔐 Requesting authorization...\n\n'
 activator_path="${QS_UPDATE_ACTIVATOR:-}"
 if [[ "$activator_path" != /nix/store/* \
@@ -166,17 +167,25 @@ if [[ "$elevator_path" != /nix/store/*/bin/run0 \
   fail_update "The systemd authorization helper is unavailable."
 fi
 if ! "$elevator_path" --pipe "$activator_path" "$result_path"; then
-  fail_update "System activation failed. The previous lockfile was restored."
+  fail_update "Boot generation installation failed. The previous lockfile was restored."
 fi
 
 rollback_pending=false
 clear_candidate
+temporary="$(mktemp "$cache_dir/pending-reboot.XXXXXX")"
+jq -cn --arg targetSystem "$result_path" \
+  '{version: 1, targetSystem: $targetSystem, createdAt: (now | floor)}' \
+  >"$temporary"
+mv "$temporary" "$pending_reboot"
+
 temporary="$(mktemp "$cache_dir/updates.XXXXXX")"
-jq -cn '{state: "ok", hasUpdates: false, message: "Just updated",
-  updates: [], checkedAt: (now | floor)}' >"$temporary"
+jq -cn --arg targetSystem "$result_path" \
+  '{state: "reboot-required", hasUpdates: false,
+    message: "Update ready — reboot required", updates: [],
+    targetSystem: $targetSystem, checkedAt: (now | floor)}' >"$temporary"
 mv "$temporary" "$cache_file"
 
 qs --config top-bar ipc call topbar refreshNix || true
 
-printf '\n✅ NixOS update and activation complete.\n'
-emit_event "success" "NixOS is up to date"
+printf '\n✅ NixOS update installed. Reboot to use the new generation.\n'
+emit_event "success" "Update ready — reboot required"

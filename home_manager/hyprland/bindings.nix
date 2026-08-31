@@ -163,7 +163,10 @@ in {
     ++ workspaceBinds
     ++ specialWorkspaceBinds
     ++ [
-      (mkBind (mainKey "ESCAPE") (mkExec "hyprlock") {})
+      (mkBind
+        (mainKey "ESCAPE")
+        (mkExec "${pkgs.procps}/bin/pidof hyprlock || ${pkgs.hyprlock}/bin/hyprlock")
+        {})
       (mkBind (mainKey "mouse:272") "hl.dsp.window.drag()" {mouse = true;})
       (mkBind (mainKey "mouse:273") "hl.dsp.window.resize()" {mouse = true;})
     ]

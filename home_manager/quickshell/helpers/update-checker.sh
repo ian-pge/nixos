@@ -6,6 +6,10 @@ cache_file="$cache_dir/updates.json"
 lock_file="$cache_dir/updates.lock"
 candidate_lock="$cache_dir/update-candidate.lock"
 candidate_meta="$cache_dir/update-candidate.json"
+pending_reboot="$cache_dir/pending-reboot.json"
+current_system_link="${QS_CURRENT_SYSTEM_LINK:-/run/current-system}"
+system_profile="${QS_SYSTEM_PROFILE:-/nix/var/nix/profiles/system}"
+store_dir="${QS_STORE_DIR:-/nix/store}"
 max_age=1800
 
 mkdir -p "$cache_dir"
@@ -43,17 +47,55 @@ write_status() {
   local updates_json=$1
   local message=$2
   local state=${3:-ok}
-  local temporary
+  local temporary source_hash=""
+  if [[ -f "$flake_dir/flake.nix" ]]; then
+    source_hash="$(flake_state_hash)"
+  fi
   temporary=$(mktemp "$cache_dir/updates.XXXXXX")
 
   jq -cn \
     --argjson updates "$updates_json" \
     --arg message "$message" \
     --arg state "$state" \
+    --arg sourceHash "$source_hash" \
     '{state: $state, hasUpdates: ($updates | length > 0),
-      message: $message, updates: $updates, checkedAt: (now | floor)}' \
+      message: $message, updates: $updates,
+      sourceHash: (if $sourceHash == "" then null else $sourceHash end),
+      checkedAt: (now | floor)}' \
     >"$temporary"
   mv "$temporary" "$cache_file"
+}
+
+pending_reboot_status() {
+  [[ -f "$pending_reboot" ]] || return 1
+  if ! jq -e --arg storePrefix "$store_dir/" '
+      .version == 1
+      and (.targetSystem | type == "string")
+      and (.targetSystem | startswith($storePrefix))
+    ' "$pending_reboot" >/dev/null 2>&1; then
+    rm -f "$pending_reboot"
+    return 1
+  fi
+
+  local target_system current_system profile_system
+  target_system="$(jq -r '.targetSystem' "$pending_reboot")"
+  current_system="$(readlink -f "$current_system_link" 2>/dev/null || true)"
+  profile_system="$(readlink -f "$system_profile" 2>/dev/null || true)"
+
+  if [[ "$current_system" == "$target_system" ]]; then
+    rm -f "$pending_reboot"
+    return 1
+  fi
+  if [[ "$profile_system" != "$target_system" ]]; then
+    rm -f "$pending_reboot"
+    return 1
+  fi
+
+  jq -cn --arg targetSystem "$target_system" \
+    '{state: "reboot-required", hasUpdates: false,
+      message: "Update ready — reboot required", updates: [],
+      targetSystem: $targetSystem, checkedAt: null}'
+  return 0
 }
 
 check_updates() (
@@ -150,11 +192,16 @@ check_updates() (
 
 cache_is_fresh() {
   [[ -f "$cache_file" ]] || return 1
+  [[ -f "$flake_dir/flake.nix" ]] || return 1
   jq -e '
     (.state // "ok") == "ok"
     and (.updates | type == "array")
+    and (.sourceHash | type == "string")
     and (.checkedAt == null or (.checkedAt | type == "number"))
   ' "$cache_file" >/dev/null || return 1
+
+  [[ "$(jq -r '.sourceHash' "$cache_file")" == "$(flake_state_hash)" ]] \
+    || return 1
 
   local current_time file_time
   current_time=$(date +%s)
@@ -163,6 +210,10 @@ cache_is_fresh() {
 }
 
 exec 9>"$lock_file"
+
+if pending_reboot_status; then
+  exit 0
+fi
 
 if [[ "${1:-}" == "force" ]]; then
   flock 9

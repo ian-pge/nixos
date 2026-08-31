@@ -142,7 +142,8 @@ PanelWindow {
       accent: Theme.sideUpdates
       forceHovered: window.updateSelectorActive || statusData.nixUpdateBusy
         || statusData.nixChecking
-        || statusData.nixUpdatePhase === "awaitingActivation"
+        || statusData.nixRebootRequired
+        || statusData.nixUpdatePhase === "awaitingInstall"
       tooltipText: statusData.displayedNixTooltip
       tooltipHost: window
       interactive: true

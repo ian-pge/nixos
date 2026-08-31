@@ -2,25 +2,23 @@
   lib,
   pkgs,
   ...
-}: {
+}: let
+  userSession = pkgs.writeShellApplication {
+    name = "greetd-uwsm-session";
+    text = ''
+      exec ${lib.getExe pkgs.uwsm} start -e -D Hyprland -- \
+        hyprland.desktop -- --locked-cmd "${lib.getExe pkgs.hyprlock} --config /home/ian/.config/hypr/hyprlock-boot.conf --immediate-render"
+    '';
+  };
+in {
   services.greetd = {
-    enable = true; # start greetd daemon
+    enable = true;
     settings = {
+      # Use the same fail-closed path at boot and after every logout: greetd
+      # starts a fresh desktop whose first visible client is Hyprlock.
       default_session = {
-        # tuigreet binary from nixpkgs
-        command = lib.concatStringsSep " " [
-          "${pkgs.tuigreet}/bin/tuigreet"
-          "--remember"
-          "--width"
-          "40"
-          "--time"
-          "--asterisks"
-          "--theme"
-          "'border=magenta;prompt=yellow;time=cyan;container=black;input=green'"
-          "--cmd"
-          "'uwsm start hyprland-uwsm.desktop'"
-        ];
-        user = "greeter"; # unprivileged greeter user
+        command = lib.getExe userSession;
+        user = "ian";
       };
     };
   };

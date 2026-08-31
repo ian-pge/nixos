@@ -1,11 +1,11 @@
-{
+{pkgs, ...}: {
   ## hypridle itself
   services.hypridle = {
     enable = true; # systemd-user unit :contentReference[oaicite:1]{index=1}
 
     settings = {
       general = {
-        lock_cmd = "pidof hyprlock || hyprlock";
+        lock_cmd = "${pkgs.procps}/bin/pidof hyprlock || ${pkgs.hyprlock}/bin/hyprlock";
         before_sleep_cmd = "loginctl lock-session";
         after_sleep_cmd = "hyprctl dispatch dpms on";
       };

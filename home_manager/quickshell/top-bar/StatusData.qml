@@ -34,6 +34,7 @@ Scope {
   property var nixUpdates: []
   property bool nixChecking: true
   property bool nixCheckFailed: false
+  property bool nixRebootRequired: false
   property string nixUpdatePhase: "idle"
   property string nixUpdateMessage: ""
   property string nixOperation: "update"
@@ -43,8 +44,8 @@ Scope {
   property bool nixUpdateAwaitingPolkit: false
   readonly property bool nixUpdateBusy: nixUpdatePhase === "updating"
     || nixUpdatePhase === "building" || nixUpdatePhase === "preparingAuth"
-    || nixUpdatePhase === "activating" || nixUpdatePhase === "cleaning"
-  readonly property string displayedNixIcon: nixUpdatePhase === "awaitingActivation" ? "󰌾"
+    || nixUpdatePhase === "installing" || nixUpdatePhase === "cleaning"
+  readonly property string displayedNixIcon: nixUpdatePhase === "awaitingInstall" ? "󰌾"
     : nixUpdatePhase === "error" ? "" : nixIcon
   readonly property string displayedNixTooltip: nixUpdatePhase !== "idle"
     ? (nixUpdateMessage || "NixOS update") : nixTooltip
@@ -1714,6 +1715,8 @@ Scope {
       }
       if (nixUpdatePhase === "success") {
         nixUpdateAwaitingPolkit = false;
+        if (nixOperation === "update")
+          nixRebootRequired = true;
         refreshNixStatus();
       } else if (nixUpdatePhase === "error") {
         nixUpdateAwaitingPolkit = false;
@@ -1725,7 +1728,7 @@ Scope {
 
   function startNixUpdate() {
     if (nixUpdateProcess.running || nixCleanProcess.running
-        || nixChecking || nixUpdates.length === 0)
+        || nixChecking || nixRebootRequired || nixUpdates.length === 0)
       return;
     nixOperation = "update";
     nixUpdateChanges = [];
@@ -1752,14 +1755,14 @@ Scope {
     nixCleanProcess.exec(["quickshell-nix-cleaner"]);
   }
 
-  function activateNixUpdate() {
+  function installNixUpdate() {
     if (!nixUpdateProcess.running
-        || nixUpdatePhase !== "awaitingActivation")
+        || nixUpdatePhase !== "awaitingInstall")
       return;
     nixUpdatePhase = "preparingAuth";
     nixUpdateMessage = "Preparing authentication";
     nixUpdateAwaitingPolkit = true;
-    nixUpdateProcess.write("activate\n");
+    nixUpdateProcess.write("install\n");
   }
 
   function handleNixUpdateEnter() {
@@ -1772,8 +1775,8 @@ Scope {
         startNixUpdate();
       else
         hideUpdateSelector();
-    } else if (nixUpdatePhase === "awaitingActivation") {
-      activateNixUpdate();
+    } else if (nixUpdatePhase === "awaitingInstall") {
+      installNixUpdate();
     } else if (nixUpdatePhase === "success") {
       nixUpdatePhase = "idle";
       nixUpdateMessage = "";
@@ -1859,15 +1862,20 @@ Scope {
       const status = JSON.parse(text.trim());
       if (Array.isArray(status.updates)) {
         root.nixCheckFailed = status.state === "error";
+        root.nixRebootRequired = status.state === "reboot-required";
         root.nixUpdates = status.updates;
         root.nixIcon = root.nixCheckFailed ? ""
+          : root.nixRebootRequired ? "󰜉"
           : status.hasUpdates ? "" : "";
-        root.nixTooltip = status.hasUpdates
+        root.nixTooltip = root.nixRebootRequired
+          ? status.message || "Update ready — reboot required"
+          : status.hasUpdates
           ? status.updates.map(update => update.name + ": " + update.date).join("\n")
           : status.message || "System is up to date";
       } else {
         // Compatibility with the preserved Waybar helper cache format.
         root.nixCheckFailed = false;
+        root.nixRebootRequired = false;
         root.nixIcon = status.alt === "has-updates" ? "" : "";
         root.nixTooltip = status.tooltip || "System is up to date";
         const lines = status.alt === "has-updates"
@@ -1881,6 +1889,7 @@ Scope {
       }
     } catch (error) {
       root.nixCheckFailed = true;
+      root.nixRebootRequired = false;
       root.nixIcon = "";
       root.nixUpdates = [];
       root.nixTooltip = "Unable to check for updates";

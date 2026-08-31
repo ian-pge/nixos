@@ -12,7 +12,6 @@
       "/var/lib/tailscale"
       "/var/lib/NetworkManager"
       "/var/lib/flatpak"
-      "/var/cache/tuigreet"
       "/etc/NetworkManager/system-connections"
       {
         directory = "/var/lib/colord";

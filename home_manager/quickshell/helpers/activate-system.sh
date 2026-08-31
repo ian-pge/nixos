@@ -37,10 +37,27 @@ if [[ "$(stat -c %u -- "$system_path")" -ne 0 ]]; then
   exit 1
 fi
 
-# Match nixos-rebuild's native switch sequence while keeping the whole
-# privileged operation behind one direct run0 call: register the generation
-# first, then activate it. Calling `test` followed by `boot` is not equivalent
-# to `switch` and can leave runtime wrappers pointing at a temporary directory.
+# Register the generation and make it the boot default without changing the
+# running session.  In particular, do not use `switch` here: Home Manager can
+# restart Quickshell during a live activation and kill the update process that
+# is coordinating this privileged helper.
 export NIXOS_INSTALL_BOOTLOADER=0
-nix-env -p /nix/var/nix/profiles/system --set "$system_path"
-"$switch_script" switch
+system_profile=/nix/var/nix/profiles/system
+previous_system="$(readlink -f -- "$system_profile" 2>/dev/null || true)"
+
+nix-env -p "$system_profile" --set "$system_path"
+if "$switch_script" boot; then
+  exit 0
+else
+  activation_status=$?
+fi
+
+printf 'failed to install the new boot generation; restoring the previous profile\n' >&2
+
+if [[ "$previous_system" == /nix/store/*-nixos-system-* \
+    && -x "$previous_system/bin/switch-to-configuration" ]]; then
+  nix-env -p "$system_profile" --set "$previous_system" || true
+  "$previous_system/bin/switch-to-configuration" boot || true
+fi
+
+exit "$activation_status"

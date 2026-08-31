@@ -40,12 +40,24 @@ export NIXOS_FLAKE_DIR="$flake_dir"
 export XDG_CACHE_HOME="$cache_home"
 export FAKE_NIX_COUNT="$test_root/nix-count"
 export FAKE_NEW_LOCK="$test_root/new.lock"
+export QS_CURRENT_SYSTEM_LINK="$test_root/current-system"
+export QS_SYSTEM_PROFILE="$test_root/system-profile"
+export QS_STORE_DIR="$test_root/store"
 export PATH="$fake_bin:$PATH"
 
 bash "$helpers_dir/update-checker.sh" force >/dev/null
 [[ "$(cat "$FAKE_NIX_COUNT")" == 1 ]]
 [[ -f "$cache_home/quickshell/top-bar/update-candidate.lock" ]]
 [[ -f "$cache_home/quickshell/top-bar/update-candidate.json" ]]
+[[ "$(jq -r '.sourceHash | type' \
+  "$cache_home/quickshell/top-bar/updates.json")" == string ]]
+
+bash "$helpers_dir/update-checker.sh" >/dev/null
+[[ "$(cat "$FAKE_NIX_COUNT")" == 1 ]]
+
+printf '\n# changed after checking\n' >>"$flake_dir/flake.nix"
+bash "$helpers_dir/update-checker.sh" >/dev/null
+[[ "$(cat "$FAKE_NIX_COUNT")" == 2 ]]
 
 installer_output="$test_root/installer-output"
 if bash "$helpers_dir/update-installer.sh" >"$installer_output"; then
@@ -54,10 +66,10 @@ if bash "$helpers_dir/update-installer.sh" >"$installer_output"; then
 fi
 grep -Fq 'Reusing the lockfile already checked by the update widget.' \
   "$installer_output"
-[[ "$(cat "$FAKE_NIX_COUNT")" == 1 ]]
+[[ "$(cat "$FAKE_NIX_COUNT")" == 2 ]]
 [[ "$(jq -r '.nodes.nixpkgs.locked.rev' "$flake_dir/flake.lock")" == old ]]
 
-printf '\n# changed after checking\n' >>"$flake_dir/flake.nix"
+printf '\n# changed again after checking\n' >>"$flake_dir/flake.nix"
 if bash "$helpers_dir/update-installer.sh" >"$installer_output"; then
   printf 'installer unexpectedly succeeded with the failing fake nh\n' >&2
   exit 1
@@ -67,9 +79,26 @@ if grep -Fq 'Reusing the lockfile already checked by the update widget.' \
   printf 'installer reused a stale candidate lock\n' >&2
   exit 1
 fi
-[[ "$(cat "$FAKE_NIX_COUNT")" == 2 ]]
+[[ "$(cat "$FAKE_NIX_COUNT")" == 3 ]]
 [[ ! -e "$cache_home/quickshell/top-bar/update-candidate.lock" ]]
 [[ ! -e "$cache_home/quickshell/top-bar/update-candidate.json" ]]
 [[ "$(jq -r '.nodes.nixpkgs.locked.rev' "$flake_dir/flake.lock")" == old ]]
+
+mkdir -p "$QS_STORE_DIR/current" "$QS_STORE_DIR/target"
+ln -s "$QS_STORE_DIR/current" "$QS_CURRENT_SYSTEM_LINK"
+ln -s "$QS_STORE_DIR/target" "$QS_SYSTEM_PROFILE"
+jq -cn --arg targetSystem "$QS_STORE_DIR/target" \
+  '{version: 1, targetSystem: $targetSystem, createdAt: 1}' \
+  >"$cache_home/quickshell/top-bar/pending-reboot.json"
+
+status="$(bash "$helpers_dir/update-checker.sh" force)"
+[[ "$(jq -r '.state' <<<"$status")" == reboot-required ]]
+[[ "$(cat "$FAKE_NIX_COUNT")" == 3 ]]
+
+rm "$QS_CURRENT_SYSTEM_LINK"
+ln -s "$QS_STORE_DIR/target" "$QS_CURRENT_SYSTEM_LINK"
+bash "$helpers_dir/update-checker.sh" force >/dev/null
+[[ ! -e "$cache_home/quickshell/top-bar/pending-reboot.json" ]]
+[[ "$(cat "$FAKE_NIX_COUNT")" == 4 ]]
 
 printf 'update cache integration tests passed\n'

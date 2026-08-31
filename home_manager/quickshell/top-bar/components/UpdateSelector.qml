@@ -25,19 +25,22 @@ FocusScope {
   readonly property string phaseLabel: {
     if (statusData.nixUpdatePhase === "updating") return "UPDATING";
     if (statusData.nixUpdatePhase === "building") return "BUILDING";
-    if (statusData.nixUpdatePhase === "awaitingActivation") return "READY";
+    if (statusData.nixUpdatePhase === "awaitingInstall") return "READY";
     if (statusData.nixUpdatePhase === "preparingAuth") return "AUTH";
-    if (statusData.nixUpdatePhase === "activating") return "ACTIVATING";
+    if (statusData.nixUpdatePhase === "installing") return "INSTALLING";
     if (statusData.nixUpdatePhase === "cleaning") return "CLEANING";
-    if (statusData.nixUpdatePhase === "success") return "COMPLETE";
+    if (statusData.nixUpdatePhase === "success")
+      return statusData.nixOperation === "clean" ? "COMPLETE" : "REBOOT";
     if (statusData.nixUpdatePhase === "error") return "ERROR";
     return "UPDATE";
   }
   readonly property string listTitleText: statusData.nixChecking
     ? "Checking for updates…"
-    : statusData.nixCheckFailed ? "Update check failed" : "NixOS updates"
+    : statusData.nixCheckFailed ? "Update check failed"
+    : statusData.nixRebootRequired ? "Update ready" : "NixOS updates"
   readonly property string listStatusText: statusData.nixChecking ? "CHECKING"
     : statusData.nixCheckFailed ? "ERROR"
+      : statusData.nixRebootRequired ? "REBOOT"
       : updates.length > 0 ? updates.length + " AVAILABLE" : "UP TO DATE"
   readonly property string progressTitleText:
     statusData.nixUpdateMessage || "NixOS update"
@@ -45,9 +48,10 @@ FocusScope {
     statusData.nixUpdateChanges.length + " CHANGES"
   readonly property string completionTitleText:
     cleaningMode || statusData.nixOperation === "clean"
-      ? statusData.nixUpdateMessage : "Update complete"
+      ? statusData.nixUpdateMessage
+      : statusData.nixUpdateMessage || "Update ready — reboot required"
   readonly property string completionStatusText: cleaningMode ? "CLEANING"
-    : statusData.nixOperation === "clean" ? "CLEANED" : "COMPLETE"
+    : statusData.nixOperation === "clean" ? "CLEANED" : "REBOOT"
   readonly property string authLabelText:
     statusData.polkitSupplementaryMessage !== ""
       ? statusData.polkitSupplementaryMessage : statusData.polkitPrompt
@@ -182,9 +186,10 @@ FocusScope {
   }
 
   function changesTitle() {
-    if (statusData.nixUpdatePhase === "success") return "Update complete";
-    if (statusData.nixUpdatePhase === "activating") return "Activating system";
-    if (statusData.nixUpdatePhase === "error") return "Activation failed";
+    if (statusData.nixUpdatePhase === "success") return "Update ready";
+    if (statusData.nixUpdatePhase === "installing")
+      return "Installing boot generation";
+    if (statusData.nixUpdatePhase === "error") return "Installation failed";
     return "Package changes";
   }
 
@@ -275,6 +280,7 @@ FocusScope {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         text: statusData.nixCheckFailed ? ""
+          : statusData.nixRebootRequired ? "󰜉"
           : updates.length > 0 ? "" : ""
         color: statusData.nixCheckFailed ? Theme.error : Theme.sideUpdates
         font.family: "Ubuntu Nerd Font"
@@ -458,7 +464,7 @@ FocusScope {
       height: 20
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
-      text: statusData.nixUpdatePhase === "activating"
+      text: statusData.nixUpdatePhase === "installing"
         ? statusData.brailleFrame
         : statusData.nixUpdatePhase === "success" ? ""
         : statusData.nixUpdatePhase === "error" ? ""
