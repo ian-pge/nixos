@@ -10,6 +10,7 @@
     ./direnv.nix
     ./additional_packages.nix
     ./desktop_packages.nix
+    ./beeper
     # ./mime_apps.nix
     ./gh.nix
     ./zed

@@ -1,15 +1,14 @@
 [
   {
-    # Global Agent workspace shortcuts: Shift+Space, then A, then the
-    # action key. This keeps the leader available in every Zed surface.
+    # Reserve Ctrl+A/F/G as global leaders.
     bindings = {
       "ctrl-space" = "workspace::ToggleZoom";
       "ctrl-e" = "project_panel::Toggle";
       # Invoke the Inline Assistant from every Zed surface that supports it.
       "alt-tab" = "assistant::InlineAssist";
-      "shift-space a a" = "agent::Toggle";
-      "shift-space a t" = "multi_workspace::FocusWorkspaceSidebar";
-      "shift-space a f" = [
+      "ctrl-a a" = "agent::Toggle";
+      "ctrl-t" = "multi_workspace::ToggleWorkspaceSidebar";
+      "ctrl-a f" = [
         "action::Sequence"
         [
           "workspace::FocusCenterPane"
@@ -19,30 +18,30 @@
           ]
         ]
       ];
-      "shift-space a w" = [
+      "ctrl-a w" = [
         "git::CreateWorktree"
         {
           worktree_name = null;
           branch_target.kind = "current_branch";
         }
       ];
-      "shift-space a c" = [
+      "ctrl-a c" = [
         "agent::NewExternalAgentThread"
         {agent = "claude-acp";}
       ];
-      "shift-space a x" = [
+      "ctrl-a x" = [
         "agent::NewExternalAgentThread"
         {agent = "codex-acp";}
       ];
-      "shift-space a enter" = "agent::NewTerminalThread";
-      # Fuzzy finders: Shift+Space, F, then Space or Slash.
-      "shift-space f space" = "file_finder::Toggle";
-      "shift-space f /" = "text_finder::Toggle";
-      # Git workflow: Shift+Space, then G, then the action key.
-      "shift-space g g" = "git_panel::Toggle";
-      "shift-space g s" = "git::StageAll";
-      "shift-space g p" = "git::Push";
-      "shift-space g c" = [
+      "ctrl-a enter" = "agent::NewTerminalThread";
+      # Fuzzy finders: Ctrl+F, then Space or Slash.
+      "ctrl-f space" = "file_finder::Toggle";
+      "ctrl-f /" = "text_finder::Toggle";
+      # Git workflow: Ctrl+G, then the action key.
+      "ctrl-g g" = "git_panel::Toggle";
+      "ctrl-g s" = "git::StageAll";
+      "ctrl-g p" = "git::Push";
+      "ctrl-g c" = [
         "action::Sequence"
         [
           "git::ExpandCommitEditor"
@@ -52,9 +51,46 @@
           ]
         ]
       ];
-      "shift-space g m" = "git::GenerateCommitMessage";
+      "ctrl-g m" = "git::GenerateCommitMessage";
       "ctrl-enter" = "terminal_panel::Toggle";
       "shift-escape" = null;
+    };
+  }
+  # Remove every native single-key action attached to the three leaders.
+  # Unlike a null binding, `unbind` leaves longer key sequences functional.
+  {
+    unbind = {
+      "ctrl-a" = "editor::SelectAll";
+      "ctrl-f" = "buffer_search::Deploy";
+      "ctrl-g" = "go_to_line::Toggle";
+      "ctrl-t" = "project_symbols::Toggle";
+    };
+  }
+  {
+    unbind = {
+      "ctrl-a" = "vim::Increment";
+      "ctrl-f" = "vim::PageDown";
+      "ctrl-g" = "vim::ShowLocation";
+      "ctrl-t" = "pane::GoToOlderTag";
+    };
+  }
+  {
+    unbind = {
+      "ctrl-f" = "agent::ToggleSearch";
+      "ctrl-g" = "agents_sidebar::ToggleThreadHistory";
+      "ctrl-t" = "debugger::ToggleThreadPicker";
+    };
+  }
+  {
+    unbind = {
+      "ctrl-f" = "search::FocusSearch";
+      "ctrl-t" = "keymap_editor::ShowMatchingKeybinds";
+    };
+  }
+  {
+    unbind = {
+      "ctrl-f" = "agents_sidebar::FocusSidebarFilter";
+      "ctrl-t" = "vim::Indent";
     };
   }
   {
@@ -209,9 +245,6 @@
   {
     context = "ThreadsSidebar";
     bindings = {
-      # From elsewhere the global binding opens or focuses this sidebar;
-      # once focused, the same shortcut hides it.
-      "shift-space a t" = "multi_workspace::CloseWorkspaceSidebar";
       # Native context-sensitive action: archive an agent thread or close
       # a terminal thread, depending on the selected sidebar entry.
       "ctrl-w" = "agent::ArchiveSelectedThread";

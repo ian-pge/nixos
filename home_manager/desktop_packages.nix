@@ -4,6 +4,7 @@
     hyprshot
     bluetui
     # gazelle-tui
+    beeper
     vlc
     nvtopPackages.full
     adwaita-icon-theme

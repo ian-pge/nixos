@@ -85,6 +85,7 @@
         ".config/gcloud"
         ".config/Antigravity"
         ".config/discord"
+        ".config/BeeperTexts"
         ".antigravity"
         ".gemini"
         ".claude"

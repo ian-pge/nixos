@@ -13,6 +13,10 @@
   };
 in {
   window_rule = [
+    {
+      match.class = "^(Beeper)$";
+      workspace = "special:Chat";
+    }
     (pwaWindowRule "Chat" pwaAppIds.whatsapp)
     (pwaWindowRule "Chat" pwaAppIds.mattermost)
     (pwaWindowRule "Chat" pwaAppIds.mattermostAlternate)
