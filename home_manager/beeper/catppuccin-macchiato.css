@@ -144,8 +144,8 @@ html body.theme-rich[data-theme-color] {
   --color-background-menu-badge: rgb(202 211 245 / 12%);
   --color-background-kbd: var(--ctp-surface-1);
   --color-background-tag: var(--ctp-surface-0);
-  --color-background-selected: rgb(166 218 149 / 16%);
-  --color-background-selected-primary: var(--ctp-green);
+  --color-background-selected: rgb(138 173 244 / 25%);
+  --color-background-selected-primary: var(--ctp-blue);
   --color-background-scrollbar: rgb(110 115 141 / 45%);
   --color-background-scrollbar-hover: rgb(128 135 162 / 70%);
   --left-pane-bg: var(--ctp-mantle);
@@ -243,7 +243,33 @@ html body.theme-rich[data-theme-color] {
   display: none;
 }
 
-/* Yellow at 10% for unread chats, including pins. Selected chats keep Green. */
+/* Solid Pink selection with dark Catppuccin text and icons. */
+:root body .ThreadListItem-module__wrapper.ThreadListItem-module__isSelected::before,
+:root body .PinnedThreadListItem-module__wrapper.PinnedThreadListItem-module__isSelected::before {
+  background: var(--ctp-pink);
+}
+
+:root body .ThreadListItem-module__wrapper.ThreadListItem-module__isSelected {
+  --thread-children-text: var(--ctp-crust);
+  --thread-children-icon: var(--ctp-crust);
+  --thread-children-icon-strong: var(--ctp-crust);
+}
+
+:root body .ThreadListItem-module__isSelected .ThreadListItem-module__title,
+:root body .PinnedThreadListItem-module__isSelected .PinnedThreadListItem-module__title {
+  color: var(--ctp-crust);
+  font-weight: 700;
+}
+
+:root body .ThreadListItem-module__isSelected .ThreadListItem-module__timestamp {
+  color: var(--ctp-crust);
+}
+
+:root body .ThreadListItem-module__isSelected .ThreadListReadIcon-module__threadReadIcon:not(.ThreadListReadIcon-module__messageErroredIcon) {
+  color: var(--ctp-crust);
+}
+
+/* Yellow at 10% for unread chats, including pins. Selected chats keep Pink. */
 :root body .ThreadListItem-module__wrapper.ThreadListItem-module__isUnread:not(.ThreadListItem-module__isSelected)::before,
 :root body .PinnedThreadListItem-module__wrapper.PinnedThreadListItem-module__isUnread:not(.PinnedThreadListItem-module__isSelected)::before {
   content: "";
