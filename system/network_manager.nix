@@ -1,6 +1,6 @@
 {pkgs, inputs, ...}: {
   environment.systemPackages = [
-    inputs.wlctl.packages.${pkgs.system}.default
+    inputs.wlctl.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
   networking = {
     useDHCP = false; # NM will do DHCP itself

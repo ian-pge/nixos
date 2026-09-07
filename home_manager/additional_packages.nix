@@ -8,7 +8,7 @@
     nil
     nixpkgs-fmt
     alejandra
-    texlive.combined.scheme-full
+    texliveFull
     texlab
     texpresso
 
@@ -52,7 +52,7 @@
     razergenie
     unrar
     mutagen
-    antigravity
+    antigravity-ide
     ffmpeg-full
     # f3d # disabled: pulls vtk -> pdal -> gdal-minimal, currently failing GDAL tests
     discord
