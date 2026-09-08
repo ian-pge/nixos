@@ -1,3 +1,6 @@
 .codex
 .claude
 .pi-subagents/artifacts/
+.direnv/
+result
+target/

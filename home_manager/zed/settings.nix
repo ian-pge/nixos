@@ -22,8 +22,6 @@
   agent = {
     enabled = true;
     button = true;
-    # Surface Zed's native agent action whenever Git reports conflicts.
-    show_merge_conflict_indicator = true;
     # Keep the Agent Panel next to the Threads Sidebar.
     dock = "left";
     # Keep the opposite horizontal docks independently resizable.
@@ -178,12 +176,6 @@
   git_panel = {
     dock = "right";
     file_icons = true;
-  };
-
-  # Keep the complete agent-branch diff visible, including committed changes,
-  # until the branch is integrated into the repository's default branch.
-  git = {
-    diff_base = "default_branch";
   };
 
   outline_panel = {

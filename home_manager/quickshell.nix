@@ -1,15 +1,30 @@
-{pkgs, ...}: let
-  topBarConfig = pkgs.runCommand "quickshell-top-bar" {
-    nativeBuildInputs = [pkgs.qt6Packages.qtshadertools];
-  } ''
-    cp -R ${./quickshell/top-bar} "$out"
-    chmod -R u+w "$out"
-    qsb --qt6 \
-      -o "$out/shaders/activity-border.frag.qsb" \
-      "$out/shaders/activity-border.frag"
-  '';
+{
+  pkgs,
+  localPackages,
+  ...
+}: let
+  topBarConfig =
+    pkgs.runCommand "quickshell-top-bar" {
+      nativeBuildInputs = [pkgs.qt6Packages.qtshadertools];
+    } ''
+      cp -R ${./quickshell/top-bar} "$out"
+      chmod -R u+w "$out"
+      qsb --qt6 \
+        -o "$out/shaders/activity-border.frag.qsb" \
+        "$out/shaders/activity-border.frag"
+    '';
 in {
-  imports = [./quickshell/helpers];
+  home.packages = with localPackages; [
+    quickshellUpdateChecker
+    quickshellUpdateDiff
+    quickshellUpdateInstaller
+    quickshellNixCleaner
+    quickshellBrightness
+    quickshellSystemStats
+    quickshellGpuMonitor
+    quickshellWeather
+    quickshellSpeedtest
+  ];
 
   programs.quickshell = {
     enable = true;

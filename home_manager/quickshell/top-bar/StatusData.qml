@@ -1949,33 +1949,19 @@ Scope {
   function parseNixStatus(text) {
     try {
       const status = JSON.parse(text.trim());
-      if (Array.isArray(status.updates)) {
-        root.nixCheckFailed = status.state === "error";
-        root.nixRebootRequired = status.state === "reboot-required";
-        root.nixUpdates = status.updates;
-        root.nixIcon = root.nixCheckFailed ? ""
-          : root.nixRebootRequired ? "󰜉"
-          : status.hasUpdates ? "" : "";
-        root.nixTooltip = root.nixRebootRequired
-          ? status.message || "Update ready — reboot required"
-          : status.hasUpdates
-          ? status.updates.map(update => update.name + ": " + update.date).join("\n")
-          : status.message || "System is up to date";
-      } else {
-        // Compatibility with the preserved Waybar helper cache format.
-        root.nixCheckFailed = false;
-        root.nixRebootRequired = false;
-        root.nixIcon = status.alt === "has-updates" ? "" : "";
-        root.nixTooltip = status.tooltip || "System is up to date";
-        const lines = status.alt === "has-updates"
-          ? root.nixTooltip.split("\n").filter(line => line.trim() !== "") : [];
-        root.nixUpdates = lines.map(line => {
-          const separator = line.lastIndexOf(": ");
-          return separator >= 0
-            ? { "name": line.slice(0, separator), "date": line.slice(separator + 2) }
-            : { "name": line, "date": "" };
-        });
-      }
+      if (!Array.isArray(status.updates))
+        throw new Error("Invalid update status");
+      root.nixCheckFailed = status.state === "error";
+      root.nixRebootRequired = status.state === "reboot-required";
+      root.nixUpdates = status.updates;
+      root.nixIcon = root.nixCheckFailed ? ""
+        : root.nixRebootRequired ? "󰜉"
+        : status.hasUpdates ? "" : "";
+      root.nixTooltip = root.nixRebootRequired
+        ? status.message || "Update ready — reboot required"
+        : status.hasUpdates
+        ? status.updates.map(update => update.name + ": " + update.date).join("\n")
+        : status.message || "System is up to date";
     } catch (error) {
       root.nixCheckFailed = true;
       root.nixRebootRequired = false;

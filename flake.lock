@@ -41,11 +41,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786696832,
-        "narHash": "sha256-wjdfX+jCJCJsteGD75xEfsDR3yATFFEx4mwelhlDXdU=",
+        "lastModified": 1788792980,
+        "narHash": "sha256-TX/Z3PQZQVHgy4g9OZpflVpuazwturkGolsRDkFVHiU=",
         "owner": "catppuccin",
         "repo": "nix",
-        "rev": "35d78c213b65e38789bcb359aae2380fcb4dc3e8",
+        "rev": "3142fdbeea0b181ad6600587dfe484ccb644dcc6",
         "type": "github"
       },
       "original": {
@@ -110,22 +110,6 @@
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
-        "type": "github"
-      }
-    },
-    "gazelle-tui": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1775935854,
-        "narHash": "sha256-7ZaeIW6zgkRNHBggA7SxfmY+t4lGIBErSim2JHmUjvQ=",
-        "owner": "Zeus-Deus",
-        "repo": "gazelle-tui",
-        "rev": "5ad4c67bda67c898c1a144838affa4c760e5db7c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Zeus-Deus",
-        "repo": "gazelle-tui",
         "type": "github"
       }
     },
@@ -200,11 +184,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1788772354,
-        "narHash": "sha256-oijyt7Evt2fZDQPHNrUmmDOVlpy8EIVo/EfjrHpqwQA=",
+        "lastModified": 1788840929,
+        "narHash": "sha256-8wZHO3gePzZR4QpORDB4QpD/8jdNAFel7kHixn1A/gc=",
         "owner": "numtide",
         "repo": "llm-agents.nix",
-        "rev": "5fce1da07b0a62ab7fd2e2c4fea9cab68686bc65",
+        "rev": "296b980f3a95823d2b2f9d5822d10eb99ea8443e",
         "type": "github"
       },
       "original": {
@@ -247,11 +231,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1788614874,
-        "narHash": "sha256-7QYjT2vHLuX9Z1pdxHXDKCbh1CR3D/2rywB9Tx0MPRg=",
+        "lastModified": 1788752844,
+        "narHash": "sha256-VaWGJ6+cIYN2erfSecbRV+4ljI185Ty2wUrXyvQbgOw=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "c043004d1c6985732bcc1cbc5a9c9aecbbb4e0f0",
+        "rev": "dc5d91f840324650bac8c379428c7037a416959a",
         "type": "github"
       },
       "original": {
@@ -265,7 +249,6 @@
       "inputs": {
         "catppuccin": "catppuccin",
         "disko": "disko",
-        "gazelle-tui": "gazelle-tui",
         "home-manager": "home-manager",
         "impermanence": "impermanence",
         "llm-agents": "llm-agents",
@@ -309,11 +292,11 @@
     "tabctl": {
       "flake": false,
       "locked": {
-        "lastModified": 1787744361,
-        "narHash": "sha256-JMjTRumOdHBL3tc5XkElBlUSj2qRoFBVaDT6O/tIfvU=",
+        "lastModified": 1788814671,
+        "narHash": "sha256-NfD4ZOSuUTTnGBYMkd81wXvsFLrs+aqXCIpakww36rE=",
         "owner": "slastra",
         "repo": "tabctl",
-        "rev": "adfecec1ed86cfae5a62a4dcadcf914605363688",
+        "rev": "e0336435603ee9d255708fc640e03cae6db42d44",
         "type": "github"
       },
       "original": {

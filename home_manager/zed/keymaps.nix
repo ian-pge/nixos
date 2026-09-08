@@ -8,23 +8,6 @@
       "alt-tab" = "assistant::InlineAssist";
       "ctrl-a a" = "agent::Toggle";
       "ctrl-t" = "multi_workspace::ToggleWorkspaceSidebar";
-      "ctrl-a f" = [
-        "action::Sequence"
-        [
-          "workspace::FocusCenterPane"
-          [
-            "task::Spawn"
-            {task_name = "Apply agent worktree";}
-          ]
-        ]
-      ];
-      "ctrl-a w" = [
-        "git::CreateWorktree"
-        {
-          worktree_name = null;
-          branch_target.kind = "current_branch";
-        }
-      ];
       "ctrl-a c" = [
         "agent::NewExternalAgentThread"
         {agent = "claude-acp";}

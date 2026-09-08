@@ -34,8 +34,7 @@
       package = pkgs.catppuccin-cursors.macchiatoDark;
     };
 
-    # Tells GTK 3 to prefer a dark theme variant and makes GTK tooltips
-    # appear faster. Waybar is GTK3, so this affects its tooltips too.
+    # Prefer a dark theme variant and show GTK 3 tooltips faster.
     gtk3.extraConfig = {
       gtk-application-prefer-dark-theme = true;
       gtk-tooltip-timeout = 80;

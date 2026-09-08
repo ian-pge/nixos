@@ -27,7 +27,6 @@
     ./fish.nix
     # ./oh_my_posh.nix
     ./starship.nix
-    ./waybar.nix
     # ./xdg_termfilechooser.nix
     ./fuzzel.nix
     ./mako.nix

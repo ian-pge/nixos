@@ -33,8 +33,9 @@ Principes fondamentaux :
 - `../components/WifiSelector.qml` / `BluetoothSelector.qml` : sélecteurs clavier.
 - `../components/UpdateSelector.qml` : liste des mises à jour.
 - `../components/Pill.qml` : capsule générique des modules latéraux.
-- `../scripts/system-stats.py` : télémétrie persistante CPU, mémoire, disque et luminosité.
-- `../../helpers/` : paquets Nix optimisés et nommés pour Quickshell.
+- `../../../../tools/quickshell/system-stats.py` : télémétrie persistante CPU, mémoire, disque et luminosité.
+- `../../../../tools/quickshell/` : sources et tests des helpers Quickshell.
+- `../../../../packages/quickshell.nix` : recettes Nix des helpers, exposées par `localPackages`.
 
 ### État partagé, rendu ciblé par écran
 

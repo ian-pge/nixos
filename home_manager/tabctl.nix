@@ -1,12 +1,8 @@
 {
-  inputs,
+  localPackages,
   pkgs,
   ...
 }: let
-  tabctl = pkgs.callPackage ../packages/tabctl.nix {
-    src = inputs.tabctl;
-  };
-
   chromeTabFavicons = pkgs.writeShellApplication {
     name = "quickshell-chrome-tab-favicons";
     runtimeInputs = [pkgs.python3];
@@ -18,7 +14,7 @@
   chromeTabs = pkgs.writeShellApplication {
     name = "quickshell-chrome-tabs";
     runtimeInputs = [
-      tabctl
+      localPackages.tabctl
       chromeTabFavicons
       pkgs.jq
     ];
@@ -63,7 +59,7 @@
   nativeMessagingHost = {
     name = "tabctl_mediator";
     description = "TabCtl Native Messaging Host";
-    path = "${tabctl}/bin/tabctl-mediator";
+    path = "${localPackages.tabctl}/bin/tabctl-mediator";
     type = "stdio";
     allowed_origins = [
       "chrome-extension://baomblllgemcgbignhpbipgiofmjdhpn/"
@@ -71,7 +67,7 @@
   };
 in {
   home.packages = [
-    tabctl
+    localPackages.tabctl
     chromeTabs
   ];
 

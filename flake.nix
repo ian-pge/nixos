@@ -29,10 +29,6 @@
       url = "github:peteonrails/voxtype";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    gazelle-tui = {
-      url = "github:Zeus-Deus/gazelle-tui";
-      flake = false;
-    };
     tabctl = {
       url = "github:slastra/tabctl";
       flake = false;
@@ -41,11 +37,21 @@
 
   outputs = inputs @ {nixpkgs, ...}: let
     inherit (nixpkgs) lib;
+    system = "x86_64-linux";
+    pkgs = import nixpkgs {
+      inherit system;
+      config.allowUnfree = true;
+    };
+    localPackages = import ./packages {inherit inputs pkgs;};
   in {
+    packages.${system} = localPackages // {default = localPackages.hyprlockAge;};
+
+    devShells.${system}.rust = import ./dev-shells/rust.nix {inherit pkgs;};
+
     nixosConfigurations = {
       nixos = lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = {inherit inputs;};
+        inherit system;
+        specialArgs = {inherit inputs localPackages;};
 
         modules = [
           ./system

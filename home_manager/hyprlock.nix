@@ -1,6 +1,6 @@
 {
   lib,
-  pkgs,
+  localPackages,
   ...
 }: let
   wallpaper = "${../material/wallpaper.png}";
@@ -118,9 +118,7 @@
       }
       {
         monitor = "eDP-1";
-        text = ''
-          cmd[update:100] echo "<b> <big> $(${pkgs.python3}/bin/python3 -c 'import datetime; birth=datetime.datetime(1998,11,15); print(f"{((datetime.datetime.now()-birth).total_seconds()/(365.2425*24*3600)):.9f}")') </big></b>"
-        '';
+        text = "cmd[update:100] ${lib.getExe localPackages.hyprlockAge}";
         color = "$yellow";
         font_size = 20;
         font_family = "Ubuntu Nerd Font";

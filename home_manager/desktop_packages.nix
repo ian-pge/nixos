@@ -2,8 +2,6 @@
   home.packages = with pkgs; [
     hyprpicker
     hyprshot
-    bluetui
-    # gazelle-tui
     beeper
     vlc
     nvtopPackages.full

@@ -1,11 +1,5 @@
-{pkgs, ...}: let
-  createWorktreeTask = import ./tasks/create-worktree.nix {inherit pkgs;};
-  finishWorktreeCommand = import ./commands/finish-worktree.nix {inherit pkgs;};
-  applyWorktreeTask = import ./tasks/apply-worktree.nix {inherit finishWorktreeCommand;};
-in {
+{...}: {
   imports = [./services/playwright-mcp.nix];
-
-  home.packages = [finishWorktreeCommand];
 
   programs.zed-editor = {
     enable = true;
@@ -17,9 +11,6 @@ in {
 
     userSettings = import ./settings.nix;
     userKeymaps = import ./keymaps.nix;
-    userTasks = [
-      createWorktreeTask
-      applyWorktreeTask
-    ];
+    userTasks = [];
   };
 }

@@ -79,7 +79,6 @@
         ".local/share/DaVinciResolve"
         ".config/polychromatic"
         ".config/openrazer"
-        ".config/gazelle"
         ".config/chezmoi"
         ".local/state/wireplumber"
         ".config/gcloud"
