@@ -109,11 +109,11 @@ in {
         {repeating = true;})
       (mkBind
         (plainKey "XF86MonBrightnessUp")
-        (mkExec "${pkgs.brightnessctl}/bin/brightnessctl set +5%; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showBrightness")
+        (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar brightnessUp")
         {repeating = true;})
       (mkBind
         (plainKey "XF86MonBrightnessDown")
-        (mkExec "${pkgs.brightnessctl}/bin/brightnessctl set 5%-; ${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar showBrightness")
+        (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar brightnessDown")
         {repeating = true;})
 
       (mkBind (plainKey "XF86AudioPlay") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar mediaPlayPause") {})

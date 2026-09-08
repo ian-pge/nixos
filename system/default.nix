@@ -27,6 +27,7 @@
     ./razer.nix
     ./home_manager.nix
     ./nvidia.nix
+    ./ddcutil.nix
     ./bluetooth.nix
     ./keyring.nix
     ./udisks2.nix

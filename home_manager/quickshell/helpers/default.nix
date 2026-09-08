@@ -77,6 +77,12 @@
     '';
   };
 
+  brightness = pkgs.writeShellApplication {
+    name = "quickshell-brightness";
+    runtimeInputs = with pkgs; [brightnessctl coreutils ddcutil gawk hyprland jq];
+    text = builtins.readFile ./brightness.sh;
+  };
+
   systemStats = pkgs.writeShellApplication {
     name = "quickshell-system-stats";
     runtimeInputs = [pkgs.python3];
@@ -166,6 +172,7 @@ in {
     updateDiff
     updateInstaller
     nixCleaner
+    brightness
     systemStats
     gpuMonitor
     weather

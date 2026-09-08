@@ -395,7 +395,7 @@ Conventions :
 - Les touches multimédia et les molettes modifient le volume par pas de `5%`.
 - La barre de progression anime sa largeur en `140ms`.
 - Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
-- La luminosité reste pilotée par `brightnessctl`, faute de service Quickshell natif. Tous les gestes passent par `StatusData.changeBrightness()`, qui sérialise les changements et lit la valeur machine-readable renvoyée par la commande ; aucun composant ne lance son propre processus de luminosité.
+- La luminosité passe par `quickshell-brightness` : `brightnessctl` pour la dalle interne, `ddcutil` pour un écran externe identifié par connecteur, modèle et numéro de série. Les touches ciblent le moniteur focalisé ; la molette cible celui de la barre. Pour un écran externe, les appuis sont regroupés jusqu’à une pause de 180 ms, avec conservation des inversions de sens et saturation à chaque pas. L’OSD affiche immédiatement la consigne dès qu’une valeur est connue, puis se recale sur la réponse. Le bus est mémorisé en RAM et invalidé lors d’un changement de moniteurs ; une génération permet d’ignorer les réponses antérieures au changement. La dernière valeur vérifiée est réutilisée pendant deux secondes, puis relue à la prochaine interaction. Une seule écriture vérifiée est effectuée par groupe d’appuis, sans polling DDC ni modification du pilote.
 - Le volume utilise `Theme.sideVolume` pour son icône et son remplissage.
 - La luminosité utilise `Theme.sideBrightness` pour son icône et son remplissage.
 - Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage coloré indique le niveau.

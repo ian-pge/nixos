@@ -16,7 +16,12 @@ Scope {
   property int memoryUsage: 0
   property int diskUsage: 0
   property int brightness: 0
-  property int pendingBrightnessDelta: 0
+  property var pendingBrightnessChanges: []
+  property var brightnessValues: ({})
+  property var brightnessStates: ({})
+  property int brightnessGeneration: 0
+  property int brightnessRequestGeneration: 0
+  property string brightnessRequestMonitor: ""
   readonly property real volumeStep: 0.05
   property int brailleFrameIndex: 0
   readonly property var brailleFrames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -1118,33 +1123,117 @@ Scope {
   }
 
   function parseBrightnessStatus(text) {
-    const fields = text.trim().split(",");
-    if (fields.length < 4)
+    if (brightnessRequestGeneration !== brightnessGeneration)
       return;
-    const value = parseInt(fields[3].replace("%", ""), 10);
-    if (!isNaN(value))
-      brightness = value;
+    try {
+      const status = JSON.parse(text);
+      if (typeof status.monitor !== "string"
+          || typeof status.brightness !== "number"
+          || !isFinite(status.brightness))
+        return;
+      const states = Object.assign({}, brightnessStates);
+      states[status.monitor] = status;
+      brightnessStates = states;
+      // A completed write must not erase newer keypresses shown in the OSD.
+      let value = Math.max(0, Math.min(100, status.brightness));
+      for (const change of pendingBrightnessChanges) {
+        if (change.monitor === status.monitor) {
+          for (const delta of change.steps)
+            value = Math.max(0, Math.min(100, value + delta));
+        }
+      }
+      const values = Object.assign({}, brightnessValues);
+      values[status.monitor] = value;
+      brightnessValues = values;
+      if (status.monitor === brightnessTargetMonitor) {
+        brightness = value;
+        if (brightnessOverlayVisible)
+          brightnessOverlayTimer.restart();
+      }
+    } catch (error) {
+      console.warn("Cannot read monitor brightness:", text);
+    }
+  }
+
+  function queueBrightnessChange(monitor, delta) {
+    if (monitor === "")
+      return;
+    const queue = pendingBrightnessChanges.slice();
+    const index = queue.findIndex(change => change.monitor === monitor);
+    const steps = index >= 0 ? queue[index].steps.concat([delta]) : [delta];
+    // Keep every direction reversal for correct clamping, but send only the
+    // final level after the external monitor's key-repeat burst has ended.
+    const internal = /^(eDP|LVDS|DSI)-/.test(monitor);
+    const deadline = Date.now() + (internal || delta === 0 ? 0 : 180);
+    const change = {monitor: monitor, steps: steps, deadline: deadline};
+    if (index >= 0)
+      queue[index] = change;
+    else
+      queue.push(change);
+    pendingBrightnessChanges = queue;
+    if (delta !== 0 && brightnessValues[monitor] !== undefined) {
+      const values = Object.assign({}, brightnessValues);
+      values[monitor] = Math.max(0, Math.min(100, values[monitor] + delta));
+      brightnessValues = values;
+      if (monitor === brightnessTargetMonitor)
+        brightness = values[monitor];
+    }
+    applyPendingBrightnessChange();
   }
 
   function applyPendingBrightnessChange() {
-    if (brightnessChangeProcess.running || pendingBrightnessDelta === 0)
+    if (brightnessProcess.running || pendingBrightnessChanges.length === 0)
       return;
-    const delta = pendingBrightnessDelta;
-    pendingBrightnessDelta = 0;
-    const adjustment = delta > 0 ? "+" + delta + "%" : -delta + "%-";
-    brightnessChangeProcess.exec([
-      "brightnessctl", "-m", "set", adjustment
+    brightnessDispatchTimer.stop();
+    const queue = pendingBrightnessChanges.slice();
+    queue.sort((a, b) => a.deadline - b.deadline);
+    const change = queue[0];
+    const remaining = change.deadline - Date.now();
+    if (remaining > 0) {
+      brightnessDispatchTimer.interval = remaining;
+      brightnessDispatchTimer.start();
+      return;
+    }
+    queue.shift();
+    pendingBrightnessChanges = queue;
+    brightnessRequestGeneration = brightnessGeneration;
+    brightnessRequestMonitor = change.monitor;
+    brightnessProcess.exec([
+      "quickshell-brightness", change.monitor, JSON.stringify(change.steps),
+      JSON.stringify(brightnessStates[change.monitor] || null)
     ]);
+  }
+
+  function resetBrightnessState() {
+    brightnessGeneration++;
+    brightnessStates = ({});
+    brightnessValues = ({});
+    pendingBrightnessChanges = [];
+    brightnessDispatchTimer.stop();
+    hideBrightnessOverlay();
+  }
+
+  function failBrightnessChange() {
+    if (brightnessRequestGeneration !== brightnessGeneration)
+      return;
+    const monitor = brightnessRequestMonitor;
+    const states = Object.assign({}, brightnessStates);
+    const values = Object.assign({}, brightnessValues);
+    delete states[monitor];
+    delete values[monitor];
+    brightnessStates = states;
+    brightnessValues = values;
+    pendingBrightnessChanges = pendingBrightnessChanges.filter(change => change.monitor !== monitor);
+    if (brightnessTargetMonitor === monitor)
+      hideBrightnessOverlay();
   }
 
   function changeBrightness(delta, targetMonitor = "") {
     if (delta === 0)
       return;
-    pendingBrightnessDelta += Math.round(delta);
-    if (brightnessRefreshProcess.running)
-      brightnessRefreshProcess.running = false;
-    showBrightnessOverlay(targetMonitor, false);
-    applyPendingBrightnessChange();
+    const monitor = resolveTargetMonitor(targetMonitor);
+    showBrightnessOverlay(monitor, false);
+    queueBrightnessChange(monitor, Math.round(delta));
   }
 
   function showBrightnessOverlay(targetMonitor = "", refreshValue = true) {
@@ -1158,11 +1247,11 @@ Scope {
     hideVolumeOverlay();
     hideChromeTabs();
     brightnessTargetMonitor = resolvedTarget;
+    brightness = brightnessValues[resolvedTarget] || 0;
     brightnessOverlayVisible = true;
     brightnessOverlayTimer.restart();
-    if (refreshValue && !brightnessChangeProcess.running
-        && !brightnessRefreshProcess.running)
-      brightnessRefreshProcess.exec(["brightnessctl", "-m"]);
+    if (refreshValue)
+      queueBrightnessChange(resolvedTarget, 0);
     finishCenterTransition(ownsTransition);
   }
 
@@ -1997,6 +2086,14 @@ Scope {
   }
 
   Connections {
+    target: Hyprland.monitors
+
+    function onValuesChanged() {
+      root.resetBrightnessState();
+    }
+  }
+
+  Connections {
     target: root.wifiPendingNetwork !== null
       ? root.wifiPendingNetwork.nativeNetwork : null
 
@@ -2119,30 +2216,18 @@ Scope {
   }
 
   Process {
-    id: brightnessRefreshProcess
-
-    stdout: StdioCollector {
-      onStreamFinished: {
-        if (!brightnessChangeProcess.running
-            && root.pendingBrightnessDelta === 0)
-          root.parseBrightnessStatus(text);
-      }
-    }
-  }
-
-  Process {
-    id: brightnessChangeProcess
+    id: brightnessProcess
 
     stdout: StdioCollector {
       onStreamFinished: root.parseBrightnessStatus(text)
     }
 
     onExited: (exitCode, exitStatus) => {
-      if (root.pendingBrightnessDelta !== 0) {
-        Qt.callLater(() => root.applyPendingBrightnessChange());
-      } else if (exitCode !== 0 && !brightnessRefreshProcess.running) {
-        brightnessRefreshProcess.exec(["brightnessctl", "-m"]);
+      if (exitCode !== 0) {
+        console.warn("Monitor brightness command failed:", exitCode);
+        root.failBrightnessChange();
       }
+      Qt.callLater(() => root.applyPendingBrightnessChange());
     }
   }
 
@@ -2285,6 +2370,12 @@ Scope {
   }
 
   Timer {
+    id: brightnessDispatchTimer
+    interval: 180
+    onTriggered: root.applyPendingBrightnessChange()
+  }
+
+  Timer {
     id: brightnessOverlayTimer
     interval: 2000
     onTriggered: root.hideBrightnessOverlay()
@@ -2334,6 +2425,14 @@ Scope {
 
     function showBrightness() {
       root.showBrightnessOverlay();
+    }
+
+    function brightnessUp() {
+      root.changeBrightness(5);
+    }
+
+    function brightnessDown() {
+      root.changeBrightness(-5);
     }
 
     function toggleWifi() {
