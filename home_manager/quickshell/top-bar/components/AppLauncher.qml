@@ -193,95 +193,99 @@ FocusScope {
         width: appList.width
         height: 42
 
-        Rectangle {
+        Item {
           anchors.fill: parent
-          anchors.leftMargin: 8
-          anchors.rightMargin: 8
-          anchors.topMargin: 2
-          anchors.bottomMargin: 2
-          radius: 10
-          color: appRow.selected ? Theme.surfaceRaised : "transparent"
 
-          Behavior on color { ColorAnimation { duration: 90 } }
-        }
-
-        Rectangle {
-          id: iconFrame
-          anchors.left: parent.left
-          anchors.leftMargin: 16
-          anchors.verticalCenter: parent.verticalCenter
-          width: 30
-          height: 30
-          radius: 8
-          color: appRow.selected ? Theme.surfaceSelected : Theme.surface
-
-          Image {
-            id: appIcon
+          Rectangle {
             anchors.fill: parent
-            anchors.margins: 3
-            source: Quickshell.iconPath(appRow.entry.icon,
-              "application-x-executable")
-            sourceSize.width: 24
-            sourceSize.height: 24
-            fillMode: Image.PreserveAspectFit
-            asynchronous: true
-            cache: true
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: 2
+            anchors.bottomMargin: 2
+            radius: 10
+            color: appRow.selected ? Theme.surfaceRaised : "transparent"
+
+            Behavior on color { ColorAnimation { duration: 90 } }
+          }
+
+          Rectangle {
+            id: iconFrame
+            anchors.left: parent.left
+            anchors.leftMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            width: 30
+            height: 30
+            radius: 8
+            color: appRow.selected ? Theme.surfaceSelected : Theme.surface
+
+            Image {
+              id: appIcon
+              anchors.fill: parent
+              anchors.margins: 3
+              source: Quickshell.iconPath(appRow.entry.icon,
+                "application-x-executable")
+              sourceSize.width: 24
+              sourceSize.height: 24
+              fillMode: Image.PreserveAspectFit
+              asynchronous: true
+              cache: true
+            }
+
+            Text {
+              visible: appIcon.status === Image.Error
+              anchors.centerIn: parent
+              text: "󰀻"
+              color: appRow.selected ? Theme.sideApplications : Theme.inactive
+              font.family: "Ubuntu Nerd Font"
+              font.pixelSize: 15
+              font.bold: true
+            }
           }
 
           Text {
-            visible: appIcon.status === Image.Error
-            anchors.centerIn: parent
-            text: "󰀻"
-            color: appRow.selected ? Theme.sideApplications : Theme.inactive
+            anchors.left: iconFrame.right
+            anchors.leftMargin: 11
+            anchors.right: runningDot.left
+            anchors.rightMargin: 12
+            y: 4
+            height: 18
+            verticalAlignment: Text.AlignVCenter
+            text: appRow.entry.name
+            color: appRow.selected ? Theme.selectedForeground : Theme.foreground
+            elide: Text.ElideRight
             font.family: "Ubuntu Nerd Font"
-            font.pixelSize: 15
+            font.pixelSize: 13
             font.bold: true
           }
-        }
 
-        Text {
-          anchors.left: iconFrame.right
-          anchors.leftMargin: 11
-          anchors.right: runningDot.left
-          anchors.rightMargin: 12
-          y: 4
-          height: 18
-          verticalAlignment: Text.AlignVCenter
-          text: appRow.entry.name
-          color: appRow.selected ? Theme.selectedForeground : Theme.foreground
-          elide: Text.ElideRight
-          font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 13
-          font.bold: true
-        }
+          Text {
+            anchors.left: iconFrame.right
+            anchors.leftMargin: 11
+            anchors.right: runningDot.left
+            anchors.rightMargin: 12
+            y: 21
+            height: 15
+            verticalAlignment: Text.AlignVCenter
+            text: appRow.entry.genericName !== "" ? appRow.entry.genericName
+              : appRow.entry.comment
+            color: Theme.secondary
+            elide: Text.ElideRight
+            font.family: "Ubuntu Nerd Font"
+            font.pixelSize: 10
+            font.bold: true
+          }
 
-        Text {
-          anchors.left: iconFrame.right
-          anchors.leftMargin: 11
-          anchors.right: runningDot.left
-          anchors.rightMargin: 12
-          y: 21
-          height: 15
-          verticalAlignment: Text.AlignVCenter
-          text: appRow.entry.genericName !== "" ? appRow.entry.genericName
-            : appRow.entry.comment
-          color: Theme.secondary
-          elide: Text.ElideRight
-          font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 10
-          font.bold: true
-        }
-
-        Rectangle {
-          id: runningDot
-          anchors.right: parent.right
-          anchors.rightMargin: 21
-          anchors.verticalCenter: parent.verticalCenter
-          width: 7
-          height: 7
-          radius: 3.5
-          visible: appRow.runningToplevel !== null
-          color: Theme.sideApplications
+          Rectangle {
+            id: runningDot
+            anchors.right: parent.right
+            anchors.rightMargin: 21
+            anchors.verticalCenter: parent.verticalCenter
+            width: 7
+            height: 7
+            radius: 3.5
+            visible: appRow.runningToplevel !== null
+            color: Theme.sideApplications
+          }
         }
 
         MouseArea {

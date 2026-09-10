@@ -31,11 +31,8 @@ Scope {
     || voiceDictationTranscribing
 
   property string gpuText: "--"
-  property string gpuTooltip: "GPU data unavailable"
   property string weatherText: "--°"
-  property string weatherTooltip: "Weather unavailable"
   property string nixIcon: ""
-  property string nixTooltip: "Checking for updates…"
   property var nixUpdates: []
   property bool nixChecking: true
   property bool nixCheckFailed: false
@@ -52,8 +49,6 @@ Scope {
     || nixUpdatePhase === "installing" || nixUpdatePhase === "cleaning"
   readonly property string displayedNixIcon: nixUpdatePhase === "awaitingInstall" ? "󰌾"
     : nixUpdatePhase === "error" ? "" : nixIcon
-  readonly property string displayedNixTooltip: nixUpdatePhase !== "idle"
-    ? (nixUpdateMessage || "NixOS update") : nixTooltip
 
   onBrailleAnimationRunningChanged: {
     if (brailleAnimationRunning)
@@ -232,10 +227,6 @@ Scope {
   readonly property string networkType: wiredDevice !== null
     ? "ethernet" : activeWifiNetwork !== null ? "wifi"
       : !Networking.wifiEnabled ? "disabled" : "disconnected"
-  readonly property string networkName: wiredDevice !== null
-    ? wiredConnectionLabel : activeWifiNetwork !== null
-      ? activeWifiNetwork.ssid
-      : !Networking.wifiEnabled ? "Wi-Fi Off" : "Disconnected"
   readonly property int networkStrength: wiredDevice !== null
     ? 100 : activeWifiNetwork !== null ? activeWifiNetwork.strength : 0
 
@@ -256,23 +247,8 @@ Scope {
     return left.name.localeCompare(right.name);
   })
   onBluetoothSelectorDevicesChanged: syncBluetoothSelection()
-  readonly property bool bluetoothEnabled: bluetoothAdapter !== null
-    && bluetoothAdapter.enabled
-  readonly property var connectedBluetoothDevices: Bluetooth.devices.values
-    .filter(device => device.connected)
-  readonly property bool bluetoothConnected: connectedBluetoothDevices.length > 0
-  readonly property string bluetoothTooltip: {
-    if (!bluetoothEnabled)
-      return "Bluetooth disabled";
-    if (!bluetoothConnected)
-      return bluetoothAdapter !== null ? bluetoothAdapter.name : "Bluetooth";
-    return connectedBluetoothDevices.map(device => {
-      const battery = device.batteryAvailable
-        ? " (" + Math.round(device.battery * 100) + "%)"
-        : "";
-      return device.name + battery;
-    }).join("\n");
-  }
+  readonly property bool bluetoothConnected: Bluetooth.devices.values
+    .some(device => device.connected)
 
   readonly property var battery: UPower.displayDevice
   readonly property bool batteryAvailable: battery.ready && battery.isPresent
@@ -1957,17 +1933,11 @@ Scope {
       root.nixIcon = root.nixCheckFailed ? ""
         : root.nixRebootRequired ? "󰜉"
         : status.hasUpdates ? "" : "";
-      root.nixTooltip = root.nixRebootRequired
-        ? status.message || "Update ready — reboot required"
-        : status.hasUpdates
-        ? status.updates.map(update => update.name + ": " + update.date).join("\n")
-        : status.message || "System is up to date";
     } catch (error) {
       root.nixCheckFailed = true;
       root.nixRebootRequired = false;
       root.nixIcon = "";
       root.nixUpdates = [];
-      root.nixTooltip = "Unable to check for updates";
     }
     root.nixChecking = false;
   }
@@ -2227,7 +2197,6 @@ Scope {
         try {
           const gpu = JSON.parse(data);
           root.gpuText = gpu.text || "--";
-          root.gpuTooltip = gpu.tooltip || "GPU data unavailable";
         } catch (error) {
           console.warn("Unable to parse GPU data:", error);
         }
@@ -2245,10 +2214,9 @@ Scope {
         try {
           const weather = JSON.parse(text.trim());
           root.weatherText = (weather.text || "--") + "°";
-          root.weatherTooltip = (weather.tooltip || "Weather unavailable")
-            .replace(/<[^>]*>/g, "");
         } catch (error) {
-          root.weatherTooltip = "Unable to retrieve weather";
+          root.weatherText = "--°";
+          console.warn("Unable to parse weather data:", error);
         }
       }
     }

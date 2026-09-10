@@ -166,7 +166,7 @@ Item {
       Repeater {
         model: 8
 
-        Rectangle {
+        Item {
           id: workspaceButton
 
           readonly property int workspaceId: index + 1
@@ -178,10 +178,6 @@ Item {
 
           width: active ? 60 : 40
           height: 24
-          radius: 16
-          color: active
-            ? Theme.action
-            : hovered ? Theme.surfaceRaised : "transparent"
 
           Behavior on width {
             NumberAnimation {
@@ -190,33 +186,40 @@ Item {
             }
           }
 
-          Behavior on color {
-            ColorAnimation { duration: 220 }
-          }
-
-          Text {
-            anchors.centerIn: parent
-            text: workspaceButton.active
-              ? "󰮯"
-              : workspaceButton.occupied ? "󰊠" : ""
-            color: workspaceButton.active
-              ? Theme.background
-              : workspaceButton.hovered
-                ? Theme.action
-                : workspaceButton.occupied ? Theme.state : Theme.inactive
-            font.family: "Ubuntu Nerd Font"
-            font.pixelSize: 16
-            font.bold: true
-            scale: workspaceButton.hovered && !workspaceButton.active ? 1.14 : 1
+          Rectangle {
+            anchors.fill: parent
+            radius: 16
+            color: workspaceButton.active ? Theme.action
+              : workspaceButton.hovered ? Theme.surfaceRaised : "transparent"
 
             Behavior on color {
               ColorAnimation { duration: 220 }
             }
 
-            Behavior on scale {
-              NumberAnimation {
-                duration: 180
-                easing.type: Easing.OutCubic
+            Text {
+              anchors.centerIn: parent
+              text: workspaceButton.active
+                ? "󰮯"
+                : workspaceButton.occupied ? "󰊠" : ""
+              color: workspaceButton.active
+                ? Theme.background
+                : workspaceButton.hovered
+                  ? Theme.action
+                  : workspaceButton.occupied ? Theme.state : Theme.inactive
+              font.family: "Ubuntu Nerd Font"
+              font.pixelSize: 16
+              font.bold: true
+              scale: workspaceButton.hovered && !workspaceButton.active ? 1.14 : 1
+
+              Behavior on color {
+                ColorAnimation { duration: 220 }
+              }
+
+              Behavior on scale {
+                NumberAnimation {
+                  duration: 180
+                  easing.type: Easing.OutCubic
+                }
               }
             }
           }

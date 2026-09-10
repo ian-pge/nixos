@@ -2,13 +2,11 @@ import Quickshell
 import QtQuick
 import "Theme.js" as Theme
 
-Rectangle {
+Item {
   id: root
 
   property string text: ""
   property color accent: Theme.foreground
-  property string tooltipText: ""
-  property var tooltipHost: null
   property string leftCommand: ""
   property string rightCommand: ""
   property string wheelUpCommand: ""
@@ -26,50 +24,48 @@ Rectangle {
 
   implicitWidth: iconOnly ? 36 : Math.max(36, label.implicitWidth + 20)
   implicitHeight: 36
-  radius: 18
-  color: root.hovered ? accent : Theme.background
 
   function run(command) {
     if (command !== "")
       Quickshell.execDetached(["sh", "-c", command]);
   }
 
-  Behavior on color {
-    ColorAnimation { duration: 220 }
-  }
-
-  Text {
-    id: label
+  Rectangle {
     anchors.fill: parent
-    horizontalAlignment: Text.AlignHCenter
-    verticalAlignment: Text.AlignVCenter
-    text: root.text
-    color: root.hovered ? Theme.background : root.accent
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 16
-    font.bold: true
+    radius: 18
+    color: root.hovered ? root.accent : Theme.background
+    transform: SelectionBounce {
+      active: root.hovered && root.visible && root.enabled
+    }
 
     Behavior on color {
       ColorAnimation { duration: 220 }
     }
+
+    Text {
+      id: label
+      anchors.fill: parent
+      horizontalAlignment: Text.AlignHCenter
+      verticalAlignment: Text.AlignVCenter
+      text: root.text
+      color: root.hovered ? Theme.background : root.accent
+      font.family: "Ubuntu Nerd Font"
+      font.pixelSize: 16
+      font.bold: true
+
+      Behavior on color {
+        ColorAnimation { duration: 220 }
+      }
+    }
   }
 
+  // Keep the hit area still so the bounce cannot toggle hover at its edges.
   MouseArea {
     id: pointer
     anchors.fill: parent
     hoverEnabled: true
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     cursorShape: root.interactive ? Qt.PointingHandCursor : Qt.ArrowCursor
-
-    onEntered: {
-      if (root.tooltipHost !== null && root.tooltipText !== "")
-        root.tooltipHost.showTooltip(root, root.tooltipText);
-    }
-
-    onExited: {
-      if (root.tooltipHost !== null)
-        root.tooltipHost.hideTooltip(root);
-    }
 
     onClicked: mouse => {
       if (mouse.button === Qt.RightButton) {

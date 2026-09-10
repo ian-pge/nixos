@@ -205,105 +205,109 @@ FocusScope {
         width: tabList.width
         height: 42
 
-        Rectangle {
+        Item {
           anchors.fill: parent
-          anchors.leftMargin: 8
-          anchors.rightMargin: 8
-          anchors.topMargin: 2
-          anchors.bottomMargin: 2
-          radius: 10
-          color: tabRow.selected ? Theme.surfaceRaised : "transparent"
 
-          Behavior on color { ColorAnimation { duration: 90 } }
-        }
-
-        Rectangle {
-          id: iconFrame
-          anchors.left: parent.left
-          anchors.leftMargin: 16
-          anchors.verticalCenter: parent.verticalCenter
-          width: 30
-          height: 30
-          radius: 8
-          color: tabRow.selected ? Theme.surfaceSelected : Theme.surface
-
-          Image {
-            id: favicon
+          Rectangle {
             anchors.fill: parent
-            anchors.margins: 4
-            source: tabRow.tab.iconPath
-              ? "file://" + tabRow.tab.iconPath : ""
-            fillMode: Image.PreserveAspectFit
-            asynchronous: true
-            cache: true
-          }
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: 2
+            anchors.bottomMargin: 2
+            radius: 10
+            color: tabRow.selected ? Theme.surfaceRaised : "transparent"
 
-          Text {
-            anchors.centerIn: parent
-            visible: !tabRow.tab.iconPath || favicon.status === Image.Error
-            text: ""
-            color: tabRow.tab.active ? Theme.sideApplications : Theme.inactive
-            font.family: "Ubuntu Nerd Font"
-            font.pixelSize: 17
-            font.bold: true
-          }
-        }
-
-        Text {
-          anchors.left: iconFrame.right
-          anchors.leftMargin: 11
-          anchors.right: stateIcons.left
-          anchors.rightMargin: 10
-          y: 4
-          height: 18
-          verticalAlignment: Text.AlignVCenter
-          text: tabRow.tab.title || "Untitled tab"
-          color: tabRow.selected ? Theme.selectedForeground : Theme.foreground
-          elide: Text.ElideRight
-          font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 13
-          font.bold: true
-        }
-
-        Text {
-          anchors.left: iconFrame.right
-          anchors.leftMargin: 11
-          anchors.right: stateIcons.left
-          anchors.rightMargin: 10
-          y: 21
-          height: 15
-          verticalAlignment: Text.AlignVCenter
-          text: root.urlLabel(tabRow.tab.url)
-          color: Theme.secondary
-          elide: Text.ElideRight
-          font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 10
-          font.bold: true
-        }
-
-        Row {
-          id: stateIcons
-          anchors.right: parent.right
-          anchors.rightMargin: 18
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 6
-
-          Text {
-            visible: tabRow.tab.pinned
-            text: "󰐃"
-            color: Theme.sideApplications
-            font.family: "Ubuntu Nerd Font"
-            font.pixelSize: 12
-            font.bold: true
+            Behavior on color { ColorAnimation { duration: 90 } }
           }
 
           Rectangle {
-            visible: tabRow.tab.active
+            id: iconFrame
+            anchors.left: parent.left
+            anchors.leftMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            width: 7
-            height: 7
-            radius: 3.5
-            color: Theme.sideApplications
+            width: 30
+            height: 30
+            radius: 8
+            color: tabRow.selected ? Theme.surfaceSelected : Theme.surface
+
+            Image {
+              id: favicon
+              anchors.fill: parent
+              anchors.margins: 4
+              source: tabRow.tab.iconPath
+                ? "file://" + tabRow.tab.iconPath : ""
+              fillMode: Image.PreserveAspectFit
+              asynchronous: true
+              cache: true
+            }
+
+            Text {
+              anchors.centerIn: parent
+              visible: !tabRow.tab.iconPath || favicon.status === Image.Error
+              text: ""
+              color: tabRow.tab.active ? Theme.sideApplications : Theme.inactive
+              font.family: "Ubuntu Nerd Font"
+              font.pixelSize: 17
+              font.bold: true
+            }
+          }
+
+          Text {
+            anchors.left: iconFrame.right
+            anchors.leftMargin: 11
+            anchors.right: stateIcons.left
+            anchors.rightMargin: 10
+            y: 4
+            height: 18
+            verticalAlignment: Text.AlignVCenter
+            text: tabRow.tab.title || "Untitled tab"
+            color: tabRow.selected ? Theme.selectedForeground : Theme.foreground
+            elide: Text.ElideRight
+            font.family: "Ubuntu Nerd Font"
+            font.pixelSize: 13
+            font.bold: true
+          }
+
+          Text {
+            anchors.left: iconFrame.right
+            anchors.leftMargin: 11
+            anchors.right: stateIcons.left
+            anchors.rightMargin: 10
+            y: 21
+            height: 15
+            verticalAlignment: Text.AlignVCenter
+            text: root.urlLabel(tabRow.tab.url)
+            color: Theme.secondary
+            elide: Text.ElideRight
+            font.family: "Ubuntu Nerd Font"
+            font.pixelSize: 10
+            font.bold: true
+          }
+
+          Row {
+            id: stateIcons
+            anchors.right: parent.right
+            anchors.rightMargin: 18
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+
+            Text {
+              visible: tabRow.tab.pinned
+              text: "󰐃"
+              color: Theme.sideApplications
+              font.family: "Ubuntu Nerd Font"
+              font.pixelSize: 12
+              font.bold: true
+            }
+
+            Rectangle {
+              visible: tabRow.tab.active
+              anchors.verticalCenter: parent.verticalCenter
+              width: 7
+              height: 7
+              radius: 3.5
+              color: Theme.sideApplications
+            }
           }
         }
 

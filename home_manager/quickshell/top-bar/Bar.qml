@@ -12,11 +12,7 @@ PanelWindow {
   required property var statusData
 
   property bool entered: false
-  property var pendingTooltipAnchor: null
-  property var tooltipAnchor: null
-  property string tooltipText: ""
-  property string pendingTooltipText: ""
-  property bool tooltipVisible: false
+  readonly property int barTopInset: 10
   readonly property var hyprlandMonitor: Hyprland.monitorFor(window.screen)
   readonly property string monitorName: hyprlandMonitor !== null
     ? hyprlandMonitor.name : ""
@@ -57,17 +53,18 @@ PanelWindow {
   }
 
   margins {
-    top: 10
+    top: 0
     left: 5
     right: 5
   }
 
   // Keep the layer surface geometry fixed so expanding the update card cannot
   // nudge the other bar modules. The mask leaves the unused area click-through.
-  implicitHeight: 850
+  // Include the space above the bar so upward bounces are not clipped.
+  implicitHeight: 850 + barTopInset
   color: "transparent"
   exclusionMode: ExclusionMode.Normal
-  exclusiveZone: 36
+  exclusiveZone: 36 + barTopInset
   aboveWindows: true
   WlrLayershell.namespace: "quickshell-top-bar"
   WlrLayershell.keyboardFocus: keyboardSelectorActive
@@ -81,37 +78,10 @@ PanelWindow {
 
   Component.onCompleted: entered = true
 
-  function showTooltip(item, text) {
-    pendingTooltipAnchor = item;
-    pendingTooltipText = text;
-    tooltipDelay.restart();
-  }
-
-  function hideTooltip(item) {
-    if (pendingTooltipAnchor === item) {
-      tooltipDelay.stop();
-      pendingTooltipAnchor = null;
-    }
-    if (tooltipAnchor === item) {
-      tooltipVisible = false;
-      tooltipAnchor = null;
-    }
-  }
-
-  Timer {
-    id: tooltipDelay
-    interval: 300
-    onTriggered: {
-      window.tooltipAnchor = window.pendingTooltipAnchor;
-      window.tooltipText = window.pendingTooltipText;
-      window.tooltipVisible = window.tooltipAnchor !== null;
-    }
-  }
-
   Row {
     id: leftModules
     anchors.left: parent.left
-    y: 0
+    y: window.barTopInset
     spacing: 10
     opacity: window.entered ? 1 : 0
     transform: Translate {
@@ -130,8 +100,6 @@ PanelWindow {
       text: ""
       accent: Theme.sideApplications
       forceHovered: window.appLauncherActive
-      tooltipText: "Applications"
-      tooltipHost: window
       interactive: true
       onLeftClicked: statusData.toggleAppLauncher(window.monitorName)
     }
@@ -140,12 +108,7 @@ PanelWindow {
       iconOnly: true
       text: statusData.displayedNixIcon
       accent: Theme.sideUpdates
-      forceHovered: window.updateSelectorActive || statusData.nixUpdateBusy
-        || statusData.nixChecking
-        || statusData.nixRebootRequired
-        || statusData.nixUpdatePhase === "awaitingInstall"
-      tooltipText: statusData.displayedNixTooltip
-      tooltipHost: window
+      forceHovered: window.updateSelectorActive
       interactive: true
       onLeftClicked: statusData.toggleUpdateSelector(window.monitorName)
       onRightClicked: statusData.forceNixStatus()
@@ -156,8 +119,6 @@ PanelWindow {
       text: statusData.networkIcon()
       accent: Theme.sideNetwork
       forceHovered: window.wifiSelectorActive
-      tooltipText: statusData.networkName
-      tooltipHost: window
       interactive: true
       onLeftClicked: statusData.toggleWifiSelector(window.monitorName)
     }
@@ -167,8 +128,6 @@ PanelWindow {
       text: statusData.bluetoothConnected ? "󰂯" : "󰂲"
       accent: Theme.sideBluetooth
       forceHovered: window.bluetoothSelectorActive
-      tooltipText: statusData.bluetoothTooltip
-      tooltipHost: window
       interactive: true
       onLeftClicked: statusData.toggleBluetoothSelector(window.monitorName)
     }
@@ -194,8 +153,6 @@ PanelWindow {
     Pill {
       text: " " + statusData.gpuText
       accent: Theme.sideGpu
-      tooltipText: statusData.gpuTooltip
-      tooltipHost: window
       leftCommand: "ghostty -e nvtop"
     }
   }
@@ -329,6 +286,7 @@ PanelWindow {
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: parent.top
+    anchors.topMargin: window.barTopInset
     width: targetWidth
     height: targetHeight
     radius: 18
@@ -556,7 +514,7 @@ PanelWindow {
   Row {
     id: rightModules
     anchors.right: parent.right
-    y: 0
+    y: window.barTopInset
     spacing: 10
     opacity: window.entered ? 1 : 0
     transform: Translate {
@@ -607,8 +565,6 @@ PanelWindow {
     Pill {
       text: statusData.weatherText
       accent: Theme.sideWeather
-      tooltipText: statusData.weatherTooltip
-      tooltipHost: window
     }
 
     Pill {
@@ -622,43 +578,4 @@ PanelWindow {
     }
   }
 
-  PopupWindow {
-    id: tooltip
-
-    anchor.window: window
-    anchor.rect.x: {
-      if (window.tooltipAnchor === null)
-        return 0;
-      const point = window.tooltipAnchor.mapToItem(window.contentItem, 0, 0);
-      return Math.max(0, Math.min(window.width - width,
-        point.x + window.tooltipAnchor.width / 2 - width / 2));
-    }
-    anchor.rect.y: 42
-
-    implicitWidth: Math.min(620, Math.max(120, window.tooltipText.length * 7 + 24))
-    implicitHeight: tooltipLabel.implicitHeight + 20
-    visible: window.tooltipVisible
-    color: "transparent"
-
-    Rectangle {
-      anchors.fill: parent
-      radius: 14
-      color: Theme.surfaceRaised
-
-      Text {
-        id: tooltipLabel
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 10
-        text: window.tooltipText
-        color: Theme.foreground
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 14
-        font.bold: true
-        textFormat: Text.PlainText
-        wrapMode: Text.Wrap
-      }
-    }
-  }
 }

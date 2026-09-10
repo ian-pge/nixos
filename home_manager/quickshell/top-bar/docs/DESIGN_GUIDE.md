@@ -33,9 +33,11 @@ Principes fondamentaux :
 - `../components/WifiSelector.qml` / `BluetoothSelector.qml` : sélecteurs clavier.
 - `../components/UpdateSelector.qml` : liste des mises à jour.
 - `../components/Pill.qml` : capsule générique des modules latéraux.
-- `../../../../tools/quickshell/system-stats.py` : télémétrie persistante CPU, mémoire, disque et luminosité.
-- `../../../../tools/quickshell/` : sources et tests des helpers Quickshell.
-- `../../../../packages/quickshell.nix` : recettes Nix des helpers, exposées par `localPackages`.
+- `../components/SelectionBounce.qml` : rebond partagé des éléments sélectionnés.
+- `../../../../tools/quickshell/system-stats/` : télémétrie Rust persistante CPU, mémoire, disque et luminosité.
+- `../../../../tools/quickshell/chrome-tabs/` : adaptateur Rust TabCtl et cache local des favicons Chrome.
+- `../../../../tools/README.md` : sources et tests organisés par outil logique.
+- `../../../../packages/default.nix` : catalogue des paquets exposés par `localPackages`, avec une recette Nix par outil.
 
 ### État partagé, rendu ciblé par écran
 
@@ -56,7 +58,7 @@ Conséquences :
 |---|---:|
 | Hauteur normale d’une capsule | `36px` |
 | Rayon normal | `18px` |
-| Marge supérieure du panel | `10px` |
+| Décalage supérieur du contenu dans le panel | `10px` |
 | Marges latérales du panel | `5px` |
 | Espacement entre modules latéraux | `10px` |
 | Capsule latérale avec icône seule | `36×36px` |
@@ -87,18 +89,22 @@ peuvent jamais mesurer moins de `36px` de large.
 
 ### Surface layer-shell fixe
 
-Le `PanelWindow` garde une hauteur fixe de `600px`, même lorsque la capsule ne fait que `36px`.
+Le `PanelWindow` garde une hauteur fixe de `860px`, même lorsque la capsule ne fait que `36px`.
 
 C’est volontaire : animer la hauteur du `PanelWindow` provoquait un léger déplacement vertical des autres modules à cause des recalculs du layer-shell et des arrondis du compositeur.
 
 À respecter :
 
-- `implicitHeight: 600`
-- `exclusiveZone: 36`
-- marge supérieure de `10px`, donc réserve Hyprland effective de `46px`
+- `implicitHeight: 850 + barTopInset`, avec `barTopInset: 10`
+- `exclusiveZone: 36 + barTopInset`, soit une réserve Hyprland de `46px`
+- marge supérieure du panel de `0px`, contenu décalé de `10px` à l’intérieur
 - `mask: Region` limité à `leftModules`, `centerMorph` et `rightModules`
 
 La zone transparente inutilisée doit rester click-through. **Ne pas recommencer à animer la hauteur du `PanelWindow`.** Seule la hauteur de `centerMorph` est animée.
+
+L’espace au-dessus des capsules appartient à la surface du panel afin que leur
+rebond vers le haut reste visible. Leur position au repos et la réserve pour
+les fenêtres restent identiques.
 
 ### Croissance verticale
 
@@ -107,6 +113,7 @@ La zone transparente inutilisée doit rester click-through. **Ne pas recommencer
 ```qml
 anchors.horizontalCenter: parent.horizontalCenter
 anchors.top: parent.top
+anchors.topMargin: window.barTopInset
 ```
 
 Ainsi, le widget update grandit uniquement vers le bas, jamais vers le haut.
@@ -140,7 +147,7 @@ Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, vo
 
 Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
 
-Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les six accents contextuels ci-dessus sont partagés avec leur widget central correspondant. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert, sans afficher artificiellement son tooltip :
+Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les six accents contextuels ci-dessus sont partagés avec leur widget central correspondant. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
 
 | Capsule | Token | Couleur |
 |---|---|---|
@@ -192,7 +199,35 @@ Ne pas réintroduire :
 - une séquence aller-retour pour simuler un rebond ;
 - un état ou timer temporaire tel que `updateMorphGentle` / `updateMorphTimer`.
 
-Les animations secondaires suivent la même règle : le hover et les interactions internes peuvent translater, redimensionner ou changer d’opacité, mais toujours avec une courbe monotone. Les pulses de scale sur les icônes volume et luminosité ont été supprimés. Le contenu central utilise une seule animation partagée, calculée depuis le widget source et le widget destination ; chaque composant ne relance jamais sa propre animation `presented`.
+Les transitions secondaires suivent la même règle, avec une exception explicite
+pour le rebond de sélection demandé par l’utilisateur. `SelectionBounce.qml`
+anime uniquement les capsules latérales en état `hovered` (survol ou
+`forceHovered`). Le rebond accompagne les couleurs existantes et reste actif
+lors d’une sélection au clavier. Les workspaces, y compris les special
+workspaces, ainsi que les lignes des lanceurs applications / onglets Chrome
+ne rebondissent pas.
+
+La capsule updates suit uniquement le survol ou l’ouverture de son sélecteur
+sur le même écran. Une vérification, une installation, une attente de validation
+ou un redémarrage requis ne forcent ni la couleur de sélection ni le rebond.
+Ces états restent indiqués par l’icône et le contenu du sélecteur.
+
+Le mouvement est centré sur la position au repos : `6px` vers le haut et `6px`
+vers le bas. La montée jusqu’à `-6px` dure `300ms` en `OutQuad`, puis la chute
+accélère jusqu’à `+6px` pendant `220ms` en `InQuad`. Le changement de direction
+est immédiat en bas, comme un impact sur une surface dure ; seul le sommet
+ralentit progressivement. La boucle dure `520ms` et traverse la position au
+repos sans y marquer de pause. La désélection interrompt la
+boucle et ramène l’élément à sa position initiale en `140ms`. Une resélection
+interrompt ce retour et repart de la position courante. Seul le contenu visuel
+bouge : les zones de clic et la géométrie de mise en page restent fixes. Les
+animations sont arrêtées lorsque le composant est masqué ou désactivé.
+
+Les pulses de scale sur les icônes volume et luminosité restent supprimés. Le
+contenu central utilise une seule animation partagée, calculée depuis le widget
+source et le widget destination ; chaque composant ne relance jamais sa propre
+animation `presented`. Le rebond de sélection ne modifie pas cette transformation
+ni les interpolations monotones de largeur et de hauteur.
 
 ### Transition de contenu à deux couches
 
