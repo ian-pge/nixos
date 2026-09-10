@@ -8,13 +8,13 @@ layout(std140, binding = 0) uniform buf {
     float qt_Opacity;
     vec2 itemSize;
     float phase;
+    vec4 trailColor;
 };
 
 const float PI = 3.14159265358979323846;
 const float OUTER_RADIUS = 18.0;
 const float BORDER_WIDTH = 3.0;
 const float TRAIL_LENGTH = 0.5;
-const vec3 TRAIL_COLOR = vec3(1.0, 0.2, 0.8);
 
 float roundedRectSdf(vec2 point, vec2 size, float radius)
 {
@@ -95,5 +95,5 @@ void main()
         : 0.0;
 
     float alpha = borderAlpha * trailAlpha * qt_Opacity;
-    fragColor = vec4(TRAIL_COLOR * alpha, alpha);
+    fragColor = trailColor * alpha;
 }

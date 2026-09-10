@@ -8,12 +8,12 @@ La barre doit donner l’impression d’être un seul système animé, pas une c
 
 Principes fondamentaux :
 
-- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, luminosité, dictée vocale, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth et mises à jour.
+- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, panneau audio, calendrier météo, luminosité, dictée vocale, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth, mises à jour et notifications éphémères.
 - Les changements de taille utilisent une interpolation monotone sans rebond.
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
 - Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
-- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui reprennent l’accent de leur capsule latérale. Le liseré animé reste rose.
+- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui reprennent l’accent de leur capsule latérale. Le liseré animé reste rose, sauf pour les notifications qui utilisent le jaune vif.
 
 ## 2. Architecture à préserver
 
@@ -21,11 +21,16 @@ Principes fondamentaux :
 
 - `../shell.qml` : instancie un `StatusData` partagé et un `Bar` par écran.
 - `../StatusData.qml` : source d’état globale, processus externes, timers, IPC et exclusivité entre overlays.
+- `../NotificationData.qml` : serveur natif de notifications, carte courante et expiration, partagé via `StatusData.notifications`.
+- `../WeatherData.qml` : température et météo quotidienne partagées, actualisation et état du cache.
+- `../components/CalendarPanel.qml` / `Calendar.js` : calendrier mensuel et calculs de dates locales, icônes météo monochromes et températures mini/maxi.
+- `../components/NotificationPopup.qml` / `NotificationInputGuard.qml` : carte avec image et protection du focus du panneau masqué.
 - `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
 - `../OsdOverlay.qml` : indicateurs temporaires au-dessus des fenêtres plein écran.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
 - `../components/Theme.js` : source unique des couleurs QML, y compris les accents partagés entre capsules latérales et widgets centraux correspondants.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
+- `../components/AudioSelector.qml` : choix des sorties et du micro sur une page.
 - `../components/VoiceDictationIndicator.qml` / `VoiceWaveform.qml` : états Voxtype et rendu de l’onde vocale alimentée par le bridge audio partagé.
 - `../components/NowPlayingIndicator.qml` : média MPRIS et métadonnées textuelles.
 - `../components/AppLauncher.qml` : lanceur natif, icônes et recherche fuzzy.
@@ -65,27 +70,51 @@ Conséquences :
 | Largeur dictée vocale | `180px` |
 | Largeur volume/luminosité | `280px` |
 | Plafond Wi-Fi/Bluetooth | `400px` |
-| Largeur lanceurs applications / onglets | `480px` |
-| Plafond média / updates | `480px` |
+| Plafond commun à tous les widgets centraux | Largeur des workspaces avec un slot spécial (`WorkspaceSwitcher.expandedImplicitWidth`) |
+| Largeur souhaitée audio / lanceurs applications / onglets | `480px`, limitée par le plafond commun |
+| Plafond souhaité média / updates | `480px`, limité par le plafond commun |
+| Largeur souhaitée notification | `160–480px` selon le texte, limitée par le plafond commun |
+| Largeur calendrier | Exactement le plafond commun des workspaces |
+| Hauteur calendrier | Ajustée aux 4–6 semaines et à leur contenu météo, au plus `492px` |
 | Hauteur lanceur applications / onglets | `398px` |
 | Hauteur d’une ligne update | `30px` |
 | Hauteur d’une ligne application | `42px` |
 
-Les sélecteurs textuels, le média et les updates mesurent leur contenu avec
-`FontMetrics` et adaptent leur largeur en direct, jusqu'aux plafonds ci-dessus.
-Les lanceurs de recherche conservent `480px`. Les widgets à barre longue —
+`centerMorph` limite systématiquement la largeur souhaitée du contenu à
+`WorkspaceSwitcher.expandedImplicitWidth` : les huit slots normaux, leurs marges,
+plus un slot spécial et son espacement. Ce plafond est calculé même sans special
+workspace ouvert ; le slot vide utilise alors sa largeur minimum de `70px`.
+Avec un workspace normal focalisé et ce slot minimum, le plafond vaut `434px`.
+Si le nom du special workspace exige davantage de place, sa largeur réelle sert
+de référence. Ne pas recopier une constante en pixels dans chaque widget.
+
+Les sélecteurs textuels, le média, les updates et les notifications mesurent leur contenu avec
+`FontMetrics` et adaptent leur largeur en direct, dans leurs propres limites
+puis sous ce plafond commun. Les panneaux audio et les lanceurs de recherche
+demandent `480px`, mais occupent au maximum la largeur de référence des workspaces.
+Les contenus suivent la largeur réelle de la capsule ; les libellés trop longs
+sont élidés et les listes conservent leur défilement. Les widgets à barre longue —
 dictée vocale, volume et luminosité — conservent eux aussi leur largeur fixe ;
 le Wi-Fi reste à `400px` pendant un speed test afin de ne pas redimensionner sa
 barre de progression.
 
 Une capsule latérale composée uniquement d'une icône est toujours un cercle
 strict de `36×36px`, indépendamment de la chasse du glyphe Nerd Font.
-Applications, updates, Wi-Fi et Bluetooth utilisent ce mode en permanence ; le
-volume l'utilise lorsqu'il est muet. Le contenu est centré horizontalement et
+Applications, updates, Wi-Fi et Bluetooth utilisent ce mode en permanence. La
+capsule audio reste textuelle même muette, avec pourcentage et état du micro.
+Le contenu est centré horizontalement et
 verticalement dans toute la surface. La capsule update latérale conserve une
 icône statique pendant les opérations : les animations Braille sont réservées
 au widget central. Les capsules textuelles gardent `20px` de padding mais ne
 peuvent jamais mesurer moins de `36px` de large.
+
+Les indicateurs CPU, RAM, GPU et disque forment une seule `Pill`, dans cet ordre,
+à gauche. Température météo, date et heure forment une seconde `Pill`, à droite.
+Chaque groupe utilise un unique libellé avec trois espaces entre les indicateurs,
+un seul fond et le rebond commun au groupe entier. Conserver les icônes, formats
+et mises à jour des données existants. La capsule système n’a pour l’instant
+aucune action au clic et ne lance plus `htop`, `nvtop` ou `ncdu`. La capsule
+température/date/heure ouvre le calendrier météo central.
 
 ### Surface layer-shell fixe
 
@@ -143,11 +172,11 @@ Règle sémantique de la capsule centrale :
 - **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
 - **rouge** : échec explicite, sauf l’exception volontaire du microphone pendant l’enregistrement.
 
-Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume et luminosité sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume` et `Theme.sideBrightness`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose.
+Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume, luminosité et calendrier sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume`, `Theme.sideBrightness` et `Theme.sideWeather`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose, sauf pendant une notification : liseré et accents internes utilisent alors `Theme.state`.
 
 Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
 
-Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les six accents contextuels ci-dessus sont partagés avec leur widget central correspondant. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
+Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les sept accents contextuels ci-dessus sont partagés avec leur widget central correspondant. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
 
 | Capsule | Token | Couleur |
 |---|---|---|
@@ -155,16 +184,11 @@ Les capsules latérales ne changent pas de couleur selon leur état et conserven
 | Updates | `Theme.sideUpdates` | `#f0c6c6` |
 | Réseau | `Theme.sideNetwork` | `#ee99a0` |
 | Bluetooth | `Theme.sideBluetooth` | `#8aadf4` |
-| Disque | `Theme.sideDisk` | `#f5a97f` |
-| CPU | `Theme.sideCpu` | `#91d7e3` |
-| Mémoire | `Theme.sideMemory` | `#c6a0f6` |
-| GPU | `Theme.sideGpu` | `#a6da95` |
+| Système (CPU, RAM, GPU, disque) | `Theme.sideSystem` | `#c6a0f6` |
 | Batterie | `Theme.sideBattery` | `#f4dbd6` |
 | Volume | `Theme.sideVolume` | `#b7bdf8` |
 | Luminosité | `Theme.sideBrightness` | `#eed49f` |
-| Météo | `Theme.sideWeather` | `#f5bde6` |
-| Date | `Theme.sideDate` | `#8bd5ca` |
-| Heure | `Theme.sideTime` | `#ed8796` |
+| Température météo, date, heure | `Theme.sideWeather` | `#f5bde6` |
 
 Ne pas écrire de nouveau littéral hexadécimal dans un fichier QML : ajouter ou réutiliser un token de `Theme.js`. Le shader du liseré et les couleurs de bordure Hyprland sont des systèmes séparés.
 
@@ -237,9 +261,14 @@ Le conteneur, le clipping et la bordure restent persistants. Seuls les contenus 
 
 ## 6. Animation contextuelle du contenu central
 
-`StatusData` décrit chaque transaction avec le mode et le moniteur source, puis le mode et le moniteur destination. Le serial n’est incrémenté qu’après la fermeture propre de l’ancien état et l’ouverture du nouveau ; les états intermédiaires `workspaces` produits par les booléens ne doivent jamais devenir la source logique d’une transition directe.
+`StatusData` conserve les transactions des overlays. Chaque `Bar` pilote désormais
+la transition depuis son mode réellement présenté vers son `targetMode`, avec
+`Qt.callLater` pour regrouper les changements synchrones. Les états intermédiaires
+`workspaces` produits par les booléens ne deviennent donc pas une transition
+visible. Une notification peut masquer un overlay dont l’état continue à évoluer ;
+sa fermeture révèle directement le mode sous-jacent encore actif sur ce moniteur.
 
-Chaque `Bar` ramène un mode situé sur l’autre moniteur à `workspaces`, puis anime pendant les mêmes `360ms` que la géométrie :
+Chaque `Bar` anime pendant les mêmes `360ms` que la géométrie :
 
 - contenu source : opacité `1 → 0` entre `0 %` et `48 %`, déplacement de `0 → 8px` dans le sens du changement de hauteur ;
 - contenu destination : opacité `0 → 1` entre `18 %` et `78 %`, déplacement de `10px → 0` dans ce même sens visuel ;
@@ -260,11 +289,12 @@ Ce système est une container transform à deux couches, pas encore un morphing 
 - fades indépendants non synchronisés, rebond ou translation dépassant les `360ms` de géométrie ;
 - remise de `transitionProgress` à zéro sans capturer les opacités/offsets rendus lors d’une interruption.
 
-## 7. Liseré rose d’activité
+## 7. Liseré d’activité rose / jaune
 
 Le liseré apparaît lorsque `centerMorph.overlayVisible` est vrai, donc pour :
 
 - volume ;
+- panneau audio ;
 - luminosité ;
 - dictée vocale ;
 - Wi-Fi ;
@@ -272,7 +302,8 @@ Le liseré apparaît lorsque `centerMorph.overlayVisible` est vrai, donc pour :
 - média MPRIS ;
 - lanceur d’applications ;
 - onglets Chrome ;
-- updates.
+- updates ;
+- notifications.
 
 Il disparaît uniquement quand la capsule redevient le widget des workspaces.
 
@@ -287,11 +318,11 @@ La version actuelle utilise un unique `ShaderEffect` et `shaders/activity-border
 - anneau intérieur de `3px` calculé par signed-distance field ;
 - position exacte sur le périmètre calculée avec les longueurs des quatre segments et des quatre quarts de cercle ;
 - traînée couvrant `50 %` du périmètre ;
-- couleur de tête `#ff33cc` ;
+- couleur de tête `Theme.action` (`#ff33cc`), ou `Theme.state` (`#ffcc33`) pour les notifications, transmise par l’uniforme `trailColor` ;
 - opacité `Math.pow(1 - behindHead / 0.5, 1.35)` ;
 - phase de `0` à `1` en `1600ms`.
 
-Les états `0` et `1` sont identiques et la coupure opaque-vers-transparent reste placée à la tête. QML ne met à jour qu’un uniforme `phase` par frame ; la géométrie, la position sur le chemin, l’anticrénelage et le dégradé sont calculés en parallèle sur le GPU. La sortie du fragment shader est prémultipliée pour respecter le blending du scene graph Qt Quick.
+Les états `0` et `1` sont identiques et la coupure opaque-vers-transparent reste placée à la tête. La phase est le seul uniforme animé en continu ; la géométrie, la position sur le chemin, l’anticrénelage et le dégradé sont calculés en parallèle sur le GPU. La sortie du fragment shader est prémultipliée pour respecter le blending du scene graph Qt Quick. La couleur reste jaune jusqu’à la fin du fade de la notification sortante, puis retrouve le rose du widget sous-jacent, sans redémarrer la rotation.
 
 Le mouvement doit conserver une vitesse linéaire perceptuelle identique sur les segments et dans les coins, quelle que soit la largeur de la capsule.
 
@@ -389,15 +420,62 @@ Le speed test n’est jamais automatique. `t` étend la capsule vers le bas et l
 - Bluetooth : icône, point de connexion et onglets `PAIRED` / `NEARBY` utilisent `Theme.sideBluetooth` ;
 - tout appareil ou réseau non connecté reste gris ;
 - cadenas Wi-Fi : même gris que le compteur (`#939ab7`) ;
-- le liseré animé autour de la capsule reste rose, indépendamment du widget affiché.
+- le liseré animé autour de la capsule reste rose, sauf pendant les notifications où il devient jaune vif.
 
-## 11. Lanceur d’applications
+## 11. Panneau audio et lanceurs
+
+### Panneau audio
+
+Le clic sur la capsule volume et `Super+R` appellent `topbar.toggleAudio` et
+ouvrent `AudioSelector.qml` au centre, sur l’écran cible. L’en-tête affiche
+l’icône audio, le titre `AUDIO` et le compteur `n OUT · n IN`, puis une seule page
+affiche `OUTPUTS` et `MICROPHONE`, avec une coche sur les périphériques réellement utilisés.
+Largeur limitée par le plafond commun des workspaces, hauteur adaptée jusqu’à
+`398px`, puis défilement. Haut/bas ou
+`j/k` naviguent, `Tab` change de section, `Enter` choisit sans fermer et `Esc`
+ferme. Aucun volume par application ni barre de réglage supplémentaire.
+
+Le panneau utilise `Theme.sideVolume`, les transitions communes de `360ms`, le
+liseré et l’exclusivité des overlays. La dictée conserve sa priorité ; le panneau
+ne prend pas le focus clavier pendant la dictée. Les touches volume et la molette
+restent actives et ne remplacent pas un panneau audio ouvert par l’OSD volume.
+
+La capsule latérale garde toujours `icône son + pourcentage + icône micro`, même
+si la sortie est muette. Le micro est barré lorsqu’il est muet, normal sinon, et
+grisé sans entrée disponible. La touche VIA `Mac Voice` du NuPhy Air60 V2
+émet `XF86VoiceCommand` sous Linux et appelle `topbar.toggleMicrophoneMute`,
+qui agit sur le micro par défaut uniquement.
+Chaque action mute ou démute active l’inversion de couleur et le rebond de la
+capsule audio sur l’écran focalisé pendant `2000ms`, comme l’indicateur volume.
+Une nouvelle action relance ce délai. L’état muet seul n’entretient pas le rebond ;
+à la fin du délai, la capsule revient au repos, sauf si elle est survolée ou si
+son panneau/indicateur volume reste ouvert.
+L’icône reflète aussi les changements externes et ne représente pas un
+enregistrement en cours. Changer d’entrée ne modifie pas son état muet.
+
+Les périphériques et leur état sont fournis par PipeWire natif dans Quickshell,
+avec `PwObjectTracker` ; aucun helper Rust ni polling de `wpctl`. Une sélection
+écrit `preferredDefaultAudioSink` ou `preferredDefaultAudioSource`, tandis que
+les coches suivent les périphériques par défaut effectifs.
+
+`system/wireplumber/release-on-hotplug.lua` libère le choix manuel de la direction
+concernée quand les périphériques ou la disponibilité de leurs routes changent.
+WirePlumber reprend alors ses priorités habituelles. Les changements de volume,
+de mute ou les flux d’applications ne libèrent pas le choix. La désactivation de
+`node.restore-default-targets` empêche seulement la restauration des anciens
+choix : elle ne suffit pas à elle seule pour annuler une préférence courante.
+Le test isolé est `lua system/wireplumber/release-on-hotplug_test.lua`, depuis la
+racine du dépôt. Une validation matérielle doit couvrir casque filaire,
+Bluetooth, HDMI, retrait de périphérique et touche micro du laptop.
+
+### Applications
 
 Le raccourci `Super+A` et le logo Nix à gauche ouvrent `AppLauncher.qml` dans la capsule centrale. Le lanceur utilise exclusivement `DesktopEntries.applications` et `DesktopEntry.execute()` : ne pas réintroduire Fuzzel ou une analyse périodique des fichiers `.desktop`.
 
 Conventions :
 
-- largeur fixe `480px`, hauteur `398px` et huit lignes visibles ;
+- largeur souhaitée `480px`, limitée par le plafond commun des workspaces,
+  hauteur `398px` et huit lignes visibles ;
 - toutes les applications non marquées `NoDisplay` restent accessibles avec une icône issue du thème ;
 - le catalogue normalisé est construit une seule fois, puis la recherche fuzzy s’effectue en mémoire ;
 - le `ListView` virtualise les lignes pour ne charger que les icônes visibles ;
@@ -453,7 +531,7 @@ l'état et la waveform. Voxtype mémorise les lecteurs réellement en lecture,
 les met en pause pendant la dictée et les relance une fois la transcription et
 la sortie terminées.
 
-`NowPlayingIndicator.qml` ajuste sa largeur au titre et à l'artiste entre `160px` et `480px`. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média déclenchée par les touches Play/Pause, Suivant ou Précédent. Les signaux automatiques de changement de piste n'ouvrent jamais le widget, car les navigateurs et les applications de communication publient les vocaux et vidéos par le même protocole MPRIS que les lecteurs musicaux.
+`NowPlayingIndicator.qml` ajuste sa largeur souhaitée au titre et à l'artiste entre `160px` et `480px`, puis la capsule applique le plafond commun des workspaces. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média déclenchée par les touches Play/Pause, Suivant ou Précédent. Les signaux automatiques de changement de piste n'ouvrent jamais le widget, car les navigateurs et les applications de communication publient les vocaux et vidéos par le même protocole MPRIS que les lecteurs musicaux.
 
 ## 14. Exclusivité entre overlays
 
@@ -521,7 +599,7 @@ Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHEC
 
 Le checker compare les anciens et nouveaux `flake.lock` comme JSON, sans analyser la sortie humaine de Nix. Il s'exécute au démarrage, toutes les 30 minutes et après une demande explicite ; son cache est invalidé immédiatement si `flake.nix` ou `flake.lock` change. L'installateur partage son verrou et restaure le lockfile précédent si le rebuild ou l'installation de la génération de démarrage échoue.
 
-Le premier `Enter` remplace la liste par une capsule compacte de `36px` contenant uniquement le spinner Braille, le message d'étape et son état. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit et l'enregistre avec l'action native `boot`, sans modifier ni redémarrer la session courante. L'état final `Update ready — reboot required` persiste dans `$XDG_CACHE_HOME/quickshell/top-bar/pending-reboot.json`, y compris si QuickShell est relancé, puis disparaît automatiquement lorsque `/run/current-system` correspond à la génération attendue. Chaque état mesure son contenu : les états compacts sont plafonnés à `280px` ou `360px`, tandis que les listes et la saisie Polkit peuvent atteindre `480px`. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
+Le premier `Enter` remplace la liste par une capsule compacte de `36px` contenant uniquement le spinner Braille, le message d'étape et son état. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit et l'enregistre avec l'action native `boot`, sans modifier ni redémarrer la session courante. L'état final `Update ready — reboot required` persiste dans `$XDG_CACHE_HOME/quickshell/top-bar/pending-reboot.json`, y compris si QuickShell est relancé, puis disparaît automatiquement lorsque `/run/current-system` correspond à la génération attendue. Chaque état mesure son contenu : les états compacts sont plafonnés à `280px` ou `360px`, tandis que les listes et la saisie Polkit demandent jusqu’à `480px`, toujours sous le plafond commun des workspaces. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
 
 Le processus appartient à `StatusData`, pas au composant visible. `q`, `Esc` ou un clic sur la capsule latérale ne font donc que replier l'interface ; l'update continue et un nouveau clic retrouve l'état compact ou le résumé existant. Pendant l'installation de la génération de démarrage, la liste structurée reste visible ; après succès, une capsule compacte demande le redémarrage. Une erreur de build reste dans la capsule compacte avec son message structuré ; une erreur après le diff conserve la liste avec un état d'erreur. `Enter` relance ensuite une nouvelle tentative.
 
@@ -633,7 +711,160 @@ hyprctl getoption general:col.active_border -j
 
 La réserve supérieure doit rester `[0,46,0,0]`. Hors overlay, la bordure active doit être revenue à `ff33ff33`.
 
-## 18. Règle finale pour une future IA
+## 18. Notifications éphémères
+
+Quickshell est l’unique serveur `org.freedesktop.Notifications` configuré.
+`NotificationData.qml` est instancié une seule fois dans `StatusData`.
+
+Une seule notification est présentée, sur l’écran focalisé à la réception.
+La suivante remplace la précédente, y compris les mises à jour d’un même ID.
+Il n’y a ni cloche, ni historique, ni file, ni stockage de messages sur disque.
+Les notifications reçues en plein écran sont expirées sans affichage ni rejeu.
+Le passage en plein écran ou la disparition du moniteur ferme la carte courante.
+
+Chaque nouvelle notification affichée joue directement `message-new-instant.oga`
+du thème freedesktop (environ `1s`) avec `pw-play`, au volume `2.0` (200 %) et
+avec le rôle `Notification`. C’est le son « Message instantané » choisi après
+écoute : amplification directe du flux par `pw-play` (gain linéaire ×2, environ
+`+6dB`), sans conversion ni étape FFmpeg. Le fichier original et le volume général
+restent inchangés. Le lecteur et le son sont épinglés dans le Nix store. Respecter
+le hint `suppress-sound` ; les notifications rejetées en plein écran restent
+silencieuses. Il n’y a **aucun intervalle minimum**, ni file audio : chaque arrivée
+lance son lecteur indépendant, même pendant un son précédent. Les mises à jour
+d’une carte existante (même ID, image, texte) ne rejouent pas le son.
+
+La capsule s’étend vers le bas, sous le plafond commun des workspaces. La carte
+adapte sa largeur au nom d’application, au titre et au message : `FontMetrics`
+mesure la plus longue ligne non repliée avec la police du champ correspondant,
+puis ajoute les marges et l’avatar (`16 + 42 + 12 + texte + 16`). La largeur
+souhaitée va de `160px` à `480px`, toujours plafonnée par les workspaces dans
+`Bar.qml`. Les retours à la ligne explicites ne s’additionnent pas. Cette mesure
+ne dépend jamais de la largeur animée ni du texte déjà replié. Les messages longs
+reviennent à la ligne et les remplacements plus courts réduisent la capsule.
+Un `Text` de mesure non rendu calcule la hauteur du message à sa largeur finale,
+avec le plafond transmis par `Bar.qml` et les mêmes paramètres de texte que le
+champ affiché. Les retours à la ligne temporaires pendant l’animation ne font
+donc pas gonfler puis rétrécir la hauteur de la capsule.
+La carte mesure entre `80px` et `180px` de haut et affiche une image ronde de `42px`,
+l’application, le titre et quatre lignes de message maximum. L’image native
+peut être la photo d’un contact Beeper si l’application la transmet ; sinon,
+utiliser son icône, puis un glyphe de notification si celle-ci manque aussi.
+Le texte est rendu en `PlainText` et utilise les tokens de `Theme.js`.
+Le liseré tournant et les accents internes (dont la cloche de secours) utilisent
+le jaune vif `Theme.state`, jamais le rose `Theme.action`. Les textes neutres et
+les images/icônes fournies par les applications conservent leurs couleurs.
+
+Le timer dure `360 + 3000ms` : ouverture commune puis trois secondes de lecture,
+sans pause au survol. Il est relancé lors d’un remplacement. Échap ferme sans
+attendre ce timer. Un clic invoque l’action native `default` lorsqu’elle existe.
+La fermeture conserve brièvement l’objet avec `RetainableLock` pour terminer
+le fade et afficher son image, puis libère l’objet après `360ms`.
+
+La notification a priorité visuelle sur tous les autres modes, y compris la
+dictée. Leurs états et opérations continuent ; à la fermeture, afficher le mode
+encore actif, sans relancer un indicateur déjà expiré. Ne pas désactiver puis
+réactiver les composants masqués : cela réinitialiserait leurs sélections.
+`NotificationInputGuard.qml` intercepte leur saisie et restaure le champ focalisé.
+Une notification seule ne demande jamais de focus clavier exclusif.
+
+`topbar.dismissNotification` ferme la carte. Un bind Lua `auto_consuming` ne
+consomme Échap que lorsqu’une carte est signalée par Quickshell ; autrement,
+la touche est transmise normalement. La présence est synchronisée par `hyprctl
+eval`, avec un bail de cinq secondes pour ne pas garder Échap capturé après un
+crash. Dans le sous-mode Voxtype, fermer une notification ne doit ni annuler
+l’enregistrement ni réinitialiser le sous-mode ; l’Échap suivant reprend le
+comportement d’annulation habituel.
+
+Tests de régression : `QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
+QT_NO_XDG_DESKTOP_PORTAL=1 qs -p tests/tst_NotificationPopup.qml` depuis `top-bar/`
+vérifie la largeur adaptative, les retours à la ligne, les plafonds, les textes
+Unicode et l’indépendance par rapport à la largeur rendue. Ce test QtTest utilise
+`qs`, qui embarque les plugins statiques Quickshell nécessaires à la carte.
+`tests/tst_NotificationInputGuard.qml` avec `qmltestrunner`
+vérifie le focus, la protection du texte et Échap. `tests/escape_test.lua` prend
+le fichier `hyprland.lua` généré par Home Manager et vérifie les deux raccourcis
+dans un environnement Lua simulé. Vérifier également avec `notify-send` la
+réception native, les remplacements d’ID, l’action `default`, les images et
+l’expiration ; une notification réelle Beeper valide les données qu’il fournit.
+
+## 19. Calendrier météo
+
+`Super+E` (`Cmd+E`) remplace le lancement de Zed par `topbar.toggleCalendar`.
+Le clic sur la capsule température/date/heure appelle le même panneau sur son
+moniteur. Un second clic/raccourci ou Échap ferme le calendrier. `Super+Q`
+continue d’ouvrir la configuration dans Zed ; `Super+M` garde le special
+workspace Agenda, indépendant de ce calendrier consultatif.
+
+Le mode `calendar` appartient aux transitions communes et prend exactement
+`WorkspaceSwitcher.expandedImplicitWidth`, sans plafond local de `480px` ni
+constante copiée de `434px`. Sa hauteur suit le contenu : en-tête, noms des jours,
+quatre à six semaines nécessaires au mois, puis pied de panneau. Chaque semaine
+garde sept colonnes alignées et adapte sa hauteur : `24px` pour les numéros seuls,
+`44px` avec une icône, `60px` avec les mini/maxi. Les semaines sont espacées de
+`4px`. Le pied de panneau suit la dernière semaine avec `10px` de marge, puis
+`10px` jusqu’au bas. Aucune semaine vide ni espace météo inutilisé n’est réservé.
+La hauteur est calculée depuis les données, sans attendre une passe de layout
+(y compris derrière une notification ou sur un autre écran). Elle reste
+indépendante de la largeur et utilise l’animation commune de la capsule centrale.
+Les cases hors du mois sont vides. Le mois et les jours sont en français,
+du lundi au dimanche. Utiliser la couleur météo `Theme.sideWeather` pour les
+contrôles, icônes météo, températures et aujourd’hui, les neutres habituels pour
+le texte. Les icônes météo utilisent les glyphes monochromes d’`Ubuntu Nerd Font`,
+jamais les emojis multicolores. Chaque jour couvert affiche son numéro, son
+icône et les températures mini/maxi en °C (`12°/24°`). Aujourd’hui utilise un
+fond neutre et un contour coloré pour garder aussi son icône dans l’accent météo.
+Le liseré reste le rose d’activité commun ; seules les notifications le rendent jaune.
+
+Il n’y a pas de boutons de navigation souris dans l’en-tête : le titre utilise
+toute la largeur disponible. H/L et les flèches gauche/droite (ou Page Up/Down)
+changent le mois. Home et Entrée (y compris le pavé numérique) rétablissent le
+mois courant avec aujourd’hui surligné, sans fermer.
+Chaque nouvelle ouverture repart sur ce mois ; le passage derrière une
+notification, la dictée ou une demande Polkit conserve le mois consulté.
+Le passage à minuit suit le nouveau jour/mois tant que l’utilisateur n’a pas
+navigué vers un autre mois. Il n’y a aucune action sur les cases, aucun événement
+d’agenda, ni infobulle. Le focus et les clics masqués sont protégés par le guard
+des notifications ; la dictée garde sa priorité. Une disparition du moniteur
+cible ferme le calendrier.
+
+L’outil Rust `quickshell-weather`, dans `tools/quickshell/weather/` et empaqueté
+par `packages/quickshell/weather.nix`, remplace le wrapper `wttrbar`. Il récupère
+la localisation IP automatique via `https://fwd.gr/api/tools/ip` (Cloudflare), puis une température
+actuelle et 31 jours passés / jusqu’à 16 jours de prévision chez Open-Meteo.
+Pas de compte, clé API, scan Wi-Fi ou service système supplémentaire. Conserver
+le choix IPv4/IPv6 automatique de curl : ces adresses peuvent être localisées
+différemment. Seuls ville et coordonnées sont conservées, pas l’IP ni les autres
+métadonnées réseau/client renvoyées par fwd.gr. Le changement de fournisseur
+ne modifie pas le protocole/cache v2 ; un cache existant reste utilisable en cas d’échec.
+Il fournit des codes météo et températures mini/maxi quotidiens, pas les conditions de l’heure courante
+répétées dans chaque case. Les jours passés utilisent des données de modèle
+archivées et ne sont pas présentés comme des observations mesurées. Les dates
+restent des clés ISO locales sans conversion UTC. Code inconnu ou nul : pas
+d’icône. Mini/maxi incomplets : pas de température inventée. Date hors couverture :
+numéro seul, sans tiret ni météo inventée.
+
+Un seul `WeatherData` fournit température et calendrier à tous les écrans.
+Actualiser au démarrage, chaque heure et à l’ouverture si les données sont
+périmées ; ne jamais lancer une requête par jour ou écran. L’outil émet le cache
+valide immédiatement puis le résultat actualisé en JSON Lines. Le cache est
+écrit atomiquement dans `quickshell/weather/v2.json`, conservé en cas d’échec et
+rejeté au-delà de 24 heures ;
+l’interface applique aussi cette limite, même si aucun nouveau résultat n’arrive.
+Afficher la ville, Open-Meteo et l’heure de mise à jour/cache dans le pied de
+panneau. Sans données utilisables, conserver tout le calendrier et afficher `--°`
+dans la barre. La géolocalisation IP peut être erronée même en fibre, et peut
+être affectée par un VPN. Ne pas confondre ville estimée et position physique.
+
+Tests : `tst_CalendarPanel.qml` avec `qmltestrunner` vérifie la grille, les années
+bissextiles, les dates locales, les icônes/couleurs, les mini/maxi, la navigation
+clavier (dont H/L/Entrée), l’absence de boutons et la hauteur ajustée aux semaines
+et aux changements de données météo, sans variation liée à la largeur.
+`QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QT_NO_XDG_DESKTOP_PORTAL=1
+qs -p tests/tst_WeatherData.qml` depuis `top-bar/` vérifie température nulle/zéro,
+cache, expiration et erreurs. Les tests Rust du dossier de l’outil vérifient la
+validation, l’horizon demandé et la cohérence localisation/cache hors ligne.
+
+## 20. Règle finale pour une future IA
 
 Avant toute modification visuelle, identifier clairement :
 

@@ -29,7 +29,6 @@
     ./starship.nix
     # ./xdg_termfilechooser.nix
     ./fuzzel.nix
-    ./mako.nix
     ./neovim.nix
     # ./hyprpanel.nix
     ./hypridle.nix

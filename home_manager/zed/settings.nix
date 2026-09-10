@@ -86,6 +86,10 @@
   markdown_preview = {
     limit_content_width = false;
   };
+  markdown_preview_theme = (import ./markdown-theme.nix).name;
+  markdown_preview_font_family = "Ubuntu Nerd Font";
+  markdown_preview_code_font_family = "JetBrainsMono Nerd Font";
+  markdown_preview_font_size = 16;
 
   session = {
     trust_all_worktrees = true;

@@ -9,6 +9,10 @@
     } ''
       cp -R ${./quickshell/top-bar} "$out"
       chmod -R u+w "$out"
+      substituteInPlace "$out/NotificationData.qml" \
+        --replace-fail '"pw-play"' '"${pkgs.pipewire}/bin/pw-play"' \
+        --replace-fail '"/run/current-system/sw/share/sounds/freedesktop/stereo/message-new-instant.oga"' \
+          '"${pkgs.sound-theme-freedesktop}/share/sounds/freedesktop/stereo/message-new-instant.oga"'
       qsb --qt6 \
         -o "$out/shaders/activity-border.frag.qsb" \
         "$out/shaders/activity-border.frag"

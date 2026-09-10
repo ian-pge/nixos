@@ -15,9 +15,9 @@ commands through `localPackages`; Home Manager selects what to install.
 | `quickshell/system-stats/` | `quickshell/system-stats.nix` | Persistent Rust CPU, RAM, disk and backlight telemetry |
 | `quickshell/chrome-tabs/` | `quickshell/chrome-tabs.nix` | Rust TabCtl adapter and local SQLite favicon cache |
 | `quickshell/speedtest/` | `quickshell/speedtest.nix` | Generation-tagged Ookla JSON streaming and cancellation |
+| `quickshell/weather/` | `quickshell/weather.nix` | Rust automatic location, current temperature and daily calendar weather |
 
-The trivial GPU and weather wrappers live directly in
-`packages/quickshell/gpu-monitor.nix` and `packages/quickshell/weather.nix`.
+The trivial GPU wrapper lives directly in `packages/quickshell/gpu-monitor.nix`.
 The upstream GPU program has its own `packages/gpu-usage.nix` recipe. The
 Chrome tab integration and favicons live in `quickshell/chrome-tabs/`;
 `home_manager/tabctl.nix` installs the commands and registers the native host.
@@ -37,6 +37,7 @@ cargo test --manifest-path tools/quickshell/update/Cargo.toml
 cargo test --manifest-path tools/quickshell/brightness/Cargo.toml
 cargo test --manifest-path tools/quickshell/system-stats/Cargo.toml
 cargo test --manifest-path tools/quickshell/chrome-tabs/Cargo.toml
+cargo test --manifest-path tools/quickshell/weather/Cargo.toml
 ```
 
 The existing `tools/.envrc` selects that shell when direnv is enabled. There is

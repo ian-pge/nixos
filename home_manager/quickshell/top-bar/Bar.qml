@@ -14,10 +14,22 @@ PanelWindow {
   property bool entered: false
   readonly property int barTopInset: 10
   readonly property var hyprlandMonitor: Hyprland.monitorFor(window.screen)
+    ?? Hyprland.monitors.values.find(monitor => monitor.name === window.modelData.name)
+    ?? null
   readonly property string monitorName: hyprlandMonitor !== null
     ? hyprlandMonitor.name : ""
+  readonly property bool notificationActive: statusData.notifications.visible
+    && monitorName === statusData.notifications.targetMonitor
   readonly property bool volumeOverlayActive: statusData.volumeOverlayVisible
     && monitorName === statusData.volumeTargetMonitor
+  readonly property bool audioSelectorActive: statusData.audioSelectorVisible
+    && monitorName === statusData.audioTargetMonitor
+  readonly property bool audioSelectorKeyboardActive: audioSelectorActive
+    && !statusData.voiceDictationActive
+  readonly property bool calendarActive: statusData.calendarVisible
+    && monitorName === statusData.calendarTargetMonitor
+  readonly property bool calendarKeyboardActive: calendarActive
+    && !statusData.voiceDictationActive
   readonly property bool brightnessOverlayActive: statusData.brightnessOverlayVisible
     && monitorName === statusData.brightnessTargetMonitor
   readonly property bool dictationOverlayActive: statusData.voiceDictationActive
@@ -42,7 +54,8 @@ PanelWindow {
     && !statusData.chromeTabsActionPending
   readonly property bool keyboardSelectorActive: wifiSelectorKeyboardActive
     || bluetoothSelectorKeyboardActive || updateSelectorKeyboardActive
-    || appLauncherKeyboardActive || chromeTabsKeyboardActive
+    || appLauncherKeyboardActive || chromeTabsKeyboardActive || audioSelectorKeyboardActive
+    || calendarKeyboardActive
 
   screen: modelData
 
@@ -133,39 +146,29 @@ PanelWindow {
     }
 
     Pill {
-      text: " " + statusData.diskUsage + "%"
-      accent: Theme.sideDisk
-      leftCommand: "ghostty -e ncdu"
-    }
-
-    Pill {
-      text: " " + statusData.cpuUsage + "%"
-      accent: Theme.sideCpu
-      leftCommand: "ghostty -e htop"
-    }
-
-    Pill {
-      text: "  " + statusData.memoryUsage + "%"
-      accent: Theme.sideMemory
-      leftCommand: "ghostty -e htop"
-    }
-
-    Pill {
-      text: " " + statusData.gpuText
-      accent: Theme.sideGpu
-      leftCommand: "ghostty -e nvtop"
+      text: [
+        " " + statusData.cpuUsage + "%",
+        "  " + statusData.memoryUsage + "%",
+        " " + statusData.gpuText,
+        " " + statusData.diskUsage + "%"
+      ].join("   ")
+      accent: Theme.sideSystem
     }
   }
 
   Rectangle {
     id: centerMorph
-    readonly property bool overlayVisible: window.volumeOverlayActive
+    readonly property bool overlayVisible: window.notificationActive || window.volumeOverlayActive
+      || window.audioSelectorActive || window.calendarActive
       || window.brightnessOverlayActive || window.mediaOverlayActive
       || window.appLauncherActive || window.chromeTabsActive
       || window.wifiSelectorActive || window.bluetoothSelectorActive
       || window.updateSelectorActive || window.dictationOverlayActive
-    readonly property string targetMode: window.dictationOverlayActive
-      ? "dictation" : window.appLauncherActive ? "launcher"
+    readonly property string targetMode: window.notificationActive ? "notification"
+      : window.dictationOverlayActive
+      ? "dictation" : window.calendarActive ? "calendar"
+      : window.audioSelectorActive ? "audio"
+      : window.appLauncherActive ? "launcher"
       : window.chromeTabsActive ? "tabs"
       : window.updateSelectorActive ? "updates"
       : window.wifiSelectorActive ? "wifi"
@@ -173,8 +176,11 @@ PanelWindow {
       : window.mediaOverlayActive ? "media"
       : window.volumeOverlayActive ? "volume"
       : window.brightnessOverlayActive ? "brightness" : "workspaces"
-    readonly property real targetWidth: window.dictationOverlayActive
+    readonly property real preferredWidth: window.notificationActive
+      ? notificationPopup.implicitWidth : window.dictationOverlayActive
       ? voiceDictationIndicator.implicitWidth
+      : window.calendarActive ? workspaceSwitcher.expandedImplicitWidth
+      : window.audioSelectorActive ? audioSelector.implicitWidth
       : window.appLauncherActive ? appLauncher.implicitWidth
       : window.chromeTabsActive ? chromeTabsLauncher.implicitWidth
       : window.updateSelectorActive ? updateSelector.implicitWidth
@@ -182,15 +188,20 @@ PanelWindow {
       : window.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
       : window.mediaOverlayActive ? nowPlayingIndicator.implicitWidth
       : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
-    readonly property real targetHeight: window.dictationOverlayActive
+    readonly property real targetWidth: Math.min(preferredWidth,
+      workspaceSwitcher.expandedImplicitWidth)
+    readonly property real targetHeight: window.notificationActive
+      ? notificationPopup.implicitHeight : window.dictationOverlayActive
       ? voiceDictationIndicator.implicitHeight
+      : window.calendarActive ? calendarPanel.implicitHeight
+      : window.audioSelectorActive ? audioSelector.implicitHeight
       : window.appLauncherActive ? appLauncher.implicitHeight
       : window.chromeTabsActive ? chromeTabsLauncher.implicitHeight
       : window.updateSelectorActive ? updateSelector.implicitHeight
       : window.wifiSelectorActive ? wifiSelector.implicitHeight : 36
-    readonly property var contentModes: ["workspaces", "volume",
+    readonly property var contentModes: ["workspaces", "volume", "audio",
       "brightness", "dictation", "media", "wifi", "bluetooth",
-      "launcher", "tabs", "updates"]
+      "launcher", "tabs", "updates", "notification", "calendar"]
     property string visualSourceMode: "workspaces"
     property string visualTargetMode: "workspaces"
     property real transitionProgress: 1
@@ -199,6 +210,9 @@ PanelWindow {
     property var startOffsets: ({})
 
     function modeHeight(mode) {
+      if (mode === "notification") return notificationPopup.implicitHeight;
+      if (mode === "calendar") return calendarPanel.implicitHeight;
+      if (mode === "audio") return audioSelector.implicitHeight;
       if (mode === "launcher") return appLauncher.implicitHeight;
       if (mode === "tabs") return chromeTabsLauncher.implicitHeight;
       if (mode === "updates") return updateSelector.implicitHeight;
@@ -211,9 +225,12 @@ PanelWindow {
       return workspaceSwitcher.implicitHeight;
     }
 
-    function localTransitionMode(mode, targetMonitor) {
-      return mode === "workspaces" || targetMonitor === window.monitorName
-        ? mode : "workspaces";
+    // Coalesce synchronous state changes and follow the actually presented mode
+    // on this monitor, including when a notification covers a changing widget.
+    onTargetModeChanged: Qt.callLater(syncContentTransition)
+
+    function syncContentTransition() {
+      startContentTransition(visualTargetMode, targetMode);
     }
 
     function clamp01(value) {
@@ -318,20 +335,6 @@ PanelWindow {
       easing.type: Easing.Linear
     }
 
-    Connections {
-      target: window.statusData
-
-      function onCenterTransitionSerialChanged() {
-        const sourceMode = centerMorph.localTransitionMode(
-          window.statusData.centerTransitionSourceMode,
-          window.statusData.centerTransitionSourceMonitor);
-        const targetMode = centerMorph.localTransitionMode(
-          window.statusData.centerTransitionTargetMode,
-          window.statusData.centerTransitionTargetMonitor);
-        centerMorph.startContentTransition(sourceMode, targetMode);
-      }
-    }
-
     transform: Translate {
       y: window.entered ? 0 : -12
       Behavior on y {
@@ -373,6 +376,20 @@ PanelWindow {
       color: "transparent"
       opacity: centerMorph.contentOpacity("volume")
       enabled: window.volumeOverlayActive
+    }
+
+    AudioSelector {
+      id: audioSelector
+      anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+      }
+      height: implicitHeight
+      transform: Translate { y: centerMorph.contentOffset("audio") }
+      statusData: window.statusData
+      opacity: centerMorph.contentOpacity("audio")
+      enabled: window.audioSelectorKeyboardActive
     }
 
     BrightnessIndicator {
@@ -490,6 +507,42 @@ PanelWindow {
       enabled: window.updateSelectorKeyboardActive
     }
 
+    CalendarPanel {
+      id: calendarPanel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      implicitWidth: workspaceSwitcher.expandedImplicitWidth
+      height: implicitHeight
+      statusData: window.statusData
+      transform: Translate { y: centerMorph.contentOffset("calendar") }
+      opacity: centerMorph.contentOpacity("calendar")
+      enabled: window.calendarKeyboardActive
+    }
+
+    NotificationInputGuard {
+      id: notificationKeyboardShield
+      anchors.fill: parent
+      active: window.notificationActive
+      captureInput: window.keyboardSelectorActive
+      z: 1
+      onDismissed: window.statusData.notifications.close()
+    }
+
+    NotificationPopup {
+      id: notificationPopup
+      maximumWidth: workspaceSwitcher.expandedImplicitWidth
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: implicitHeight
+      notificationData: window.statusData.notifications
+      transform: Translate { y: centerMorph.contentOffset("notification") }
+      opacity: centerMorph.contentOpacity("notification")
+      enabled: window.notificationActive
+      z: 2
+    }
+
     ShaderEffect {
       id: activityBorder
       anchors.fill: parent
@@ -498,6 +551,9 @@ PanelWindow {
 
       property size itemSize: Qt.size(width, height)
       property real phase: 0
+      // Keep the notification accent until its outgoing content has faded out.
+      property color trailColor: window.notificationActive || notificationPopup.opacity > 0.001
+        ? Theme.state : Theme.action
       fragmentShader: Qt.resolvedUrl(
         "shaders/activity-border.frag.qsb")
 
@@ -535,14 +591,16 @@ PanelWindow {
     }
 
     Pill {
-      iconOnly: statusData.audioMuted
-      text: statusData.audioMuted
-        ? "󰖁"
-        : statusData.audioIcon() + " " + statusData.audioVolume + "%"
+      text: statusData.audioIcon() + " " + statusData.audioVolume + "%"
+      trailingText: !statusData.microphoneAvailable || statusData.microphoneMuted
+        ? "󰍭" : "󰍬"
+      trailingInactive: !statusData.microphoneAvailable
       accent: Theme.sideVolume
-      forceHovered: window.volumeOverlayActive
-      leftCommand: "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer"
+      forceHovered: window.volumeOverlayActive || window.audioSelectorActive
+        || (statusData.microphoneFeedbackActive
+          && window.monitorName === statusData.microphoneFeedbackTargetMonitor)
       interactive: true
+      onLeftClicked: statusData.toggleAudioSelector(window.monitorName)
       onWheelUp: {
         statusData.setVolume(statusData.volumeStep);
         statusData.showVolumeOverlay(window.monitorName);
@@ -563,18 +621,15 @@ PanelWindow {
     }
 
     Pill {
-      text: statusData.weatherText
+      text: [
+        statusData.weatherText,
+        " " + statusData.dateText,
+        " " + statusData.timeText
+      ].join("   ")
       accent: Theme.sideWeather
-    }
-
-    Pill {
-      text: " " + statusData.dateText
-      accent: Theme.sideDate
-    }
-
-    Pill {
-      text: " " + statusData.timeText
-      accent: Theme.sideTime
+      forceHovered: window.calendarActive
+      interactive: true
+      onLeftClicked: statusData.toggleCalendar(window.monitorName)
     }
   }
 

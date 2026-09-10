@@ -2,14 +2,19 @@
   helpers,
   voxtypePackage,
 }: let
-  inherit (helpers) mkBind mkExec plainKey;
+  inherit (helpers) mkBind plainKey toLua;
 in {
   voxtype = {
-    onDispatch = "reset";
     settings.bind = [
       (mkBind
         (plainKey "ESCAPE")
-        (mkExec "${voxtypePackage}/bin/voxtype record cancel")
+        ''function()
+          if quickshell_dismiss_notification() then
+            return
+          end
+          hl.exec_cmd(${toLua "${voxtypePackage}/bin/voxtype record cancel"})
+          hl.dispatch(hl.dsp.submap("reset"))
+        end''
         {ignore_mods = true;})
     ];
   };

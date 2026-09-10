@@ -8,9 +8,15 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.Polkit
 import Quickshell.Services.UPower
 import QtQuick
+import "components/Calendar.js" as Calendar
 
 Scope {
   id: root
+
+  readonly property var notifications: notificationData
+  NotificationData { id: notificationData }
+  readonly property var weather: weatherData
+  WeatherData { id: weatherData }
 
   property int cpuUsage: 0
   property int memoryUsage: 0
@@ -31,7 +37,7 @@ Scope {
     || voiceDictationTranscribing
 
   property string gpuText: "--"
-  property string weatherText: "--°"
+  readonly property string weatherText: weatherData.temperatureText
   property string nixIcon: ""
   property var nixUpdates: []
   property bool nixChecking: true
@@ -96,6 +102,20 @@ Scope {
   property string updateTargetMonitor: ""
   property bool volumeOverlayVisible: false
   property string volumeTargetMonitor: ""
+  readonly property bool microphoneFeedbackActive: microphoneFeedbackTimer.running
+  property string microphoneFeedbackTargetMonitor: ""
+  property bool audioSelectorVisible: false
+  property string audioTargetMonitor: ""
+  property bool calendarVisible: false
+  property string calendarTargetMonitor: ""
+  property int calendarYear: calendarToday.getFullYear()
+  property int calendarMonth: calendarToday.getMonth()
+  property bool calendarFollowsToday: true
+  readonly property date calendarToday: clock.date
+  onCalendarTodayChanged: {
+    if (calendarFollowsToday)
+      calendarGoToday();
+  }
   property bool brightnessOverlayVisible: false
   property string brightnessTargetMonitor: ""
   property string voiceDictationState: "stopped"
@@ -148,6 +168,7 @@ Scope {
   property var bluetoothActionDevice: null
   property bool bluetoothStartedDiscovery: false
   readonly property bool centerOverlayVisible: volumeOverlayVisible
+    || audioSelectorVisible || calendarVisible
     || brightnessOverlayVisible || mediaOverlayVisible || appLauncherVisible
     || chromeTabsVisible || wifiSelectorVisible || bluetoothSelectorVisible
     || updateSelectorVisible
@@ -269,6 +290,15 @@ Scope {
   }
 
   readonly property var audioSink: Pipewire.defaultAudioSink
+  readonly property var microphoneSource: Pipewire.defaultAudioSource
+  readonly property var microphone: microphoneSource !== null ? microphoneSource.audio : null
+  readonly property bool microphoneAvailable: microphoneSource !== null
+    && microphoneSource.ready && microphone !== null
+  readonly property bool microphoneMuted: microphoneAvailable && microphone.muted
+  readonly property var audioDevices: Pipewire.nodes.values.filter(node =>
+    !node.isStream && node.audio !== null)
+  readonly property var audioOutputs: audioDevices.filter(node => node.isSink)
+  readonly property var audioInputs: audioDevices.filter(node => !node.isSink)
   readonly property var audio: audioSink !== null ? audioSink.audio : null
   readonly property bool audioMuted: audio !== null && audio.muted
   readonly property int audioVolume: audio !== null
@@ -786,6 +816,8 @@ Scope {
   }
 
   function visibleCenterModeWithoutVoice() {
+    if (calendarVisible) return "calendar";
+    if (audioSelectorVisible) return "audio";
     if (appLauncherVisible) return "launcher";
     if (chromeTabsVisible) return "tabs";
     if (updateSelectorVisible) return "updates";
@@ -803,6 +835,8 @@ Scope {
   }
 
   function monitorForCenterMode(mode) {
+    if (mode === "calendar") return calendarTargetMonitor;
+    if (mode === "audio") return audioTargetMonitor;
     if (mode === "dictation") return voiceDictationTargetMonitor;
     if (mode === "launcher") return appLauncherTargetMonitor;
     if (mode === "tabs") return chromeTabsTargetMonitor;
@@ -934,6 +968,8 @@ Scope {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const preserveQuery = appLauncherVisible;
     const ownsTransition = beginCenterTransition("launcher", resolvedTarget);
+    hideCalendar();
+    hideAudioSelector();
     hideMediaOverlay();
     hideWifiSelector();
     hideBluetoothSelector();
@@ -968,6 +1004,8 @@ Scope {
   function showChromeTabs(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("tabs", resolvedTarget);
+    hideCalendar();
+    hideAudioSelector();
     hideAppLauncher();
     hideMediaOverlay();
     hideWifiSelector();
@@ -992,9 +1030,9 @@ Scope {
   }
 
   function showMediaOverlay(targetMonitor = "") {
-    if (mprisPlayer === null || appLauncherVisible || chromeTabsVisible
+    if (mprisPlayer === null || appLauncherVisible || chromeTabsVisible || audioSelectorVisible
         || wifiSelectorVisible || bluetoothSelectorVisible
-        || updateSelectorVisible)
+        || updateSelectorVisible || calendarVisible)
       return;
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("media", resolvedTarget);
@@ -1049,6 +1087,110 @@ Scope {
     audio.volume = Math.max(0, Math.min(1, audio.volume + delta));
   }
 
+  function audioDeviceLabel(node) {
+    return node.nickname || node.description || node.name;
+  }
+
+  function selectAudioDevice(node) {
+    // Re-check membership: a device may disappear between key press and dispatch.
+    if (!Pipewire.ready || node === null || !node.ready
+        || !audioDevices.includes(node))
+      return;
+    if (node.isSink)
+      Pipewire.preferredDefaultAudioSink = node;
+    else
+      Pipewire.preferredDefaultAudioSource = node;
+  }
+
+  function toggleMicrophoneMute() {
+    if (!microphoneAvailable)
+      return;
+    microphone.muted = !microphone.muted;
+    microphoneFeedbackTargetMonitor = resolveTargetMonitor();
+    microphoneFeedbackTimer.restart();
+  }
+
+  function toggleAudioSelector(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (audioSelectorVisible && audioTargetMonitor === resolvedTarget) {
+      hideAudioSelector();
+      return;
+    }
+    const ownsTransition = beginCenterTransition("audio", resolvedTarget);
+    hideCalendar();
+    hideAppLauncher();
+    hideChromeTabs();
+    hideMediaOverlay();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    audioTargetMonitor = resolvedTarget;
+    audioSelectorVisible = true;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function hideAudioSelector() {
+    if (!audioSelectorVisible)
+      return;
+    const ownsTransition = beginCenterTransition("workspaces");
+    audioSelectorVisible = false;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function calendarGoToday() {
+    calendarYear = calendarToday.getFullYear();
+    calendarMonth = calendarToday.getMonth();
+    calendarFollowsToday = true;
+  }
+
+  function calendarMoveMonth(delta) {
+    const date = Calendar.localDate(calendarYear, calendarMonth + delta, 1);
+    if (date.getFullYear() < 1 || date.getFullYear() > 9999)
+      return;
+    calendarYear = date.getFullYear();
+    calendarMonth = date.getMonth();
+    calendarFollowsToday = false;
+  }
+
+  function toggleCalendar(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (calendarVisible && calendarTargetMonitor === resolvedTarget)
+      hideCalendar();
+    else
+      showCalendar(resolvedTarget);
+  }
+
+  function showCalendar(targetMonitor = "", resetMonth = true) {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const wasVisible = calendarVisible;
+    const ownsTransition = beginCenterTransition("calendar", resolvedTarget);
+    hideAudioSelector();
+    hideAppLauncher();
+    hideChromeTabs();
+    hideMediaOverlay();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    if (!wasVisible && resetMonth)
+      calendarGoToday();
+    calendarTargetMonitor = resolvedTarget;
+    calendarVisible = true;
+    weatherData.refreshIfNeeded();
+    finishCenterTransition(ownsTransition);
+  }
+
+  function hideCalendar() {
+    if (!calendarVisible)
+      return;
+    const ownsTransition = beginCenterTransition("workspaces");
+    calendarVisible = false;
+    finishCenterTransition(ownsTransition);
+  }
+
   function volumeUp() {
     setVolume(volumeStep);
     showVolumeOverlay();
@@ -1072,8 +1214,11 @@ Scope {
   }
 
   function showVolumeOverlay(targetMonitor = "") {
+    if (audioSelectorVisible)
+      return;
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("volume", resolvedTarget);
+    hideCalendar();
     hideAppLauncher();
     hideMediaOverlay();
     hideWifiSelector();
@@ -1215,6 +1360,8 @@ Scope {
   function showBrightnessOverlay(targetMonitor = "", refreshValue = true) {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("brightness", resolvedTarget);
+    hideCalendar();
+    hideAudioSelector();
     hideAppLauncher();
     hideMediaOverlay();
     hideWifiSelector();
@@ -1255,6 +1402,8 @@ Scope {
     if (wifiSelectorVisible && wifiTargetMonitor === resolvedTarget)
       return;
     const ownsTransition = beginCenterTransition("wifi", resolvedTarget);
+    hideCalendar();
+    hideAudioSelector();
     if (wifiSelectorVisible)
       hideWifiSelector();
     hideAppLauncher();
@@ -1525,6 +1674,8 @@ Scope {
     if (bluetoothSelectorVisible && bluetoothTargetMonitor === resolvedTarget)
       return;
     const ownsTransition = beginCenterTransition("bluetooth", resolvedTarget);
+    hideCalendar();
+    hideAudioSelector();
     if (bluetoothSelectorVisible)
       hideBluetoothSelector();
     hideAppLauncher();
@@ -1744,6 +1895,8 @@ Scope {
   function showUpdateSelector(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("updates", resolvedTarget);
+    hideCalendar();
+    hideAudioSelector();
     hideAppLauncher();
     hideMediaOverlay();
     hideWifiSelector();
@@ -1896,6 +2049,8 @@ Scope {
     else if (mode === "updates") showUpdateSelector(monitor);
     else if (mode === "wifi") showWifiSelector(monitor);
     else if (mode === "bluetooth") showBluetoothSelector(monitor);
+    else if (mode === "audio") toggleAudioSelector(monitor);
+    else if (mode === "calendar") showCalendar(monitor, false);
     else if (mode === "media") showMediaOverlay(monitor);
   }
 
@@ -1948,7 +2103,8 @@ Scope {
   }
 
   PwObjectTracker {
-    objects: [Pipewire.defaultAudioSink]
+    objects: root.audioSelectorVisible ? root.audioDevices
+      : [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource].filter(node => node !== null)
   }
 
   Process {
@@ -2046,6 +2202,8 @@ Scope {
 
     function onValuesChanged() {
       root.resetBrightnessState();
+      if (root.calendarVisible && !Hyprland.monitors.values.some(monitor => monitor.name === root.calendarTargetMonitor))
+        root.hideCalendar();
     }
   }
 
@@ -2204,34 +2362,6 @@ Scope {
     }
   }
 
-  Process {
-    id: weatherProcess
-    command: ["quickshell-weather"]
-    running: true
-
-    stdout: StdioCollector {
-      onStreamFinished: {
-        try {
-          const weather = JSON.parse(text.trim());
-          root.weatherText = (weather.text || "--") + "°";
-        } catch (error) {
-          root.weatherText = "--°";
-          console.warn("Unable to parse weather data:", error);
-        }
-      }
-    }
-  }
-
-  Timer {
-    interval: 3600000
-    running: true
-    repeat: true
-    onTriggered: {
-      if (!weatherProcess.running)
-        weatherProcess.running = true;
-    }
-  }
-
   PolkitAgent {
     id: polkitAgent
 
@@ -2324,6 +2454,11 @@ Scope {
   }
 
   Timer {
+    id: microphoneFeedbackTimer
+    interval: volumeOverlayTimer.interval
+  }
+
+  Timer {
     id: brightnessDispatchTimer
     interval: 180
     onTriggered: root.applyPendingBrightnessChange()
@@ -2344,6 +2479,10 @@ Scope {
 
   IpcHandler {
     target: "topbar"
+
+    function dismissNotification() {
+      notificationData.close();
+    }
 
     function refreshNix() {
       root.refreshNixStatus();
@@ -2371,6 +2510,18 @@ Scope {
 
     function toggleAudioMute() {
       root.toggleAudioMute();
+    }
+
+    function toggleAudio() {
+      root.toggleAudioSelector();
+    }
+
+    function toggleCalendar() {
+      root.toggleCalendar();
+    }
+
+    function toggleMicrophoneMute() {
+      root.toggleMicrophoneMute();
     }
 
     function showVolume() {

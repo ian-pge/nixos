@@ -18,8 +18,6 @@ Item {
   readonly property string specialSlotName: presentedSpecialWorkspace.startsWith("special:")
     ? presentedSpecialWorkspace.slice(8) : presentedSpecialWorkspace
   readonly property real specialSlotWidth: Math.max(70, specialLabel.implicitWidth + 24)
-  readonly property real specialExtraWidth: specialWorkspaceVisible
-    ? specialSlotWidth + 12 : 0
   readonly property real naturalContentWidth: {
     let total = 0;
     for (let workspaceId = 1; workspaceId <= 8; workspaceId++) {
@@ -108,7 +106,9 @@ Item {
   }
 
   readonly property real baseImplicitWidth: naturalContentWidth + 12
-  implicitWidth: baseImplicitWidth + specialExtraWidth
+  // Shared central-widget width limit, including a special slot even when closed.
+  readonly property real expandedImplicitWidth: baseImplicitWidth + specialSlotWidth + 12
+  implicitWidth: specialWorkspaceVisible ? expandedImplicitWidth : baseImplicitWidth
   implicitHeight: 36
 
   Component.onCompleted: Qt.callLater(() => syncSpecialWorkspace(false))

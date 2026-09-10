@@ -15,6 +15,17 @@ in {
     configType = "lua";
     systemd.enable = false;
 
+    extraConfig = ''
+      function quickshell_dismiss_notification()
+        if (quickshell_notification_deadline or 0) <= os.time() then
+          return false
+        end
+        quickshell_notification_deadline = 0
+        hl.exec_cmd(${helpers.toLua "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar dismissNotification"})
+        return true
+      end
+    '';
+
     submaps = import ./submaps.nix {
       inherit helpers voxtypePackage;
     };

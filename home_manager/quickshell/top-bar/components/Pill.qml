@@ -6,6 +6,8 @@ Item {
   id: root
 
   property string text: ""
+  property string trailingText: ""
+  property bool trailingInactive: false
   property color accent: Theme.foreground
   property string leftCommand: ""
   property string rightCommand: ""
@@ -22,7 +24,8 @@ Item {
   signal wheelUp()
   signal wheelDown()
 
-  implicitWidth: iconOnly ? 36 : Math.max(36, label.implicitWidth + 20)
+  implicitWidth: iconOnly ? 36 : Math.max(36, label.implicitWidth + 20
+    + (trailingText !== "" ? trailingLabel.implicitWidth + 8 : 0))
   implicitHeight: 36
 
   function run(command) {
@@ -42,19 +45,30 @@ Item {
       ColorAnimation { duration: 220 }
     }
 
-    Text {
-      id: label
-      anchors.fill: parent
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: root.text
-      color: root.hovered ? Theme.background : root.accent
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 16
-      font.bold: true
+    Row {
+      anchors.centerIn: parent
+      spacing: 8
 
-      Behavior on color {
-        ColorAnimation { duration: 220 }
+      Text {
+        id: label
+        text: root.text
+        color: root.hovered ? Theme.background : root.accent
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: 16
+        font.bold: true
+
+        Behavior on color { ColorAnimation { duration: 220 } }
+      }
+
+      Text {
+        id: trailingLabel
+        visible: root.trailingText !== ""
+        text: root.trailingText
+        color: root.trailingInactive ? Theme.inactive
+          : root.hovered ? Theme.background : root.accent
+        font: label.font
+
+        Behavior on color { ColorAnimation { duration: 220 } }
       }
     }
   }

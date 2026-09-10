@@ -3,8 +3,8 @@
     wireplumber.enable = true;
     wireplumber.extraConfig."10-output-priorities" = {
       "wireplumber.settings" = {
-        # Always select the best currently available output instead of
-        # restoring a previously selected one.
+        # Do not restore past manual choices across sessions. The hotplug hook
+        # below releases the current choice when device availability changes.
         "node.restore-default-targets" = false;
       };
 
@@ -32,6 +32,18 @@
           actions.update-props."priority.session" = 1200;
         }
       ];
+    };
+    wireplumber.extraScripts."default-nodes/release-on-hotplug.lua" =
+      builtins.readFile ./wireplumber/release-on-hotplug.lua;
+    wireplumber.extraConfig."11-release-on-hotplug" = {
+      "wireplumber.components" = [
+        {
+          name = "default-nodes/release-on-hotplug.lua";
+          type = "script/lua";
+          provides = "custom.default-nodes.release-on-hotplug";
+        }
+      ];
+      "wireplumber.profiles".main."custom.default-nodes.release-on-hotplug" = "required";
     };
     enable = true;
     alsa = {

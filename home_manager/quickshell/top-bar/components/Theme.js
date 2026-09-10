@@ -20,6 +20,7 @@ var sideApplications = "#7dc4e4";
 var sideUpdates = "#f0c6c6";
 var sideNetwork = "#ee99a0";
 var sideBluetooth = "#8aadf4";
+var sideSystem = "#c6a0f6";
 var sideDisk = "#f5a97f";
 var sideCpu = "#91d7e3";
 var sideMemory = "#c6a0f6";

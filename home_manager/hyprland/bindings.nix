@@ -92,13 +92,21 @@ in {
   fileManagerGraphic._var = "nautilus";
   calculator._var = "ghostty --class=dev.me.calc --title=Calculator -e kalker";
   menu._var = "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleLauncher";
-  editor._var = "zeditor";
-  audio._var = "pgrep -x pulsemixer >/dev/null 2>&1 || ghostty --class=dev.me.audio --title=Audio -e pulsemixer";
+  audio._var = "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleAudio";
   settings._var = "cosmic-settings";
   mainMod._var = "SUPER";
 
   bind =
     [
+      (mkBind
+        (plainKey "ESCAPE")
+        ''function()
+          if quickshell_dismiss_notification() then
+            return { ok = true }
+          end
+          return { ok = false, pass_event = true }
+        end''
+        {auto_consuming = true;})
       (mkBind
         (plainKey "XF86AudioRaiseVolume")
         (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar volumeUp")
@@ -120,6 +128,7 @@ in {
       (mkBind (plainKey "XF86AudioNext") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar mediaNext") {})
       (mkBind (plainKey "XF86AudioPrev") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar mediaPrevious") {})
       (mkBind (plainKey "XF86AudioMute") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleAudioMute") {})
+      (mkBind (plainKey "XF86VoiceCommand") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleMicrophoneMute") {})
       (mkBind (plainKey "PRINT") (mkExec "hyprshot -m region -o ~/Pictures/Screenshots") {})
       (mkBind (mainKey "RETURN") "hl.dsp.exec_cmd(terminal)" {})
       (mkBind (mainKey "W") "hl.dsp.window.close()" {})
@@ -135,7 +144,7 @@ in {
       (mkBind (mainKey "R") "hl.dsp.exec_cmd(audio)" {})
       (mkBind (mainKey "A") "hl.dsp.exec_cmd(menu)" {})
       (mkBind (mainKey "code:47") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleChromeTabs") {})
-      (mkBind (mainKey "E") "hl.dsp.exec_cmd(editor)" {})
+      (mkBind (mainKey "E") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleCalendar") {})
       (mkBind (mainKey "Z") ''hl.dsp.layout("togglesplit")'' {})
       (mkBind (mainKey "G") "hl.dsp.exec_cmd(browser)" {})
       (mkBind (mainKey "M") ''hl.dsp.workspace.toggle_special("Agenda")'' {})

@@ -1,4 +1,8 @@
-{pkgs, ...}: let
+{
+  config,
+  pkgs,
+  ...
+}: let
   yaziOpen = pkgs.writeShellScriptBin "yazi-open" ''
     # Debug logging used while fixing this wrapper; left here for easy re-enable:
     # log_dir="$HOME/.cache/yazi-open"
@@ -25,7 +29,7 @@
     }
 
     open_with_zed() {
-      run_in_uwsm zed ${pkgs.zed-editor}/bin/zeditor --new "$1"
+      run_in_uwsm zed ${config.programs.zed-editor.package}/bin/zeditor --new "$1"
     }
 
     open_with_default_app() {
