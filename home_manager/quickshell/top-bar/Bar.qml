@@ -3,6 +3,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
 import "components"
+import "components/Calendar.js" as Calendar
 import "components/Theme.js" as Theme
 
 PanelWindow {
@@ -18,6 +19,9 @@ PanelWindow {
     ?? null
   readonly property string monitorName: hyprlandMonitor !== null
     ? hyprlandMonitor.name : ""
+  readonly property bool fullscreenActive: hyprlandMonitor !== null
+    && hyprlandMonitor.activeWorkspace !== null
+    && hyprlandMonitor.activeWorkspace.hasFullscreen
   readonly property bool notificationActive: statusData.notifications.visible
     && monitorName === statusData.notifications.targetMonitor
   readonly property bool volumeOverlayActive: statusData.volumeOverlayVisible
@@ -29,6 +33,10 @@ PanelWindow {
   readonly property bool calendarActive: statusData.calendarVisible
     && monitorName === statusData.calendarTargetMonitor
   readonly property bool calendarKeyboardActive: calendarActive
+    && !statusData.voiceDictationActive
+  readonly property bool systemPanelActive: statusData.systemPanelVisible
+    && monitorName === statusData.systemTargetMonitor
+  readonly property bool systemPanelKeyboardActive: systemPanelActive
     && !statusData.voiceDictationActive
   readonly property bool brightnessOverlayActive: statusData.brightnessOverlayVisible
     && monitorName === statusData.brightnessTargetMonitor
@@ -55,7 +63,7 @@ PanelWindow {
   readonly property bool keyboardSelectorActive: wifiSelectorKeyboardActive
     || bluetoothSelectorKeyboardActive || updateSelectorKeyboardActive
     || appLauncherKeyboardActive || chromeTabsKeyboardActive || audioSelectorKeyboardActive
-    || calendarKeyboardActive
+    || calendarKeyboardActive || systemPanelKeyboardActive
 
   screen: modelData
 
@@ -78,7 +86,11 @@ PanelWindow {
   color: "transparent"
   exclusionMode: ExclusionMode.Normal
   exclusiveZone: 36 + barTopInset
-  aboveWindows: true
+  // Raise this monitor's entire bar while a central widget is open. Keep it
+  // above fullscreen through the closing morph, then return to the normal layer.
+  WlrLayershell.layer: fullscreenActive
+    && (centerMorph.overlayVisible || fullscreenHideDelay.running)
+    ? WlrLayer.Overlay : WlrLayer.Top
   WlrLayershell.namespace: "quickshell-top-bar"
   WlrLayershell.keyboardFocus: keyboardSelectorActive
     ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
@@ -90,6 +102,11 @@ PanelWindow {
   }
 
   Component.onCompleted: entered = true
+
+  Timer {
+    id: fullscreenHideDelay
+    interval: 360
+  }
 
   Row {
     id: leftModules
@@ -109,64 +126,58 @@ PanelWindow {
     Behavior on opacity { NumberAnimation { duration: 240 } }
 
     Pill {
-      iconOnly: true
-      text: ""
-      accent: Theme.sideApplications
-      forceHovered: window.appLauncherActive
+      readonly property var forecast: statusData.weather.days[Calendar.dateKey(statusData.calendarToday)]
+      readonly property string weatherIcon: Calendar.weatherIcon(forecast?.code)
+      textFormat: Text.StyledText
+      text: [
+        " " + statusData.timeText,
+        " " + statusData.dateText,
+        (weatherIcon !== "" ? weatherIcon + "&nbsp;" : "") + statusData.weatherText
+      ].join("&nbsp;&nbsp;&nbsp;")
+      accent: Theme.sideWeather
+      forceHovered: window.calendarActive
       interactive: true
-      onLeftClicked: statusData.toggleAppLauncher(window.monitorName)
+      onLeftClicked: statusData.toggleCalendar(window.monitorName)
     }
 
     Pill {
-      iconOnly: true
-      text: statusData.displayedNixIcon
-      accent: Theme.sideUpdates
-      forceHovered: window.updateSelectorActive
-      interactive: true
-      onLeftClicked: statusData.toggleUpdateSelector(window.monitorName)
-      onRightClicked: statusData.forceNixStatus()
-    }
-
-    Pill {
-      iconOnly: true
-      text: statusData.networkIcon()
-      accent: Theme.sideNetwork
-      forceHovered: window.wifiSelectorActive
-      interactive: true
-      onLeftClicked: statusData.toggleWifiSelector(window.monitorName)
-    }
-
-    Pill {
-      iconOnly: true
-      text: statusData.bluetoothConnected ? "󰂯" : "󰂲"
-      accent: Theme.sideBluetooth
-      forceHovered: window.bluetoothSelectorActive
-      interactive: true
-      onLeftClicked: statusData.toggleBluetoothSelector(window.monitorName)
-    }
-
-    Pill {
+      objectName: "systemPill"
       text: [
         " " + statusData.cpuUsage + "%",
         "  " + statusData.memoryUsage + "%",
-        " " + statusData.gpuText,
-        " " + statusData.diskUsage + "%"
+        " " + statusData.gpuText
       ].join("   ")
       accent: Theme.sideSystem
+      forceHovered: window.systemPanelActive
+      interactive: true
+      onLeftClicked: statusData.toggleSystemPanel(window.monitorName)
+    }
+
+    Pill {
+      objectName: "storagePill"
+      text: " " + statusData.diskUsage + "%"
+      accent: Theme.sideDisk
     }
   }
 
   Rectangle {
     id: centerMorph
     readonly property bool overlayVisible: window.notificationActive || window.volumeOverlayActive
-      || window.audioSelectorActive || window.calendarActive
+      || window.audioSelectorActive || window.calendarActive || window.systemPanelActive
       || window.brightnessOverlayActive || window.mediaOverlayActive
       || window.appLauncherActive || window.chromeTabsActive
       || window.wifiSelectorActive || window.bluetoothSelectorActive
       || window.updateSelectorActive || window.dictationOverlayActive
+    onOverlayVisibleChanged: {
+      if (overlayVisible)
+        fullscreenHideDelay.stop();
+      else if (window.fullscreenActive)
+        fullscreenHideDelay.restart();
+    }
     readonly property string targetMode: window.notificationActive ? "notification"
       : window.dictationOverlayActive
-      ? "dictation" : window.calendarActive ? "calendar"
+      ? "dictation" : window.systemPanelActive ? "system"
+      : window.calendarActive ? "calendar"
       : window.audioSelectorActive ? "audio"
       : window.appLauncherActive ? "launcher"
       : window.chromeTabsActive ? "tabs"
@@ -179,6 +190,7 @@ PanelWindow {
     readonly property real preferredWidth: window.notificationActive
       ? notificationPopup.implicitWidth : window.dictationOverlayActive
       ? voiceDictationIndicator.implicitWidth
+      : window.systemPanelActive ? workspaceSwitcher.expandedImplicitWidth
       : window.calendarActive ? workspaceSwitcher.expandedImplicitWidth
       : window.audioSelectorActive ? audioSelector.implicitWidth
       : window.appLauncherActive ? appLauncher.implicitWidth
@@ -193,6 +205,7 @@ PanelWindow {
     readonly property real targetHeight: window.notificationActive
       ? notificationPopup.implicitHeight : window.dictationOverlayActive
       ? voiceDictationIndicator.implicitHeight
+      : window.systemPanelActive ? systemPanel.implicitHeight
       : window.calendarActive ? calendarPanel.implicitHeight
       : window.audioSelectorActive ? audioSelector.implicitHeight
       : window.appLauncherActive ? appLauncher.implicitHeight
@@ -201,7 +214,7 @@ PanelWindow {
       : window.wifiSelectorActive ? wifiSelector.implicitHeight : 36
     readonly property var contentModes: ["workspaces", "volume", "audio",
       "brightness", "dictation", "media", "wifi", "bluetooth",
-      "launcher", "tabs", "updates", "notification", "calendar"]
+      "launcher", "tabs", "updates", "notification", "calendar", "system"]
     property string visualSourceMode: "workspaces"
     property string visualTargetMode: "workspaces"
     property real transitionProgress: 1
@@ -210,6 +223,7 @@ PanelWindow {
     property var startOffsets: ({})
 
     function modeHeight(mode) {
+      if (mode === "system") return systemPanel.implicitHeight;
       if (mode === "notification") return notificationPopup.implicitHeight;
       if (mode === "calendar") return calendarPanel.implicitHeight;
       if (mode === "audio") return audioSelector.implicitHeight;
@@ -357,7 +371,7 @@ PanelWindow {
       height: implicitHeight
       transform: Translate { y: centerMorph.contentOffset("workspaces") }
       backgroundColor: "transparent"
-      monitorName: window.monitorName
+      monitor: window.hyprlandMonitor
       opacity: centerMorph.contentOpacity("workspaces")
       enabled: !centerMorph.overlayVisible
     }
@@ -507,6 +521,20 @@ PanelWindow {
       enabled: window.updateSelectorKeyboardActive
     }
 
+    SystemPanel {
+      id: systemPanel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      implicitWidth: workspaceSwitcher.expandedImplicitWidth
+      height: implicitHeight
+      statusData: window.statusData
+      transform: Translate { y: centerMorph.contentOffset("system") }
+      opacity: centerMorph.contentOpacity("system")
+      visible: opacity > 0
+      enabled: window.systemPanelKeyboardActive
+    }
+
     CalendarPanel {
       id: calendarPanel
       anchors.top: parent.top
@@ -553,7 +581,8 @@ PanelWindow {
       property real phase: 0
       // Keep the notification accent until its outgoing content has faded out.
       property color trailColor: window.notificationActive || notificationPopup.opacity > 0.001
-        ? Theme.state : Theme.action
+        ? Theme.state : window.systemPanelActive || systemPanel.opacity > 0.001
+          ? Theme.sideSystem : Theme.action
       fragmentShader: Qt.resolvedUrl(
         "shaders/activity-border.frag.qsb")
 
@@ -585,9 +614,21 @@ PanelWindow {
     Behavior on opacity { NumberAnimation { duration: 240 } }
 
     Pill {
-      visible: statusData.batteryAvailable
-      text: statusData.batteryIcon() + " " + statusData.batteryPercent + "%"
+      visible: statusData.batteryAvailable || statusData.keyboardBatteries.length > 0
+      textFormat: Text.StyledText
+      text: (statusData.batteryAvailable
+        ? [batteryLabel("󰌢", statusData.batteryPercent, statusData.batteryPluggedIn)] : [])
+        .concat(statusData.keyboardBatteries.map(device =>
+          batteryLabel("󰌌", device.percent, device.pluggedIn)))
+        .join("&nbsp;&nbsp;&nbsp;")
       accent: Theme.sideBattery
+
+      function batteryLabel(icon, percent, pluggedIn) {
+        const iconColor = pluggedIn ? Theme.batteryPluggedIn
+          : percent !== null && percent < 20 ? Theme.error : "";
+        return (iconColor !== "" ? '<font color="' + iconColor + '">' + icon + '</font>' : icon)
+          + "&nbsp;" + (percent === null ? "--" : percent) + "%";
+      }
     }
 
     Pill {
@@ -621,15 +662,48 @@ PanelWindow {
     }
 
     Pill {
-      text: [
-        statusData.weatherText,
-        " " + statusData.dateText,
-        " " + statusData.timeText
-      ].join("   ")
-      accent: Theme.sideWeather
-      forceHovered: window.calendarActive
+      iconOnly: true
+      text: statusData.displayedNixIcon
+      accent: Theme.sideUpdates
+      forceHovered: window.updateSelectorActive
       interactive: true
-      onLeftClicked: statusData.toggleCalendar(window.monitorName)
+      onLeftClicked: statusData.toggleUpdateSelector(window.monitorName)
+      onRightClicked: statusData.forceNixStatus()
+    }
+
+    Pill {
+      iconOnly: true
+      text: statusData.networkIcon()
+      accent: Theme.sideNetwork
+      forceHovered: window.wifiSelectorActive
+      interactive: true
+      onLeftClicked: statusData.toggleWifiSelector(window.monitorName)
+    }
+
+    Pill {
+      iconOnly: true
+      text: statusData.bluetoothConnected ? "󰂯" : "󰂲"
+      accent: Theme.sideBluetooth
+      forceHovered: window.bluetoothSelectorActive
+      interactive: true
+      onLeftClicked: statusData.toggleBluetoothSelector(window.monitorName)
+    }
+
+    Pill {
+      objectName: "doNotDisturbPill"
+      iconOnly: true
+      text: statusData.notifications.doNotDisturb ? "󰂛" : "󰂚"
+      accent: Theme.sideNotifications
+      forceHovered: statusData.notifications.dndFeedbackActive
+        && statusData.notifications.dndFeedbackTargetMonitor === window.monitorName
+      interactive: true
+      onLeftClicked: statusData.notifications.toggleDoNotDisturb(window.monitorName)
+      onRightClicked: Quickshell.execDetached([
+        "hyprctl", "eval",
+        "local disabled = not quickshell_internal_keyboard_disabled; "
+          + "hl.device({name = 'at-translated-set-2-keyboard', enabled = not disabled}); "
+          + "quickshell_internal_keyboard_disabled = disabled"
+      ])
     }
   }
 

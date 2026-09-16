@@ -6,6 +6,7 @@ Item {
   id: root
 
   property string text: ""
+  property int textFormat: Text.AutoText
   property string trailingText: ""
   property bool trailingInactive: false
   property color accent: Theme.foreground
@@ -52,6 +53,7 @@ Item {
       Text {
         id: label
         text: root.text
+        textFormat: root.textFormat
         color: root.hovered ? Theme.background : root.accent
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 16

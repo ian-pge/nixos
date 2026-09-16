@@ -10,15 +10,41 @@ Scope {
   property var current: null
   property var presented: null
   property string targetMonitor: ""
+  property var monitors: Hyprland.monitors.values
+  property var focusedMonitor: Hyprland.focusedMonitor
   readonly property bool visible: current !== null
-  readonly property var targetOutput: Hyprland.monitors.values.find(
+  readonly property var targetOutput: monitors.find(
     monitor => monitor.name === targetMonitor) ?? null
   readonly property bool targetBlocked: targetOutput === null
-    || (targetOutput.activeWorkspace !== null
-      && targetOutput.activeWorkspace.hasFullscreen)
   property bool escapeSyncPending: false
+  property alias doNotDisturb: preferences.doNotDisturb
+  readonly property bool dndFeedbackActive: dndFeedback.running
+  property string dndFeedbackTargetMonitor: ""
+  property var soundProcesses: []
   // Nix pins the player and the unmodified theme sound to store paths.
   property string soundPlayer: "pw-play"
+
+  PersistentProperties {
+    id: preferences
+    reloadableId: "notificationPreferences"
+    property bool doNotDisturb: false
+  }
+
+  function toggleDoNotDisturb(targetMonitor = "") {
+    const monitor = focusedMonitor ?? monitors[0] ?? null;
+    dndFeedbackTargetMonitor = targetMonitor !== ""
+      ? targetMonitor : monitor !== null ? monitor.name : "";
+    doNotDisturb = !doNotDisturb;
+    dndFeedback.restart();
+  }
+
+  onDoNotDisturbChanged: {
+    if (doNotDisturb) {
+      close(true);
+      // Stop only our notification sounds, never other application audio.
+      soundProcesses.slice().forEach(player => player.running = false);
+    }
+  }
 
   // Keep the native image alive until the closing animation has finished.
   RetainableLock {
@@ -39,10 +65,13 @@ Scope {
 
   function receive(notification) {
     notification.tracked = true;
-    const monitor = Hyprland.focusedMonitor
-      ?? Hyprland.monitors.values[0] ?? null;
-    if (monitor === null || (monitor.activeWorkspace !== null
-        && monitor.activeWorkspace.hasFullscreen)) {
+    // Discard immediately, including critical notifications; no deferred queue.
+    if (doNotDisturb) {
+      notification.expire();
+      return;
+    }
+    const monitor = focusedMonitor ?? monitors[0] ?? null;
+    if (monitor === null) {
       notification.expire();
       return;
     }
@@ -58,12 +87,16 @@ Scope {
   }
 
   function playSound(notification) {
-    if (notification.hints["suppress-sound"])
+    if (doNotDisturb || notification.hints["suppress-sound"])
       return;
     // Independent one-shot players: no cooldown, queue or dropped burst sounds.
     // Only new arrivals play; updating an existing card must not replay its sound.
-    Quickshell.execDetached([soundPlayer, "--media-role", "Notification", "--volume", "2.0",
-      "/run/current-system/sw/share/sounds/freedesktop/stereo/message-new-instant.oga"]);
+    const player = soundProcess.createObject(root, {
+      command: [soundPlayer, "--media-role", "Notification", "--volume", "2.0",
+        "/run/current-system/sw/share/sounds/freedesktop/stereo/message-new-instant.oga"]
+    });
+    soundProcesses = soundProcesses.concat([player]);
+    player.running = true;
   }
 
   function refreshPresentation() {
@@ -128,6 +161,24 @@ Scope {
     function onSummaryChanged() { Qt.callLater(root.refreshPresentation); }
     function onBodyChanged() { Qt.callLater(root.refreshPresentation); }
     function onImageChanged() { Qt.callLater(root.refreshPresentation); }
+  }
+
+  Timer {
+    id: dndFeedback
+    interval: 2000
+  }
+
+  Component {
+    id: soundProcess
+    Process {
+      id: player
+      onRunningChanged: {
+        if (!running) {
+          root.soundProcesses = root.soundProcesses.filter(item => item !== player);
+          player.destroy();
+        }
+      }
+    }
   }
 
   Timer {

@@ -13,10 +13,21 @@ import "components/Calendar.js" as Calendar
 Scope {
   id: root
 
+  WorkspaceMonitorSync {}
+
   readonly property var notifications: notificationData
   NotificationData { id: notificationData }
   readonly property var weather: weatherData
   WeatherData { id: weatherData }
+  readonly property var systemTelemetry: systemData
+  SystemData {
+    id: systemData
+    topRequested: root.systemProcessListsWanted()
+  }
+  Connections {
+    target: systemData
+    function onTopRequestIdChanged() { Qt.callLater(root.syncSystemProcessLists); }
+  }
 
   property int cpuUsage: 0
   property int memoryUsage: 0
@@ -107,10 +118,14 @@ Scope {
   property bool audioSelectorVisible: false
   property string audioTargetMonitor: ""
   property bool calendarVisible: false
+  property bool systemPanelVisible: false
+  property string systemTargetMonitor: ""
   property string calendarTargetMonitor: ""
   property int calendarYear: calendarToday.getFullYear()
   property int calendarMonth: calendarToday.getMonth()
   property bool calendarFollowsToday: true
+  property string calendarSelectedDate: Calendar.dateKey(calendarToday)
+  property bool calendarDetailsOpen: false
   readonly property date calendarToday: clock.date
   onCalendarTodayChanged: {
     if (calendarFollowsToday)
@@ -168,7 +183,7 @@ Scope {
   property var bluetoothActionDevice: null
   property bool bluetoothStartedDiscovery: false
   readonly property bool centerOverlayVisible: volumeOverlayVisible
-    || audioSelectorVisible || calendarVisible
+    || audioSelectorVisible || calendarVisible || systemPanelVisible
     || brightnessOverlayVisible || mediaOverlayVisible || appLauncherVisible
     || chromeTabsVisible || wifiSelectorVisible || bluetoothSelectorVisible
     || updateSelectorVisible
@@ -273,9 +288,20 @@ Scope {
 
   readonly property var battery: UPower.displayDevice
   readonly property bool batteryAvailable: battery.ready && battery.isPresent
+  readonly property bool batteryPluggedIn: batteryAvailable && !UPower.onBattery
   readonly property int batteryPercent: batteryAvailable
     ? Math.round(battery.percentage * 100)
     : 0
+  readonly property var keyboardBatteries: Bluetooth.devices.values
+    .filter(device => device.icon === "input-keyboard")
+    .sort((left, right) => left.address.localeCompare(right.address))
+    .map(device => ({
+      available: device.connected && device.batteryAvailable,
+      percent: device.connected && device.batteryAvailable
+        ? Math.round(device.battery * 100) : null,
+      pluggedIn: keyboardPluggedIn(device)
+    }))
+    .filter(device => device.available || device.pluggedIn)
   readonly property var mprisPlayer: {
     const players = Mpris.players.values.filter(player => player.canControl);
     return players.find(player => player.dbusName.includes("playerctld"))
@@ -298,7 +324,12 @@ Scope {
   readonly property var audioDevices: Pipewire.nodes.values.filter(node =>
     !node.isStream && node.audio !== null)
   readonly property var audioOutputs: audioDevices.filter(node => node.isSink)
-  readonly property var audioInputs: audioDevices.filter(node => !node.isSink)
+  readonly property var audioInputs: audioDevices.filter(node => !node.isSink
+    && !audioAvailability.unavailableNames[node.name])
+  AudioAvailability {
+    id: audioAvailability
+    enabled: root.audioSelectorVisible
+  }
   readonly property var audio: audioSink !== null ? audioSink.audio : null
   readonly property bool audioMuted: audio !== null && audio.muted
   readonly property int audioVolume: audio !== null
@@ -306,55 +337,19 @@ Scope {
     : 0
 
   readonly property string timeText: Qt.formatDateTime(clock.date, "HH:mm")
-  readonly property string dateText: Qt.formatDateTime(clock.date, "MMM dd yyyy")
+  readonly property string dateText: Qt.formatDateTime(clock.date, "dd/MM/yy")
 
-  function batteryIcon() {
-    const percentage = batteryPercent;
-    const charging = battery.state === UPowerDeviceState.Charging
-      || battery.state === UPowerDeviceState.PendingCharge;
-
-    if (battery.state === UPowerDeviceState.FullyCharged)
-      return "󰁹";
-
-    if (charging) {
-      if (percentage <= 10)
-        return "󰂄";
-      if (percentage <= 25)
-        return "󰂆";
-      if (percentage <= 35)
-        return "󰂇";
-      if (percentage <= 45)
-        return "󰂈";
-      if (percentage <= 65)
-        return "󰂉";
-      if (percentage <= 85)
-        return "󰂊";
-      if (percentage <= 95)
-        return "󰂋";
-      return "󰂅";
-    }
-
-    if (battery.state === UPowerDeviceState.Empty || percentage <= 5)
-      return "󰂃";
-    if (percentage <= 15)
-      return "󰁺";
-    if (percentage <= 25)
-      return "󰁻";
-    if (percentage <= 35)
-      return "󰁼";
-    if (percentage <= 45)
-      return "󰁽";
-    if (percentage <= 55)
-      return "󰁾";
-    if (percentage <= 65)
-      return "󰁿";
-    if (percentage <= 75)
-      return "󰂀";
-    if (percentage <= 85)
-      return "󰂁";
-    if (percentage <= 95)
-      return "󰂂";
-    return "󰁹";
+  function keyboardPluggedIn(device) {
+    const power = UPower.devices.values.find(item => item.ready && item.isPresent
+      && item.nativePath === device.dbusPath);
+    if (power && (power.state === UPowerDeviceState.Charging
+        || power.state === UPowerDeviceState.PendingCharge))
+      return true;
+    // Agar BLE exposes only a percentage over Bluetooth. Match its actual USB
+    // identity, including the serial, independently of the port/hub in use.
+    return device.address === "E6:9D:03:3D:7C:3C" && systemData.systemFresh
+      && systemData.usbDevices.some(usb => usb.vendorId === "9d5b"
+        && usb.productId === "2565" && usb.serial === "0D37F50E477AF37B");
   }
 
   function audioIcon() {
@@ -816,6 +811,7 @@ Scope {
   }
 
   function visibleCenterModeWithoutVoice() {
+    if (systemPanelVisible) return "system";
     if (calendarVisible) return "calendar";
     if (audioSelectorVisible) return "audio";
     if (appLauncherVisible) return "launcher";
@@ -835,6 +831,7 @@ Scope {
   }
 
   function monitorForCenterMode(mode) {
+    if (mode === "system") return systemTargetMonitor;
     if (mode === "calendar") return calendarTargetMonitor;
     if (mode === "audio") return audioTargetMonitor;
     if (mode === "dictation") return voiceDictationTargetMonitor;
@@ -849,6 +846,11 @@ Scope {
     return "";
   }
 
+  function notificationCoversMonitor(monitor) {
+    return notificationData.visible
+      && notificationData.targetMonitor === monitor;
+  }
+
   function beginCenterTransition(targetMode, targetMonitor = "",
       allowVoiceExit = false) {
     if (centerTransitionPending)
@@ -860,6 +862,12 @@ Scope {
     const sourceMonitor = monitorForCenterMode(sourceMode);
     const resolvedTargetMonitor = targetMode === "workspaces"
       ? "" : resolveTargetMonitor(targetMonitor);
+    // Explicit UI requests replace a notification on the same monitor instead
+    // of opening invisibly behind it. Keeping `presented` alive in
+    // NotificationData still lets the normal outgoing animation complete.
+    if (targetMode !== "workspaces"
+        && notificationCoversMonitor(resolvedTargetMonitor))
+      notificationData.close();
     if (sourceMode === targetMode && sourceMonitor === resolvedTargetMonitor)
       return false;
     centerTransitionSourceMode = sourceMode;
@@ -958,7 +966,8 @@ Scope {
 
   function toggleAppLauncher(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    if (appLauncherVisible && appLauncherTargetMonitor === resolvedTarget)
+    if (appLauncherVisible && appLauncherTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget))
       hideAppLauncher();
     else
       showAppLauncher(resolvedTarget);
@@ -968,6 +977,7 @@ Scope {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const preserveQuery = appLauncherVisible;
     const ownsTransition = beginCenterTransition("launcher", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAudioSelector();
     hideMediaOverlay();
@@ -995,7 +1005,8 @@ Scope {
 
   function toggleChromeTabs(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    if (chromeTabsVisible && chromeTabsTargetMonitor === resolvedTarget)
+    if (chromeTabsVisible && chromeTabsTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget))
       hideChromeTabs();
     else
       showChromeTabs(resolvedTarget);
@@ -1004,6 +1015,7 @@ Scope {
   function showChromeTabs(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("tabs", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAudioSelector();
     hideAppLauncher();
@@ -1032,7 +1044,7 @@ Scope {
   function showMediaOverlay(targetMonitor = "") {
     if (mprisPlayer === null || appLauncherVisible || chromeTabsVisible || audioSelectorVisible
         || wifiSelectorVisible || bluetoothSelectorVisible
-        || updateSelectorVisible || calendarVisible)
+        || updateSelectorVisible || calendarVisible || systemPanelVisible)
       return;
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("media", resolvedTarget);
@@ -1094,7 +1106,7 @@ Scope {
   function selectAudioDevice(node) {
     // Re-check membership: a device may disappear between key press and dispatch.
     if (!Pipewire.ready || node === null || !node.ready
-        || !audioDevices.includes(node))
+        || !(node.isSink ? audioOutputs : audioInputs).includes(node))
       return;
     if (node.isSink)
       Pipewire.preferredDefaultAudioSink = node;
@@ -1112,11 +1124,13 @@ Scope {
 
   function toggleAudioSelector(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    if (audioSelectorVisible && audioTargetMonitor === resolvedTarget) {
+    if (audioSelectorVisible && audioTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget)) {
       hideAudioSelector();
       return;
     }
     const ownsTransition = beginCenterTransition("audio", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAppLauncher();
     hideChromeTabs();
@@ -1139,33 +1153,34 @@ Scope {
     finishCenterTransition(ownsTransition);
   }
 
-  function calendarGoToday() {
-    calendarYear = calendarToday.getFullYear();
-    calendarMonth = calendarToday.getMonth();
-    calendarFollowsToday = true;
-  }
-
-  function calendarMoveMonth(delta) {
-    const date = Calendar.localDate(calendarYear, calendarMonth + delta, 1);
-    if (date.getFullYear() < 1 || date.getFullYear() > 9999)
-      return;
-    calendarYear = date.getFullYear();
-    calendarMonth = date.getMonth();
-    calendarFollowsToday = false;
-  }
-
-  function toggleCalendar(targetMonitor = "") {
+  function toggleSystemPanel(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    if (calendarVisible && calendarTargetMonitor === resolvedTarget)
-      hideCalendar();
+    if (systemPanelVisible && systemTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget))
+      hideSystemPanel();
     else
-      showCalendar(resolvedTarget);
+      showSystemPanel(resolvedTarget);
   }
 
-  function showCalendar(targetMonitor = "", resetMonth = true) {
+  function systemProcessListsWanted() {
+    return systemPanelVisible && !polkitActive
+      && !(voiceDictationActive && voiceDictationTargetMonitor === systemTargetMonitor)
+      && !(notificationData.visible && notificationData.targetMonitor === systemTargetMonitor);
+  }
+
+  function sendSystemProcessRequest(process) {
+    process.write(systemData.topRequestId + "\n");
+  }
+
+  function syncSystemProcessLists() {
+    sendSystemProcessRequest(systemStatsProcess);
+    sendSystemProcessRequest(gpuProcess);
+  }
+
+  function showSystemPanel(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    const wasVisible = calendarVisible;
-    const ownsTransition = beginCenterTransition("calendar", resolvedTarget);
+    const ownsTransition = beginCenterTransition("system", resolvedTarget);
+    hideCalendar();
     hideAudioSelector();
     hideAppLauncher();
     hideChromeTabs();
@@ -1175,8 +1190,83 @@ Scope {
     hideUpdateSelector();
     hideVolumeOverlay();
     hideBrightnessOverlay();
-    if (!wasVisible && resetMonth)
+    systemTargetMonitor = resolvedTarget;
+    systemPanelVisible = true;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function hideSystemPanel() {
+    if (!systemPanelVisible)
+      return;
+    const ownsTransition = beginCenterTransition("workspaces");
+    systemPanelVisible = false;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function calendarGoToday() {
+    calendarYear = calendarToday.getFullYear();
+    calendarMonth = calendarToday.getMonth();
+    calendarFollowsToday = true;
+    calendarSelectedDate = Calendar.dateKey(calendarToday);
+    calendarDetailsOpen = false;
+  }
+
+  function calendarSelectDate(key, openDetails = false) {
+    const date = Calendar.dateFromKey(key);
+    if (!isFinite(date.getTime()) || date.getFullYear() < 1 || date.getFullYear() > 9999)
+      return;
+    calendarSelectedDate = Calendar.dateKey(date);
+    calendarYear = date.getFullYear();
+    calendarMonth = date.getMonth();
+    calendarFollowsToday = false;
+    if (openDetails)
+      calendarDetailsOpen = true;
+  }
+
+  function calendarMoveDay(delta) {
+    const date = Calendar.dateFromKey(calendarSelectedDate);
+    date.setDate(date.getDate() + delta);
+    calendarSelectDate(Calendar.dateKey(date));
+  }
+
+  function calendarMoveMonth(delta) {
+    const date = Calendar.localDate(calendarYear, calendarMonth + delta, 1);
+    if (date.getFullYear() < 1 || date.getFullYear() > 9999)
+      return;
+    const selected = Calendar.dateFromKey(calendarSelectedDate);
+    const lastDay = Calendar.localDate(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    date.setDate(Math.min(selected.getDate(), lastDay));
+    calendarSelectDate(Calendar.dateKey(date));
+    calendarDetailsOpen = false;
+  }
+
+  function toggleCalendar(targetMonitor = "") {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    if (calendarVisible && calendarTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget))
+      hideCalendar();
+    else
+      showCalendar(resolvedTarget);
+  }
+
+  function showCalendar(targetMonitor = "", resetMonth = true) {
+    const resolvedTarget = resolveTargetMonitor(targetMonitor);
+    const wasVisible = calendarVisible;
+    const ownsTransition = beginCenterTransition("calendar", resolvedTarget);
+    hideSystemPanel();
+    hideAudioSelector();
+    hideAppLauncher();
+    hideChromeTabs();
+    hideMediaOverlay();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    if (!wasVisible && resetMonth) {
       calendarGoToday();
+      weatherData.beginCalendarSession();
+    }
     calendarTargetMonitor = resolvedTarget;
     calendarVisible = true;
     weatherData.refreshIfNeeded();
@@ -1188,6 +1278,7 @@ Scope {
       return;
     const ownsTransition = beginCenterTransition("workspaces");
     calendarVisible = false;
+    weatherData.closeLocationSearch();
     finishCenterTransition(ownsTransition);
   }
 
@@ -1218,6 +1309,7 @@ Scope {
       return;
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("volume", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAppLauncher();
     hideMediaOverlay();
@@ -1360,6 +1452,7 @@ Scope {
   function showBrightnessOverlay(targetMonitor = "", refreshValue = true) {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("brightness", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAudioSelector();
     hideAppLauncher();
@@ -1391,7 +1484,8 @@ Scope {
 
   function toggleWifiSelector(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    if (wifiSelectorVisible && wifiTargetMonitor === resolvedTarget)
+    if (wifiSelectorVisible && wifiTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget))
       hideWifiSelector();
     else
       showWifiSelector(resolvedTarget);
@@ -1402,6 +1496,7 @@ Scope {
     if (wifiSelectorVisible && wifiTargetMonitor === resolvedTarget)
       return;
     const ownsTransition = beginCenterTransition("wifi", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAudioSelector();
     if (wifiSelectorVisible)
@@ -1663,7 +1758,8 @@ Scope {
 
   function toggleBluetoothSelector(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    if (bluetoothSelectorVisible && bluetoothTargetMonitor === resolvedTarget)
+    if (bluetoothSelectorVisible && bluetoothTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget))
       hideBluetoothSelector();
     else
       showBluetoothSelector(resolvedTarget);
@@ -1674,6 +1770,7 @@ Scope {
     if (bluetoothSelectorVisible && bluetoothTargetMonitor === resolvedTarget)
       return;
     const ownsTransition = beginCenterTransition("bluetooth", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAudioSelector();
     if (bluetoothSelectorVisible)
@@ -1886,7 +1983,8 @@ Scope {
 
   function toggleUpdateSelector(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
-    if (updateSelectorVisible && updateTargetMonitor === resolvedTarget)
+    if (updateSelectorVisible && updateTargetMonitor === resolvedTarget
+        && !notificationCoversMonitor(resolvedTarget))
       hideUpdateSelector();
     else
       showUpdateSelector(resolvedTarget);
@@ -1895,6 +1993,7 @@ Scope {
   function showUpdateSelector(targetMonitor = "") {
     const resolvedTarget = resolveTargetMonitor(targetMonitor);
     const ownsTransition = beginCenterTransition("updates", resolvedTarget);
+    hideSystemPanel();
     hideCalendar();
     hideAudioSelector();
     hideAppLauncher();
@@ -2051,6 +2150,7 @@ Scope {
     else if (mode === "bluetooth") showBluetoothSelector(monitor);
     else if (mode === "audio") toggleAudioSelector(monitor);
     else if (mode === "calendar") showCalendar(monitor, false);
+    else if (mode === "system") showSystemPanel(monitor);
     else if (mode === "media") showMediaOverlay(monitor);
   }
 
@@ -2110,12 +2210,20 @@ Scope {
   Process {
     id: systemStatsProcess
     command: ["quickshell-system-stats"]
+    stdinEnabled: true
     running: true
+    onStarted: root.sendSystemProcessRequest(systemStatsProcess)
+
+    onExited: (exitCode, exitStatus) => {
+      systemData.invalidateSystem();
+      systemStatsRestart.restart();
+    }
 
     stdout: SplitParser {
       onRead: data => {
         try {
           const stats = JSON.parse(data);
+          systemData.acceptSystem(stats);
           if (stats.error !== undefined) {
             console.warn("System telemetry error:", stats.error);
             return;
@@ -2127,9 +2235,16 @@ Scope {
             root.brightness = stats.brightness;
         } catch (error) {
           console.warn("Unable to parse system stats:", error);
+          systemData.invalidateSystem();
         }
       }
     }
+  }
+
+  Timer {
+    id: systemStatsRestart
+    interval: 5000
+    onTriggered: systemStatsProcess.running = true
   }
 
   Process {
@@ -2204,6 +2319,8 @@ Scope {
       root.resetBrightnessState();
       if (root.calendarVisible && !Hyprland.monitors.values.some(monitor => monitor.name === root.calendarTargetMonitor))
         root.hideCalendar();
+      if (root.systemPanelVisible && !Hyprland.monitors.values.some(monitor => monitor.name === root.systemTargetMonitor))
+        root.hideSystemPanel();
     }
   }
 
@@ -2348,18 +2465,34 @@ Scope {
   Process {
     id: gpuProcess
     command: ["quickshell-gpu-monitor"]
+    stdinEnabled: true
     running: true
+    onStarted: root.sendSystemProcessRequest(gpuProcess)
+
+    onExited: (exitCode, exitStatus) => {
+      root.gpuText = "--";
+      systemData.invalidateGpu();
+      gpuRestart.restart();
+    }
 
     stdout: SplitParser {
       onRead: data => {
         try {
           const gpu = JSON.parse(data);
+          systemData.acceptGpu(gpu);
           root.gpuText = gpu.text || "--";
         } catch (error) {
           console.warn("Unable to parse GPU data:", error);
+          systemData.invalidateGpu();
         }
       }
     }
+  }
+
+  Timer {
+    id: gpuRestart
+    interval: 30000
+    onTriggered: gpuProcess.running = true
   }
 
   PolkitAgent {
@@ -2482,6 +2615,10 @@ Scope {
 
     function dismissNotification() {
       notificationData.close();
+    }
+
+    function toggleDoNotDisturb() {
+      notificationData.toggleDoNotDisturb();
     }
 
     function refreshNix() {

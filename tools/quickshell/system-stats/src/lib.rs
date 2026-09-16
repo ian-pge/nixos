@@ -1,4 +1,6 @@
 //! Local telemetry; no subprocesses and no writes to procfs or sysfs.
+mod details;
+pub mod processes;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::{
@@ -63,32 +65,10 @@ fn cpu_percent(before: Cpu, after: Cpu) -> u64 {
     percent(total.saturating_sub(idle), total)
 }
 
+#[cfg(test)]
 fn memory_percent(text: &str) -> Result<u64> {
-    let mut total = None;
-    let mut available = None;
-    for line in text.lines() {
-        let Some((key, value)) = line.split_once(':') else {
-            continue;
-        };
-        if key == "MemTotal" || key == "MemAvailable" {
-            let value = value
-                .split_whitespace()
-                .next()
-                .context("Missing memory value")?
-                .parse::<u64>()?;
-            if key == "MemTotal" {
-                total = Some(value);
-            } else {
-                available = Some(value);
-            }
-        }
-    }
-    let total = total.context("MemTotal is missing")?;
-    let available = available.context("MemAvailable is missing")?;
-    Ok(percent(
-        u128::from(total.saturating_sub(available)),
-        u128::from(total),
-    ))
+    let memory = details::memory(text)?;
+    Ok(percent(u128::from(memory.used), u128::from(memory.total)))
 }
 
 pub fn disk_percent(path: &Path) -> Result<u64> {
@@ -100,16 +80,44 @@ pub fn disk_percent(path: &Path) -> Result<u64> {
     ))
 }
 
+fn usb_devices(root: &Path) -> Vec<Value> {
+    let Ok(entries) = fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut devices: Vec<Value> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            let read = |name| {
+                fs::read_to_string(path.join(name))
+                    .ok()
+                    .map(|s| s.trim().to_owned())
+            };
+            Some(json!({
+                "vendorId": read("idVendor")?,
+                "productId": read("idProduct")?,
+                "serial": read("serial").unwrap_or_default(),
+            }))
+        })
+        .collect();
+    devices.sort_by_cached_key(Value::to_string);
+    devices
+}
+
 pub struct Paths {
     pub proc: PathBuf,
+    pub hwmon: PathBuf,
     pub backlight: PathBuf,
+    pub usb: PathBuf,
     pub disk: PathBuf,
 }
 impl Default for Paths {
     fn default() -> Self {
         Self {
             proc: "/proc".into(),
+            hwmon: "/sys/class/hwmon".into(),
             backlight: "/sys/class/backlight".into(),
+            usb: "/sys/bus/usb/devices".into(),
             disk: "/".into(),
         }
     }
@@ -172,7 +180,9 @@ impl Sampler {
         let cpu = cpu_totals(&fs::read_to_string(self.paths.proc.join("stat"))?)?;
         let usage = self.previous.map_or(0, |before| cpu_percent(before, cpu));
         self.previous = Some(cpu);
-        let memory = memory_percent(&fs::read_to_string(self.paths.proc.join("meminfo"))?)?;
+        let memory = details::memory(&fs::read_to_string(self.paths.proc.join("meminfo"))?)?;
+        let memory_usage = percent(u128::from(memory.used), u128::from(memory.total));
+        let system = details::snapshot(&self.paths.proc, &self.paths.hwmon, &memory);
         if self
             .disk
             .is_none_or(|(checked, _)| elapsed.saturating_sub(checked) >= Duration::from_secs(30))
@@ -180,7 +190,10 @@ impl Sampler {
             self.disk = Some((elapsed, disk_reader(&self.paths.disk)?));
         }
         let brightness = self.brightness()?;
-        Ok(json!({"cpu":usage,"memory":memory,"disk":self.disk.unwrap().1,"brightness":brightness}))
+        let usb_devices = usb_devices(&self.paths.usb);
+        Ok(
+            json!({"cpu":usage,"memory":memory_usage,"disk":self.disk.unwrap().1,"brightness":brightness,"system":system,"usbDevices":usb_devices}),
+        )
     }
 }
 
@@ -231,10 +244,34 @@ mod tests {
         .unwrap();
         let sampler = Sampler::new(Paths {
             proc: temp.path().join("proc"),
+            hwmon: temp.path().join("hwmon"),
             backlight: temp.path().join("backlight"),
+            usb: temp.path().join("usb"),
             disk: temp.path().into(),
         });
         (temp, sampler)
+    }
+    #[test]
+    fn usb_hotplug_is_reflected_without_breaking_telemetry() {
+        let (temp, mut sampler) = fixture();
+        assert_eq!(sampler.sample(Duration::ZERO)["usbDevices"], json!([]));
+        let keyboard = temp.path().join("usb/1-2");
+        fs::create_dir_all(&keyboard).unwrap();
+        fs::write(keyboard.join("idVendor"), "9d5b\n").unwrap();
+        fs::write(keyboard.join("idProduct"), "2565\n").unwrap();
+        fs::write(keyboard.join("serial"), "test-keyboard\n").unwrap();
+        // Interface entries lack USB identity files and must be ignored.
+        fs::create_dir(temp.path().join("usb/1-2:1.0")).unwrap();
+        assert_eq!(
+            sampler.sample(Duration::from_secs(1))["usbDevices"],
+            json!([
+                {"vendorId": "9d5b", "productId": "2565", "serial": "test-keyboard"}
+            ])
+        );
+        fs::remove_dir_all(&keyboard).unwrap();
+        let unplugged = sampler.sample(Duration::from_secs(2));
+        assert_eq!(unplugged["usbDevices"], json!([]));
+        assert!(unplugged["error"].is_null());
     }
     #[test]
     fn disk_is_cached_and_retried_on_failure() {
@@ -282,6 +319,8 @@ mod tests {
         let value = s.sample(Duration::from_secs(1));
         assert_eq!(value["cpu"], 10);
         assert!(value["error"].is_null());
-        assert_eq!(value.as_object().unwrap().len(), 4);
+        assert_eq!(value["system"]["memoryTotalBytes"], 1000 * 1024);
+        assert!(value["system"]["cpuTemperatureC"].is_null());
+        assert!(value["system"]["cpuName"].is_null());
     }
 }

@@ -27,6 +27,9 @@ ShellRoot {
       root.weather.snapshot = null;
       root.weather.lastError = "";
       root.weather.reportedStale = false;
+      root.weather.manualLocation = null;
+      root.weather.pendingRefresh = false;
+      root.weather.closeLocationSearch();
     }
     function report(age = 0, temperature = 0) {
       return {data: {version: 2, updatedAt: Math.floor(Date.now() / 1000) - age,
@@ -72,6 +75,24 @@ ShellRoot {
       root.weather.applyReport(JSON.stringify(old));
       compare(root.weather.days["2026-09-10"].code, 0);
       compare(root.weather.lastError, "Météo indisponible");
+    }
+    function test_location_change_clears_old_data_and_ignores_inflight_report() {
+      root.weather.applyReport(JSON.stringify(report()));
+      root.weather.snapshot = null;
+      root.weather.manualLocation = {name: "Lyon", latitude: 45.75, longitude: 4.85};
+      root.weather.pendingRefresh = true;
+      root.weather.applyReport(JSON.stringify(report()));
+      compare(root.weather.snapshot, null);
+      compare(root.weather.locationText, "Lyon");
+      compare(root.weather.temperatureText, "--°");
+      compare(Object.keys(root.weather.days).length, 0);
+      root.weather.pendingRefresh = false;
+      const lyon = report();
+      lyon.data.location.name = "Lyon";
+      lyon.manualLocation = root.weather.manualLocation;
+      root.weather.applyReport(JSON.stringify(lyon));
+      compare(root.weather.locationText, "Lyon");
+      compare(root.weather.manualLocation.name, "Lyon");
     }
   }
 }

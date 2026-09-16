@@ -16,6 +16,17 @@ Item {
     property var days: initialDays
     property string locationText: "Paris"
     property string updateText: "Màj 10/09 14:00"
+    property bool loading: false
+    property bool locationSearchOpen: false
+    property string locationQuery: ""
+    property var locationResults: []
+    property string locationSearchError: ""
+    property bool searchingLocations: false
+    property var chosenLocation: undefined
+    function openLocationSearch() { locationSearchOpen = true; setLocationQuery(""); }
+    function closeLocationSearch() { locationSearchOpen = false; }
+    function setLocationQuery(query) { locationQuery = query; }
+    function chooseLocation(location) { chosenLocation = location; closeLocationSearch(); }
   }
   QtObject {
     id: state
@@ -23,12 +34,31 @@ Item {
     property date calendarToday: Calendar.localDate(2026, 8, 10)
     property int calendarYear: 2026
     property int calendarMonth: 8
+    property string calendarSelectedDate: "2026-09-10"
+    property bool calendarDetailsOpen: false
     property bool closed: false
     function calendarMoveMonth(delta) {
       const date = Calendar.localDate(calendarYear, calendarMonth + delta, 1);
-      calendarYear = date.getFullYear(); calendarMonth = date.getMonth();
+      date.setDate(Math.min(Calendar.dateFromKey(calendarSelectedDate).getDate(),
+        Calendar.localDate(date.getFullYear(), date.getMonth() + 1, 0).getDate()));
+      calendarSelectDate(Calendar.dateKey(date));
+      calendarDetailsOpen = false;
     }
-    function calendarGoToday() { calendarYear = calendarToday.getFullYear(); calendarMonth = calendarToday.getMonth(); }
+    function calendarSelectDate(key, details = false) {
+      const date = Calendar.dateFromKey(key);
+      calendarYear = date.getFullYear(); calendarMonth = date.getMonth();
+      calendarSelectedDate = key;
+      if (details) calendarDetailsOpen = true;
+    }
+    function calendarMoveDay(delta) {
+      const date = Calendar.dateFromKey(calendarSelectedDate);
+      date.setDate(date.getDate() + delta);
+      calendarSelectDate(Calendar.dateKey(date));
+    }
+    function calendarGoToday() {
+      calendarSelectDate(Calendar.dateKey(calendarToday));
+      calendarDetailsOpen = false;
+    }
     function hideCalendar() { closed = true; }
   }
   CalendarPanel {
@@ -42,6 +72,9 @@ Item {
     when: windowShown
 
     function init() {
+      weather.closeLocationSearch();
+      weather.locationResults = [];
+      weather.chosenLocation = undefined;
       weather.days = weather.initialDays;
       state.calendarToday = Calendar.localDate(2026, 8, 10);
       state.calendarGoToday();
@@ -104,7 +137,7 @@ Item {
       compare(findChild(panel, "2026-09-30").temperatureText, "");
       for (const day of [today, findChild(panel, "2026-09-11")]) {
         const icon = findChild(day, "weatherIcon");
-        compare(icon.color, Theme.sideWeather);
+        compare(icon.color, day === today ? Theme.weatherSun : Theme.weatherRain);
         compare(icon.font.family, "Ubuntu Nerd Font");
         const temperature = findChild(day, "temperature");
         compare(temperature.color, Theme.sideWeather);
@@ -187,9 +220,10 @@ Item {
       panel.visible = true;
     }
     function test_keyboard_and_year_boundary() {
-      state.calendarMonth = 11;
+      state.calendarSelectDate("2026-12-31");
       keyClick(Qt.Key_Right);
       compare(state.calendarYear, 2027); compare(state.calendarMonth, 0);
+      compare(state.calendarSelectedDate, "2027-01-01");
       keyClick(Qt.Key_Left);
       compare(state.calendarYear, 2026); compare(state.calendarMonth, 11);
       keyClick(Qt.Key_Home);
@@ -197,34 +231,140 @@ Item {
       keyClick(Qt.Key_Escape);
       verify(state.closed);
     }
-    function test_vim_keys_and_enter_today() {
-      state.calendarMonth = 0;
+    function test_vim_days_months_and_details() {
       keyClick(Qt.Key_H);
-      compare(state.calendarYear, 2025); compare(state.calendarMonth, 11);
+      compare(state.calendarSelectedDate, "2026-09-09");
+      keyClick(Qt.Key_J);
+      compare(state.calendarSelectedDate, "2026-09-16");
+      keyClick(Qt.Key_K);
+      compare(state.calendarSelectedDate, "2026-09-09");
       keyClick(Qt.Key_L);
-      compare(state.calendarYear, 2026); compare(state.calendarMonth, 0);
+      compare(state.calendarSelectedDate, "2026-09-10");
       keyClick(Qt.Key_Return);
-      compare(state.calendarYear, 2026); compare(state.calendarMonth, 8);
-      verify(findChild(panel, "2026-09-10").isToday);
+      verify(state.calendarDetailsOpen);
       keyClick(Qt.Key_L);
+      compare(state.calendarSelectedDate, "2026-09-11");
+      verify(state.calendarDetailsOpen);
+      keyClick(Qt.Key_Escape);
+      verify(!state.calendarDetailsOpen); verify(!state.closed);
+      keyClick(Qt.Key_U);
+      compare(state.calendarSelectedDate, "2026-08-11");
+      keyClick(Qt.Key_D);
+      compare(state.calendarSelectedDate, "2026-09-11");
       keyClick(Qt.Key_Enter);
-      compare(state.calendarMonth, 8);
+      verify(state.calendarDetailsOpen);
       verify(panel.activeFocus); verify(!state.closed);
+      keyClick(Qt.Key_N);
+      compare(state.calendarSelectedDate, "2026-09-10");
+      verify(!state.calendarDetailsOpen);
+      keyClick(Qt.Key_U);
+      keyClick(Qt.Key_N);
+      compare(state.calendarSelectedDate, "2026-09-10");
+      compare(state.calendarMonth, 8);
     }
     function test_no_buttons_and_cover_dont_reset_month() {
       for (const name of ["previousMonth", "today", "nextMonth"])
         verify(findChild(panel, name) === null);
-      keyClick(Qt.Key_L);
+      keyClick(Qt.Key_D);
       compare(state.calendarMonth, 9);
       panel.enabled = false;
       panel.enabled = true;
       wait(0);
       compare(state.calendarMonth, 9);
-      keyClick(Qt.Key_H);
+      keyClick(Qt.Key_U);
       compare(state.calendarMonth, 8);
       state.calendarMonth = 0;
-      keyClick(Qt.Key_Return);
+      keyClick(Qt.Key_Home);
       compare(state.calendarMonth, 8);
+    }
+    function test_mouse_day_and_back() {
+      const day = findChild(panel, "2026-09-11");
+      mouseClick(day, day.width / 2, day.height / 2);
+      compare(state.calendarSelectedDate, "2026-09-11");
+      verify(state.calendarDetailsOpen);
+      verify(findChild(panel, "dayDetails").visible);
+      const back = findChild(panel, "backToCalendar");
+      mouseClick(back, back.width / 2, back.height / 2);
+      verify(!state.calendarDetailsOpen);
+      verify(findChild(panel, "2026-09-11").isSelected);
+      const selected = findChild(panel, "2026-09-11");
+      const today = findChild(panel, "2026-09-10");
+      compare(selected.color, today.color);
+      compare(selected.radius, today.radius);
+      compare(selected.border.width, today.border.width);
+      compare(selected.border.color, Theme.calendarSelected);
+      compare(today.border.color, Theme.sideWeather);
+      compare(findChild(selected, "dayNumber").color, Theme.calendarSelected);
+      verify(findChild(selected, "dayNumber").font.bold);
+      keyClick(Qt.Key_N);
+      compare(today.border.color, Theme.calendarSelected);
+    }
+    function test_location_search_keyboard_keeps_calendar_keys_as_text() {
+      keyClick(Qt.Key_S);
+      verify(weather.locationSearchOpen);
+      const input = findChild(panel, "locationSearchInput");
+      tryCompare(input, "activeFocus", true);
+      keyClick(Qt.Key_S); keyClick(Qt.Key_U); keyClick(Qt.Key_N);
+      compare(input.text, "sun");
+      compare(state.calendarSelectedDate, "2026-09-10");
+      weather.locationResults = [{name: "Sun City", region: "Arizona", country: "États-Unis",
+        latitude: 33.6, longitude: -112.3}];
+      wait(0);
+      keyClick(Qt.Key_Return);
+      compare(weather.chosenLocation.name, "Sun City");
+      verify(!weather.locationSearchOpen);
+      tryCompare(panel, "activeFocus", true);
+      keyClick(Qt.Key_S);
+      tryCompare(input, "activeFocus", true);
+      weather.locationResults = [];
+      keyClick(Qt.Key_Return);
+      compare(weather.chosenLocation.name, "Sun City");
+      verify(weather.locationSearchOpen);
+      compare(findChild(panel, "locationResults").count, 0);
+    }
+    function test_location_search_escape_and_mouse() {
+      keyClick(Qt.Key_Return);
+      verify(state.calendarDetailsOpen);
+      keyClick(Qt.Key_S);
+      verify(weather.locationSearchOpen);
+      const input = findChild(panel, "locationSearchInput");
+      tryCompare(input, "activeFocus", true);
+      keyClick(Qt.Key_Escape);
+      verify(!weather.locationSearchOpen);
+      verify(state.calendarDetailsOpen);
+      tryCompare(panel, "activeFocus", true);
+      keyClick(Qt.Key_S);
+      weather.locationResults = [{name: "Lyon", region: "Auvergne-Rhône-Alpes", country: "France",
+        latitude: 45.75, longitude: 4.85}];
+      const list = findChild(panel, "locationResults");
+      tryCompare(list, "count", 1);
+      wait(0);
+      mouseClick(list, 100, 23);
+      compare(weather.chosenLocation.name, "Lyon");
+      verify(!weather.locationSearchOpen);
+    }
+    function test_hourly_details_and_scroll() {
+      const days = Object.assign({}, weather.days);
+      days["2026-09-10"] = {code: 0, temperatureMinC: 0, temperatureMaxC: 12.5,
+        hours: Array.from({length: 24}, (_, i) => ({time: String(i).padStart(2, "0") + ":00",
+          code: i < 12 ? 0 : 61, temperatureC: 0, apparentTemperatureC: -1,
+          precipitationProbability: 0, precipitationMm: 0, windKmh: 12, gustsKmh: 20}))};
+      weather.days = days;
+      keyClick(Qt.Key_Return);
+      const list = findChild(panel, "weatherHours");
+      compare(list.count, 24);
+      compare(findChild(panel, "dayDetails").implicitHeight, 358);
+      keyClick(Qt.Key_J);
+      verify(list.contentY > 0);
+      keyClick(Qt.Key_K);
+      compare(list.contentY, 0);
+      keyClick(Qt.Key_L);
+      compare(list.count, 0);
+      verify(findChild(panel, "hourlyEmpty").visible);
+      compare(state.calendarSelectedDate, "2026-09-11");
+      keyClick(Qt.Key_Escape);
+      keyClick(Qt.Key_Escape);
+      verify(state.closed);
     }
   }
 }

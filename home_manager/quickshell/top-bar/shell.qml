@@ -1,6 +1,8 @@
 import Quickshell
 
 ShellRoot {
+  KeyboardCheatsheet {}
+
   StatusData {
     id: sharedStatus
   }
@@ -9,14 +11,6 @@ ShellRoot {
     model: Quickshell.screens
 
     Bar {
-      statusData: sharedStatus
-    }
-  }
-
-  Variants {
-    model: Quickshell.screens
-
-    OsdOverlay {
       statusData: sharedStatus
     }
   }

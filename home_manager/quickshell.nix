@@ -9,6 +9,12 @@
     } ''
       cp -R ${./quickshell/top-bar} "$out"
       chmod -R u+w "$out"
+      substituteInPlace "$out/StatusData.qml" \
+        --replace-fail '"quickshell-system-stats"' '"${localPackages.quickshellSystemStats}/bin/quickshell-system-stats"'
+      substituteInPlace "$out/WeatherData.qml" \
+        --replace-fail '"quickshell-weather"' '"${localPackages.quickshellWeather}/bin/quickshell-weather"'
+      substituteInPlace "$out/AudioAvailability.qml" \
+        --replace-fail '"pw-dump"' '"${pkgs.pipewire}/bin/pw-dump"'
       substituteInPlace "$out/NotificationData.qml" \
         --replace-fail '"pw-play"' '"${pkgs.pipewire}/bin/pw-play"' \
         --replace-fail '"/run/current-system/sw/share/sounds/freedesktop/stereo/message-new-instant.oga"' \

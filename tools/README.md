@@ -13,13 +13,14 @@ commands through `localPackages`; Home Manager selects what to install.
 | `quickshell/brightness/` | `quickshell/brightness.nix` | Internal backlight and external DDC/CI brightness |
 | `quickshell/nix-cleaner/` | `quickshell/nix-cleaner.nix` | Native `nh clean all` integration |
 | `quickshell/system-stats/` | `quickshell/system-stats.nix` | Persistent Rust CPU, RAM, disk and backlight telemetry |
+| `quickshell/gpu-monitor/` | `quickshell/gpu-monitor.nix` | Persistent Rust NVIDIA telemetry through NVML, with runtime-suspend checks |
 | `quickshell/chrome-tabs/` | `quickshell/chrome-tabs.nix` | Rust TabCtl adapter and local SQLite favicon cache |
 | `quickshell/speedtest/` | `quickshell/speedtest.nix` | Generation-tagged Ookla JSON streaming and cancellation |
 | `quickshell/weather/` | `quickshell/weather.nix` | Rust automatic location, current temperature and daily calendar weather |
 
-The trivial GPU wrapper lives directly in `packages/quickshell/gpu-monitor.nix`.
-The upstream GPU program has its own `packages/gpu-usage.nix` recipe. The
-Chrome tab integration and favicons live in `quickshell/chrome-tabs/`;
+The GPU collector lives in `quickshell/gpu-monitor/` and directly loads the
+NVIDIA driver's NVML library; no upstream GPU executable or wrapper is needed.
+The Chrome tab integration and favicons live in `quickshell/chrome-tabs/`;
 `home_manager/tabctl.nix` installs the commands and registers the native host.
 
 The Rust projects are independent Cargo packages, each with its own lockfile.
@@ -36,9 +37,17 @@ nix develop .#rust
 cargo test --manifest-path tools/quickshell/update/Cargo.toml
 cargo test --manifest-path tools/quickshell/brightness/Cargo.toml
 cargo test --manifest-path tools/quickshell/system-stats/Cargo.toml
+cargo test --manifest-path tools/quickshell/gpu-monitor/Cargo.toml
 cargo test --manifest-path tools/quickshell/chrome-tabs/Cargo.toml
 cargo test --manifest-path tools/quickshell/weather/Cargo.toml
 ```
+
+The system and GPU collectors share the central panel's demand-driven stdin
+protocol: process top fives are collected every two seconds only while the
+panel is visible; the ordinary bubble telemetry continues every second.
+After building both Cargo binaries, run
+`node home_manager/quickshell/top-bar/tests/system-process-streams_test.mjs`
+from the repository root to check subscription, cadence and pipe lifetime.
 
 The existing `tools/.envrc` selects that shell when direnv is enabled. There is
 one repository flake and one shared development environment. A NixOS rebuild

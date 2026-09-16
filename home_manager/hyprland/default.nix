@@ -31,7 +31,10 @@ in {
     };
 
     settings = lib.mergeAttrsList [
-      (import ./settings.nix {inherit helpers;})
+      (import ./settings.nix {
+        inherit helpers;
+        lafayetteKeymap = import ./lafayette.nix {inherit pkgs;};
+      })
       (import ./workspaces.nix {inherit pwaAppIds;})
       (import ./bindings.nix {
         inherit

@@ -1,4 +1,5 @@
 .pragma library
+.import "Theme.js" as Theme
 
 const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
@@ -13,6 +14,42 @@ function dateKey(date) {
   return String(date.getFullYear()).padStart(4, "0") + "-"
     + String(date.getMonth() + 1).padStart(2, "0") + "-"
     + String(date.getDate()).padStart(2, "0");
+}
+
+function dateFromKey(key) {
+  const parts = key.split("-").map(Number);
+  return localDate(parts[0], parts[1] - 1, parts[2]);
+}
+
+function detailTitle(key) {
+  const date = dateFromKey(key);
+  return ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][date.getDay()]
+    + " " + date.getDate() + " " + monthNames[date.getMonth()].toLowerCase();
+}
+
+function weatherDescription(code) {
+  switch (code) {
+    case 0: return "Ciel dégagé";
+    case 1: return "Peu nuageux";
+    case 2: return "Éclaircies";
+    case 3: return "Couvert";
+    case 45: case 48: return "Brouillard";
+    case 51: case 53: case 55: return "Bruine";
+    case 56: case 57: return "Bruine verglaçante";
+    case 61: case 63: case 65: return "Pluie";
+    case 66: case 67: return "Pluie verglaçante";
+    case 71: case 73: case 75: case 77: return "Neige";
+    case 80: case 81: case 82: return "Averses";
+    case 85: case 86: return "Averses de neige";
+    case 95: return "Orage";
+    case 96: case 99: return "Orage avec grêle";
+    default: return "Météo indisponible";
+  }
+}
+
+function weatherValue(value, suffix, decimals = 0) {
+  return typeof value === "number" && isFinite(value)
+    ? (decimals ? value.toFixed(decimals) : Math.round(value)) + suffix : "—";
 }
 
 function monthTitle(year, month) {
@@ -31,7 +68,7 @@ function monthCells(year, month) {
   });
 }
 
-// Nerd Font weather glyphs are monochrome and follow the widget accent.
+// Monochrome Nerd Font glyphs allow condition-specific icon colors.
 function weatherIcon(code) {
   switch (code) {
     case 0: return "\ue30d";
@@ -44,6 +81,17 @@ function weatherIcon(code) {
     case 80: case 81: case 82: return "\ue319";
     case 95: case 96: case 99: return "\ue31d";
     default: return "";
+  }
+}
+
+function weatherIconColor(code) {
+  switch (code) {
+    case 0: case 1: case 2: return Theme.weatherSun;
+    case 51: case 53: case 55: case 56: case 57:
+    case 61: case 63: case 65: case 66: case 67:
+    case 80: case 81: case 82:
+    case 95: case 96: case 99: return Theme.weatherRain;
+    default: return Theme.sideWeather;
   }
 }
 

@@ -6,7 +6,13 @@ Item {
   id: root
 
   property color backgroundColor: Theme.background
-  property string monitorName: ""
+  property var monitor: null
+  readonly property string monitorName: monitor?.name ?? ""
+  property var workspaces: Hyprland.workspaces.values
+  // workspacev2 can reach Quickshell before focusedmon and corrupt the old
+  // monitor's activeWorkspace. Use the compositor snapshot, refreshed by
+  // WorkspaceMonitorSync, rather than that focus-derived property.
+  readonly property int activeWorkspaceId: monitor?.lastIpcObject?.activeWorkspace?.id ?? 0
   property string activeSpecialWorkspace: ""
   property string presentedSpecialWorkspace: ""
   property bool specialTransitionTargetVisible: false
@@ -21,8 +27,7 @@ Item {
   readonly property real naturalContentWidth: {
     let total = 0;
     for (let workspaceId = 1; workspaceId <= 8; workspaceId++) {
-      const workspace = workspaceForId(workspaceId);
-      total += workspace !== null && workspace.focused ? 60 : 40;
+      total += workspaceId === activeWorkspaceId ? 60 : 40;
     }
     return total;
   }
@@ -83,7 +88,7 @@ Item {
   }
 
   function workspaceForId(workspaceId) {
-    return Hyprland.workspaces.values.find(workspace => workspace.id === workspaceId) ?? null;
+    return workspaces.find(workspace => workspace.id === workspaceId) ?? null;
   }
 
   function focusWorkspace(workspaceId) {
@@ -96,9 +101,7 @@ Item {
   }
 
   function syncSpecialWorkspace(animate = true) {
-    const monitor = Hyprland.monitors.values.find(candidate =>
-      candidate.name === monitorName);
-    if (monitor === undefined || monitor.lastIpcObject === undefined)
+    if (monitor === null || monitor.lastIpcObject === undefined)
       return;
     const special = monitor.lastIpcObject.specialWorkspace;
     setSpecialWorkspace(special !== undefined && special.id < 0
@@ -170,8 +173,9 @@ Item {
           id: workspaceButton
 
           readonly property int workspaceId: index + 1
+          objectName: "workspace-" + workspaceId
           readonly property var workspace: root.workspaceForId(workspaceId)
-          readonly property bool active: workspace !== null && workspace.focused
+          readonly property bool active: workspaceId === root.activeWorkspaceId
           readonly property bool occupied: workspace !== null
             && workspace.toplevels.values.length > 0
           readonly property bool hovered: pointer.containsMouse

@@ -1,4 +1,4 @@
-{helpers}: let
+{helpers, lafayetteKeymap}: let
   inherit (helpers) mkLuaArgs;
 in {
   config = {
@@ -55,7 +55,9 @@ in {
     };
 
     input = {
+      kb_file = "${lafayetteKeymap}";
       kb_layout = "us";
+      kb_variant = "";
       kb_options = "compose:caps";
       follow_mouse = 1;
       sensitivity = 0.8;

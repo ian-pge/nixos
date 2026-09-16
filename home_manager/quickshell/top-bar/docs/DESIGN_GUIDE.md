@@ -13,7 +13,7 @@ Principes fondamentaux :
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
 - Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
-- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui reprennent l’accent de leur capsule latérale. Le liseré animé reste rose, sauf pour les notifications qui utilisent le jaune vif.
+- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui utilisent leurs accents dédiés. Le liseré animé reste rose, sauf pour les notifications qui utilisent le jaune vif.
 
 ## 2. Architecture à préserver
 
@@ -26,7 +26,6 @@ Principes fondamentaux :
 - `../components/CalendarPanel.qml` / `Calendar.js` : calendrier mensuel et calculs de dates locales, icônes météo monochromes et températures mini/maxi.
 - `../components/NotificationPopup.qml` / `NotificationInputGuard.qml` : carte avec image et protection du focus du panneau masqué.
 - `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
-- `../OsdOverlay.qml` : indicateurs temporaires au-dessus des fenêtres plein écran.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
 - `../components/Theme.js` : source unique des couleurs QML, y compris les accents partagés entre capsules latérales et widgets centraux correspondants.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
@@ -37,6 +36,8 @@ Principes fondamentaux :
 - `../components/ChromeTabsLauncher.qml` : recherche et activation des onglets Chrome via TabCtl.
 - `../components/WifiSelector.qml` / `BluetoothSelector.qml` : sélecteurs clavier.
 - `../components/UpdateSelector.qml` : liste des mises à jour.
+- `../SystemData.qml` / `../components/SystemPanel.qml` : mesures partagées et panneau CPU/RAM/GPU.
+- `../components/ProcessList.qml` : cinq processus maximum, sans collecte propre.
 - `../components/Pill.qml` : capsule générique des modules latéraux.
 - `../components/SelectionBounce.qml` : rebond partagé des éléments sélectionnés.
 - `../../../../tools/quickshell/system-stats/` : télémétrie Rust persistante CPU, mémoire, disque et luminosité.
@@ -55,7 +56,7 @@ Conséquences :
 - Les propriétés `wifiTargetMonitor`, `bluetoothTargetMonitor`, `appLauncherTargetMonitor`, `chromeTabsTargetMonitor`, `updateTargetMonitor`, `volumeTargetMonitor`, `brightnessTargetMonitor`, `voiceDictationTargetMonitor` et `mediaTargetMonitor` pilotent à la fois le rendu et, pour les sélecteurs interactifs, le focus clavier.
 - Un clic sur une capsule latérale transmet toujours le nom du moniteur de cette barre. Un raccourci IPC sans cible utilise le moniteur Hyprland actuellement focalisé.
 - Activer un overlay déjà ouvert depuis un autre écran le déplace vers ce nouvel écran ; l’activer à nouveau sur son écran courant le ferme.
-- Tant qu’un widget central applications, updates, Wi-Fi, Bluetooth, volume ou luminosité est visible, sa capsule latérale correspondante adopte visuellement son état hover sur le même moniteur.
+- Tant qu’un widget central updates, Wi-Fi, Bluetooth, volume ou luminosité est visible, sa capsule latérale correspondante adopte visuellement son état hover sur le même moniteur. Les lanceurs applications et onglets Chrome n’ont aucune capsule latérale à illuminer.
 
 ## 3. Géométrie canonique
 
@@ -84,7 +85,7 @@ Conséquences :
 `WorkspaceSwitcher.expandedImplicitWidth` : les huit slots normaux, leurs marges,
 plus un slot spécial et son espacement. Ce plafond est calculé même sans special
 workspace ouvert ; le slot vide utilise alors sa largeur minimum de `70px`.
-Avec un workspace normal focalisé et ce slot minimum, le plafond vaut `434px`.
+Avec un workspace normal affiché sur cet écran et ce slot minimum, le plafond vaut `434px`.
 Si le nom du special workspace exige davantage de place, sa largeur réelle sert
 de référence. Ne pas recopier une constante en pixels dans chaque widget.
 
@@ -100,7 +101,7 @@ barre de progression.
 
 Une capsule latérale composée uniquement d'une icône est toujours un cercle
 strict de `36×36px`, indépendamment de la chasse du glyphe Nerd Font.
-Applications, updates, Wi-Fi et Bluetooth utilisent ce mode en permanence. La
+Updates, Wi-Fi, Bluetooth et Ne pas déranger utilisent ce mode en permanence. La
 capsule audio reste textuelle même muette, avec pourcentage et état du micro.
 Le contenu est centré horizontalement et
 verticalement dans toute la surface. La capsule update latérale conserve une
@@ -108,13 +109,74 @@ icône statique pendant les opérations : les animations Braille sont réservée
 au widget central. Les capsules textuelles gardent `20px` de padding mais ne
 peuvent jamais mesurer moins de `36px` de large.
 
-Les indicateurs CPU, RAM, GPU et disque forment une seule `Pill`, dans cet ordre,
-à gauche. Température météo, date et heure forment une seconde `Pill`, à droite.
+Les indicateurs CPU, RAM et GPU forment une seule `Pill` violette, dans cet ordre,
+à gauche. Le stockage possède sa propre `Pill` pêche immédiatement après ce
+groupe, avec son icône et son pourcentage d’occupation. Température météo, date
+et heure forment une autre `Pill`, à droite.
 Chaque groupe utilise un unique libellé avec trois espaces entre les indicateurs,
 un seul fond et le rebond commun au groupe entier. Conserver les icônes, formats
-et mises à jour des données existants. La capsule système n’a pour l’instant
-aucune action au clic et ne lance plus `htop`, `nvtop` ou `ncdu`. La capsule
+et mises à jour des données existants. La capsule système ouvre le panneau
+central Système ; celle du stockage reste sans action. Aucune ne lance
+`htop`, `nvtop` ou `ncdu`. La capsule
 température/date/heure ouvre le calendrier météo central.
+
+### Panneau Système
+
+Le clic sur CPU/RAM/GPU ouvre ou ferme `SystemPanel` sur le moniteur cliqué.
+Un clic sur l’autre écran y transfère le panneau. Il reprend exactement le
+plafond `WorkspaceSwitcher.expandedImplicitWidth`, sans largeur parallèle.
+Échap ferme le panneau ; aucun nouveau raccourci global n’est affecté.
+La bulle système reprend son accent violet tant que son panneau est ouvert.
+
+Les trois sections gardent l’ordre CPU, RAM, GPU :
+
+- CPU : charge, modèle, température package, fréquence moyenne des CPU logiques
+  et top 5 des processus par charge récente. Dans la liste, 100 % = un cœur ;
+  le pourcentage global en titre reste rapporté à l’ensemble du processeur.
+- RAM : pourcentage et mémoire utilisée/totale en Gio, top 5 par mémoire
+  résidente (RSS). Le swap n’apparaît que si une quantité non nulle est utilisée.
+- GPU : modèle, charge, température, VRAM utilisée/totale en Gio et top 5
+  par charge 3D/calcul, avec la VRAM de chaque processus. Si cette charge
+  n’est pas disponible dans le pilote, le classement devient explicitement
+  `Top VRAM`, pas une approximation de l’activité GPU.
+  Une carte suspendue indique `Veille`, pas une charge fictive de 0 %.
+
+La hauteur dérive du contenu : 720 px avec les trois listes pleines, 744 px
+avec le swap ; moins lorsque des listes sont vides ou indisponibles.
+Les libellés longs sont élidés et les mesures manquantes affichent `—`.
+Les graphiques et leur historique ont été retirés. Les tops sont collectés
+toutes les deux secondes, seulement lorsque Système est visible et non
+recouvert sur son écran (notification, dictée ou polkit). Les mesures globales
+des bulles continuent chaque seconde. `SystemData` consomme les deux flux
+déjà lancés par `StatusData`, sans processus supplémentaire ni collecte par
+écran. Les demandes passent par stdin : `0` désactive les tops, un entier
+positif identifie la nouvelle ouverture. Le premier top CPU attend deux
+lectures ; la RAM peut être affichée immédiatement. Les anciennes réponses
+en attente sont rejetées après fermeture/réouverture. Après 5 secondes sans
+mesure correspondante, les listes cessent d’être présentées comme actuelles.
+Un collecteur terminé est relancé après 5 secondes (CPU/RAM) ou 30 secondes
+(GPU), puis reçoit la demande courante.
+
+Le flux GPU vient du collecteur Rust local `tools/quickshell/gpu-monitor`,
+packagé dans `packages/quickshell/gpu-monitor.nix`. Il utilise directement
+NVML pour la NVIDIA, après vérification de l’état d’alimentation PCI dans
+sysfs ; même l’initialisation de NVML est différée tant que la carte est en
+veille. Il n’utilise ni programme Waybar, ni wrapper, ni `nvidia-smi`.
+Les erreurs de pilote donnent des données indisponibles et une nouvelle
+tentative après 30 secondes, sans arrêter le flux. AMD/Intel ne sont pas
+pris en charge par ce collecteur ; les mesures manquantes restent `—`.
+
+Les autres panneaux ferment Système à leur ouverture ; une notification ou la
+dictée le recouvre temporairement. Les tops sont rééchantillonnés à son retour.
+Les demandes polkit restaurent aussi le panneau précédent et
+le débranchement de l’écran cible ferme Système.
+
+Tests : `tst_SystemData.qml` avec `qs` offscreen, `tst_SystemPanel.qml` avec
+`qmltestrunner`, et `node tests/system-panel-state_test.mjs`. Ce dernier
+exécute les fonctions réelles de `StatusData` dans un contexte isolé, sans
+démarrer ses services ni modifier la session Hyprland.
+`node tests/system-process-streams_test.mjs` teste le protocole des deux vrais
+binaires Rust (après `cargo build`), avec une carte GPU fictive en veille.
 
 ### Surface layer-shell fixe
 
@@ -134,6 +196,18 @@ La zone transparente inutilisée doit rester click-through. **Ne pas recommencer
 L’espace au-dessus des capsules appartient à la surface du panel afin que leur
 rebond vers le haut reste visible. Leur position au repos et la réserve pour
 les fenêtres restent identiques.
+
+### Apparition en plein écran
+
+Lorsqu’un widget central ou une notification est actif sur un écran en plein
+écran, **la barre entière de cet écran** passe de `WlrLayer.Top` à
+`WlrLayer.Overlay`. Tous les widgets utilisent la même capsule, les mêmes
+animations et le même focus clavier qu’en mode normal. Les modules latéraux
+deviennent également visibles et utilisables. Aucun OSD séparé n’est instancié.
+Après fermeture du dernier widget ou de la dernière notification, la barre
+attend la fin du morphing (`360ms`) avant de revenir sous le plein écran.
+Ouvrir un widget sur un autre écran ne fait pas apparaître cette barre.
+La géométrie et la zone réservée restent fixes pendant le changement de couche.
 
 ### Croissance verticale
 
@@ -174,17 +248,22 @@ Règle sémantique de la capsule centrale :
 
 Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume, luminosité et calendrier sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume`, `Theme.sideBrightness` et `Theme.sideWeather`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose, sauf pendant une notification : liseré et accents internes utilisent alors `Theme.state`.
 
+Le panneau Système utilise `Theme.sideSystem` pour ses accents et son liseré,
+y compris pendant sa sortie animée. Une notification conserve la priorité jaune.
+
 Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
 
-Les capsules latérales ne changent pas de couleur selon leur état et conservent les accents fixes d’origine déclarés dans `Theme.js`. Les sept accents contextuels ci-dessus sont partagés avec leur widget central correspondant. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
+Les capsules latérales conservent les accents fixes d’origine déclarés dans `Theme.js`, à l’exception des icônes de batterie branchée ou faible décrites ci-dessous. Les accents sont partagés avec leur widget central correspondant lorsqu’une capsule latérale existe ; `Theme.sideApplications` reste réservé aux deux lanceurs centraux. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
 
 | Capsule | Token | Couleur |
 |---|---|---|
-| Applications | `Theme.sideApplications` | `#7dc4e4` |
+| Lanceurs centraux applications / onglets | `Theme.sideApplications` | `#7dc4e4` |
 | Updates | `Theme.sideUpdates` | `#f0c6c6` |
 | Réseau | `Theme.sideNetwork` | `#ee99a0` |
 | Bluetooth | `Theme.sideBluetooth` | `#8aadf4` |
-| Système (CPU, RAM, GPU, disque) | `Theme.sideSystem` | `#c6a0f6` |
+| Ne pas déranger | `Theme.sideNotifications` | `#a6da95` |
+| Système (CPU, RAM, GPU) | `Theme.sideSystem` | `#c6a0f6` |
+| Stockage | `Theme.sideDisk` | `#f5a97f` |
 | Batterie | `Theme.sideBattery` | `#f4dbd6` |
 | Volume | `Theme.sideVolume` | `#b7bdf8` |
 | Luminosité | `Theme.sideBrightness` | `#eed49f` |
@@ -356,6 +435,39 @@ Cela évite de laisser Hyprland en gris après un redémarrage de Quickshell.
 - Slot actif rose néon `#ff33cc` avec texte sombre.
 - Les workspaces occupés utilisent le jaune ; les vides utilisent une couleur discrète.
 
+Chaque barre conserve les huit slots et son propre Pac-Man rose : le slot actif
+correspond à `HyprlandMonitor.lastIpcObject.activeWorkspace.id` du moniteur déjà
+résolu par `Bar.hyprlandMonitor` et transmis au composant, jamais à
+`workspace.focused` (focus global). `WorkspaceMonitorSync`, instancié une seule
+fois dans `StatusData`, rafraîchit ces instantanés avec l’API native
+`Hyprland.refreshMonitors()` sur les événements de workspace, focus, special
+workspace et changement de moniteur/configuration. Les événements d’un même
+changement sont regroupés avec `Qt.callLater` ; aucun polling ni processus
+`hyprctl`. Ne pas utiliser directement `monitor.activeWorkspace` : Quickshell
+0.3.1 traite `workspacev2` sur l’ancien écran focalisé si cet événement précède
+`focusedmon`, et peut donc afficher le workspace de destination sur les deux
+barres. L’instantané conserve le bon workspace source jusqu’à confirmation
+de l’état par Hyprland. Ne pas refaire la recherche du moniteur dans chaque sélecteur : la référence
+partagée avec la barre évite une boucle de binding à l’initialisation. Passer la souris ou
+le focus clavier sur un autre écran ne change donc ni le Pac-Man ni la largeur
+de cette barre. L’occupation des huit workspaces reste globale : fantôme jaune
+si des fenêtres y sont présentes, point gris sinon. Les clics gardent leurs
+dispatchers existants ; aucun workspace n’est déplacé ou réaffecté.
+
+Le calcul de largeur et le rendu des slots utilisent le même identifiant local,
+y compris pendant un special workspace. Un moniteur absent, sans workspace ou
+sur un workspace hors des huit emplacements ne reprend jamais le focus d’un
+autre écran. `tests/tst_WorkspaceSwitcher.qml`, lancé avec `qs` en mode offscreen,
+vérifie les deux moniteurs, les changements de focus et de workspace, les
+couleurs/icônes, le plafond de largeur et les special workspaces avec des données
+simulées, sans dispatcher d’action sur la session réelle.
+`node tests/workspaces_test.mjs` teste aussi le vrai traitement IPC de Quickshell
+avec des sockets Hyprland privés et des composants offscreen : passage Dell 3
+→ laptop 6 avec `workspacev2` avant `focusedmon`, sens inverse, changement sur
+un même écran et simple changement de focus. Le test vérifie que le mauvais
+identifiant n’apparaît même pas transitoirement sur la barre source et ne touche
+jamais aux workspaces de la session réelle.
+
 Quand la capsule change de largeur, l’espacement entre les slots dépend de la largeur disponible. Les icônes suivent donc l’interpolation de largeur au lieu de rester figées au centre.
 
 ### Special workspace
@@ -403,6 +515,27 @@ La roue ne se déclenche que pour une navigation volontaire (`j/k/h/l`, flèches
 Le Wi-Fi utilise exclusivement `Quickshell.Networking` : devices NetworkManager, réseaux, puissance, sécurité, états, scan et connexion PSK. Aucun helper `nmcli` ne doit être réintroduit.
 
 Le Bluetooth utilise exclusivement `Quickshell.Bluetooth` : découverte BlueZ, appareils, appairage, connexion et déconnexion. Aucun helper `bluetoothctl` ne doit être réintroduit.
+
+La capsule batterie regroupe le PC (`󰌢`, pourcentage UPower) et les claviers
+Bluetooth (`󰌌`, pourcentage natif `BluetoothDevice.battery`), séparés par trois
+espaces, avec l’accent `Theme.sideBattery`. Les icônes seules deviennent vertes
+(`Theme.batteryPluggedIn`), y compris au survol, lorsque l’appareil est branché.
+Sinon, une batterie connue strictement inférieure à `20 %` rend uniquement son
+icône rouge (`Theme.error`), y compris au survol. Le vert est prioritaire sur le
+rouge ; à `20 %` ou avec un niveau inconnu, conserver la couleur normale.
+Chaque appareil est évalué indépendamment et les pourcentages gardent leur couleur.
+Pour le PC, utiliser `!UPower.onBattery` afin de couvrir aussi une batterie pleine
+ou dont la charge est limitée. Pour « Agar BLE », le Bluetooth ne fournit aucun
+état de charge : son adresse est associée à son identité USB (vendor/product et
+numéro de série), détectée via le flux système existant, sans processus ajouté.
+Cela fonctionne aussi via un hub, mais pas avec un chargeur mural sans connexion
+USB au PC. Un état UPower `Charging` ou `PendingCharge` est également accepté
+lorsqu’un clavier le fournit. Le niveau `100 %` seul n’indique jamais un branchement.
+
+Les claviers (`input-keyboard`) sont triés par adresse. Un clavier connecté en
+Bluetooth avec `batteryAvailable`, ou reconnu en USB, reste visible. En USB seul,
+une valeur inconnue s’affiche `--%` ; un clavier entièrement déconnecté disparaît.
+La télémétrie USB expirée après cinq secondes ne doit plus colorer l’icône.
 
 À l’ouverture, les modèles natifs déjà chargés s’affichent immédiatement. `WifiDevice.scannerEnabled` reste actif pendant toute la durée de vie du sélecteur, car Quickshell masque les réseaux inconnus dès que le scanner est désactivé. Le timer de rafraîchissement arrête uniquement le spinner ; la fermeture du sélecteur arrête réellement le scanner.
 
@@ -470,7 +603,7 @@ Bluetooth, HDMI, retrait de périphérique et touche micro du laptop.
 
 ### Applications
 
-Le raccourci `Super+A` et le logo Nix à gauche ouvrent `AppLauncher.qml` dans la capsule centrale. Le lanceur utilise exclusivement `DesktopEntries.applications` et `DesktopEntry.execute()` : ne pas réintroduire Fuzzel ou une analyse périodique des fichiers `.desktop`.
+Le raccourci `Super+A` ouvre `AppLauncher.qml` dans la capsule centrale. Le widget latéral avec le logo NixOS est supprimé pour libérer de la place : `Super+A` et `Super+;` conservent leurs panneaux centraux sans illuminer de widget latéral. Le lanceur utilise exclusivement `DesktopEntries.applications` et `DesktopEntry.execute()` : ne pas réintroduire Fuzzel ou une analyse périodique des fichiers `.desktop`.
 
 Conventions :
 
@@ -514,7 +647,7 @@ Conventions :
 - La luminosité utilise `Theme.sideBrightness` pour son icône et son remplissage.
 - Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage coloré indique le niveau.
 - Chaque indicateur central apparaît uniquement sur le moniteur qui a reçu la touche ou le geste de molette.
-- Hors plein écran, le volume et la luminosité restent dans `centerMorph` : le widget central précédent se transforme directement en indicateur, avec le même morphing et le même fondu croisé que les autres modes de la barre. Lorsqu'un workspace contient une fenêtre plein écran, un `LazyLoader` crée à la place une `PanelWindow` dédiée sur la couche Wayland native `Overlay`. La barre principale reste alors en permanence sur `Top` et ne peut jamais apparaître brièvement au début ou à la fin de l'OSD. La surface dédiée ignore les zones d'exclusion ; son contenu passe de `352px` à `280px` et descend de `8px` pendant `360ms`, puis joue le mouvement inverse à la fermeture.
+- Le volume et la luminosité restent toujours dans `centerMorph`, avec le même morphing et le même fondu croisé que les autres modes. En plein écran, leur activation fait apparaître toute la barre du moniteur cible (voir « Apparition en plein écran »).
 
 ## 13. Contrôles média MPRIS
 
@@ -718,9 +851,40 @@ Quickshell est l’unique serveur `org.freedesktop.Notifications` configuré.
 
 Une seule notification est présentée, sur l’écran focalisé à la réception.
 La suivante remplace la précédente, y compris les mises à jour d’un même ID.
-Il n’y a ni cloche, ni historique, ni file, ni stockage de messages sur disque.
-Les notifications reçues en plein écran sont expirées sans affichage ni rejeu.
-Le passage en plein écran ou la disparition du moniteur ferme la carte courante.
+Il n’y a ni historique, ni file, ni stockage de messages sur disque.
+Les notifications reçues en plein écran font apparaître toute la barre sur
+l’écran ciblé. Passer en plein écran conserve la carte courante ; la disparition
+du moniteur la ferme. Le mode Ne pas déranger reste prioritaire en plein écran.
+
+Une capsule `36×36px` de contrôle Ne pas déranger se place tout à droite,
+immédiatement après Bluetooth. Accent vert Catppuccin
+`Theme.sideNotifications` : cloche normale si le mode est désactivé, cloche barrée
+s’il est actif. Le clic gauche et l’IPC `topbar.toggleDoNotDisturb` basculent le même
+état global sur tous les écrans. `forceHovered` donne une inversion de couleur
+et un rebond pendant `2000ms` à chaque activation/désactivation. Ensuite, le fond
+redevient sombre et le rebond s’arrête, sauf en cas de vrai survol ; seule la
+cloche barrée indique que le mode est encore actif. L’état actif n’entretient
+ni le fond vert ni l’animation.
+Aucune infobulle ni notification de confirmation n’est émise.
+
+Le clic droit bascule uniquement le clavier intégré
+`at-translated-set-2-keyboard` via `hyprctl eval` et `hl.device`.
+L’état est conservé dans la variable Lua `quickshell_internal_keyboard_disabled`
+du compositeur, partagée entre les écrans et conservée lors d’un redémarrage de
+Quickshell. Le premier clic désactive le clavier, le suivant le réactive.
+Aucun indicateur, changement d’icône ou message ne représente l’état du clavier ;
+la cloche et son feedback restent liés uniquement au mode Ne pas déranger.
+
+La touche VIA `Mac Dnd` du NuPhy Air60 V2 (`XF86DoNotDisturb`) appelle ce même
+IPC, sans modificateur et sans répétition au maintien. `Mac Search`/`Super+Space`
+reste réservé à la maximisation, et `Mac Voice` conserve le mute/démute du micro.
+
+`NotificationData.doNotDisturb` conserve son état pendant un rechargement QML
+via `PersistentProperties`, mais repart désactivé au redémarrage du processus.
+L’activer expire la carte courante et arrête uniquement les lecteurs de sons de
+notifications appartenant à Quickshell. Musique, appels, volume et micro ne sont
+pas modifiés. Toutes les notifications arrivant pendant ce mode, y compris les
+critiques, sont expirées sans affichage ni son ; rien n’est rejoué à sa sortie.
 
 Chaque nouvelle notification affichée joue directement `message-new-instant.oga`
 du thème freedesktop (environ `1s`) avec `pw-play`, au volume `2.0` (200 %) et
@@ -728,9 +892,11 @@ avec le rôle `Notification`. C’est le son « Message instantané » choisi ap
 écoute : amplification directe du flux par `pw-play` (gain linéaire ×2, environ
 `+6dB`), sans conversion ni étape FFmpeg. Le fichier original et le volume général
 restent inchangés. Le lecteur et le son sont épinglés dans le Nix store. Respecter
-le hint `suppress-sound` ; les notifications rejetées en plein écran restent
-silencieuses. Il n’y a **aucun intervalle minimum**, ni file audio : chaque arrivée
-lance son lecteur indépendant, même pendant un son précédent. Les mises à jour
+le hint `suppress-sound`, y compris en plein écran. Il n’y a **aucun intervalle minimum**, ni file audio : chaque arrivée
+lance son `Process` indépendant suivi par Quickshell, même pendant un son précédent.
+Chaque lecteur est libéré à sa fin, y compris après un échec de lancement ;
+ce suivi permet de couper aussi les sons déjà en cours quand on active Ne pas déranger.
+Les mises à jour
 d’une carte existante (même ID, image, texte) ne rejouent pas le son.
 
 La capsule s’étend vers le bas, sous le plafond commun des workspaces. La carte
@@ -782,10 +948,18 @@ Unicode et l’indépendance par rapport à la largeur rendue. Ce test QtTest ut
 `qs`, qui embarque les plugins statiques Quickshell nécessaires à la carte.
 `tests/tst_NotificationInputGuard.qml` avec `qmltestrunner`
 vérifie le focus, la protection du texte et Échap. `tests/escape_test.lua` prend
-le fichier `hyprland.lua` généré par Home Manager et vérifie les deux raccourcis
+le fichier `hyprland.lua` généré par Home Manager et vérifie les deux raccourcis Échap,
+`Mac Dnd` et la conservation de `Mac Voice` et `Super+Space`
 dans un environnement Lua simulé. Vérifier également avec `notify-send` la
 réception native, les remplacements d’ID, l’action `default`, les images et
 l’expiration ; une notification réelle Beeper valide les données qu’il fournit.
+
+`tests/notifications_test.sh` (avec `qs`, `notify-send` et `dbus-run-session` dans
+PATH) teste le serveur natif, les rafales sans intervalle, le filtrage de toutes
+les urgences en mode Ne pas déranger, l’absence de rejeu, l’arrêt des lecteurs,
+le plein écran, `suppress-sound`, les échecs audio et le rebond borné dans les deux
+sens. Ce lanceur utilise un bus D-Bus privé, un faux lecteur silencieux et un
+`hyprctl` inoffensif : ne pas lancer directement le fichier QML sur le bus réel.
 
 ## 19. Calendrier météo
 
@@ -808,22 +982,46 @@ La hauteur est calculée depuis les données, sans attendre une passe de layout
 indépendante de la largeur et utilise l’animation commune de la capsule centrale.
 Les cases hors du mois sont vides. Le mois et les jours sont en français,
 du lundi au dimanche. Utiliser la couleur météo `Theme.sideWeather` pour les
-contrôles, icônes météo, températures et aujourd’hui, les neutres habituels pour
+contrôles, températures et aujourd’hui, les neutres habituels pour
 le texte. Les icônes météo utilisent les glyphes monochromes d’`Ubuntu Nerd Font`,
 jamais les emojis multicolores. Chaque jour couvert affiche son numéro, son
 icône et les températures mini/maxi en °C (`12°/24°`). Aujourd’hui utilise un
-fond neutre et un contour coloré pour garder aussi son icône dans l’accent météo.
+fond neutre et un contour coloré. Les icônes soleil/éclaircies sont vertes
+(`Theme.weatherSun`), celles de bruine/pluie/averses/orages rouges (`Theme.weatherRain`),
+les autres gardent `Theme.sideWeather`.
 Le liseré reste le rose d’activité commun ; seules les notifications le rendent jaune.
 
-Il n’y a pas de boutons de navigation souris dans l’en-tête : le titre utilise
-toute la largeur disponible. H/L et les flèches gauche/droite (ou Page Up/Down)
-changent le mois. Home et Entrée (y compris le pavé numérique) rétablissent le
-mois courant avec aujourd’hui surligné, sans fermer.
+H/J/K/L et les flèches sélectionnent les jours : gauche/droite déplacent d’un jour,
+haut/bas d’une semaine, y compris à travers les limites des mois. U/D (ou Page
+Up/Down) changent le mois en conservant le numéro du jour si possible. Home revient
+à aujourd’hui, tout comme N depuis la grille ou le détail. Le jour sélectionné
+reprend exactement le fond, le contour et le numéro gras d’aujourd’hui, avec
+l’accent orange `Theme.calendarSelected` prioritaire lorsqu’aujourd’hui est sélectionné.
+Un clic sur une case ou Entrée ouvre son détail horaire dans la
+même capsule. `WeatherDayDetails.qml` affiche température/ressenti, pluie en %/mm,
+vent/rafales en km/h dans une liste défilante. En détail, H/L changent le jour,
+J/K et la molette défilent ; Échap ou le chevron retourne à la grille, puis Échap
+ferme le calendrier. La sélection et le mode détail appartiennent au `StatusData`
+partagé. La hauteur du détail est bornée et suit l’animation commune de la capsule.
+S ouvre `WeatherLocationSelector.qml` depuis la grille ou le détail. Le champ
+de recherche prend le focus ; les lettres H/J/K/L/U/D/N/S y restent du texte.
+Flèches haut/bas, Tab ou Ctrl-J/K sélectionnent un résultat, Entrée ou un clic le
+valide. Échap/chevron revient à la vue précédente. La recherche utilise le géocodage
+Open-Meteo, affiche région/pays et attend 350 ms après la frappe. Rejeter les
+réponses d’une ancienne requête. La liste ne contient que des villes, aucun choix
+de mode automatique/manuel. La ville recherchée est temporaire : chaque nouvelle
+ouverture du calendrier redétecte la localisation IP, même si le cache est récent.
+Restaurer après une notification/Polkit ou déplacer un calendrier déjà ouvert
+conserve la ville consultée. Aucune préférence de lieu n’est enregistrée ; les
+anciens `location.json` sont ignorés. Le cache automatique `v2.json` est séparé
+du cache de recherche `manual-v2.json`. La météo est relancée après toute requête déjà en cours.
+Vider l’ancienne météo à la sélection et ne jamais afficher le cache d’une autre
+ville ou d’un autre mode. Une ville manuelle désactive la géolocalisation IP.
 Chaque nouvelle ouverture repart sur ce mois ; le passage derrière une
 notification, la dictée ou une demande Polkit conserve le mois consulté.
 Le passage à minuit suit le nouveau jour/mois tant que l’utilisateur n’a pas
-navigué vers un autre mois. Il n’y a aucune action sur les cases, aucun événement
-d’agenda, ni infobulle. Le focus et les clics masqués sont protégés par le guard
+navigué vers un autre jour. Il n’y a aucun événement d’agenda, ni infobulle.
+Le focus et les clics masqués sont protégés par le guard
 des notifications ; la dictée garde sa priorité. Une disparition du moniteur
 cible ferme le calendrier.
 
@@ -836,8 +1034,9 @@ le choix IPv4/IPv6 automatique de curl : ces adresses peuvent être localisées
 différemment. Seuls ville et coordonnées sont conservées, pas l’IP ni les autres
 métadonnées réseau/client renvoyées par fwd.gr. Le changement de fournisseur
 ne modifie pas le protocole/cache v2 ; un cache existant reste utilisable en cas d’échec.
-Il fournit des codes météo et températures mini/maxi quotidiens, pas les conditions de l’heure courante
-répétées dans chaque case. Les jours passés utilisent des données de modèle
+Il fournit des codes météo et températures mini/maxi quotidiens, ainsi que les
+conditions horaires regroupées par date locale dans `days[date].hours`, via la même
+requête. Les anciennes entrées v2 sans heures restent compatibles. Les jours passés utilisent des données de modèle
 archivées et ne sont pas présentés comme des observations mesurées. Les dates
 restent des clés ISO locales sans conversion UTC. Code inconnu ou nul : pas
 d’icône. Mini/maxi incomplets : pas de température inventée. Date hors couverture :
@@ -857,8 +1056,11 @@ dans la barre. La géolocalisation IP peut être erronée même en fibre, et peu
 
 Tests : `tst_CalendarPanel.qml` avec `qmltestrunner` vérifie la grille, les années
 bissextiles, les dates locales, les icônes/couleurs, les mini/maxi, la navigation
-clavier (dont H/L/Entrée), l’absence de boutons et la hauteur ajustée aux semaines
+clavier (H/J/K/L, U/D, Entrée, Échap), les clics, le détail horaire et son défilement,
+ainsi que la hauteur ajustée aux semaines
 et aux changements de données météo, sans variation liée à la largeur.
+`node tests/calendar-navigation_test.mjs` vérifie les fonctions réelles du
+`StatusData` : limites de mois/années, année bissextile, changement d’heure et sélection.
 `QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QT_NO_XDG_DESKTOP_PORTAL=1
 qs -p tests/tst_WeatherData.qml` depuis `top-bar/` vérifie température nulle/zéro,
 cache, expiration et erreurs. Les tests Rust du dossier de l’outil vérifient la

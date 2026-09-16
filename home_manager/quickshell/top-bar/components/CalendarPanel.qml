@@ -17,28 +17,55 @@ FocusScope {
   }, 24))
   readonly property string todayKey: Calendar.dateKey(statusData.calendarToday)
   readonly property string monthTitle: Calendar.monthTitle(statusData.calendarYear, statusData.calendarMonth)
+  readonly property bool detailsOpen: statusData.calendarDetailsOpen
+  readonly property bool locationSearchOpen: statusData.weather.locationSearchOpen
 
   // Bar supplies the exact workspace ceiling; height never depends on wrapping.
   implicitHeight: updateLabel.y + updateLabel.height + 10
 
   onEnabledChanged: {
     if (enabled)
-      Qt.callLater(() => { if (root.enabled) root.forceActiveFocus(); });
+      Qt.callLater(root.restoreFocus);
   }
   Component.onCompleted: {
     if (enabled)
-      Qt.callLater(() => { if (root.enabled) root.forceActiveFocus(); });
+      Qt.callLater(root.restoreFocus);
   }
 
+  function restoreFocus() {
+    if (!enabled) return;
+    if (locationSearchOpen) locationSelector.focusSearch();
+    else forceActiveFocus();
+  }
+  onLocationSearchOpenChanged: Qt.callLater(restoreFocus)
+
   Keys.onPressed: event => {
-    if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp || event.key === Qt.Key_H)
+    if (locationSearchOpen)
+      return;
+    if (event.key === Qt.Key_S)
+      statusData.weather.openLocationSearch();
+    else if (event.key === Qt.Key_U || event.key === Qt.Key_PageUp)
       statusData.calendarMoveMonth(-1);
-    else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown || event.key === Qt.Key_L)
+    else if (event.key === Qt.Key_D || event.key === Qt.Key_PageDown)
       statusData.calendarMoveMonth(1);
-    else if (event.key === Qt.Key_Home || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+    else if (event.key === Qt.Key_Left || event.key === Qt.Key_H)
+      statusData.calendarMoveDay(-1);
+    else if (event.key === Qt.Key_Right || event.key === Qt.Key_L)
+      statusData.calendarMoveDay(1);
+    else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
+      if (detailsOpen) dayDetails.scrollHours(1);
+      else statusData.calendarMoveDay(7);
+    } else if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
+      if (detailsOpen) dayDetails.scrollHours(-1);
+      else statusData.calendarMoveDay(-7);
+    } else if (event.key === Qt.Key_Home || event.key === Qt.Key_N)
       statusData.calendarGoToday();
-    else if (event.key === Qt.Key_Escape)
-      statusData.hideCalendar();
+    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+      statusData.calendarSelectDate(statusData.calendarSelectedDate, true);
+    else if (event.key === Qt.Key_Escape) {
+      if (detailsOpen) statusData.calendarDetailsOpen = false;
+      else statusData.hideCalendar();
+    }
     else
       return;
     event.accepted = true;
@@ -46,17 +73,28 @@ FocusScope {
 
   Text {
     x: 16; y: 12; width: 22; height: 24
-    text: ""
+    text: root.detailsOpen || root.locationSearchOpen ? "‹" : ""
     color: Theme.sideWeather
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 18
     verticalAlignment: Text.AlignVCenter
+    MouseArea {
+      objectName: "backToCalendar"
+      anchors.fill: parent
+      enabled: root.detailsOpen || root.locationSearchOpen
+      cursorShape: Qt.PointingHandCursor
+      onClicked: {
+        if (root.locationSearchOpen) root.statusData.weather.closeLocationSearch();
+        else root.statusData.calendarDetailsOpen = false;
+      }
+    }
   }
   Text {
     x: 44; y: 12
     width: Math.max(0, parent.width - x - 16)
-    height: 24
-    text: root.monthTitle
+    height: 20
+    text: root.locationSearchOpen ? "Localisation météo"
+      : root.detailsOpen ? Calendar.detailTitle(root.statusData.calendarSelectedDate) : root.monthTitle
     textFormat: Text.PlainText
     elide: Text.ElideRight
     color: Theme.foreground
@@ -65,12 +103,22 @@ FocusScope {
     font.bold: true
     verticalAlignment: Text.AlignVCenter
   }
+  Text {
+    x: 44; y: 33; width: parent.width - 60; height: 12
+    text: root.locationSearchOpen ? "↑/↓ choisir · Entrée valider · Échap retour"
+      : root.detailsOpen ? "h/l jours · j/k défiler · n aujourd’hui · s ville · Échap"
+      : "hjkl jours · u/d mois · n aujourd’hui · s ville · ↵"
+    color: Theme.secondary
+    font.family: "Ubuntu Nerd Font"
+    font.pixelSize: 9
+  }
   Rectangle {
     x: 14; y: 46; width: parent.width - 28; height: 1
     color: Theme.surfaceRaised
   }
   Row {
     x: 16; y: 52
+    visible: !root.detailsOpen && !root.locationSearchOpen
     spacing: 4
     Repeater {
       model: ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
@@ -90,6 +138,7 @@ FocusScope {
     id: dayGrid
     objectName: "dayGrid"
     x: 16; y: 76
+    visible: !root.detailsOpen && !root.locationSearchOpen
     width: parent.width - 32
     spacing: 4
     // Size from data, not a layout pass: covered/off-monitor panels must update too.
@@ -113,6 +162,7 @@ FocusScope {
             id: cell
             required property var modelData
             readonly property bool isToday: modelData.date === root.todayKey
+            readonly property bool isSelected: modelData.date === root.statusData.calendarSelectedDate
             readonly property var forecast: root.statusData.weather.days[modelData.date]
             readonly property string weatherIcon: Calendar.weatherIcon(forecast?.code)
             readonly property string temperatureText: Calendar.temperatureRange(forecast)
@@ -120,17 +170,19 @@ FocusScope {
             width: dayGrid.cellWidth
             height: week.height
             radius: 8
-            color: isToday ? Theme.surfaceRaised : "transparent"
-            border.width: isToday ? 1 : 0
-            border.color: Theme.sideWeather
+            color: isSelected || isToday ? Theme.surfaceRaised : "transparent"
+            border.width: isSelected || isToday ? 1 : 0
+            border.color: isSelected ? Theme.calendarSelected : Theme.sideWeather
             Text {
+              objectName: "dayNumber"
               anchors.horizontalCenter: parent.horizontalCenter
               y: 2; height: 18
               text: cell.modelData.day === 0 ? "" : cell.modelData.day
-              color: cell.isToday ? Theme.sideWeather : Theme.foreground
+              color: cell.isSelected ? Theme.calendarSelected
+                : cell.isToday ? Theme.sideWeather : Theme.foreground
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 13
-              font.bold: cell.isToday
+              font.bold: cell.isSelected || cell.isToday
             }
             Text {
               objectName: "weatherIcon"
@@ -138,11 +190,20 @@ FocusScope {
               y: 20; height: 22
               text: cell.modelData.day === 0 ? "" : cell.weatherIcon
               visible: text !== ""
-              color: Theme.sideWeather
+              color: Calendar.weatherIconColor(cell.forecast?.code)
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 20
               verticalAlignment: Text.AlignVCenter
               textFormat: Text.PlainText
+            }
+            MouseArea {
+              anchors.fill: parent
+              enabled: cell.modelData.day > 0
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                root.statusData.calendarSelectDate(cell.modelData.date, true);
+                root.forceActiveFocus();
+              }
             }
             Text {
               objectName: "temperature"
@@ -162,6 +223,23 @@ FocusScope {
       }
     }
   }
+  WeatherDayDetails {
+    id: dayDetails
+    objectName: "dayDetails"
+    x: 16; y: 56; width: parent.width - 32; height: implicitHeight
+    visible: root.detailsOpen && !root.locationSearchOpen
+    forecast: root.statusData.weather.days[root.statusData.calendarSelectedDate] ?? null
+    loading: root.statusData.weather.loading
+  }
+  WeatherLocationSelector {
+    id: locationSelector
+    objectName: "locationSelector"
+    x: 16; y: 56; width: parent.width - 32; height: implicitHeight
+    weather: root.statusData.weather
+    visible: root.locationSearchOpen
+    enabled: root.enabled && root.locationSearchOpen
+    onClosed: root.statusData.weather.closeLocationSearch()
+  }
   Text {
     x: 16; y: updateLabel.y
     width: Math.max(0, updateLabel.x - x - 10)
@@ -178,7 +256,8 @@ FocusScope {
     objectName: "updateLabel"
     anchors.right: parent.right
     anchors.rightMargin: 16
-    y: dayGrid.y + dayGrid.height + 10; height: 16
+    y: (root.locationSearchOpen ? locationSelector.y + locationSelector.height
+      : root.detailsOpen ? dayDetails.y + dayDetails.height : dayGrid.y + dayGrid.height) + 10; height: 16
     text: root.statusData.weather.updateText
     color: Theme.secondary
     font.family: "Ubuntu Nerd Font"

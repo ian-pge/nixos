@@ -85,6 +85,19 @@
     "SUPER + SUPER_L"
     "SUPER + SUPER_R"
   ];
+
+  # Ordered compositor events avoid a late show process racing the release.
+  hideKeyboardCheatsheetBinds = map (key:
+    mkBind
+    (plainKey key)
+    ''hl.dsp.event("keyboard-cheatsheet:hide")''
+    {
+      release = true;
+      ignore_mods = true;
+      non_consuming = true;
+      transparent = true;
+      submap_universal = true;
+    }) ["apostrophe" "SUPER + SUPER_L" "SUPER + SUPER_R"];
 in {
   terminal._var = "ghostty";
   browser._var = "google-chrome-stable";
@@ -100,12 +113,12 @@ in {
     [
       (mkBind
         (plainKey "ESCAPE")
-        ''function()
-          if quickshell_dismiss_notification() then
-            return { ok = true }
-          end
-          return { ok = false, pass_event = true }
-        end''
+        ''          function()
+                    if quickshell_dismiss_notification() then
+                      return { ok = true }
+                    end
+                    return { ok = false, pass_event = true }
+                  end''
         {auto_consuming = true;})
       (mkBind
         (plainKey "XF86AudioRaiseVolume")
@@ -129,11 +142,18 @@ in {
       (mkBind (plainKey "XF86AudioPrev") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar mediaPrevious") {})
       (mkBind (plainKey "XF86AudioMute") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleAudioMute") {})
       (mkBind (plainKey "XF86VoiceCommand") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleMicrophoneMute") {})
+      (mkBind (plainKey "XF86DoNotDisturb") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleDoNotDisturb") {})
+      # XKB names the physical F13 key XF86Tools with the default evdev rules.
+      (mkBind (plainKey "XF86Tools") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleDoNotDisturb") {})
       (mkBind (plainKey "PRINT") (mkExec "hyprshot -m region -o ~/Pictures/Screenshots") {})
+      (mkBind
+        (plainKey "mouse:274")
+        (mkExec "hyprshot -m region -o ~/Pictures/Screenshots")
+        {release = true;})
       (mkBind (mainKey "RETURN") "hl.dsp.exec_cmd(terminal)" {})
       (mkBind (mainKey "W") "hl.dsp.window.close()" {})
       (mkBind (mainKey "CONTROL + Q") (mkExec "uwsm stop") {})
-      (mkBind (mainKey "P") (mkExec "ghostty --class=dev.me.pi --title=Pi -e pi") {})
+      (mkBind (mainKey "P") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleChromeTabs") {})
       (mkBind (mainKey "F") "hl.dsp.exec_cmd(fileManager)" {})
       (mkBind (mainKey "SHIFT + F") "hl.dsp.exec_cmd(fileManagerGraphic)" {})
       (mkBind (mainKey "N") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleWifi") {})
@@ -143,7 +163,7 @@ in {
       (mkBind (mainKey "SHIFT + Q") "hl.dsp.exec_cmd(settings)" {})
       (mkBind (mainKey "R") "hl.dsp.exec_cmd(audio)" {})
       (mkBind (mainKey "A") "hl.dsp.exec_cmd(menu)" {})
-      (mkBind (mainKey "code:47") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleChromeTabs") {})
+      (mkBind (mainKey "apostrophe") ''hl.dsp.event("keyboard-cheatsheet:show")'' {})
       (mkBind (mainKey "E") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleCalendar") {})
       (mkBind (mainKey "Z") ''hl.dsp.layout("togglesplit")'' {})
       (mkBind (mainKey "G") "hl.dsp.exec_cmd(browser)" {})
@@ -179,5 +199,6 @@ in {
       (mkBind (mainKey "mouse:272") "hl.dsp.window.drag()" {mouse = true;})
       (mkBind (mainKey "mouse:273") "hl.dsp.window.resize()" {mouse = true;})
     ]
-    ++ stopVoiceDictationBinds;
+    ++ stopVoiceDictationBinds
+    ++ hideKeyboardCheatsheetBinds;
 }

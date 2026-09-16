@@ -36,7 +36,7 @@
     kalker
     google-chrome
     blender
-    davinci-resolve
+    # davinci-resolve
     nvd
     nix-output-monitor
     zotero
@@ -56,6 +56,7 @@
     ffmpeg-full
     # f3d # disabled: pulls vtk -> pdal -> gdal-minimal, currently failing GDAL tests
     discord
+    teams-for-linux
     krabby
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code

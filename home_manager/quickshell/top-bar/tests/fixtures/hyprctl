@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Notification tests must never alter the real compositor's Escape lease.
+exit 0
