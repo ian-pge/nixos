@@ -55,6 +55,9 @@
 
   startVoiceDictation = ''
     function()
+      if quickshell_cycle_keyboard_cheatsheet(false) then
+        return
+      end
       hl.exec_cmd("${voxtypePackage}/bin/voxtype record start")
       hl.dispatch(hl.dsp.submap("voxtype"))
     end
@@ -90,7 +93,7 @@
   hideKeyboardCheatsheetBinds = map (key:
     mkBind
     (plainKey key)
-    ''hl.dsp.event("keyboard-cheatsheet:hide")''
+    ''function() quickshell_hide_keyboard_cheatsheet() end''
     {
       release = true;
       ignore_mods = true;
@@ -163,7 +166,7 @@ in {
       (mkBind (mainKey "SHIFT + Q") "hl.dsp.exec_cmd(settings)" {})
       (mkBind (mainKey "R") "hl.dsp.exec_cmd(audio)" {})
       (mkBind (mainKey "A") "hl.dsp.exec_cmd(menu)" {})
-      (mkBind (mainKey "apostrophe") ''hl.dsp.event("keyboard-cheatsheet:show")'' {})
+      (mkBind (mainKey "apostrophe") "function() quickshell_show_keyboard_cheatsheet() end" {})
       (mkBind (mainKey "E") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleCalendar") {})
       (mkBind (mainKey "Z") ''hl.dsp.layout("togglesplit")'' {})
       (mkBind (mainKey "G") "hl.dsp.exec_cmd(browser)" {})
@@ -174,6 +177,8 @@ in {
       (mkBind (mainKey "L") ''hl.dsp.focus({ direction = "right" })'' {})
       (mkBind (mainKey "K") ''hl.dsp.focus({ direction = "up" })'' {})
       (mkBind (mainKey "J") ''hl.dsp.focus({ direction = "down" })'' {})
+      (mkBind (mainKey "ALT + H") ''hl.dsp.focus({ workspace = "r-1" })'' {})
+      (mkBind (mainKey "ALT + L") ''hl.dsp.focus({ workspace = "r+1" })'' {})
       (mkBind (mainKey "SHIFT + H") ''hl.dsp.window.move({ direction = "left" })'' {})
       (mkBind (mainKey "SHIFT + L") ''hl.dsp.window.move({ direction = "right" })'' {})
       (mkBind (mainKey "SHIFT + K") ''hl.dsp.window.move({ direction = "up" })'' {})
@@ -184,6 +189,15 @@ in {
         (mainKey "TAB")
         startVoiceDictation
         {})
+      (mkBind
+        (mainKey "SHIFT + TAB")
+        ''          function()
+                    if quickshell_cycle_keyboard_cheatsheet(true) then
+                      return { ok = true }
+                    end
+                    return { ok = false, pass_event = true }
+                  end''
+        {auto_consuming = true;})
       (mkBind (mainKey "CONTROL + h") ''hl.dsp.window.resize({ x = -50, y = 0, relative = true })'' {})
       (mkBind (mainKey "CONTROL + j") ''hl.dsp.window.resize({ x = 0, y = 50, relative = true })'' {})
       (mkBind (mainKey "CONTROL + k") ''hl.dsp.window.resize({ x = 0, y = -50, relative = true })'' {})

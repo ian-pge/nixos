@@ -3,11 +3,25 @@
   pkgs,
   ...
 }: {
+  # Single source of truth for GTK, X11/XWayland and Hyprland cursors.
+  home.pointerCursor = {
+    enable = true;
+    name = "catppuccin-macchiato-dark-cursors";
+    package = pkgs.catppuccin-cursors.macchiatoDark;
+    size = 24;
+    gtk.enable = true;
+    x11.enable = true;
+    # Catppuccin provides both native Hyprcursor and fallback XCursor assets.
+    hyprcursor.enable = true;
+  };
+
+  wayland.windowManager.hyprland.settings.config.cursor.enable_hyprcursor =
+    config.home.pointerCursor.hyprcursor.enable;
+
   # Let XWayland applications scale themselves at 1.25x without compositor
   # scaling, which otherwise enlarges their cursors disproportionately.
   xresources.properties = {
     "Xft.dpi" = 120;
-    "Xcursor.size" = 24;
   };
 
   # Enable dconf to manage GNOME settings
@@ -21,6 +35,10 @@
   # Configure GTK settings
   gtk = {
     enable = true;
+    font = {
+      name = "Ubuntu Nerd Font";
+      size = 11;
+    };
     theme = {
       name = "Adwaita-dark";
       package = pkgs.gnome-themes-extra;
@@ -29,10 +47,6 @@
     #   name = "Adwaita";
     #   package = pkgs.adwaita-icon-theme;
     # };
-    cursorTheme = {
-      name = "catppuccin-macchiato-dark-cursors";
-      package = pkgs.catppuccin-cursors.macchiatoDark;
-    };
 
     # Prefer a dark theme variant and show GTK 3 tooltips faster.
     gtk3.extraConfig = {

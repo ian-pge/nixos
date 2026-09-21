@@ -9,8 +9,6 @@
     "zed-markdown-theme-overrides.json"
     markdownTheme;
 in {
-  imports = [./services/playwright-mcp.nix];
-
   xdg.configFile."zed/themes/catppuccin-markdown.json".source =
     pkgs.runCommand "zed-catppuccin-markdown.json" {
       nativeBuildInputs = [pkgs.jq];

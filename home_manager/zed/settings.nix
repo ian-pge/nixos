@@ -64,17 +64,20 @@
       # Apply full access both through Zed's ACP session selection and at
       # Codex ACP process startup, so every new thread begins in this mode.
       default_mode = "agent-full-access";
+      # Keep this scoped to Zed's Codex ACP sessions; the standalone Codex
+      # CLI can retain its own model from ~/.codex/config.toml.
+      default_config_options = {
+        model = "gpt-6-astra";
+      };
       env = {
         INITIAL_AGENT_MODE = "agent-full-access";
+        # Astra's advertised Codex maximum; 95% gives 828400 usable tokens.
+        # Keep these overrides in Zed, without changing standalone Codex.
+        CODEX_CONFIG = builtins.toJSON {
+          model_context_window = 872000;
+          model_auto_compact_token_limit = 800000;
+        };
       };
-    };
-  };
-
-  # The graphical-session service owns the visible browser process. Zed
-  # forwards this native Streamable HTTP MCP endpoint to ACP agents.
-  context_servers = {
-    playwright = {
-      url = "http://localhost:8931/mcp";
     };
   };
 
@@ -196,10 +199,9 @@
 
   terminal = {
     font_family = "JetBrainsMono Nerd Font";
-    font_fallbacks = ["Iosevka"];
     dock = "right";
     flexible = false;
-    font_size = 14;
+    font_size = 16;
     blinking = "on";
     show_count_badge = true;
     copy_on_select = true;
@@ -210,10 +212,9 @@
   };
 
   buffer_font_family = "JetBrainsMono Nerd Font";
-  buffer_font_fallbacks = ["Iosevka"];
   buffer_font_size = 16;
 
   ui_font_family = "Ubuntu Nerd Font";
-  ui_font_fallbacks = ["Iosevka"];
+  ui_font_fallbacks = ["Hack Nerd Font"];
   ui_font_size = 16;
 }

@@ -119,6 +119,8 @@
       # Scroll the active Agent response by three lines.
       "ctrl-j" = "agent::ScrollOutputLineDown";
       "ctrl-k" = "agent::ScrollOutputLineUp";
+      # Cycle through the reasoning levels advertised by the ACP agent.
+      "ctrl-a r" = "agent::CycleThinkingEffort";
     };
   }
   {

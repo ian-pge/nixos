@@ -6,7 +6,6 @@
     vlc
     nvtopPackages.full
     adwaita-icon-theme
-    catppuccin-cursors.macchiatoDark
     nmap
     nettools
     wl-clipboard

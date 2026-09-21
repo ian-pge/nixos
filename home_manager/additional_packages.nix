@@ -34,7 +34,6 @@
       }))
     herdr
     kalker
-    google-chrome
     blender
     # davinci-resolve
     nvd
@@ -61,15 +60,6 @@
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli
-    (symlinkJoin {
-      name = "pi";
-      paths = [inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi];
-      nativeBuildInputs = [makeWrapper];
-      postBuild = ''
-        wrapProgram $out/bin/pi \
-          --prefix PATH : ${lib.makeBinPath [nodejs_latest]}
-      '';
-    })
     runpodctl
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode
     chezmoi

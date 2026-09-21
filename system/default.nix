@@ -26,6 +26,7 @@
     ./appimage.nix
     ./razer.nix
     ./home_manager.nix
+    ./chrome.nix
     ./nvidia.nix
     ./ddcutil.nix
     ./bluetooth.nix

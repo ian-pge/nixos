@@ -3,12 +3,14 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
 import "components"
+import "components/KeyboardShortcuts.js" as KeyboardShortcuts
 
 Scope {
   id: root
 
   property bool shown: false
   property string targetMonitor: ""
+  property int pageIndex: 0
 
   Connections {
     target: Hyprland
@@ -16,7 +18,14 @@ Scope {
       if (event.name === "custom" && event.data === "keyboard-cheatsheet:show") {
         root.targetMonitor = Hyprland.focusedMonitor?.name
           ?? Quickshell.screens[0]?.name ?? "";
+        root.pageIndex = 0;
         root.shown = true;
+      } else if (event.name === "custom" && root.shown
+          && event.data === "keyboard-cheatsheet:next") {
+        root.pageIndex = KeyboardShortcuts.nextPage(root.pageIndex, 1);
+      } else if (event.name === "custom" && root.shown
+          && event.data === "keyboard-cheatsheet:previous") {
+        root.pageIndex = KeyboardShortcuts.nextPage(root.pageIndex, -1);
       } else if ((event.name === "custom" && event.data === "keyboard-cheatsheet:hide")
           || event.name === "configreloaded" || event.name === "submap") {
         root.shown = false;
@@ -57,6 +66,7 @@ Scope {
 
       KeyboardSheet {
         id: sheet
+        pageIndex: root.pageIndex
         anchors.centerIn: parent
         scale: window.fit
       }

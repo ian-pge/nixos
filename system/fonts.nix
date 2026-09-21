@@ -3,7 +3,10 @@
     nerd-fonts.jetbrains-mono
     nerd-fonts.hack
     nerd-fonts.ubuntu
-    maple-mono.NF
-    iosevka
   ];
+
+  fonts.fontconfig.defaultFonts = {
+    sansSerif = ["Ubuntu Nerd Font"];
+    monospace = ["JetBrainsMono Nerd Font"];
+  };
 }

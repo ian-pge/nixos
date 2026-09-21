@@ -22,8 +22,12 @@ installs it with TabCtl and registers the Chrome native messaging host.
 Hold Cmd+' (apostrophe) to display the Catppuccin Macchiato keyboard on the
 focused monitor. Releasing apostrophe or either Cmd key hides it. Cmd+P opens
 Chrome tabs. The sheet does not take keyboard focus or intercept pointer input.
+While holding Cmd+apostrophe, press Tab to cycle **Clavier → Navigateur → Vim**,
+or Shift+Tab to go backwards. Each opening starts on Clavier. Tab is consumed
+by Hyprland while the sheet is shown, so it does not start voice dictation or
+reach the application; Cmd+Tab keeps its usual dictation behavior when hidden.
 The overlay covers the focused monitor with an 82% black scrim. The keyboard
-panel is transparent, with translucent keycaps and fully opaque labels; both
+panel is transparent, with opaque keycaps and labels; both
 the keyboard and scrim disappear together on release.
 
 `top-bar/KeyboardCheatsheet.qml` receives ordered Hyprland custom events from
@@ -31,6 +35,10 @@ the keyboard and scrim disappear together on release.
 changes. Reloading the compositor config or changing submaps closes the sheet.
 `top-bar/components/KeyboardSheet.qml` renders the diagram, while
 `KeyboardLayout.js` contains its HHKB geometry and the configured Cmd actions.
+`KeyboardShortcuts.js` supplies the browser and Vim reference labels on the same
+physical keyboard, plus cards for sequences and modifier combinations. The
+browser page includes the custom Surfingkeys J/K bindings; the Vim page covers
+Surfingkeys' built-in input editor, including its `:wq` and `:q` behavior.
 Keep these labels in sync when changing shortcuts. Firmware-specific Fn mappings
 are not assumed.
 
@@ -57,3 +65,9 @@ without injecting any keystrokes into the desktop.
 The key above Return is Backspace; the key next to right Shift is Delete, and
 the small bottom-right key is Fn, following the user's keyboard mapping.
 The key immediately right of Space is AltGr; the left Cmd key is used for shortcuts.
+
+`tests/tst_KeyboardSheet.qml` checks page cycling, context-specific shortcuts,
+label bounds and opaque keycaps with `qmltestrunner` offscreen.
+`tests/keyboard-cheatsheet_test.lua GENERATED_HYPRLAND_LUA` exercises the generated
+bindings, including Tab without dictation, release ordering, and cleanup after
+reloads or submap changes. It does not inject events into the desktop.

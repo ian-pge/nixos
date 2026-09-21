@@ -16,6 +16,30 @@ in {
     systemd.enable = false;
 
     extraConfig = ''
+      local keyboard_cheatsheet_shown = false
+
+      function quickshell_show_keyboard_cheatsheet()
+        keyboard_cheatsheet_shown = true
+        hl.dispatch(hl.dsp.event("keyboard-cheatsheet:show"))
+      end
+
+      function quickshell_hide_keyboard_cheatsheet()
+        keyboard_cheatsheet_shown = false
+        hl.dispatch(hl.dsp.event("keyboard-cheatsheet:hide"))
+      end
+
+      function quickshell_cycle_keyboard_cheatsheet(backward)
+        if not keyboard_cheatsheet_shown then
+          return false
+        end
+        hl.dispatch(hl.dsp.event(backward
+          and "keyboard-cheatsheet:previous" or "keyboard-cheatsheet:next"))
+        return true
+      end
+
+      hl.on("keybinds.submap", quickshell_hide_keyboard_cheatsheet)
+      hl.on("config.reloaded", quickshell_hide_keyboard_cheatsheet)
+
       function quickshell_dismiss_notification()
         if (quickshell_notification_deadline or 0) <= os.time() then
           return false
