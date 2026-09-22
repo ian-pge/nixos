@@ -1,12 +1,15 @@
 {
   config,
   lib,
+  localPackages,
   pkgs,
   ...
 }: let
   helpers = import ./helpers.nix {inherit lib;};
   pwaAppIds = import ./pwa-apps.nix;
   voxtypePackage = config.programs.voxtype.package;
+  # Set false to restore opaque Quickshell backgrounds permanently.
+  enableLiquidGlass = true;
 in {
   imports = [./uwsm-env.nix];
 
@@ -14,6 +17,7 @@ in {
     enable = true;
     configType = "lua";
     systemd.enable = false;
+    plugins = lib.optional enableLiquidGlass localPackages.liquidGlass;
 
     extraConfig = ''
       local keyboard_cheatsheet_shown = false

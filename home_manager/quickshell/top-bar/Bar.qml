@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
+import Local.LiquidGlass
 import "components"
 import "components/Calendar.js" as Calendar
 import "components/Theme.js" as Theme
@@ -162,6 +163,7 @@ PanelWindow {
 
   Rectangle {
     id: centerMorph
+    GlassShape { anchors.fill: parent; radius: centerMorph.radius; enabled: GlassState.enabled }
     readonly property bool overlayVisible: window.notificationActive || window.volumeOverlayActive
       || window.audioSelectorActive || window.calendarActive || window.systemPanelActive
       || window.brightnessOverlayActive || window.mediaOverlayActive
@@ -321,7 +323,7 @@ PanelWindow {
     width: targetWidth
     height: targetHeight
     radius: 18
-    color: Theme.background
+    color: GlassState.enabled ? Qt.alpha(Theme.background, 0.12) : Theme.background
     clip: true
     opacity: window.entered ? 1 : 0
 
@@ -569,30 +571,6 @@ PanelWindow {
       opacity: centerMorph.contentOpacity("notification")
       enabled: window.notificationActive
       z: 2
-    }
-
-    ShaderEffect {
-      id: activityBorder
-      anchors.fill: parent
-      visible: centerMorph.overlayVisible
-      z: 100
-
-      property size itemSize: Qt.size(width, height)
-      property real phase: 0
-      // Keep the notification accent until its outgoing content has faded out.
-      property color trailColor: window.notificationActive || notificationPopup.opacity > 0.001
-        ? Theme.state : window.systemPanelActive || systemPanel.opacity > 0.001
-          ? Theme.sideSystem : Theme.action
-      fragmentShader: Qt.resolvedUrl(
-        "shaders/activity-border.frag.qsb")
-
-      NumberAnimation on phase {
-        from: 0
-        to: 1
-        duration: 1600
-        loops: Animation.Infinite
-        running: activityBorder.visible
-      }
     }
   }
 

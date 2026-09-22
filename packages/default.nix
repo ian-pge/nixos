@@ -6,6 +6,8 @@
 in
   {
     inherit tabctl;
+    liquidGlass = pkgs.callPackage ./quickshell/liquid-glass.nix {};
+    liquidGlassClient = pkgs.callPackage ./quickshell/liquid-glass-client.nix {};
     hyprlock = pkgs.writeShellApplication {
       name = "hyprlock";
       runtimeInputs = [pkgs.hyprland pkgs.jq pkgs.coreutils];

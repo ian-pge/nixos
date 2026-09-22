@@ -11,7 +11,7 @@ Rectangle {
   implicitWidth: 180
   implicitHeight: 36
   radius: 18
-  color: Theme.background
+  color: GlassState.enabled ? "transparent" : Theme.background
 
   VoiceWaveform {
     anchors.left: parent.left

@@ -13,7 +13,7 @@ Principes fondamentaux :
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
 - Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
-- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui utilisent leurs accents dédiés. Le liseré animé reste rose, sauf pour les notifications qui utilisent le jaune vif.
+- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui utilisent leurs accents dédiés. Aucun liseré animé ne tourne autour des widgets.
 
 ## 2. Architecture à préserver
 
@@ -25,7 +25,7 @@ Principes fondamentaux :
 - `../WeatherData.qml` : température et météo quotidienne partagées, actualisation et état du cache.
 - `../components/CalendarPanel.qml` / `Calendar.js` : calendrier mensuel et calculs de dates locales, icônes météo monochromes et températures mini/maxi.
 - `../components/NotificationPopup.qml` / `NotificationInputGuard.qml` : carte avec image et protection du focus du panneau masqué.
-- `../Bar.qml` : géométrie de la barre, capsule centrale, animations globales et liseré d’activité.
+- `../Bar.qml` : géométrie de la barre, capsule centrale et animations globales.
 - `../components/WorkspaceSwitcher.qml` : workspaces normaux et slot des special workspaces.
 - `../components/Theme.js` : source unique des couleurs QML, y compris les accents partagés entre capsules latérales et widgets centraux correspondants.
 - `../components/VolumeIndicator.qml` / `BrightnessIndicator.qml` : indicateurs temporaires.
@@ -223,6 +223,32 @@ Ainsi, le widget update grandit uniquement vers le bas, jamais vers le haut.
 
 ## 4. Palette visuelle
 
+Les fonds externes des capsules et du panneau central peuvent utiliser le
+plugin local Liquid Glass (`tools/liquid-glass`). `GlassState.enabled` suit sa
+disponibilité : le fond devient translucide seulement quand le plugin répond,
+et retrouve sa couleur opaque après déchargement. Les fonds redondants des
+indicateurs internes deviennent transparents pendant cet effet. Ne pas modifier
+`Theme.background` globalement : ce token sert aussi aux textes inversés.
+La géométrie, les régions d'entrée et les animations décrites ci-dessus restent
+identiques. Le plugin échantillonne le vrai bureau avant la surface de la barre.
+
+Les rectangles externes de `Pill` et `centerMorph` portent un enfant
+`GlassShape` (module natif `Local.LiquidGlass`). Celui-ci ne dessine rien : il
+transmet leur géométrie exacte avec la frame Wayland. Conserver cet enfant
+dans le rectangle qui porte les transformations, notamment le rebond, et lier
+son rayon à celui du rectangle. Le shader calcule alors le contour par pixel,
+sans carte de distance intermédiaire. Le filtre du fond reste fixe : aucun
+flou supplémentaire ou variable vers les bords n'est souhaité.
+Le paquet Quickshell enveloppé dans `quickshell.nix` fournit le chemin du
+module QML ; après modification de ce module C++, redémarrer Quickshell via
+le déploiement Nix, pas simplement recharger ses fichiers QML.
+
+Les capsules latérales survolées ou actives gardent le verre visible : leur
+accent teinte le fond à 16 % au lieu de le remplacer par un aplat. Les textes
+et icônes conservent leur accent, sans inversion sombre. Sans le plugin, la
+même teinte est composée sur le fond opaque de secours. Le rebond et les
+transitions de couleur restent inchangés.
+
 `components/Theme.js` est l’unique source des couleurs QML de la barre :
 
 | Token | Couleur | Signification |
@@ -246,14 +272,14 @@ Règle sémantique de la capsule centrale :
 - **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
 - **rouge** : échec explicite, sauf l’exception volontaire du microphone pendant l’enregistrement.
 
-Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume, luminosité et calendrier sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume`, `Theme.sideBrightness` et `Theme.sideWeather`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Le liseré animé qui tourne autour de la capsule centrale reste rose, sauf pendant une notification : liseré et accents internes utilisent alors `Theme.state`.
+Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume, luminosité et calendrier sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume`, `Theme.sideBrightness` et `Theme.sideWeather`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Pendant une notification, les accents internes utilisent `Theme.state`.
 
-Le panneau Système utilise `Theme.sideSystem` pour ses accents et son liseré,
+Le panneau Système utilise `Theme.sideSystem` pour ses accents,
 y compris pendant sa sortie animée. Une notification conserve la priorité jaune.
 
 Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
 
-Les capsules latérales conservent les accents fixes d’origine déclarés dans `Theme.js`, à l’exception des icônes de batterie branchée ou faible décrites ci-dessous. Les accents sont partagés avec leur widget central correspondant lorsqu’une capsule latérale existe ; `Theme.sideApplications` reste réservé aux deux lanceurs centraux. `Pill.forceHovered` reproduit l’inversion visuelle du hover pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
+Les capsules latérales conservent les accents fixes d’origine déclarés dans `Theme.js`, à l’exception des icônes de batterie branchée ou faible décrites ci-dessous. Les accents sont partagés avec leur widget central correspondant lorsqu’une capsule latérale existe ; `Theme.sideApplications` reste réservé aux deux lanceurs centraux. `Pill.forceHovered` maintient la légère teinte du survol pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
 
 | Capsule | Token | Couleur |
 |---|---|---|
@@ -269,7 +295,7 @@ Les capsules latérales conservent les accents fixes d’origine déclarés dans
 | Luminosité | `Theme.sideBrightness` | `#eed49f` |
 | Température météo, date, heure | `Theme.sideWeather` | `#f5bde6` |
 
-Ne pas écrire de nouveau littéral hexadécimal dans un fichier QML : ajouter ou réutiliser un token de `Theme.js`. Le shader du liseré et les couleurs de bordure Hyprland sont des systèmes séparés.
+Ne pas écrire de nouveau littéral hexadécimal dans un fichier QML : ajouter ou réutiliser un token de `Theme.js`. Les couleurs de bordure des fenêtres Hyprland sont un système séparé.
 
 Police : `Ubuntu Nerd Font`.
 
@@ -368,42 +394,12 @@ Ce système est une container transform à deux couches, pas encore un morphing 
 - fades indépendants non synchronisés, rebond ou translation dépassant les `360ms` de géométrie ;
 - remise de `transitionProgress` à zéro sans capturer les opacités/offsets rendus lors d’une interruption.
 
-## 7. Liseré d’activité rose / jaune
+## 7. Aucun liseré d’activité
 
-Le liseré apparaît lorsque `centerMorph.overlayVisible` est vrai, donc pour :
-
-- volume ;
-- panneau audio ;
-- luminosité ;
-- dictée vocale ;
-- Wi-Fi ;
-- Bluetooth ;
-- média MPRIS ;
-- lanceur d’applications ;
-- onglets Chrome ;
-- updates ;
-- notifications.
-
-Il disparaît uniquement quand la capsule redevient le widget des workspaces.
-
-### Rendu actuel
-
-Le liseré n’utilise ni `Canvas`, ni `Repeater` de petits rectangles, ni gradient conique. Le `Repeater` demandait jusqu’à plus de mille mises à jour QML par frame sur deux écrans ; le gradient conique était plus léger mais accélérait visuellement dans les coins parce qu’un angle constant ne correspond pas à une distance constante sur un rectangle.
-
-La version actuelle utilise un unique `ShaderEffect` et `shaders/activity-border.frag` :
-
-- shader Qt 6 compilé en `.qsb` par `quickshell.nix` avec `qtshadertools` ;
-- rectangle arrondi de rayon extérieur `18px` ;
-- anneau intérieur de `3px` calculé par signed-distance field ;
-- position exacte sur le périmètre calculée avec les longueurs des quatre segments et des quatre quarts de cercle ;
-- traînée couvrant `50 %` du périmètre ;
-- couleur de tête `Theme.action` (`#ff33cc`), ou `Theme.state` (`#ffcc33`) pour les notifications, transmise par l’uniforme `trailColor` ;
-- opacité `Math.pow(1 - behindHead / 0.5, 1.35)` ;
-- phase de `0` à `1` en `1600ms`.
-
-Les états `0` et `1` sont identiques et la coupure opaque-vers-transparent reste placée à la tête. La phase est le seul uniforme animé en continu ; la géométrie, la position sur le chemin, l’anticrénelage et le dégradé sont calculés en parallèle sur le GPU. La sortie du fragment shader est prémultipliée pour respecter le blending du scene graph Qt Quick. La couleur reste jaune jusqu’à la fin du fade de la notification sortante, puis retrouve le rose du widget sous-jacent, sans redémarrer la rotation.
-
-Le mouvement doit conserver une vitesse linéaire perceptuelle identique sur les segments et dans les coins, quelle que soit la largeur de la capsule.
+Le liseré tournant a été retiré de tous les modes, notifications comprises,
+ainsi que son shader et sa compilation Qt. Ne pas le réintroduire. Le reflet
+synthétique de bord et le contre-bord sombre du plugin Liquid Glass ont aussi
+été retirés : conserver le fumé et la réfraction, sans cadre blanc ou noir ajouté.
 
 ## 8. Bordure Hyprland pendant un overlay
 
@@ -552,8 +548,7 @@ Le speed test n’est jamais automatique. `t` étend la capsule vers le bas et l
 - Wi-Fi : icône et point de connexion utilisent `Theme.sideNetwork` ;
 - Bluetooth : icône, point de connexion et onglets `PAIRED` / `NEARBY` utilisent `Theme.sideBluetooth` ;
 - tout appareil ou réseau non connecté reste gris ;
-- cadenas Wi-Fi : même gris que le compteur (`#939ab7`) ;
-- le liseré animé autour de la capsule reste rose, sauf pendant les notifications où il devient jaune vif.
+- cadenas Wi-Fi : même gris que le compteur (`#939ab7`).
 
 ## 11. Panneau audio et lanceurs
 
@@ -568,8 +563,8 @@ Largeur limitée par le plafond commun des workspaces, hauteur adaptée jusqu’
 `j/k` naviguent, `Tab` change de section, `Enter` choisit sans fermer et `Esc`
 ferme. Aucun volume par application ni barre de réglage supplémentaire.
 
-Le panneau utilise `Theme.sideVolume`, les transitions communes de `360ms`, le
-liseré et l’exclusivité des overlays. La dictée conserve sa priorité ; le panneau
+Le panneau utilise `Theme.sideVolume`, les transitions communes de `360ms`
+et l’exclusivité des overlays. La dictée conserve sa priorité ; le panneau
 ne prend pas le focus clavier pendant la dictée. Les touches volume et la molette
 restent actives et ne remplacent pas un panneau audio ouvert par l’OSD volume.
 
@@ -578,7 +573,7 @@ si la sortie est muette. Le micro est barré lorsqu’il est muet, normal sinon,
 grisé sans entrée disponible. La touche VIA `Mac Voice` du NuPhy Air60 V2
 émet `XF86VoiceCommand` sous Linux et appelle `topbar.toggleMicrophoneMute`,
 qui agit sur le micro par défaut uniquement.
-Chaque action mute ou démute active l’inversion de couleur et le rebond de la
+Chaque action mute ou démute active la légère teinte et le rebond de la
 capsule audio sur l’écran focalisé pendant `2000ms`, comme l’indicateur volume.
 Une nouvelle action relance ce délai. L’état muet seul n’entretient pas le rebond ;
 à la fin du délai, la capsule revient au repos, sauf si elle est survolée ou si
@@ -728,7 +723,7 @@ Une action Bluetooth native déjà lancée continue lorsque le sélecteur est ma
 
 ### Updates — `Super+U`
 
-Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHECKING` / `AVAILABLE` et les points de chaque ligne. `UP TO DATE`, les dates et les états vides restent gris ; `ERROR` utilise `Theme.error` et ne doit jamais être présenté comme un système à jour. Le liseré animé autour de la capsule reste rose.
+Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHECKING` / `AVAILABLE` et les points de chaque ligne. `UP TO DATE`, les dates et les états vides restent gris ; `ERROR` utilise `Theme.error` et ne doit jamais être présenté comme un système à jour.
 
 Le checker compare les anciens et nouveaux `flake.lock` comme JSON, sans analyser la sortie humaine de Nix. Il s'exécute au démarrage, toutes les 30 minutes et après une demande explicite ; son cache est invalidé immédiatement si `flake.nix` ou `flake.lock` change. L'installateur partage son verrou et restaure le lockfile précédent si le rebuild ou l'installation de la génération de démarrage échoue.
 
@@ -756,36 +751,29 @@ Ne pas tester `Enter` automatiquement : cela lance réellement `nix flake update
 1. **Animer la hauteur du `PanelWindow`** : provoque un glitch vertical du reste de la barre.
 2. **Toute courbe `OutBack`, spring ou overshoot** : franchit la cible puis inverse brièvement le mouvement, contrairement au contrat monotone inspiré de Hyprland.
 3. **Séquence géométrique aller-retour** : réintroduit un rebond même si chaque phase utilise séparément une courbe monotone.
-4. **Canvas + line dash animé** : le liseré peut disparaître ou sauter selon sa position.
-5. **`Repeater` de points proportionnel au périmètre** : multiplie les objets et les calculs JavaScript par frame sur les grands overlays et sur chaque écran.
-6. **`ConicalGradient` sur le rectangle** : sa vitesse angulaire constante accélère visuellement à l’approche des coins.
-7. **Committer le `.qsb` généré** : le shader binaire doit rester un produit du build Nix ; seule la source `.frag` est versionnée.
-8. **Espacement négatif des lignes update** : superpose les textes.
-9. **Liste update montant depuis le bas** : direction visuellement incohérente.
-10. **Fades indépendants par widget** : désynchronisent les couches ; toutes les opacités doivent dépendre du `transitionProgress` partagé.
-11. **Focus clavier sur tous les panels** : plusieurs surfaces se disputent le clavier.
-12. **Rendre un overlay sur tous les moniteurs** : masque inutilement les workspaces des écrans qui ne l’ont pas activé.
-13. **Muter directement `wifiSelectorVisible` ou `bluetoothSelectorVisible`** : contourne le nettoyage des scans, timers et états interactifs ; utiliser les fonctions `hide*`.
-14. **Mot de passe Wi-Fi dans les arguments de commande** : interdit ; utiliser directement `WifiNetwork.connectWithPsk()`.
-15. **Oublier de restaurer la bordure Hyprland** : laisse les fenêtres avec une bordure grise.
+4. **Réintroduire un liseré** : le contour tournant, le reflet de bord et le contre-bord sombre ont été retirés volontairement ; conserver le fumé et la réfraction.
+5. **Espacement négatif des lignes update** : superpose les textes.
+6. **Liste update montant depuis le bas** : direction visuellement incohérente.
+7. **Fades indépendants par widget** : désynchronisent les couches ; toutes les opacités doivent dépendre du `transitionProgress` partagé.
+8. **Focus clavier sur tous les panels** : plusieurs surfaces se disputent le clavier.
+9. **Rendre un overlay sur tous les moniteurs** : masque inutilement les workspaces des écrans qui ne l’ont pas activé.
+10. **Muter directement `wifiSelectorVisible` ou `bluetoothSelectorVisible`** : contourne le nettoyage des scans, timers et états interactifs ; utiliser les fonctions `hide*`.
+11. **Mot de passe Wi-Fi dans les arguments de commande** : interdit ; utiliser directement `WifiNetwork.connectWithPsk()`.
+12. **Oublier de restaurer la bordure Hyprland** : laisse les fenêtres avec une bordure grise.
 
 ## 17. Procédure de validation
 
 ### Vérification QML rapide
 
 ```bash
-test_config=$(mktemp -d)
-cp -R "$PWD/home_manager/quickshell/top-bar/." "$test_config/"
-nix shell \
-  '.#nixosConfigurations.nixos.pkgs.qt6Packages.qtshadertools' \
-  -c qsb --qt6 \
-  -o "$test_config/shaders/activity-border.frag.qsb" \
-  "$test_config/shaders/activity-border.frag"
-timeout --signal=TERM 5s qs --no-color -p "$test_config"
-rm -rf "$test_config"
+env PATH="$PWD/home_manager/quickshell/top-bar/tests/fixtures:$PATH" \
+  QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+  QT_NO_XDG_DESKTOP_PORTAL=1 HYPRLAND_INSTANCE_SIGNATURE= \
+  timeout 15s qs --no-color -p home_manager/quickshell/top-bar/pill-test.qml
 ```
 
-Le code doit afficher `Configuration Loaded` sans erreur QML ou shader. L’avertissement de portail `org.quickshell` est connu et non bloquant.
+Ce test vérifie le survol, l'état actif, la teinte translucide, les libellés et
+le repli opaque sans agir sur la session. Aucun shader Qt n'est à compiler.
 
 ### Vérification Nix
 
@@ -860,7 +848,7 @@ Une capsule `36×36px` de contrôle Ne pas déranger se place tout à droite,
 immédiatement après Bluetooth. Accent vert Catppuccin
 `Theme.sideNotifications` : cloche normale si le mode est désactivé, cloche barrée
 s’il est actif. Le clic gauche et l’IPC `topbar.toggleDoNotDisturb` basculent le même
-état global sur tous les écrans. `forceHovered` donne une inversion de couleur
+état global sur tous les écrans. `forceHovered` donne une légère teinte du fond
 et un rebond pendant `2000ms` à chaque activation/désactivation. Ensuite, le fond
 redevient sombre et le rebond s’arrête, sauf en cas de vrai survol ; seule la
 cloche barrée indique que le mode est encore actif. L’état actif n’entretient
@@ -916,7 +904,7 @@ l’application, le titre et quatre lignes de message maximum. L’image native
 peut être la photo d’un contact Beeper si l’application la transmet ; sinon,
 utiliser son icône, puis un glyphe de notification si celle-ci manque aussi.
 Le texte est rendu en `PlainText` et utilise les tokens de `Theme.js`.
-Le liseré tournant et les accents internes (dont la cloche de secours) utilisent
+Les accents internes (dont la cloche de secours) utilisent
 le jaune vif `Theme.state`, jamais le rose `Theme.action`. Les textes neutres et
 les images/icônes fournies par les applications conservent leurs couleurs.
 
@@ -989,7 +977,6 @@ icône et les températures mini/maxi en °C (`12°/24°`). Aujourd’hui utilis
 fond neutre et un contour coloré. Les icônes soleil/éclaircies sont vertes
 (`Theme.weatherSun`), celles de bruine/pluie/averses/orages rouges (`Theme.weatherRain`),
 les autres gardent `Theme.sideWeather`.
-Le liseré reste le rose d’activité commun ; seules les notifications le rendent jaune.
 
 H/J/K/L et les flèches sélectionnent les jours : gauche/droite déplacent d’un jour,
 haut/bas d’une semaine, y compris à travers les limites des mois. U/D (ou Page

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="liquid_glass_v1">
+  <interface name="ian_liquid_glass_v1" version="1">
+    <description summary="optional rounded-surface geometry for local glass rendering">
+      Geometry is applied with the next buffer commit of the wl_surface. It is
+      expressed in surface-local logical coordinates. It changes neither input
+      regions nor opaque regions. Absence of metadata preserves ordinary rendering.
+    </description>
+    <request name="destroy" type="destructor"/>
+    <request name="set_geometry">
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+      <arg name="valid" type="uint"/>
+      <arg name="rectangles" type="array" summary="up to 64 records: fixed x,y,width,height,radius,opacity"/>
+    </request>
+  </interface>
+</protocol>

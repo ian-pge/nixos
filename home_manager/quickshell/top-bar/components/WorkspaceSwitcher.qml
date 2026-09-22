@@ -5,7 +5,7 @@ import "Theme.js" as Theme
 Item {
   id: root
 
-  property color backgroundColor: Theme.background
+  property color backgroundColor: GlassState.enabled ? "transparent" : Theme.background
   property var monitor: null
   readonly property string monitorName: monitor?.name ?? ""
   property var workspaces: Hyprland.workspaces.values

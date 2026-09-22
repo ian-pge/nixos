@@ -46,7 +46,10 @@
   in {
     packages.${system} = localPackages // {default = localPackages.hyprlockAge;};
 
-    devShells.${system}.rust = import ./dev-shells/rust.nix {inherit pkgs;};
+    devShells.${system} = {
+      rust = import ./dev-shells/rust.nix {inherit pkgs;};
+      cpp = import ./dev-shells/cpp.nix {inherit pkgs;};
+    };
 
     nixosConfigurations = {
       nixos = lib.nixosSystem {

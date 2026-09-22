@@ -12,7 +12,7 @@ Rectangle {
   implicitWidth: 280
   implicitHeight: 36
   radius: 18
-  color: Theme.background
+  color: GlassState.enabled ? "transparent" : Theme.background
 
   Behavior on displayedLevel {
     NumberAnimation {

@@ -1,5 +1,6 @@
 import Quickshell
 import QtQuick
+import Local.LiquidGlass
 import "Theme.js" as Theme
 
 Item {
@@ -35,9 +36,14 @@ Item {
   }
 
   Rectangle {
+    objectName: "pill-background"
+    id: glassBackground
     anchors.fill: parent
     radius: 18
-    color: root.hovered ? root.accent : Theme.background
+    GlassShape { anchors.fill: parent; radius: glassBackground.radius; enabled: GlassState.enabled }
+    color: GlassState.enabled
+      ? Qt.alpha(root.hovered ? root.accent : Theme.background, root.hovered ? 0.16 : 0.12)
+      : root.hovered ? Qt.tint(Theme.background, Qt.alpha(root.accent, 0.16)) : Theme.background
     transform: SelectionBounce {
       active: root.hovered && root.visible && root.enabled
     }
@@ -52,9 +58,10 @@ Item {
 
       Text {
         id: label
+        objectName: "pill-label"
         text: root.text
         textFormat: root.textFormat
-        color: root.hovered ? Theme.background : root.accent
+        color: root.accent
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 16
         font.bold: true
@@ -64,10 +71,10 @@ Item {
 
       Text {
         id: trailingLabel
+        objectName: "pill-trailing-label"
         visible: root.trailingText !== ""
         text: root.trailingText
-        color: root.trailingInactive ? Theme.inactive
-          : root.hovered ? Theme.background : root.accent
+        color: root.trailingInactive ? Theme.inactive : root.accent
         font: label.font
 
         Behavior on color { ColorAnimation { duration: 220 } }
