@@ -1,5 +1,6 @@
 {
   helpers,
+  hyprlockPackage,
   lib,
   pkgs,
   voxtypePackage,
@@ -13,6 +14,27 @@
     toLua
     ;
 
+  workspaceCount = 8;
+
+  # Cycle globally through the bar's numbered slots, including empty workspaces.
+  # Absolute targets follow their assigned monitor instead of creating workspace 9.
+  cycleWorkspace = step: ''
+    function()
+      local workspace = hl.get_active_workspace()
+      if workspace == nil then
+        return
+      end
+
+      local target
+      if workspace.id < 1 or workspace.id > ${toString workspaceCount} then
+        target = ${toString step} > 0 and 1 or ${toString workspaceCount}
+      else
+        target = ((workspace.id - 1 + (${toString step})) % ${toString workspaceCount}) + 1
+      end
+      hl.dispatch(hl.dsp.focus({ workspace = target }))
+    end
+  '';
+
   workspaceBinds = lib.concatMap (workspace: [
     (mkBind
       (mainKey (toString workspace))
@@ -22,7 +44,7 @@
       (mainKey "SHIFT + ${toString workspace}")
       "hl.dsp.window.move({ workspace = ${toString workspace} })"
       {})
-  ]) (lib.range 1 8);
+  ]) (lib.range 1 workspaceCount);
 
   specialWorkspaceBinds =
     lib.concatMap (binding: [
@@ -177,8 +199,8 @@ in {
       (mkBind (mainKey "L") ''hl.dsp.focus({ direction = "right" })'' {})
       (mkBind (mainKey "K") ''hl.dsp.focus({ direction = "up" })'' {})
       (mkBind (mainKey "J") ''hl.dsp.focus({ direction = "down" })'' {})
-      (mkBind (mainKey "ALT + H") ''hl.dsp.focus({ workspace = "r-1" })'' {})
-      (mkBind (mainKey "ALT + L") ''hl.dsp.focus({ workspace = "r+1" })'' {})
+      (mkBind (mainKey "ALT + H") (cycleWorkspace (-1)) {})
+      (mkBind (mainKey "ALT + L") (cycleWorkspace 1) {})
       (mkBind (mainKey "SHIFT + H") ''hl.dsp.window.move({ direction = "left" })'' {})
       (mkBind (mainKey "SHIFT + L") ''hl.dsp.window.move({ direction = "right" })'' {})
       (mkBind (mainKey "SHIFT + K") ''hl.dsp.window.move({ direction = "up" })'' {})
@@ -208,7 +230,7 @@ in {
     ++ [
       (mkBind
         (mainKey "ESCAPE")
-        (mkExec "${pkgs.procps}/bin/pidof hyprlock || ${pkgs.hyprlock}/bin/hyprlock")
+        (mkExec "${pkgs.procps}/bin/pidof hyprlock || ${hyprlockPackage}/bin/hyprlock")
         {})
       (mkBind (mainKey "mouse:272") "hl.dsp.window.drag()" {mouse = true;})
       (mkBind (mainKey "mouse:273") "hl.dsp.window.resize()" {mouse = true;})

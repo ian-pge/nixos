@@ -39,6 +39,7 @@ in {
 
       output = {
         mode = "type";
+        type_delay_ms = 5;
         driver_order = [
           "wtype"
           "clipboard"

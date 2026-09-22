@@ -11,8 +11,9 @@
     size = 24;
     gtk.enable = true;
     x11.enable = true;
-    # Catppuccin provides both native Hyprcursor and fallback XCursor assets.
-    hyprcursor.enable = true;
+    # Hyprland 0.56 passes the Hyprcursor image at the highest monitor scale
+    # to XWayland. Use XCursor so inherited and GTK cursors match in Bambu Studio.
+    hyprcursor.enable = false;
   };
 
   wayland.windowManager.hyprland.settings.config.cursor.enable_hyprcursor =

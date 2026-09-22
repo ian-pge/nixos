@@ -85,7 +85,7 @@
     # ---------------- Labels --------------------------------
     label = [
       {
-        monitor = "eDP-1";
+        monitor = "$HYPRLOCK_MONITOR";
         text = ''cmd[update:1000] echo "<b><big> $(date +'%H:%M') </big></b>"'';
         color = "$sapphire";
         font_size = 112;
@@ -97,7 +97,7 @@
         valign = "top";
       }
       {
-        monitor = "eDP-1";
+        monitor = "$HYPRLOCK_MONITOR";
         text = ''cmd[update:18000000] echo "<b><big> $(date +'%A') </big></b>"'';
         color = "$pink";
         font_size = 50;
@@ -107,7 +107,7 @@
         valign = "top";
       }
       {
-        monitor = "eDP-1";
+        monitor = "$HYPRLOCK_MONITOR";
         text = ''cmd[update:18000000] echo "<b> $(date +'%d %b') </b>"'';
         color = "$pink";
         font_size = 30;
@@ -117,7 +117,7 @@
         valign = "top";
       }
       {
-        monitor = "eDP-1";
+        monitor = "$HYPRLOCK_MONITOR";
         text = "cmd[update:100] ${lib.getExe localPackages.hyprlockAge}";
         color = "$yellow";
         font_size = 20;
@@ -130,7 +130,7 @@
 
     # ---------------- Input field ---------------------------
     "input-field" = {
-      monitor = "eDP-1";
+      monitor = "$HYPRLOCK_MONITOR";
       size = "250, 50";
       outline_thickness = 3;
       dots_size = 0.26;
@@ -169,6 +169,7 @@
 in {
   programs.hyprlock = {
     enable = true;
+    package = localPackages.hyprlock;
 
     # Make sure the $var palette appears before anything that references it.
     importantPrefixes = [

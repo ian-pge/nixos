@@ -38,6 +38,23 @@ sudo nixos-install --root /mnt --flake /mnt/etc/nixos
 sudo nixos-rebuild switch --flake /etc/nixos
 ```
 
+## Workspace navigation
+
+Alt + Super (Cmd) + H/L cycles backwards/forwards through workspaces 1–8,
+including empty ones, and wraps at both ends. Focus follows the destination's
+monitor: 1–4 on DP-2 and 5–8 on eDP-1 when both are connected. Windows and
+workspace assignments are not moved. Special workspaces are excluded; navigation
+uses the underlying normal workspace. From an out-of-range workspace, H returns
+to 8 and L to 1.
+
+To test the generated bindings without switching the live desktop (requires Lua):
+
+```bash
+set -o pipefail
+nix eval --raw '.#nixosConfigurations.nixos.config.home-manager.users.ian.xdg.configFile."hypr/hyprland.lua".text' |
+  lua home_manager/hyprland/tests/workspace-navigation_test.lua /dev/stdin
+```
+
 ## Chrome and Surfingkeys
 
 `system/chrome.nix` installs Google Chrome, Surfingkeys and AdBlock through

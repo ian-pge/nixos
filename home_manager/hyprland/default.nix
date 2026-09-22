@@ -61,6 +61,7 @@ in {
       })
       (import ./workspaces.nix {inherit pwaAppIds;})
       (import ./bindings.nix {
+        hyprlockPackage = config.programs.hyprlock.package;
         inherit
           helpers
           lib

@@ -1,5 +1,6 @@
 {
   lib,
+  localPackages,
   pkgs,
   ...
 }: let
@@ -7,7 +8,7 @@
     name = "greetd-uwsm-session";
     text = ''
       exec ${lib.getExe pkgs.uwsm} start -e -D Hyprland -- \
-        hyprland.desktop -- --locked-cmd "${lib.getExe pkgs.hyprlock} --config /home/ian/.config/hypr/hyprlock-boot.conf --immediate-render"
+        hyprland.desktop -- --locked-cmd "${lib.getExe localPackages.hyprlock} --config /home/ian/.config/hypr/hyprlock-boot.conf --immediate-render"
     '';
   };
 in {
