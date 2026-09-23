@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "description": "Approved cushion port; 2346 CPU/GPU probes, displacement error < 0.75 logical px, normalized-height error < 0.008 on NVIDIA.",
+  "sources": {
+    "viewer/src/cushion.ts": "3bc5ae1e27ea2a58d2f29c72446e0ab2d4f815bd1db630129e47443014004ac1",
+    "viewer/src/profile.ts": "164f1293dc263bae90258fc5994227f37ff25088dfea237b1ca4c35db818f321",
+    "viewer/src/pebble.ts": "4a73d625efdb1e8902b2929cb4993cef8f0b6d7214d076260381e51db3cdffff",
+    "src/cushion-field.hpp": "1b42e16396c915077a9e30004f5fb3b7ba93c3e5a98b76fda864dac8663b862b",
+    "src/profile-field.hpp": "9ed3dda2a9168aeb7c46d17caea874df57d91fc4c2a25bd69a87a9edd64e9ef2",
+    "shaders/cushion-field.vert": "2897ade67acf12a714e6b1e0ea90691e099597159e82030a7b8b28e125a3ded0",
+    "shaders/cushion-field.frag": "9b3665afeabd0d91edcbc4e20dd14c80bcb1af39e6928fdec8467bc2b28f6458",
+    "shaders/analytic.frag": "d23c819e3ac741d9b18fe5e64162056721913dafc8d3916624d33ab2bdc756a7",
+    "shaders/analytic.vert": "f61b117cf3f7bef9565fa83f85c2226eee4fcc149d6247aa031d07c289038f45"
+  }
+}

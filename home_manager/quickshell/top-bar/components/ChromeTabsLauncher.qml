@@ -79,6 +79,7 @@ FocusScope {
 
     TextInput {
       id: searchInput
+      objectName: "tabSearchInput"
       anchors.left: searchIcon.right
       anchors.leftMargin: 10
       anchors.right: resultCount.left
@@ -208,27 +209,32 @@ FocusScope {
         Item {
           anchors.fill: parent
 
-          Rectangle {
+          SelectionSurface {
+            objectName: "tabSelection" + tabRow.index
             anchors.fill: parent
             anchors.leftMargin: 8
             anchors.rightMargin: 8
             anchors.topMargin: 2
             anchors.bottomMargin: 2
             radius: 10
-            color: tabRow.selected ? Theme.surfaceRaised : "transparent"
-
-            Behavior on color { ColorAnimation { duration: 90 } }
+            selected: tabRow.selected
+            accent: Theme.sideApplications
           }
 
-          Rectangle {
+          SelectionSurface {
             id: iconFrame
+            objectName: "tabIconFrame" + tabRow.index
             anchors.left: parent.left
             anchors.leftMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             width: 30
             height: 30
             radius: 8
-            color: tabRow.selected ? Theme.surfaceSelected : Theme.surface
+            selected: tabRow.selected
+            accent: Theme.sideApplications
+            tintOpacity: 0.08
+            fallbackColor: Theme.surfaceSelected
+            idleColor: GlassState.enabled ? Qt.alpha(Theme.foreground, 0.04) : Theme.surface
 
             Image {
               id: favicon
@@ -262,6 +268,7 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             text: tabRow.tab.title || "Untitled tab"
             color: tabRow.selected ? Theme.selectedForeground : Theme.foreground
+            Behavior on color { ColorAnimation { duration: 120 } }
             elide: Text.ElideRight
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 13

@@ -1,6 +1,7 @@
 #version 300 es
 precision highp float;
 uniform sampler2D background;
+uniform sampler2D blurredBackground;
 uniform sampler2D content;
 uniform highp sampler2D boundaries;
 uniform vec2 resolution;
@@ -18,15 +19,16 @@ const float EDGE_THICKNESS = 0.70;
 const float ABSORPTION = 1.40;
 
 vec3 softBackground(vec2 p, vec2 inward, float dispersion) {
-    // Same five taps and blur variance as before. Reuse the normal-aligned
+    // Sample the same cached Gaussian backdrop as the analytic material.
+    // Reuse the normal-aligned
     // pair for chromatic dispersion instead of issuing two more texture reads.
     vec2 stepUV = 1.62635 * scale / resolution;
     vec2 along = inward * stepUV;
     vec2 across = vec2(-inward.y, inward.x) * stepUV;
-    vec3 positive = texture(background, p + along).rgb;
-    vec3 negative = texture(background, p - along).rgb;
-    vec3 result = (texture(background, p).rgb * 4.0 + positive + negative
-        + texture(background, p + across).rgb + texture(background, p - across).rgb) / 8.0;
+    vec3 positive = texture(blurredBackground, p + along).rgb;
+    vec3 negative = texture(blurredBackground, p - along).rgb;
+    vec3 result = (texture(blurredBackground, p).rgb * 4.0 + positive + negative
+        + texture(blurredBackground, p + across).rgb + texture(blurredBackground, p - across).rgb) / 8.0;
     result.r += dispersion * (positive.r - negative.r);
     result.b -= dispersion * (positive.b - negative.b);
     return result;
@@ -60,7 +62,12 @@ void main() {
     // Keep the narrow meniscus, and add a broad curved body instead of a flat
     // interior. Its samples stay within this capsule (apart from the small
     // edge stencil), so neighbouring capsules do not bend towards each other.
-    float profile = (sqrt(1.06) - sqrt(max(1.06 - x*x, 0.06))) / (sqrt(1.06) - sqrt(0.06));
+    // Match the smooth inner join of the analytic path. Keep the existing
+    // thickness/body terms; only the rim displacement's falloff is softened.
+    float t = 1.0 - x;
+    float eased = t * (1.0 + t * (1.0 - t));
+    float edge = 1.0 - eased;
+    float profile = (sqrt(1.06) - sqrt(max(1.06 - edge*edge, 0.06))) / (sqrt(1.06) - sqrt(0.06));
     // Smooth minimum: match the old limits away from the join, but remove its
     // abrupt change of slope. Keep the unnormalised gradient at the centre.
     float localStrength = 0.75 * bodyRadius;

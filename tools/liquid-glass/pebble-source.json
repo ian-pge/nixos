@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "description": "Archived 0.4.0 pebble, shared atlas extraction revalidated: 286 GPU probes, max displacement error < 0.2 logical px on NVIDIA.",
+  "sources": {
+    "viewer/src/pebble.ts": "4a73d625efdb1e8902b2929cb4993cef8f0b6d7214d076260381e51db3cdffff",
+    "viewer/src/profile.ts": "164f1293dc263bae90258fc5994227f37ff25088dfea237b1ca4c35db818f321",
+    "src/pebble-field.hpp": "2c2db537bf533ce4c1491c5b76206c2cf1c1298976755a10504008cb169ad070",
+    "shaders/pebble-field.vert": "947f05a7d94f5aad38e33f5cec7bdb6c0dba395eb85a1d2db4cfdb6cd34a5d9f",
+    "shaders/pebble-field.frag": "a88989cc55871306d22327ee6d4411fd81bd50d44d0a5385d348c9460279973c",
+    "shaders/pebble.frag": "2d39e45adde82568d0a1cb753c7aa5475820489ec66139232061d7f1599838cb",
+    "src/profile-field.hpp": "9ed3dda2a9168aeb7c46d17caea874df57d91fc4c2a25bd69a87a9edd64e9ef2"
+  }
+}

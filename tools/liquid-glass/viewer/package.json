@@ -1,0 +1,22 @@
+{
+  "name": "local-glass-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build": "npm run check:shader && tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5173 --strictPort",
+    "check:shader": "node scripts/check-shader.mjs",
+    "test": "npm run check:shader && node --test tests/profile.test.ts tests/profile-source.test.mjs tests/pebble.test.ts tests/cushion.test.ts",
+    "test:browser": "playwright test"
+  },
+  "dependencies": { "three": "0.186.0" },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/three": "0.186.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
+}

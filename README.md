@@ -38,6 +38,14 @@ sudo nixos-install --root /mnt --flake /mnt/etc/nixos
 sudo nixos-rebuild switch --flake /etc/nixos
 ```
 
+## Development environments
+
+From this repository, enter `nix develop .#rust`, `nix develop .#cpp`, or
+`nix develop .#threejs`. The Three.js shell provides Node.js/npm; browser
+dependencies are local to each project's lockfile, never installed globally.
+The [glass shape viewer](tools/liquid-glass/viewer/README.md) uses this shell
+and has its own `.envrc`. No NixOS rebuild is needed for these environments.
+
 ## Workspace navigation
 
 Alt + Super (Cmd) + H/L cycles backwards/forwards through workspaces 1–8,

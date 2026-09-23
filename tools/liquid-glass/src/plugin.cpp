@@ -1,3 +1,4 @@
+#include "cushion-field.hpp"
 #include "shaders.hpp"
 #include "wire.hpp"
 #include <GLES3/gl3.h>
@@ -29,6 +30,8 @@ bool enabled = true;
 uint64_t frames = 0;
 uint64_t backgroundCopies = 0, contentUpdates = 0, copiedPixels = 0, referencePixels = 0, compositedPixels = 0;
 uint64_t analyticFrames = 0, rasterFrames = 0;
+uint64_t blurUpdates = 0;
+uint64_t profileUpdates = 0;
 std::string lastError;
 CHyprSignalListener preRender;
 CHyprSignalListener cleanupRender;
@@ -120,7 +123,8 @@ struct Resources {
     bool dirty = true;
     bool backdropDirty = true;
     bool analytic = false;
-    Target background, mask[2];
+    Target background, mask[2], blurred[2];
+    CushionField::Atlas profiles;
     SP<IFramebuffer> content;
     int maskResult = 0;
     Vector2D position;
@@ -132,14 +136,18 @@ struct Resources {
     void release() {
         commit.reset();
         background.release();
+        profiles.release();
+        for (auto& b : blurred)
+            b.release();
         for (auto& m : mask)
             m.release();
         content.reset();
     }
 };
 std::unordered_map<CLayerSurface*, std::unique_ptr<Resources>> resources;
-GLuint seedProgram = 0, distanceProgram = 0, resolveProgram = 0, smoothProgram = 0, glassProgram = 0,
-       analyticProgram = 0, vao = 0;
+GLuint seedProgram = 0, distanceProgram = 0, resolveProgram = 0, smoothProgram = 0, blurProgram = 0, glassProgram = 0,
+       analyticProgram = 0, profileProgram = 0, vao = 0;
+CushionField::Mesh profileMesh;
 
 struct GeometryObserver {
     struct Frame {
@@ -253,7 +261,8 @@ CBox effectArea(PHLLS layer, PHLMONITOR monitor) {
         p = box.pos();
         s = box.size();
     }
-    const double halo = 40.0 * monitor->m_scale;
+    // 36 px maximum refraction + Gaussian support and final small filter.
+    const double halo = 48.0 * monitor->m_scale;
     const double x1 = std::clamp(std::floor((p.x - halo) / 2.0) * 2.0, 0.0, screen.x);
     const double y1 = std::clamp(std::floor((p.y - halo) / 2.0) * 2.0, 0.0, screen.y);
     const double x2 = std::clamp(std::ceil((p.x + s.x + halo) / 2.0) * 2.0, 0.0, screen.x);
@@ -300,7 +309,7 @@ void prepareMonitor(PHLMONITOR monitor) {
 
 // Do not leave GL state altered for the next native Hyprland render pass.
 struct GLState {
-    GLint drawFB, readFB, viewport[4], scissor[4], active, prog, vertexArray, textures[3];
+    GLint drawFB, readFB, viewport[4], scissor[4], active, prog, vertexArray, textures[4], arrayTexture, arrayBuffer;
     GLboolean blend, scissorEnabled, stencil, depth, mask[4];
     GLfloat clearColor[4];
     GLState() {
@@ -311,16 +320,19 @@ struct GLState {
         glGetIntegerv(GL_ACTIVE_TEXTURE, &active);
         glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
         glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
+        glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
         glGetBooleanv(GL_COLOR_WRITEMASK, mask);
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
         blend = glIsEnabled(GL_BLEND);
         scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
         stencil = glIsEnabled(GL_STENCIL_TEST);
         depth = glIsEnabled(GL_DEPTH_TEST);
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 4; ++i) {
             glActiveTexture(GL_TEXTURE0 + i);
             glGetIntegerv(GL_TEXTURE_BINDING_2D, &textures[i]);
         }
+        glActiveTexture(GL_TEXTURE2);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D_ARRAY, &arrayTexture);
         glActiveTexture(GL_TEXTURE0);
     }
     void afterNativeDraw() {
@@ -329,6 +341,7 @@ struct GLState {
         // before drawContent (which may refer to a different texture shader).
         glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
         glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
         glGetIntegerv(GL_SCISSOR_BOX, scissor);
         blend = glIsEnabled(GL_BLEND);
         scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
@@ -347,13 +360,16 @@ struct GLState {
             g_pHyprOpenGL->setCapStatus(cap, value);
         glColorMask(mask[0], mask[1], mask[2], mask[3]);
         glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 4; ++i) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, textures[i]);
         }
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, arrayTexture);
         glActiveTexture(active);
         glUseProgram(prog);
         glBindVertexArray(vertexArray);
+        glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
     }
 };
 
@@ -409,8 +425,10 @@ void renderGlass(PHLLS layer, PHLMONITOR monitor, const Time::steady_tp& now, co
         distanceProgram = program(shaders::distance);
         resolveProgram = program(shaders::resolve);
         smoothProgram = program(shaders::smooth);
+        blurProgram = program(shaders::blur);
         glassProgram = program(shaders::glass);
         analyticProgram = program(shaders::analytic, shaders::analyticVertex);
+        profileProgram = program(shaders::cushionFragment, shaders::cushionVertex);
         glGenVertexArrays(1, &vao);
     }
     auto& r = resourceFor(layer);
@@ -426,6 +444,7 @@ void renderGlass(PHLLS layer, PHLMONITOR monitor, const Time::steady_tp& now, co
         r.backdropDirty = true;
     }
     r.background.resize(rw, rh, false);
+    const bool refreshBlur = r.backdropDirty;
     g_pHyprRenderer->disableScissor();
     if (r.backdropDirty) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, glState.drawFB);
@@ -459,6 +478,23 @@ void renderGlass(PHLLS layer, PHLMONITOR monitor, const Time::steady_tp& now, co
     g_pHyprOpenGL->setCapStatus(GL_DEPTH_TEST, false);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glBindVertexArray(vao);
+    if (refreshBlur) {
+        const int bw = (rw + 1) / 2, bh = (rh + 1) / 2;
+        // Fixed strength (~3 logical px sigma); no mip chain or per-widget
+        // adaptive blur. Both passes are cached with the pristine backdrop.
+        const float step = 1.75F * monitor->m_scale;
+        for (auto& b : r.blurred)
+            b.resize(bw, bh, false);
+        g_pHyprOpenGL->setViewport(0, 0, bw, bh);
+        glUseProgram(blurProgram);
+        for (int pass = 0; pass < 2; ++pass) {
+            glBindFramebuffer(GL_FRAMEBUFFER, r.blurred[pass].fb);
+            texture(blurProgram, "source", 0, pass == 0 ? r.background.texture : r.blurred[0].texture);
+            pair(blurProgram, "direction", pass == 0 ? step / rw : 0, pass == 1 ? step / rh : 0);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        }
+        ++blurUpdates;
+    }
     if (r.dirty && !analytic) {
         const int mw = (rw + 1) / 2, mh = (rh + 1) / 2;
         for (auto& m : r.mask) {
@@ -513,6 +549,23 @@ void renderGlass(PHLLS layer, PHLMONITOR monitor, const Time::steady_tp& now, co
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
     if (analytic) {
+        // Profiles are independent of position, background, text and uniform
+        // bounce scale. Only normalized outline changes regenerate a layer.
+        int needed = 256;
+        for (const auto& shape : geometry.shapes)
+            needed = std::max(needed, CushionField::resolution(shape.width, shape.height, shape.radius));
+        // Keep the high-water resolution until this surface is destroyed so
+        // expand/collapse animations do not churn allocations at every frame.
+        needed = std::max(r.profiles.size, needed);
+        r.profiles.allocate(needed, geometry.shapes.size());
+        g_pHyprOpenGL->setViewport(0, 0, needed, needed);
+        for (size_t i = 0; i < geometry.shapes.size(); ++i) {
+            const auto& shape = geometry.shapes[i];
+            if (r.profiles.update(i, CushionField::key(shape.width, shape.height, shape.radius, monitor->m_scale),
+                                  profileProgram, profileMesh))
+                ++profileUpdates;
+        }
+        glBindVertexArray(vao);
         for (auto& mask : r.mask)
             mask.release();
         r.dirty = false;
@@ -523,8 +576,14 @@ void renderGlass(PHLLS layer, PHLMONITOR monitor, const Time::steady_tp& now, co
     glUseProgram(material);
     texture(material, "background", 0, r.background.texture);
     texture(material, "content", 1, r.content->getTexture()->m_texID);
+    texture(material, "blurredBackground", 3, r.blurred[1].texture);
     if (!analytic)
         texture(material, "boundaries", 2, r.mask[r.maskResult].texture);
+    else {
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, r.profiles.texture);
+        glUniform1i(glGetUniformLocation(material, "surfaceProfiles"), 2);
+    }
     pair(material, "resolution", rw, rh);
     contentRect(material, area, w, h);
     scalar(material, "scale", monitor->m_scale);
@@ -632,6 +691,8 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     enabled = true;
     frames = backgroundCopies = contentUpdates = copiedPixels = referencePixels = compositedPixels = 0;
     analyticFrames = rasterFrames = 0;
+    blurUpdates = 0;
+    profileUpdates = 0;
     lastError.clear();
     if (std::string_view(__hyprland_api_get_hash()) != __hyprland_api_get_client_hash())
         throw std::runtime_error("Liquid Glass: Hyprland ABI mismatch");
@@ -659,39 +720,42 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
         });
     });
     statusCommand = HyprlandAPI::registerHyprCtlCommand(
-        handle, {"liquidglass", false, [](eHyprCtlOutputFormat, std::string request) {
-                     if (request == "liquidglass enable" || request == "liquidglass disable") {
-                         const bool requested = request == "liquidglass enable";
-                         if (requested && !lastError.empty())
-                             return std::string{"error: reload the plugin after a rendering failure"};
-                         enabled = requested;
-                         for (auto& [_, r] : resources) {
-                             r->dirty = true;
-                             r->backdropDirty = true;
-                         }
-                         announce(enabled);
-                         for (const auto& monitor : State::monitorState()->monitors())
-                             g_pHyprRenderer->damageMonitor(monitor);
-                         return std::string{"ok"};
-                     }
-                     if (request == "liquidglass reset-stats") {
-                         frames = backgroundCopies = contentUpdates = copiedPixels = referencePixels =
-                             compositedPixels = 0;
-                         analyticFrames = rasterFrames = 0;
-                         return std::string{"ok"};
-                     }
-                     if (request != "liquidglass")
-                         return std::string{"error: use liquidglass [enable|disable|reset-stats]"};
-                     return std::format(
-                         "{{\"enabled\":{},\"frames\":{},\"surfaces\":{},\"version\":1,"
-                         "\"backgroundCopies\":{},\"contentUpdates\":{},\"copiedPixels\":{},"
-                         "\"referencePixels\":{},\"compositedPixels\":{},\"analyticFrames\":{},\"rasterFrames\":{}}}",
-                         enabled ? "true" : "false", frames, resources.size(), backgroundCopies, contentUpdates,
-                         copiedPixels, referencePixels, compositedPixels, analyticFrames, rasterFrames);
-                 }});
+        handle,
+        {"liquidglass", false, [](eHyprCtlOutputFormat, std::string request) {
+             if (request == "liquidglass enable" || request == "liquidglass disable") {
+                 const bool requested = request == "liquidglass enable";
+                 if (requested && !lastError.empty())
+                     return std::string{"error: reload the plugin after a rendering failure"};
+                 enabled = requested;
+                 for (auto& [_, r] : resources) {
+                     r->dirty = true;
+                     r->backdropDirty = true;
+                 }
+                 announce(enabled);
+                 for (const auto& monitor : State::monitorState()->monitors())
+                     g_pHyprRenderer->damageMonitor(monitor);
+                 return std::string{"ok"};
+             }
+             if (request == "liquidglass reset-stats") {
+                 frames = backgroundCopies = contentUpdates = copiedPixels = referencePixels = compositedPixels = 0;
+                 analyticFrames = rasterFrames = 0;
+                 blurUpdates = 0;
+                 profileUpdates = 0;
+                 return std::string{"ok"};
+             }
+             if (request != "liquidglass")
+                 return std::string{"error: use liquidglass [enable|disable|reset-stats]"};
+             return std::format(
+                 "{{\"enabled\":{},\"frames\":{},\"surfaces\":{},\"version\":1,"
+                 "\"backgroundCopies\":{},\"contentUpdates\":{},\"copiedPixels\":{},"
+                 "\"referencePixels\":{},\"compositedPixels\":{},\"analyticFrames\":{},"
+                 "\"rasterFrames\":{},\"blurUpdates\":{},\"profileUpdates\":{},\"profile\":\"cushion\"}}",
+                 enabled ? "true" : "false", frames, resources.size(), backgroundCopies, contentUpdates, copiedPixels,
+                 referencePixels, compositedPixels, analyticFrames, rasterFrames, blurUpdates, profileUpdates);
+         }});
     GlassWire::start(g_pCompositor->m_wlDisplay, observeGeometry);
     announce(true);
-    return {"liquid-glass", "Live glass backgrounds for the Quickshell bar", "local", "0.2.3"};
+    return {"liquid-glass", "Live glass backgrounds for the Quickshell bar", "local", "0.5.0"};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
@@ -715,12 +779,15 @@ APICALL EXPORT void PLUGIN_EXIT() {
         for (auto& [_, r] : resources)
             r->release();
         resources.clear();
-        for (auto p : {seedProgram, distanceProgram, resolveProgram, smoothProgram, glassProgram, analyticProgram})
+        for (auto p : {seedProgram, distanceProgram, resolveProgram, smoothProgram, blurProgram, glassProgram,
+                       analyticProgram, profileProgram})
             if (p)
                 glDeleteProgram(p);
         if (vao)
             glDeleteVertexArrays(1, &vao);
-        seedProgram = distanceProgram = resolveProgram = smoothProgram = glassProgram = analyticProgram = vao = 0;
+        profileMesh.release();
+        seedProgram = distanceProgram = resolveProgram = smoothProgram = blurProgram = glassProgram = analyticProgram =
+            profileProgram = vao = 0;
     }
     for (const auto& monitor : State::monitorState()->monitors())
         g_pHyprRenderer->damageMonitor(monitor);

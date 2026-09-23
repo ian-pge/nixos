@@ -74,9 +74,15 @@ Item {
       id: hour
       required property var modelData
       required property int index
+      objectName: "weatherHour" + index
       width: hourlyList.width; height: 44
-      radius: 5
-      color: index % 2 === 0 ? Theme.surface : "transparent"
+      radius: 8
+      border.width: 0
+      // Reading guide, not a selected row: keep the same glass visible below
+      // both stripes and reserve the stronger accent tint for selections.
+      color: index % 2 === 0
+        ? (GlassState.enabled ? Qt.alpha(Theme.foreground, 0.04) : Theme.surface)
+        : "transparent"
       Text {
         x: 2; width: parent.width * 0.14 - 2; height: parent.height
         text: hour.modelData.time

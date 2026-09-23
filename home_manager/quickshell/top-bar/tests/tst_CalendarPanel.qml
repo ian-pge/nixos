@@ -289,7 +289,7 @@ Item {
       verify(findChild(panel, "2026-09-11").isSelected);
       const selected = findChild(panel, "2026-09-11");
       const today = findChild(panel, "2026-09-10");
-      compare(selected.color, today.color);
+      tryCompare(selected, "color", today.color);
       compare(selected.radius, today.radius);
       compare(selected.border.width, today.border.width);
       compare(selected.border.color, Theme.calendarSelected);

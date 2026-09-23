@@ -158,7 +158,7 @@ FocusScope {
         height: root.weekHeights[index]
         Repeater {
           model: week.modelData
-          delegate: Rectangle {
+          delegate: SelectionSurface {
             id: cell
             required property var modelData
             readonly property bool isToday: modelData.date === root.todayKey
@@ -170,8 +170,12 @@ FocusScope {
             width: dayGrid.cellWidth
             height: week.height
             radius: 8
-            color: isSelected || isToday ? Theme.surfaceRaised : "transparent"
-            border.width: isSelected || isToday ? 1 : 0
+            selected: isSelected
+            accent: Theme.calendarSelected
+            idleColor: isToday
+              ? (GlassState.enabled ? Qt.alpha(Theme.sideWeather, cell.tintOpacity) : Theme.surfaceRaised)
+              : "transparent"
+            border.width: !GlassState.enabled && (isSelected || isToday) ? 1 : 0
             border.color: isSelected ? Theme.calendarSelected : Theme.sideWeather
             Text {
               objectName: "dayNumber"

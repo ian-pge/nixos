@@ -2,14 +2,15 @@
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, readdir, readFile, copyFile, rm } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const plugin = path.resolve(process.argv[2] || path.join(here, "../build/libliquid-glass.so"));
-const runtime = await mkdtemp(path.join(os.tmpdir(), "gl-"));
+// Nix dev shells can put TMPDIR under a long /tmp/nix-shell.* path. Hyprland's
+// event-socket name then exceeds the Unix socket limit even though IPC1 works.
+const runtime = await mkdtemp("/tmp/gl-");
 const parentDisplay = path.resolve(process.env.XDG_RUNTIME_DIR, process.env.WAYLAND_DISPLAY);
 const env = {...process.env, XDG_RUNTIME_DIR: runtime, WAYLAND_DISPLAY: parentDisplay,
     QSG_RENDER_LOOP: "threaded",
@@ -59,6 +60,21 @@ try {
             return monitors.some(m => m.width > 0 && m.height > 0);
         } catch { return false; }
     }, "nested Hyprland readiness");
+    // Optional stabilization of OUR private compositor window only. Tiling on
+    // the parent can otherwise resize the scene midway through pixel checks.
+    if (process.env.GLASS_TEST_FLOAT === "1") {
+        let client;
+        await until(async () => {
+            const clients = JSON.parse((await exec("hyprctl", ["-j", "clients"])).stdout);
+            client = clients.find(c => c.pid === compositor.pid && c.mapped);
+            return !!client;
+        }, "private compositor's parent window");
+        const selector = JSON.stringify("address:" + client.address);
+        if (!client.floating)
+            await exec("hyprctl", ["dispatch", `hl.dsp.window.float({window=${selector}})`]);
+        await exec("hyprctl", ["dispatch", `hl.dsp.window.resize({window=${selector},x=1280,y=800})`]);
+        await delay(700);
+    }
     const ctl = async (...args) => (await exec("hyprctl", args, {env})).stdout;
     assert.equal((await ctl("configerrors")).trim(), "", "Test compositor configuration must be valid");
     // Native notification rendering after our pass used to mask GL-cache bugs.
@@ -85,7 +101,13 @@ try {
     status = JSON.parse(await ctl("liquidglass"));
     assert.ok(status.frames > before + 10, "Live background must repaint through the glass");
     const optimized = typeof status.contentUpdates === "number";
+    if (typeof status.blurUpdates === "number")
+        assert.equal(status.blurUpdates, status.backgroundCopies, "Blur must be refreshed with each new backdrop");
     const analytic = typeof status.analyticFrames === "number" && process.env.LIQUID_GLASS_DISABLE_GEOMETRY !== "1";
+    if (analytic && typeof status.profileUpdates === "number") {
+        assert.ok(status.profileUpdates > 0 && status.profileUpdates < 15, "Static cushion profiles must be cached");
+        assert.equal(status.profile, "cushion");
+    }
     if (optimized) {
         assert.ok(status.contentUpdates < status.frames / 4, "Static QML content and its mask must be cached");
         assert.ok(status.copiedPixels < status.referencePixels * 0.75, "Backdrop copies must be region-limited");
@@ -129,6 +151,9 @@ try {
                 const start = JSON.parse(await ctl("liquidglass"));
                 await delay(500);
                 const moving = JSON.parse(await ctl("liquidglass"));
+                if (typeof moving.profileUpdates === "number")
+                    assert.ok(moving.profileUpdates - start.profileUpdates <= 2,
+                        "Uniform capsule bounce must reuse its cushion profile: " + (moving.profileUpdates - start.profileUpdates));
                 assert.ok(moving.analyticFrames > start.analyticFrames + 10, "Animated capsule geometry must reach the renderer");
                 assert.ok(moving.rasterFrames - start.rasterFrames < 3, "Animated geometry must stay matched to its buffer");
                 await exec("qs", ["ipc", "-p", widgetConfig, "call", "glass-test", "activate", "false"], {env});
@@ -258,6 +283,10 @@ try {
         assert.ok(idle.backgroundCopies <= 2 && idle.contentUpdates === 0,
             "Unrelated animation must reuse glass caches: " + JSON.stringify(idle));
         console.log("Unrelated animation:", idle.backgroundCopies, "backdrop copies;", idle.contentUpdates, "content updates");
+        if (typeof idle.blurUpdates === "number")
+            assert.ok(idle.blurUpdates <= 2, "Unchanged backdrops must reuse the blurred texture");
+        if (typeof idle.profileUpdates === "number")
+            assert.equal(idle.profileUpdates, 0, "Unrelated animation must not rebuild pebble geometry");
         await sceneCall("traffic", "false");
         await until(async () => JSON.parse(await ctl("liquidglass")).surfaces === 2, "glass restored after unrelated animation");
     }

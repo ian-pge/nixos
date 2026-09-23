@@ -163,15 +163,16 @@ FocusScope {
       width: deviceList.width
       height: modelData.header ? 28 : 42
 
-      Rectangle {
+      SelectionSurface {
+        objectName: "audioSelection-" + row.modelData.key
         anchors.fill: parent
         anchors.leftMargin: 8
         anchors.rightMargin: 8
         anchors.topMargin: 2
         anchors.bottomMargin: 2
         radius: 10
-        color: row.selected ? Theme.surfaceRaised : "transparent"
-        Behavior on color { ColorAnimation { duration: 90 } }
+        selected: row.selected
+        accent: Theme.sideVolume
       }
 
       Text {
@@ -211,6 +212,7 @@ FocusScope {
           : row.modelData.section === "OUTPUTS" ? "No audio outputs" : "No microphones"
         color: row.node === null || !row.node.ready ? Theme.inactive
           : row.selected ? Theme.selectedForeground : Theme.foreground
+        Behavior on color { ColorAnimation { duration: 120 } }
         textFormat: Text.PlainText
         elide: Text.ElideRight
         font.family: "Ubuntu Nerd Font"

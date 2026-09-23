@@ -401,6 +401,19 @@ ainsi que son shader et sa compilation Qt. Ne pas le réintroduire. Le reflet
 synthétique de bord et le contre-bord sombre du plugin Liquid Glass ont aussi
 été retirés : conserver le fumé et la réfraction, sans cadre blanc ou noir ajouté.
 
+Les sélections internes des applications, onglets Chrome, villes météo,
+périphériques audio et jours du calendrier utilisent `SelectionSurface.qml` :
+teinte de l'accent à 20 % sur le verre existant, sans bordure et avec une
+transition de couleur de 120 ms sans rebond. Ne pas ajouter de `GlassShape`,
+de shader ou de flou à ces lignes : elles ne sont pas une deuxième vitre.
+Les fonds d'icônes des deux lanceurs restent discrets (4 % au repos, 8 %
+de l'accent à la sélection). Les libellés de liste sélectionnés sont blancs ;
+les couleurs sémantiques des dates et des états actifs restent conservées.
+Sans `GlassState.enabled`, revenir aux couleurs opaques du thème. La sélection
+de texte dans les champs de recherche garde son contraste et son comportement.
+`selection-test.qml` vérifie les composants réels avec des actions simulées,
+via Quickshell offscreen (aucune application lancée ni requête météo).
+
 ## 8. Bordure Hyprland pendant un overlay
 
 Lorsque le centre affiche un overlay, la fenêtre normale n’est plus considérée visuellement comme la cible principale.
@@ -981,12 +994,17 @@ les autres gardent `Theme.sideWeather`.
 H/J/K/L et les flèches sélectionnent les jours : gauche/droite déplacent d’un jour,
 haut/bas d’une semaine, y compris à travers les limites des mois. U/D (ou Page
 Up/Down) changent le mois en conservant le numéro du jour si possible. Home revient
-à aujourd’hui, tout comme N depuis la grille ou le détail. Le jour sélectionné
-reprend exactement le fond, le contour et le numéro gras d’aujourd’hui, avec
-l’accent orange `Theme.calendarSelected` prioritaire lorsqu’aujourd’hui est sélectionné.
+à aujourd’hui, tout comme N depuis la grille ou le détail. Sur le verre, le jour
+sélectionné prend une teinte orange `Theme.calendarSelected` à 20 % sans contour ;
+aujourd'hui garde une teinte rose à la même opacité de 20 % et son numéro gras.
+L'accent orange reste prioritaire lorsqu'aujourd'hui est sélectionné.
+Sans verre, conserver le fond opaque et les contours colorés précédents.
 Un clic sur une case ou Entrée ouvre son détail horaire dans la
 même capsule. `WeatherDayDetails.qml` affiche température/ressenti, pluie en %/mm,
-vent/rafales en km/h dans une liste défilante. En détail, H/L changent le jour,
+vent/rafales en km/h dans une liste défilante. Les bandes alternées des heures
+sont des repères de lecture, pas des sélections : voile neutre à 4 % sur le verre,
+sans contour, et `Theme.surface` opaque uniquement sans verre. Ne pas leur appliquer
+la teinte de sélection à 20 %. En détail, H/L changent le jour,
 J/K et la molette défilent ; Échap ou le chevron retourne à la grille, puis Échap
 ferme le calendrier. La sélection et le mode détail appartiennent au `StatusData`
 partagé. La hauteur du détail est bornée et suit l’animation commune de la capsule.

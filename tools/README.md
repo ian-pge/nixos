@@ -50,7 +50,7 @@ After building both Cargo binaries, run
 from the repository root to check subscription, cadence and pipe lifetime.
 
 The existing `tools/.envrc` selects that shell when direnv is enabled. There is
-one repository flake and one shared development environment. A NixOS rebuild
+one repository flake and a shared Rust development environment. A NixOS rebuild
 installs the selected commands automatically, including on a new machine.
 Cargo and rustc are build tools, not runtime dependencies; Nix may keep them
 in its store until garbage collection without adding them to the session PATH.
@@ -70,3 +70,8 @@ bash tools/quickshell/nix-cleaner/clean-installer_test.sh
 The harnesses need Bash, jq, coreutils and grep. The cleaner also uses
 util-linux and the current NixOS system's `run0` path for validation, without
 invoking it. Tests use isolated files and fake commands.
+
+The [glass shape viewer](liquid-glass/viewer/README.md) has a separate
+`nix develop .#threejs` environment (Node.js/npm), alongside the `cpp` shell
+used by the compositor plugin. Its Three.js/Vite dependencies are project-local
+and locked with npm. It is a local browser tool, not installed into the system.

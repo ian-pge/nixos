@@ -5,7 +5,10 @@ inline constexpr auto seed = R"GLSL(@SEED@)GLSL";
 inline constexpr auto distance = R"GLSL(@DISTANCE@)GLSL";
 inline constexpr auto resolve = R"GLSL(@RESOLVE@)GLSL";
 inline constexpr auto smooth = R"GLSL(@SMOOTH@)GLSL";
+inline constexpr auto blur = R"GLSL(@BLUR@)GLSL";
 inline constexpr auto glass = R"GLSL(@GLASS@)GLSL";
 inline constexpr auto analytic = R"GLSL(@ANALYTIC@)GLSL";
 inline constexpr auto analyticVertex = R"GLSL(@ANALYTIC_VERTEX@)GLSL";
+inline constexpr auto cushionVertex = R"GLSL(@CUSHION_VERTEX@)GLSL";
+inline constexpr auto cushionFragment = R"GLSL(@CUSHION_FRAGMENT@)GLSL";
 }

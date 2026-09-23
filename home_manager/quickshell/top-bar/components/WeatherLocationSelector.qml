@@ -30,7 +30,7 @@ FocusScope {
 
   Rectangle {
     width: parent.width; height: 34; radius: 7
-    color: Theme.surfaceRaised
+    color: GlassState.enabled ? Qt.alpha(Theme.foreground, 0.06) : Theme.surfaceRaised
     TextInput {
       id: searchInput
       objectName: "locationSearchInput"
@@ -87,16 +87,19 @@ FocusScope {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     model: root.rows
-    delegate: Rectangle {
+    delegate: SelectionSurface {
       id: row
       required property int index
       required property var modelData
-      width: results.width; height: 46; radius: 6
-      color: index === root.selectedIndex ? Theme.surfaceRaised : "transparent"
+      objectName: "weatherSelection" + index
+      width: results.width; height: 46; radius: 10
+      selected: index === root.selectedIndex
+      accent: Theme.sideWeather
       Text {
         x: 10; y: 4; width: parent.width - 20; height: 20
         text: row.modelData.name
-        color: row.index === root.selectedIndex ? Theme.sideWeather : Theme.foreground
+        color: row.selected ? (GlassState.enabled ? Theme.selectedForeground : Theme.sideWeather) : Theme.foreground
+        Behavior on color { ColorAnimation { duration: 120 } }
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 12
         font.bold: true
