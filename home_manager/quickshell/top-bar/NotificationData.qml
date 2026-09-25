@@ -10,6 +10,13 @@ Scope {
   property var current: null
   property var presented: null
   property string targetMonitor: ""
+  // In the messenger, notifications are non-modal banners. They must not
+  // reserve Escape globally or replace the focused composer.
+  property string inlineMonitor: ""
+  property bool suppressNativeBeeper: false
+  readonly property bool inlinePresentation: visible && inlineMonitor !== ""
+    && targetMonitor === inlineMonitor
+  onInlinePresentationChanged: syncEscape()
   property var monitors: Hyprland.monitors.values
   property var focusedMonitor: Hyprland.focusedMonitor
   readonly property bool visible: current !== null
@@ -65,6 +72,15 @@ Scope {
 
   function receive(notification) {
     notification.tracked = true;
+    // Only suppress the original Desktop client once our API consumer is
+    // connected. Our producer has its own Messages/quickshell-beeper identity.
+    const desktopEntry = notification.hints["desktop-entry"] || "";
+    if (suppressNativeBeeper && (notification.appName === "Beeper"
+        || desktopEntry === "beeper" || desktopEntry === "Beeper"
+        || desktopEntry === "com.automattic.beeper.desktop")) {
+      notification.expire();
+      return;
+    }
     // Discard immediately, including critical notifications; no deferred queue.
     if (doNotDisturb) {
       notification.expire();
@@ -145,7 +161,7 @@ Scope {
     escapeSyncPending = false;
     // A short lease also releases Escape if Quickshell exits unexpectedly.
     escapeSync.command = ["hyprctl", "eval",
-      "quickshell_notification_deadline = " + (visible ? "os.time() + 5" : "0")];
+      "quickshell_notification_deadline = " + (visible && !inlinePresentation ? "os.time() + 5" : "0")];
     escapeSync.running = true;
   }
 

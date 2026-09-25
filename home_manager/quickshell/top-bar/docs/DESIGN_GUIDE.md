@@ -15,6 +15,49 @@ Principes fondamentaux :
 - Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
 - Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui utilisent leurs accents dédiés. Aucun liseré animé ne tourne autour des widgets.
 
+### Messagerie Beeper
+
+La messagerie est un mode de la même capsule, ouvert avec Cmd+D. Elle rejoint le
+centre de la zone de travail située sous la barre, comme les fenêtres Hyprland,
+et peut atteindre 1280 × 900 pixels logiques, avec marges sur les écrans plus
+petits. C'est l'exception au plafond de largeur des workspaces. Sa position prend
+pour origine `exclusiveZone` et centre le panneau dans la hauteur restante ;
+la réserve supérieure de 46 px n'entre donc pas dans la zone à centrer.
+La surface Wayland garde une hauteur fixe égale à celle du moniteur et une zone
+exclusive de 46 px ; seules la position et les dimensions du rectangle intérieur
+s'animent. Les capsules latérales ne se déplacent pas. Le masque continue à ne
+capturer que les éléments visibles.
+
+La typographie de la messagerie est regroupée dans `Theme.beeperFont` : corps et
+saisie à 20 px, contrôles à 16 px, indications secondaires à 14–15 px. Les listes
+et boutons grandissent avec ces textes. Dans les groupes, les noms et la teinte
+discrète des bulles utilisent une couleur par identité de participant. Les
+couleurs déjà attribuées sont conservées pendant la navigation, les transferts
+entre écrans et le chargement de l'historique ; elles ne dépendent pas du numéro
+de ligne ni du nom affiché lorsque `senderID` est fourni.
+
+Le backend Go et `BeeperData` sont uniques pour la session. Chaque écran possède
+un `BeeperPanel`, mais seul celui de l'écran cible est actif. La fermeture, le
+transfert d'écran et la suspension par polkit conservent les brouillons. Le
+composeur est une `TextArea` QML classique : Entrée envoie, Maj+Entrée ajoute une
+ligne et Échap quitte la saisie avant de fermer le panneau. Les commandes de
+navigation Vim ne doivent jamais détourner les caractères composés, AltGr ou
+les touches mortes Lafayette dans les champs de texte.
+
+La messagerie utilise `WlrKeyboardFocus.OnDemand`, avec `HyprlandFocusGrab`
+activé explicitement à l'ouverture clavier. Un clic extérieur libère le focus
+sans masquer le panneau. Ne jamais lier le grab à sa visibilité : cela
+reprendrait le clavier à l'autre application. Les dialogues de fichiers
+libèrent le grab et le récupèrent à leur fermeture.
+
+Les notifications proviennent du backend Go via D-Bus freedesktop ; leur action
+ouvre la conversation dans notre panneau. Les alertes du client Beeper Desktop
+sont filtrées lorsque notre connexion est active, et ses sons doivent être
+désactivés dans ses réglages. Quand le panneau est ouvert, les notifications sur
+son moniteur deviennent des bannières non modales : elles ne changent pas la
+géométrie, ne capturent pas le focus et n'arment pas l'interception globale
+d'Échap. La dictée se présente également à l'intérieur du panneau.
+
 ## 2. Architecture à préserver
 
 ### Fichiers principaux
@@ -180,13 +223,13 @@ binaires Rust (après `cargo build`), avec une carte GPU fictive en veille.
 
 ### Surface layer-shell fixe
 
-Le `PanelWindow` garde une hauteur fixe de `860px`, même lorsque la capsule ne fait que `36px`.
+Le `PanelWindow` garde une hauteur fixe égale à celle du moniteur, même lorsque la capsule ne fait que `36px`.
 
 C’est volontaire : animer la hauteur du `PanelWindow` provoquait un léger déplacement vertical des autres modules à cause des recalculs du layer-shell et des arrondis du compositeur.
 
 À respecter :
 
-- `implicitHeight: 850 + barTopInset`, avec `barTopInset: 10`
+- `implicitHeight: screen.height`, avec `barTopInset: 10`
 - `exclusiveZone: 36 + barTopInset`, soit une réserve Hyprland de `46px`
 - marge supérieure du panel de `0px`, contenu décalé de `10px` à l’intérieur
 - `mask: Region` limité à `leftModules`, `centerMorph` et `rightModules`

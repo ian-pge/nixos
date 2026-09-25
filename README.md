@@ -40,11 +40,33 @@ sudo nixos-rebuild switch --flake /etc/nixos
 
 ## Development environments
 
-From this repository, enter `nix develop .#rust`, `nix develop .#cpp`, or
-`nix develop .#threejs`. The Three.js shell provides Node.js/npm; browser
+From this repository, enter `nix develop .#rust`, `nix develop .#cpp`,
+`nix develop .#go`, or `nix develop .#threejs`. The Go shell provides Go,
+gopls, Delve and golangci-lint; each Go project keeps its own `go.mod` and
+`go.sum`. The Three.js shell provides Node.js/npm; browser
 dependencies are local to each project's lockfile, never installed globally.
 The [glass shape viewer](tools/liquid-glass/viewer/README.md) uses this shell
 and has its own `.envrc`. No NixOS rebuild is needed for these environments.
+
+## Beeper messaging in Quickshell
+
+Review the design in a standalone window with
+`nix run .#quickshellBeeperPreview`. This uses fictional conversations and needs
+neither Beeper nor an API token; it does not change or restart the desktop.
+
+The Quickshell messenger uses a Go backend and Beeper Desktop's public local
+API. Beeper Desktop must be running with the API enabled. Account connections
+remain configured there; conversations and notifications use Quickshell.
+Disable Beeper Desktop's own desktop notifications and sounds to avoid duplicate
+alerts. The API token belongs in the system keyring, never in Nix configuration.
+
+The backend lives in `tools/quickshell/beeper/`, whose `.envrc` selects the Go
+shell. Build it without activating the desktop using
+`nix build .#quickshellBeeper`. Home Manager installs the command and adds Qt
+Multimedia's QML imports and plugins to Quickshell for media playback and voice
+recording. Drafts and prepared attachments under
+`~/.local/state/quickshell-beeper` survive reboots through impermanence; the
+existing keyring and cache persistence retain credentials and downloaded media.
 
 ## Workspace navigation
 

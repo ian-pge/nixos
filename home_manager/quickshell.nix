@@ -9,7 +9,9 @@
     paths = [pkgs.quickshell];
     nativeBuildInputs = [pkgs.makeWrapper];
     postBuild = ''
-      wrapProgram "$out/bin/quickshell" --prefix QML_IMPORT_PATH : "${localPackages.liquidGlassClient}/lib/qt-6/qml"
+      wrapProgram "$out/bin/quickshell" \
+        --prefix QML_IMPORT_PATH : "${localPackages.liquidGlassClient}/lib/qt-6/qml:${pkgs.qt6.qtmultimedia}/${pkgs.qt6.qtbase.qtQmlPrefix}" \
+        --prefix QT_PLUGIN_PATH : "${pkgs.qt6.qtmultimedia}/${pkgs.qt6.qtbase.qtPluginPrefix}"
       ln -sfn quickshell "$out/bin/qs"
     '';
   };
@@ -20,6 +22,8 @@
       --replace-fail '"quickshell-system-stats"' '"${localPackages.quickshellSystemStats}/bin/quickshell-system-stats"'
     substituteInPlace "$out/WeatherData.qml" \
       --replace-fail '"quickshell-weather"' '"${localPackages.quickshellWeather}/bin/quickshell-weather"'
+    substituteInPlace "$out/BeeperData.qml" \
+      --replace-fail '"quickshell-beeper"' '"${localPackages.quickshellBeeper}/bin/quickshell-beeper"'
     substituteInPlace "$out/AudioAvailability.qml" \
       --replace-fail '"pw-dump"' '"${pkgs.pipewire}/bin/pw-dump"'
     substituteInPlace "$out/NotificationData.qml" \
@@ -34,6 +38,7 @@ in {
     quickshellUpdateInstaller
     quickshellNixCleaner
     quickshellBrightness
+    quickshellBeeper
     quickshellSystemStats
     quickshellGpuMonitor
     quickshellWeather

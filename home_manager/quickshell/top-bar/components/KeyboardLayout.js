@@ -83,7 +83,7 @@ var rows = [
    key("["), key("]"), key("Backspace", "", "", 1.5)],
   [key("Control", "", "modifier", 1.75),
    key("A", "Lanceur", "app"), key("S", "LLM", "workspace"),
-   key("D", "Chat", "workspace"), key("F", "Fichiers", "app"),
+   key("D", "Messages", "app"), key("F", "Fichiers", "app"),
    key("G", "Chrome", "app"), key("H", "Focus ←", "window"),
    key("J", "Focus ↓", "window"), key("K", "Focus ↑", "window"),
    key("L", "Focus →", "window"), key(";"),

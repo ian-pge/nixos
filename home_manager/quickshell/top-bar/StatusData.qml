@@ -16,7 +16,22 @@ Scope {
   WorkspaceMonitorSync {}
 
   readonly property var notifications: notificationData
-  NotificationData { id: notificationData }
+  NotificationData {
+    id: notificationData
+    inlineMonitor: root.beeperVisible ? root.beeperTargetMonitor : ""
+    suppressNativeBeeper: beeperData.connected && !beeperData.demo
+  }
+  readonly property var beeper: beeperData
+  BeeperData {
+    id: beeperData
+    onOpenRequested: (chatID, messageID) => {
+      root.showBeeper();
+      beeperData.selectChat(chatID, messageID);
+    }
+  }
+  property bool beeperVisible: false
+  property string beeperTargetMonitor: ""
+  property int beeperFocusSerial: 0
   readonly property var weather: weatherData
   WeatherData { id: weatherData }
   readonly property var systemTelemetry: systemData
@@ -186,7 +201,7 @@ Scope {
     || audioSelectorVisible || calendarVisible || systemPanelVisible
     || brightnessOverlayVisible || mediaOverlayVisible || appLauncherVisible
     || chromeTabsVisible || wifiSelectorVisible || bluetoothSelectorVisible
-    || updateSelectorVisible
+    || updateSelectorVisible || (beeperVisible && beeperData.viewFocused)
   property int centerTransitionSerial: 0
   property bool centerTransitionPending: false
   property string centerTransitionSourceMode: "workspaces"
@@ -811,6 +826,7 @@ Scope {
   }
 
   function visibleCenterModeWithoutVoice() {
+    if (beeperVisible) return "beeper";
     if (systemPanelVisible) return "system";
     if (calendarVisible) return "calendar";
     if (audioSelectorVisible) return "audio";
@@ -826,11 +842,13 @@ Scope {
   }
 
   function visibleCenterMode() {
-    return voiceDictationActive
+    return voiceDictationActive && !(beeperVisible
+        && beeperTargetMonitor === voiceDictationTargetMonitor)
       ? "dictation" : visibleCenterModeWithoutVoice();
   }
 
   function monitorForCenterMode(mode) {
+    if (mode === "beeper") return beeperTargetMonitor;
     if (mode === "system") return systemTargetMonitor;
     if (mode === "calendar") return calendarTargetMonitor;
     if (mode === "audio") return audioTargetMonitor;
@@ -848,6 +866,7 @@ Scope {
 
   function notificationCoversMonitor(monitor) {
     return notificationData.visible
+      && !notificationData.inlinePresentation
       && notificationData.targetMonitor === monitor;
   }
 
@@ -875,7 +894,48 @@ Scope {
     centerTransitionTargetMode = targetMode;
     centerTransitionTargetMonitor = resolvedTargetMonitor;
     centerTransitionPending = true;
+    if (beeperVisible && targetMode !== "beeper" && targetMode !== "dictation"
+        && targetMode !== "workspaces")
+      beeperVisible = false;
     return true;
+  }
+
+  function toggleBeeper(targetMonitor = "") {
+    const monitor = resolveTargetMonitor(targetMonitor);
+    if (beeperVisible && beeperTargetMonitor === monitor)
+      hideBeeper();
+    else
+      showBeeper(monitor);
+  }
+
+  function showBeeper(targetMonitor = "") {
+    if (polkitActive)
+      return;
+    const monitor = resolveTargetMonitor(targetMonitor);
+    const ownsTransition = beginCenterTransition("beeper", monitor);
+    hideSystemPanel();
+    hideCalendar();
+    hideAudioSelector();
+    hideMediaOverlay();
+    hideWifiSelector();
+    hideBluetoothSelector();
+    hideUpdateSelector();
+    hideVolumeOverlay();
+    hideBrightnessOverlay();
+    hideAppLauncher();
+    hideChromeTabs();
+    beeperTargetMonitor = monitor;
+    beeperVisible = true;
+    beeperFocusSerial++;
+    finishCenterTransition(ownsTransition);
+  }
+
+  function hideBeeper() {
+    if (!beeperVisible)
+      return;
+    const ownsTransition = beginCenterTransition("workspaces");
+    beeperVisible = false;
+    finishCenterTransition(ownsTransition);
   }
 
   function finishCenterTransition(ownedTransition) {
@@ -1042,7 +1102,7 @@ Scope {
   }
 
   function showMediaOverlay(targetMonitor = "") {
-    if (mprisPlayer === null || appLauncherVisible || chromeTabsVisible || audioSelectorVisible
+    if (mprisPlayer === null || beeperVisible || appLauncherVisible || chromeTabsVisible || audioSelectorVisible
         || wifiSelectorVisible || bluetoothSelectorVisible
         || updateSelectorVisible || calendarVisible || systemPanelVisible)
       return;
@@ -2151,6 +2211,7 @@ Scope {
     else if (mode === "audio") toggleAudioSelector(monitor);
     else if (mode === "calendar") showCalendar(monitor, false);
     else if (mode === "system") showSystemPanel(monitor);
+    else if (mode === "beeper") showBeeper(monitor);
     else if (mode === "media") showMediaOverlay(monitor);
   }
 
@@ -2321,6 +2382,8 @@ Scope {
         root.hideCalendar();
       if (root.systemPanelVisible && !Hyprland.monitors.values.some(monitor => monitor.name === root.systemTargetMonitor))
         root.hideSystemPanel();
+      if (root.beeperVisible && !Hyprland.monitors.values.some(monitor => monitor.name === root.beeperTargetMonitor))
+        root.hideBeeper();
     }
   }
 
@@ -2612,6 +2675,10 @@ Scope {
 
   IpcHandler {
     target: "topbar"
+
+    function toggleBeeper() {
+      root.toggleBeeper();
+    }
 
     function dismissNotification() {
       notificationData.close();

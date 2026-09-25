@@ -14,7 +14,19 @@ PanelWindow {
   required property var statusData
 
   property bool entered: false
+  property bool beeperNativeDialogOpen: false
+  readonly property bool beeperActive: statusData.beeperVisible
+    && monitorName === statusData.beeperTargetMonitor
+  readonly property bool beeperNotificationActive: beeperActive
+    && statusData.notifications.visible
+    && monitorName === statusData.notifications.targetMonitor
+  readonly property bool beeperDictationActive: beeperActive
+    && statusData.voiceDictationActive
+    && monitorName === statusData.voiceDictationTargetMonitor
   readonly property int barTopInset: 10
+  readonly property real beeperWorkAreaTop: exclusiveZone
+  readonly property real beeperWorkAreaHeight: Math.max(0, height - beeperWorkAreaTop)
+  readonly property real beeperPanelHeight: Math.min(900, Math.max(0, beeperWorkAreaHeight - 128))
   readonly property var hyprlandMonitor: Hyprland.monitorFor(window.screen)
     ?? Hyprland.monitors.values.find(monitor => monitor.name === window.modelData.name)
     ?? null
@@ -25,6 +37,7 @@ PanelWindow {
     && hyprlandMonitor.activeWorkspace.hasFullscreen
   readonly property bool notificationActive: statusData.notifications.visible
     && monitorName === statusData.notifications.targetMonitor
+    && !beeperActive
   readonly property bool volumeOverlayActive: statusData.volumeOverlayVisible
     && monitorName === statusData.volumeTargetMonitor
   readonly property bool audioSelectorActive: statusData.audioSelectorVisible
@@ -43,6 +56,7 @@ PanelWindow {
     && monitorName === statusData.brightnessTargetMonitor
   readonly property bool dictationOverlayActive: statusData.voiceDictationActive
     && monitorName === statusData.voiceDictationTargetMonitor
+    && !beeperActive
   readonly property bool mediaOverlayActive: statusData.mediaOverlayVisible
     && monitorName === statusData.mediaTargetMonitor
   readonly property bool wifiSelectorActive: statusData.wifiSelectorVisible
@@ -83,7 +97,7 @@ PanelWindow {
   // Keep the layer surface geometry fixed so expanding the update card cannot
   // nudge the other bar modules. The mask leaves the unused area click-through.
   // Include the space above the bar so upward bounces are not clipped.
-  implicitHeight: 850 + barTopInset
+  implicitHeight: screen.height
   color: "transparent"
   exclusionMode: ExclusionMode.Normal
   exclusiveZone: 36 + barTopInset
@@ -94,7 +108,36 @@ PanelWindow {
     ? WlrLayer.Overlay : WlrLayer.Top
   WlrLayershell.namespace: "quickshell-top-bar"
   WlrLayershell.keyboardFocus: keyboardSelectorActive
-    ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    ? WlrKeyboardFocus.Exclusive : beeperActive && !beeperNativeDialogOpen
+    ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+
+  HyprlandFocusGrab {
+    id: beeperFocusGrab
+    windows: [window]
+    // A click outside clears the grab without closing the messenger. Never
+    // bind active to visibility: that would steal the keyboard back.
+  }
+
+  function focusBeeper() {
+    if (!beeperActive || beeperNativeDialogOpen)
+      return;
+    beeperFocusGrab.active = true;
+    beeperPanel.focusNavigation();
+  }
+
+  onBeeperActiveChanged: {
+    if (beeperActive)
+      Qt.callLater(focusBeeper);
+    else {
+      beeperFocusGrab.active = false;
+      beeperNativeDialogOpen = false;
+    }
+  }
+
+  Connections {
+    target: window.statusData
+    function onBeeperFocusSerialChanged() { Qt.callLater(window.focusBeeper); }
+  }
 
   mask: Region {
     Region { item: leftModules }
@@ -169,14 +212,15 @@ PanelWindow {
       || window.brightnessOverlayActive || window.mediaOverlayActive
       || window.appLauncherActive || window.chromeTabsActive
       || window.wifiSelectorActive || window.bluetoothSelectorActive
-      || window.updateSelectorActive || window.dictationOverlayActive
+      || window.updateSelectorActive || window.dictationOverlayActive || window.beeperActive
     onOverlayVisibleChanged: {
       if (overlayVisible)
         fullscreenHideDelay.stop();
       else if (window.fullscreenActive)
         fullscreenHideDelay.restart();
     }
-    readonly property string targetMode: window.notificationActive ? "notification"
+    readonly property string targetMode: window.beeperActive ? "beeper"
+      : window.notificationActive ? "notification"
       : window.dictationOverlayActive
       ? "dictation" : window.systemPanelActive ? "system"
       : window.calendarActive ? "calendar"
@@ -189,7 +233,8 @@ PanelWindow {
       : window.mediaOverlayActive ? "media"
       : window.volumeOverlayActive ? "volume"
       : window.brightnessOverlayActive ? "brightness" : "workspaces"
-    readonly property real preferredWidth: window.notificationActive
+    readonly property real preferredWidth: window.beeperActive
+      ? Math.max(320, Math.min(1280, window.width - 54)) : window.notificationActive
       ? notificationPopup.implicitWidth : window.dictationOverlayActive
       ? voiceDictationIndicator.implicitWidth
       : window.systemPanelActive ? workspaceSwitcher.expandedImplicitWidth
@@ -202,9 +247,10 @@ PanelWindow {
       : window.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
       : window.mediaOverlayActive ? nowPlayingIndicator.implicitWidth
       : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
-    readonly property real targetWidth: Math.min(preferredWidth,
-      workspaceSwitcher.expandedImplicitWidth)
-    readonly property real targetHeight: window.notificationActive
+    readonly property real targetWidth: window.beeperActive ? preferredWidth
+      : Math.min(preferredWidth, workspaceSwitcher.expandedImplicitWidth)
+    readonly property real targetHeight: window.beeperActive
+      ? window.beeperPanelHeight : window.notificationActive
       ? notificationPopup.implicitHeight : window.dictationOverlayActive
       ? voiceDictationIndicator.implicitHeight
       : window.systemPanelActive ? systemPanel.implicitHeight
@@ -216,7 +262,7 @@ PanelWindow {
       : window.wifiSelectorActive ? wifiSelector.implicitHeight : 36
     readonly property var contentModes: ["workspaces", "volume", "audio",
       "brightness", "dictation", "media", "wifi", "bluetooth",
-      "launcher", "tabs", "updates", "notification", "calendar", "system"]
+      "launcher", "tabs", "updates", "notification", "calendar", "system", "beeper"]
     property string visualSourceMode: "workspaces"
     property string visualTargetMode: "workspaces"
     property real transitionProgress: 1
@@ -225,6 +271,7 @@ PanelWindow {
     property var startOffsets: ({})
 
     function modeHeight(mode) {
+      if (mode === "beeper") return window.beeperPanelHeight;
       if (mode === "system") return systemPanel.implicitHeight;
       if (mode === "notification") return notificationPopup.implicitHeight;
       if (mode === "calendar") return calendarPanel.implicitHeight;
@@ -318,8 +365,9 @@ PanelWindow {
     }
 
     anchors.horizontalCenter: parent.horizontalCenter
-    anchors.top: parent.top
-    anchors.topMargin: window.barTopInset
+    y: window.beeperActive
+      ? window.beeperWorkAreaTop + (window.beeperWorkAreaHeight - targetHeight) / 2
+      : window.barTopInset
     width: targetWidth
     height: targetHeight
     radius: 18
@@ -339,6 +387,10 @@ PanelWindow {
         duration: 360
         easing.type: Easing.OutCubic
       }
+    }
+
+    Behavior on y {
+      NumberAnimation { duration: 360; easing.type: Easing.OutCubic }
     }
 
     NumberAnimation {
@@ -548,6 +600,71 @@ PanelWindow {
       transform: Translate { y: centerMorph.contentOffset("calendar") }
       opacity: centerMorph.contentOpacity("calendar")
       enabled: window.calendarKeyboardActive
+    }
+
+    BeeperPanel {
+      id: beeperPanel
+      anchors.fill: parent
+      beeperData: window.statusData.beeper
+      active: window.beeperActive
+      windowFocused: window.contentItem.Window.active && !window.beeperNativeDialogOpen
+      opacity: centerMorph.contentOpacity("beeper")
+      visible: opacity > 0
+      enabled: window.beeperActive
+      onCloseRequested: window.statusData.hideBeeper()
+      onNativeDialogOpened: {
+        window.beeperNativeDialogOpen = true;
+        beeperFocusGrab.active = false;
+      }
+      onNativeDialogClosed: {
+        window.beeperNativeDialogOpen = false;
+        Qt.callLater(() => {
+          if (window.beeperActive) {
+            beeperFocusGrab.active = true;
+            beeperPanel.forceActiveFocus();
+          }
+        });
+      }
+    }
+
+    Rectangle {
+      id: beeperNotificationBanner
+      anchors.top: parent.top
+      anchors.right: parent.right
+      anchors.margins: 16
+      width: Math.min(420, parent.width - 32)
+      height: beeperNotification.implicitHeight
+      radius: 16
+      color: Theme.surfaceRaised
+      border.color: Theme.surfaceSelected
+      visible: window.beeperNotificationActive
+      z: 4
+      NotificationPopup {
+        id: beeperNotification
+        anchors.fill: parent
+        maximumWidth: 420
+        fontScale: 1.35
+        notificationData: window.statusData.notifications
+      }
+    }
+
+    Rectangle {
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.topMargin: 16
+      width: 250
+      height: 32
+      radius: 16
+      color: Theme.surfaceRaised
+      visible: window.beeperDictationActive
+      z: 3
+      Text {
+        anchors.centerIn: parent
+        text: window.statusData.voiceDictationTranscribing ? "Dictée · transcription…" : "●  Dictée en cours"
+        color: Theme.state
+        font.family: "Ubuntu Nerd Font"
+        font.pixelSize: Theme.beeperFont.secondary
+      }
     }
 
     NotificationInputGuard {

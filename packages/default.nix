@@ -30,6 +30,8 @@ in
     hyprlockAge = pkgs.callPackage ./hyprlock-age.nix {};
     quickshellChromeTabs = pkgs.callPackage ./quickshell/chrome-tabs.nix {inherit tabctl;};
     quickshellBrightness = pkgs.callPackage ./quickshell/brightness.nix {};
+    quickshellBeeper = pkgs.callPackage ./quickshell/beeper.nix {};
+    quickshellBeeperPreview = pkgs.callPackage ./quickshell/beeper-preview.nix {};
     quickshellNixCleaner = pkgs.callPackage ./quickshell/nix-cleaner.nix {};
     quickshellSystemStats = pkgs.callPackage ./quickshell/system-stats.nix {};
     quickshellSpeedtest = pkgs.callPackage ./quickshell/speedtest.nix {};

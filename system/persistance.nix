@@ -85,6 +85,10 @@
         ".config/Antigravity"
         ".config/discord"
         ".config/BeeperTexts"
+        {
+          directory = ".local/state/quickshell-beeper";
+          mode = "0700";
+        }
         ".antigravity"
         ".gemini"
         ".claude"

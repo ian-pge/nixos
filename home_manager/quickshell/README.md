@@ -1,5 +1,27 @@
 # Quickshell layout
 
+## Messages
+
+Cmd+D transforms the top capsule into the Beeper messenger on the active
+monitor. Clicking outside leaves it open and releases keyboard focus. Escape
+leaves a text field first, then closes the panel. Enter sends; Shift+Enter adds
+a newline. Navigation outside text fields uses Vim keys; `?` shows the help.
+
+The native QML frontend talks to the persistent `quickshell-beeper` Go process.
+Beeper Desktop is the local API provider and must remain running. Create an
+API access token in Beeper's integration settings and enter it in our connection
+screen; it is stored in GNOME Keyring, never in Nix. Disable Desktop notification
+alerts and sounds in Beeper's settings without muting every conversation.
+Our Go process creates the notifications, and their actions open our panel.
+Original Beeper notification cards are suppressed while our client is connected.
+
+Drafts and staged attachments persist in `~/.local/state/quickshell-beeper`.
+The package includes Qt Multimedia for native image, GIF, audio and video views
+and voice recording. A demo preview uses fictional conversations without API
+access; see `top-bar/beeper-preview.qml` and the Go tool's README for commands.
+
+## Source layout
+
 - `top-bar/` — active Quickshell configuration managed by Home Manager.
   - `shell.qml`, `Bar.qml`, `StatusData.qml` — shell entry point, panel and shared state.
   - `components/` — visual components used by `Bar.qml`.

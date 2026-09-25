@@ -49,6 +49,7 @@
     devShells.${system} = {
       rust = import ./dev-shells/rust.nix {inherit pkgs;};
       cpp = import ./dev-shells/cpp.nix {inherit pkgs;};
+      go = import ./dev-shells/go.nix {inherit pkgs;};
       threejs = import ./dev-shells/threejs.nix {inherit pkgs;};
     };
 

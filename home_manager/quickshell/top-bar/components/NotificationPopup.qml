@@ -10,6 +10,7 @@ Item {
 
   required property var notificationData
   property real maximumWidth: 480
+  property real fontScale: 1
   readonly property var notification: notificationData.presented
   readonly property string appName: notification !== null ? notification.appName : ""
   readonly property string title: notification !== null ? notification.summary : ""
@@ -126,7 +127,7 @@ Item {
       elide: Text.ElideRight
       color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 10
+      font.pixelSize: Math.round(10 * root.fontScale)
       font.bold: true
     }
 
@@ -139,7 +140,7 @@ Item {
       elide: Text.ElideRight
       color: Theme.foreground
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: Math.round(14 * root.fontScale)
       font.bold: true
     }
 
@@ -154,7 +155,7 @@ Item {
       elide: Text.ElideRight
       color: Theme.foreground
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 13
+      font.pixelSize: Math.round(13 * root.fontScale)
     }
   }
 

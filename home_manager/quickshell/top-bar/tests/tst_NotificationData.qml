@@ -86,6 +86,8 @@ ShellRoot {
     }
     function init() {
       notifications.doNotDisturb = false;
+      notifications.inlineMonitor = "";
+      notifications.suppressNativeBeeper = false;
       notifications.monitors = [monitor];
       notifications.focusedMonitor = monitor;
       workspace.hasFullscreen = false;
@@ -152,6 +154,31 @@ ShellRoot {
       verify(!notifications.visible);
       compare(notifications.soundProcesses.length, 0);
     }
+    function test_messenger_banner_preserves_native_notification_lifetime() {
+      notifications.inlineMonitor = "TEST";
+      send("Incoming in messenger", ["--hint", "boolean:suppress-sound:true"]);
+      verify(notifications.inlinePresentation);
+      verify(notifications.visible);
+      const current = notifications.current;
+      notifications.inlineMonitor = "OTHER";
+      verify(!notifications.inlinePresentation);
+      compare(notifications.current, current);
+      notifications.close();
+      verify(!notifications.inlinePresentation);
+    }
+    function test_native_beeper_suppression_does_not_drop_our_notifications() {
+      notifications.suppressNativeBeeper = true;
+      send("Native Desktop duplicate", ["--app-name", "Beeper"]);
+      verify(!notifications.visible);
+      compare(notifications.soundProcesses.length, 0);
+      send("Our message", ["--app-name", "Messages", "--hint", "string:desktop-entry:quickshell-beeper"]);
+      verify(notifications.visible);
+      compare(notifications.current.summary, "Our message");
+      notifications.close();
+      notifications.suppressNativeBeeper = false;
+      send("Desktop fallback", ["--app-name", "Beeper"]);
+      verify(notifications.visible);
+    }
     function test_missing_monitor_still_closes_and_rejects_notifications() {
       send("Before unplugging", ["--hint", "boolean:suppress-sound:true"]);
       verify(notifications.visible);
@@ -184,7 +211,8 @@ ShellRoot {
       const visual = pill.children[0];
       const mutedIcon = pill.text;
       compare(mutedIcon, "󰂛");
-      tryCompare(visual, "color", "#a6da95");
+      // Pill's opaque hover uses the existing 16% accent tint.
+      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha("#a6da95", 0.16)));
       tryCompare(notifications, "dndFeedbackActive", false, 2500);
       verify(notifications.doNotDisturb, "Ending feedback must not disable DND");
       verify(!pill.hovered, "Active DND must not keep its highlight or bounce");
@@ -195,7 +223,7 @@ ShellRoot {
       verify(!notifications.doNotDisturb);
       verify(pill.hovered, "Unmuting must briefly bounce too");
       compare(pill.text, "󰂚");
-      tryCompare(visual, "color", "#a6da95");
+      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha("#a6da95", 0.16)));
       tryCompare(notifications, "dndFeedbackActive", false, 2500);
       tryCompare(visual.transform[0], "y", 0);
       tryCompare(visual, "color", "#181926");

@@ -11,6 +11,7 @@ function method(name) {
 }
 const methods = ["resolveTargetMonitor", "visibleCenterModeWithoutVoice", "visibleCenterMode",
   "monitorForCenterMode", "notificationCoversMonitor", "beginCenterTransition", "finishCenterTransition",
+  "showBeeper", "hideBeeper", "toggleBeeper",
   "showSystemPanel", "hideSystemPanel", "toggleSystemPanel", "showCalendar", "hideCalendar",
   "toggleAudioSelector", "hideAudioSelector", "restorePolkitPreviousOverlay",
   "systemProcessListsWanted", "sendSystemProcessRequest", "syncSystemProcessLists"];
@@ -21,13 +22,14 @@ const overlays = { AppLauncher: "appLauncherVisible", ChromeTabs: "chromeTabsVis
 const state = {
   Hyprland: { focusedMonitor: {name: "DP-2"}, monitors: {values: [{name: "DP-2"}, {name: "eDP-1"}]} },
   systemPanelVisible: false, systemTargetMonitor: "", calendarVisible: false, calendarTargetMonitor: "",
+  beeperVisible: false, beeperTargetMonitor: "", beeperFocusSerial: 0,
   audioSelectorVisible: false, audioTargetMonitor: "", voiceDictationActive: false,
   voiceDictationTargetMonitor: "DP-2", centerTransitionPending: false, centerTransitionSerial: 0,
   weatherData: { sessionCount: 0, beginCalendarSession() { this.sessionCount++; },
     refreshIfNeeded() {}, closeLocationSearch() {} }, calendarGoToday() {},
   polkitPreviousMode: "", polkitPreviousMonitor: "",
   polkitActive: false, notificationData: {
-    visible: false, targetMonitor: "DP-2", closeCount: 0,
+    visible: false, targetMonitor: "DP-2", closeCount: 0, inlinePresentation: false,
     close() { this.visible = false; this.closeCount++; }
   },
   systemData: {topRequestId:7},
@@ -140,4 +142,34 @@ assert.equal(state.weatherData.sessionCount, sessionsBefore + 1, "Restoring afte
 state.hideCalendar();
 state.showCalendar("DP-2");
 assert.equal(state.weatherData.sessionCount, sessionsBefore + 2, "Reopening must redetect the current location");
+state.showBeeper("DP-2");
+assert.equal(state.visibleCenterMode(), "beeper");
+assert.equal(state.beeperFocusSerial, 1);
+assert.ok(!state.calendarVisible && !state.systemPanelVisible);
+state.toggleBeeper("eDP-1");
+assert.ok(state.beeperVisible);
+assert.equal(state.beeperTargetMonitor, "eDP-1");
+assert.equal(state.beeperFocusSerial, 2);
+state.voiceDictationActive = true;
+state.voiceDictationTargetMonitor = "eDP-1";
+assert.equal(state.visibleCenterMode(), "beeper", "Dictation stays inside the composer");
+state.voiceDictationActive = false;
+state.notificationData.visible = true;
+state.notificationData.targetMonitor = "eDP-1";
+state.notificationData.inlinePresentation = true;
+assert.ok(!state.notificationCoversMonitor("eDP-1"), "Inline banners must not take over the messenger");
+state.notificationData.inlinePresentation = false;
+state.notificationData.visible = false;
+state.polkitPreviousMode = "beeper";
+state.polkitPreviousMonitor = "eDP-1";
+state.showSystemPanel("DP-2");
+assert.ok(!state.beeperVisible, "An explicit panel replaces the messenger presentation");
+state.restorePolkitPreviousOverlay();
+assert.equal(state.visibleCenterMode(), "beeper");
+assert.equal(state.beeperTargetMonitor, "eDP-1");
+state.toggleBeeper("eDP-1");
+assert.ok(!state.beeperVisible);
+state.polkitActive = true;
+state.showBeeper("DP-2");
+assert.ok(!state.beeperVisible, "A notification click must not replace a password prompt");
 console.log("PASS: system panel, overlay restoration and automatic weather location on calendar reopening");

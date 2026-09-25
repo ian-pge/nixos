@@ -36,3 +36,14 @@ var weatherSun = "#a6da95";
 var weatherRain = "#ed8796";
 var sideDate = "#8bd5ca";
 var sideTime = "#ed8796";
+
+// Messenger typography is independent from the compact top-bar widgets.
+var beeperFont = {
+  caption: 14, secondary: 15, control: 16, label: 17, body: 20,
+  title: 24, subheading: 28, heading: 30, hero: 38, icon: 28, illustration: 52
+};
+var beeperSenderColors = [
+  sideApplications, sideSystem, sideDisk, sideNotifications,
+  sideWeather, sideBrightness, error, sideBluetooth,
+  sideCpu, sideVolume, sideNetwork, sideUpdates
+];

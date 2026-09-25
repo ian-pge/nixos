@@ -50,7 +50,9 @@
     lib.concatMap (binding: [
       (mkBind
         (mainKey binding.key)
-        "hl.dsp.workspace.toggle_special(${toLua binding.workspace})"
+        (if binding.workspace == "Chat"
+         then mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleBeeper"
+         else "hl.dsp.workspace.toggle_special(${toLua binding.workspace})")
         {})
       (mkBind
         (mainKey "SHIFT + ${binding.key}")

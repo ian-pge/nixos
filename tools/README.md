@@ -17,6 +17,8 @@ commands through `localPackages`; Home Manager selects what to install.
 | `quickshell/chrome-tabs/` | `quickshell/chrome-tabs.nix` | Rust TabCtl adapter and local SQLite favicon cache |
 | `quickshell/speedtest/` | `quickshell/speedtest.nix` | Generation-tagged Ookla JSON streaming and cancellation |
 | `quickshell/weather/` | `quickshell/weather.nix` | Rust automatic location, current temperature and daily calendar weather |
+| `quickshell/beeper/` | `quickshell/beeper.nix` | Persistent Go Beeper API client, drafts, media and local notifications |
+| `../home_manager/quickshell/top-bar/` | `quickshell/beeper-preview.nix` | Standalone messenger design preview with fictional conversations |
 
 The GPU collector lives in `quickshell/gpu-monitor/` and directly loads the
 NVIDIA driver's NVML library; no upstream GPU executable or wrapper is needed.
@@ -59,6 +61,44 @@ Build commands individually with `nix build .#quickshellUpdateChecker` or
 `nix build .#quickshellBrightness`; see `packages/default.nix` and
 `packages/quickshell/update.nix` for the exported attributes. These builds do
 not activate the NixOS configuration.
+
+The Beeper backend is an independent Go module with pinned `go.mod` and
+`go.sum`. Its project `.envrc` selects `nix develop .#go`, which provides Go,
+gopls, Delve and golangci-lint without installing a global compiler. From the
+repository root:
+
+```sh
+nix develop .#go
+cd tools/quickshell/beeper
+go test ./...
+go build .
+```
+
+Build the installed, wrapped executable with `nix build .#quickshellBeeper`.
+Its wrapper supplies `secret-tool`, `wl-paste` and `xdg-open` at runtime;
+credentials stay in the system keyring. Source filtering includes only Go
+sources and module lockfiles, so local drafts and attachments cannot enter the
+Nix store. When dependencies change, set `vendorHash` in the Nix recipe to
+`lib.fakeHash`, build once, then replace it with the dependency hash reported
+by Nix. Home Manager launches one persistent
+backend through Quickshell; hiding the messenger does not stop notifications.
+For a local design review without Beeper, credentials, or a desktop rebuild,
+run `nix run .#quickshellBeeperPreview`. The preview uses the same QML components
+with fictional conversations and has no backend process.
+
+The messenger QML graph can also be compiled against a real Wayland backend
+without changing the desktop or connecting to Beeper:
+
+```sh
+node home_manager/quickshell/top-bar/tests/messenger-wayland_test.mjs /path/to/packaged/quickshell
+```
+
+Run this from the repository root with Node.js, Hyprland and D-Bus available
+(the `cpp` development shell supplies Node.js and Hyprland). The Quickshell
+executable must include the configured Qt Multimedia and Liquid Glass imports.
+The harness starts a minimal nested compositor and a private bus without desktop
+service activation, compiles the actual bar graph, then removes its temporary
+session. It does not load a compositor plugin or instantiate the messenger.
 
 Additional regression harnesses, after Cargo has built the update binaries:
 
