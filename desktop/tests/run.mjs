@@ -47,7 +47,7 @@ try {
   for (const file of ['audio-routes_test.mjs', 'calendar-navigation_test.mjs', 'capsule-content_test.mjs', 'launcher-logic_test.mjs', 'system-panel-state_test.mjs', 'workspaces_test.mjs', 'messenger-host_test.mjs']) {
     if (existsSync(path.join(here, file))) await run(process.execPath, [path.join(here, file)]);
   }
-  for (const file of ['tst_AcceleratedScroll.qml', 'tst_KeyedListModel.qml', 'tst_BeeperData.qml', 'tst_BeeperConnections.qml', 'tst_BeeperComposer.qml', 'tst_BeeperPanel.qml', 'tst_BeeperKeyboard.qml', 'tst_BeeperArchives.qml', 'tst_BeeperUnreadOrder.qml', 'tst_BeeperSearch.qml', 'tst_BeeperPagination.qml', 'tst_BeeperQuotes.qml', 'tst_BeeperMedia.qml', 'tst_BeeperVideo.qml', 'tst_BeeperBubble.qml',
+  for (const file of ['tst_AcceleratedScroll.qml', 'tst_KeyedListModel.qml', 'tst_BeeperData.qml', 'tst_BeeperConnections.qml', 'tst_BeeperComposer.qml', 'tst_BeeperPanel.qml', 'tst_BeeperKeyboard.qml', 'tst_BeeperArchives.qml', 'tst_BeeperUnreadOrder.qml', 'tst_BeeperSearch.qml', 'tst_BeeperPagination.qml', 'tst_BeeperQuotes.qml', 'tst_BeeperMedia.qml', 'tst_BeeperPeople.qml', 'tst_BeeperVideo.qml', 'tst_BeeperBubble.qml',
     'tst_MessengerController.qml', 'tst_LauncherControllers.qml', 'tst_NetworkControllers.qml',
     'tst_UpdateControllers.qml', 'tst_FeatureControllers.qml', 'tst_CollectorLifecycle.qml',
     'tst_ShellCoordinator.qml', 'tst_SystemData.qml',
@@ -75,7 +75,7 @@ try {
       env, /Messenger integration: all components compile/);
   } else console.log('SKIP Wayland graph compile: no Wayland display.');
   if (process.argv.includes('--wayland')) {
-    for (const mode of ['--avatar', '--bubble', '--media', '--host', '--desktop'])
+    for (const mode of ['--avatar', '--bubble', '--media', '--people', '--host', '--desktop'])
       await run(process.execPath, [path.join(here, 'messenger-wayland_test.mjs'), qs, mode], process.env);
   }
   console.log(`\nPASS: ${passed} desktop regression suites. Optional skips are listed above.`);

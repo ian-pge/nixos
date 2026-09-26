@@ -125,65 +125,97 @@ function senderProfile(message, chat, accounts) {
     imgURL: person?.imgURL || (!message.isSender && chat?.type === "single" ? chat.imgURL || "" : "")
   };
 }
+function participantProfile(id, chat, accounts, accountID) {
+  const person = (chat?.participants?.items || []).find(person => person.id === id);
+  const account = (accounts || []).find(account => (account.id || account.accountID) === (accountID || chat?.accountID));
+  const isSelf = person?.isSelf === true || (!!id && id === account?.user?.id);
+  const user = isSelf ? person || account?.user : person;
+  return {
+    id: id || "unknown-participant", isSelf: isSelf, anonymous: !id,
+    title: isSelf ? "You" : user?.fullName || user?.displayName || user?.username || user?.phoneNumber || id || "?",
+    // Only a known peer in a private chat may use that conversation's photo.
+    // Never put the group's or sender's picture on an unidentified reactor.
+    imgURL: user?.imgURL || (isSelf ? account?.user?.imgURL || "" : person && chat?.type === "single" ? chat.imgURL || "" : "")
+  };
+}
+function messageReactions(message, chat, accounts) {
+  const seen = new Set(), reactions = [];
+  for (const reaction of message?.reactions || []) {
+    const key = reaction.reactionKey || (typeof reaction.emoji === "string" ? reaction.emoji : "") || "♡";
+    const participantID = reaction.participantID || "";
+    const identity = JSON.stringify([participantID, key]);
+    if (participantID && seen.has(identity)) continue;
+    seen.add(identity);
+    reactions.push({key: key, imgURL: reaction.imgURL || "",
+      person: participantProfile(participantID, chat, accounts, message?.accountID),
+      // Older aggregate-only data cannot identify the people behind its count.
+      count: participantID ? 1 : Math.max(1, Number(reaction.count) || 1)});
+  }
+  return reactions;
+}
 function hasReadReceipt(value) {
   return value === true || (typeof value === "string" && value !== "" && !isNaN(Date.parse(value)));
 }
-function readReceiptLabel(message, chat, accounts) {
+function messageReaders(message, chat, accounts) {
   // Public API `seen`: boolean, ISO timestamp, or participant ID -> either.
   // Delivery success and our own unread marker do not identify any readers.
   const seen = message?.seen;
   const people = chat?.participants?.items || [];
-  const account = (accounts || []).find(account => (account.id || account.accountID) === (message?.accountID || chat?.accountID));
-  function isSelf(person, id) { return person?.isSelf === true || (!!id && id === account?.user?.id); }
-  function name(person, id) {
-    return person?.fullName || person?.displayName || person?.username || person?.phoneNumber || id;
-  }
   if (seen && typeof seen === "object" && !Array.isArray(seen)) {
     const readers = [];
     for (const id of Object.keys(seen)) {
       if (!hasReadReceipt(seen[id]) || id === message.senderID) continue;
-      const person = people.find(person => person.id === id);
-      if (isSelf(person, id)) continue;
-      readers.push(name(person, id));
+      const person = participantProfile(id, chat, accounts, message?.accountID);
+      if (!person.isSelf) readers.push(person);
     }
-    return readers.length ? "Read by " + readers.join(", ") : "";
+    return readers;
   }
-  if (!hasReadReceipt(seen)) return "";
-  if (!message.isSender) return "";
-  if (message.isSender && chat?.type === "single") {
-    const contact = people.find(person => person.isSelf === false && !isSelf(person, person.id));
-    const reader = contact ? name(contact, contact.id) : chat.title || chat.name;
-    if (reader) return "Read by " + reader;
+  if (!hasReadReceipt(seen) || !message.isSender) return [];
+  if (chat?.type === "single") {
+    const contact = people.find(person => person.isSelf === false
+      && !participantProfile(person.id, chat, accounts, message?.accountID).isSelf);
+    if (contact) return [participantProfile(contact.id, chat, accounts, message?.accountID)];
+    if (chat.title || chat.name) return [{id: "contact:" + (chat.id || ""),
+      title: chat.title || chat.name, imgURL: chat.imgURL || "", isSelf: false, anonymous: false}];
   }
-  return "Read";
+  return [{id: "unidentified-reader", title: "?", imgURL: "", isSelf: false, anonymous: true}];
 }
-function readReceiptLabels(messages, chat, accounts) {
-  const labels = {};
+function readersLabel(readers) {
+  return !readers?.length ? "" : readers[0].anonymous ? "Read" : "Read by " + readers.map(person => person.title).join(", ");
+}
+function readReceiptLabel(message, chat, accounts) { return readersLabel(messageReaders(message, chat, accounts)); }
+function readReceiptReaders(messages, chat, accounts) {
+  const readers = {};
   const account = (accounts || []).find(account => (account.id || account.accountID) === chat?.accountID);
   const cumulative = chat?.type === "single" && networkBadge(chat.network || account?.network).key === "telegram";
-  let latestReadTime = -Infinity, latestReadLabel = "";
+  let latestReadTime = -Infinity, latestReaders = [];
   function sent(message) {
     const status = message.sendStatus?.status || "";
     return message.isSender && status !== "PENDING" && !status.startsWith("FAIL");
   }
   function sentTime(message) { return message.timestamp ? new Date(message.timestamp).getTime() : NaN; }
   for (const message of messages) {
-    const label = readReceiptLabel(message, chat, accounts);
-    labels[message.id] = label;
+    const people = messageReaders(message, chat, accounts);
+    readers[message.id] = people;
     const timestamp = sentTime(message);
-    if (cumulative && sent(message) && label && timestamp > latestReadTime) {
-      latestReadTime = timestamp; latestReadLabel = label;
+    if (cumulative && sent(message) && people.length && timestamp > latestReadTime) {
+      latestReadTime = timestamp; latestReaders = people;
     }
   }
   // Telegram private-chat receipts mark history read through a message. Beeper
   // attaches the peer to that one message, not each earlier outgoing message.
   // Do not infer group readers, later messages, equal-time ordering, or delivery.
-  if (latestReadLabel) {
+  if (latestReaders.length) {
     for (const message of messages) {
-      if (sent(message) && !labels[message.id] && sentTime(message) < latestReadTime)
-        labels[message.id] = latestReadLabel;
+      if (sent(message) && !readers[message.id].length && sentTime(message) < latestReadTime)
+        readers[message.id] = latestReaders;
     }
   }
+  return readers;
+}
+function readReceiptLabels(messages, chat, accounts) {
+  const readers = readReceiptReaders(messages, chat, accounts), labels = {};
+  for (const id of Object.keys(readers)) labels[id] = readersLabel(readers[id]);
   return labels;
 }
 function assignSenderColors(previous, identities, palette) {

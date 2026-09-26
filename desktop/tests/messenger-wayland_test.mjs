@@ -1,5 +1,5 @@
 // Compile the real messenger/bar graph in an isolated Wayland session.
-// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--host|--desktop|--preview]
+// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--people|--host|--desktop|--preview]
 import assert from "node:assert/strict";
 import {spawn, spawnSync, execFile} from "node:child_process";
 import {mkdtemp, mkdir, readdir, readFile, rm, writeFile} from "node:fs/promises";
@@ -37,6 +37,7 @@ const quickshell = process.argv[2] || "qs";
 const renderAvatar = process.argv.includes("--avatar");
 const renderBubble = process.argv.includes("--bubble");
 const renderMedia = process.argv.includes("--media");
+const renderPeople = process.argv.includes("--people");
 const testHost = process.argv.includes("--host");
 const testDesktop = process.argv.includes("--desktop");
 const renderPreview = process.argv.includes("--preview");
@@ -117,6 +118,7 @@ try {
   }, "nested compositor readiness");
   assert.equal((await exec("hyprctl", ["configerrors"], {env, timeout: 2000})).stdout.trim(), "", "Nested compositor configuration must be valid");
   const testFile = renderAvatar ? "./tst_BeeperAvatar.qml" : renderBubble ? "./tst_BeeperBubble.qml" : renderMedia ? "./tst_BeeperMedia.qml"
+    : renderPeople ? "./tst_BeeperPeople.qml"
     : testHost ? "./tst_MessengerHost.qml" : testDesktop ? "./tst_DesktopComposition.qml"
     : renderPreview ? "../preview.qml" : "./messenger-load_test.qml";
   shell = spawn(quickshell, ["--path", path.join(here, testFile), "--no-color"], {env, detached: true});
@@ -124,7 +126,7 @@ try {
   await until(() => {
     if (compositor.exitCode !== null) throw new Error("Nested compositor exited during QML compilation");
     if (renderPreview && shell.exitCode === 0) return true;
-    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : /Messenger integration:/).test(shellLog)) return true;
+    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : /Messenger integration:/).test(shellLog)) return true;
     if (shell.exitCode !== null) throw new Error("Quickshell exited before reporting the compile result");
     return false;
   }, "messenger QML compilation");
@@ -133,7 +135,7 @@ try {
     assert.equal(report.expanded, true, shellLog);
     assert.equal(report.progress, Number(env.BEEPER_PREVIEW_PROGRESS || 1), shellLog);
   } else assert.match(shellLog, renderAvatar ? /BeeperAvatar: \d+ passed, 0 failed/
-    : renderBubble ? /BeeperBubble: \d+ passed, 0 failed/ : renderMedia ? /BeeperMedia: \d+ passed, 0 failed/ : testHost ? /MessengerHost: \d+ passed, 0 failed/
+    : renderBubble ? /BeeperBubble: \d+ passed, 0 failed/ : renderMedia ? /BeeperMedia: \d+ passed, 0 failed/ : renderPeople ? /BeeperPeople: \d+ passed, 0 failed/ : testHost ? /MessengerHost: \d+ passed, 0 failed/
     : testDesktop ? /DesktopComposition: \d+ passed, 0 failed/
     : /Messenger integration: all components compile/, shellLog);
   assert.doesNotMatch(shellLog, /(?:ERROR|TypeError|ReferenceError|Binding loop|Cannot assign|Unable to assign \[undefined\])/, shellLog);
@@ -141,6 +143,7 @@ try {
     ? "PASS: avatar photo is circular, network badge remains visible, contact fallback updates correctly"
     : renderBubble ? "PASS: independent bubble geometry, reversible animation and concurrent chat/audio focus"
     : renderMedia ? "PASS: message/media layout and native search highlight pixels"
+    : renderPeople ? "PASS: per-person reaction pills, reader avatars, wrapping and live profile updates"
     : testHost ? "PASS: MessengerHost layer surface, keyboard ownership, native dialogs and focus restoration"
     : testDesktop ? "PASS: complete desktop composition and real Bar instantiate with disabled services"
     : renderPreview ? "PASS: messenger preview rendered with the normal Wayland scene graph"

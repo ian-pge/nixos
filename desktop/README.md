@@ -278,10 +278,19 @@ switch or Escape invalidates late results and cancels further context paging.
 The messenger interface is English;
 conversation names and message content are not translated. Unread counts use circular
 badges in Catppuccin Macchiato Yellow (`#eed49f`). Message times sit at the bottom
-right inside each bubble. Read receipts appear below the bubble, resolving names
+right inside each bubble. Reactions appear on the left in rounded pills, each
+pairing one emoji (or custom reaction image) with that participant's 26 px circular
+photo. Identical emoji from different people remain separate. Read receipts use
+22 px circular photos below the bubble instead of visible names, resolving people
 from the public API's `seen` participant map (or the contact in a one-to-one chat).
-Missing receipts stay hidden; an anonymous receipt is labeled `Read` without
-guessing who read it. Delivery success alone never counts as a read receipt.
+Names remain available in tooltips and accessible labels. Missing photos use
+initials; unidentified people use a neutral placeholder, never the group or
+sender's picture. Aggregate-only reactions keep their count without inventing
+participants. Missing receipts stay hidden; an anonymous receipt gets a `?`
+avatar with a `Read · reader unavailable` tooltip. Delivery success alone never
+counts as a read receipt. Both rows wrap at narrow widths and follow text zoom;
+when a reaction and the timestamp cannot fit side by side, the time stays on the
+right of its own final row. Offscreen rows do not load these images.
 The current user's own receipts are hidden on every network; anonymous receipts
 on received messages are hidden too. Named readers use the same public API data
 on all networks, subject to what each bridge and conversation actually provide.

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
 import "../../ui/Theme.js" as Theme
@@ -19,8 +20,10 @@ Item {
   readonly property string highlightedBody: renderMedia ? Format.highlightText(plainBody, searchQuery, Theme.sideBrightness, Theme.background) : ""
   readonly property bool outgoing: !!message.isSender
   readonly property var sender: Format.senderProfile(message, beeperData?.currentChat, beeperData?.accounts)
-  readonly property string readReceipt: beeperData?.readReceiptLabels?.[message.id]
-    ?? Format.readReceiptLabel(message, beeperData?.currentChat, beeperData?.accounts)
+  readonly property var readers: beeperData?.readReceiptReaders?.[message.id]
+    ?? Format.messageReaders(message, beeperData?.currentChat, beeperData?.accounts)
+  readonly property string readReceipt: Format.readersLabel(readers)
+  readonly property var reactionPeople: Format.messageReactions(message, beeperData?.currentChat, beeperData?.accounts)
   readonly property bool groupMessage: beeperData?.currentChat?.type === "group"
   readonly property color senderColor: groupMessage
     ? (beeperData.senderColors[Format.senderKey(message)] || Theme.sideApplications)
@@ -52,7 +55,7 @@ Item {
     }
   }
   function forceMessageLayout() {
-    replyQuote.forceLayout(); metadata.forceLayout(); bubble.forceLayout(); contents.forceLayout();
+    replyQuote.forceLayout(); metadata.forceLayout(); bubble.forceLayout(); readerAvatars.forceLayout(); contents.forceLayout();
   }
   implicitHeight: contents.implicitHeight + 4
   MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton; onClicked: root.selectedRequested() }
@@ -177,7 +180,7 @@ Item {
           id: metadata
           objectName: "beeperMessageMeta"
           width: parent.width
-          readonly property bool hasReactions: !!root.message.reactions?.length
+          readonly property bool hasReactions: root.reactionPeople.length > 0
           readonly property real reactionWidth: {
             let width = 0, count = 0;
             for (const child of reactions.children) {
@@ -192,26 +195,90 @@ Item {
               if (child.objectName === "beeperMessageReaction") height = Math.max(height, child.implicitHeight);
             return height;
           }
+          readonly property real widestReaction: {
+            let width = 0;
+            for (const child of reactions.children)
+              if (child.objectName === "beeperMessageReaction") width = Math.max(width, child.implicitWidth);
+            return width;
+          }
+          readonly property bool separateTimeRow: hasReactions && width < widestReaction + messageDetails.implicitWidth + 12
           implicitWidth: messageDetails.implicitWidth + (hasReactions ? reactionWidth + 12 : 0)
-          implicitHeight: Math.max(hasReactions ? reactions.implicitHeight : 0, messageDetails.implicitHeight)
+          implicitHeight: separateTimeRow ? reactions.implicitHeight + 4 + messageDetails.implicitHeight
+            : Math.max(hasReactions ? reactions.implicitHeight : 0, messageDetails.implicitHeight)
           function forceLayout() { messageDetails.forceLayout(); reactions.forceLayout(); }
           Flow {
             id: reactions
             objectName: "beeperMessageReactions"
             visible: metadata.hasReactions
-            width: Math.max(0, parent.width - messageDetails.implicitWidth - 12)
+            width: Math.max(0, parent.width - (metadata.separateTimeRow ? 0 : messageDetails.implicitWidth + 12))
             layoutDirection: Qt.LeftToRight
             spacing: 8
             Repeater {
-              model: root.message.reactions || []
-              Text {
+              model: root.reactionPeople
+              Rectangle {
+                id: reactionChip
                 required property var modelData
                 objectName: "beeperMessageReaction"
+                readonly property string tooltipText: (modelData.person.anonymous ? "Participant unavailable" : modelData.person.title)
+                  + " · " + modelData.key + (modelData.count > 1 ? " × " + modelData.count : "")
+                implicitWidth: reactionContents.implicitWidth + 12
+                implicitHeight: reactionContents.implicitHeight + 8
+                width: Math.min(implicitWidth, reactions.width)
                 height: metadata.reactionLineHeight
-                verticalAlignment: Text.AlignVCenter
-                text: (modelData.reactionKey || modelData.emoji || "♡") + (modelData.count > 1 ? " " + modelData.count : "")
-                color: root.outgoing ? Theme.background : Theme.foreground
-                font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.body * root.textScale }
+                radius: height / 2
+                color: Qt.alpha(root.outgoing ? Theme.background : root.networkAccent, 0.16)
+                antialiasing: true
+                Accessible.role: Accessible.StaticText
+                Accessible.name: tooltipText
+                Row {
+                  id: reactionContents
+                  anchors.centerIn: parent
+                  spacing: 5
+                  Item {
+                    width: 26 * root.textScale
+                    height: reactionAvatar.height
+                    Text {
+                      objectName: "beeperReactionEmoji"
+                      anchors.centerIn: parent; width: parent.width
+                      visible: reactionImage.status !== Image.Ready
+                      text: reactionChip.modelData.key; textFormat: Text.PlainText
+                      horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+                      color: root.outgoing ? Theme.background : Theme.foreground
+                      font { family: "Ubuntu Nerd Font"; pixelSize: 22 * root.textScale }
+                    }
+                    Image {
+                      id: reactionImage
+                      objectName: "beeperReactionImage"
+                      anchors.fill: parent
+                      source: root.renderMedia ? Format.chatAvatarSource({imgURL: reactionChip.modelData.imgURL}) : ""
+                      sourceSize: Qt.size(width * 2, height * 2)
+                      visible: status === Image.Ready; asynchronous: true; fillMode: Image.PreserveAspectFit
+                    }
+                  }
+                  BeeperAvatar {
+                    id: reactionAvatar
+                    objectName: "beeperReactionAvatar"
+                    diameter: Math.round(26 * root.textScale); width: diameter; height: diameter
+                    chat: reactionChip.modelData.person
+                    imageEnabled: root.renderMedia
+                    accentBackground: root.outgoing
+                  }
+                  Text {
+                    visible: reactionChip.modelData.count > 1
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: reactionChip.modelData.count; textFormat: Text.PlainText
+                    color: root.outgoing ? Theme.background : Theme.foreground
+                    font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption * root.textScale }
+                  }
+                }
+                HoverHandler { id: reactionHover }
+                ToolTip {
+                  visible: reactionHover.hovered; delay: 350
+                  text: reactionChip.tooltipText
+                  contentItem: Text { text: reactionChip.tooltipText; textFormat: Text.PlainText; color: Theme.foreground; font.pixelSize: Theme.beeperFont.caption }
+                  palette.toolTipText: Theme.foreground
+                  background: Rectangle { radius: 8; color: Theme.surfaceRaised }
+                }
               }
             }
           }
@@ -219,7 +286,7 @@ Item {
             id: messageDetails
             anchors.right: parent.right
             // Align with the last reaction row when a narrow bubble wraps.
-            y: parent.height - (metadata.reactionLineHeight + height) / 2
+            y: metadata.separateTimeRow ? parent.height - height : parent.height - (metadata.reactionLineHeight + height) / 2
             layoutDirection: Qt.RightToLeft
             spacing: 8
             Text {
@@ -247,17 +314,36 @@ Item {
         antialiasing: true
       }
     }
-    Text {
+    Flow {
+      id: readerAvatars
       objectName: "beeperMessageReadReceipt"
       x: messageSurface.x
       width: messageSurface.width
-      visible: !!root.readReceipt
-      text: root.readReceipt
-      textFormat: Text.PlainText
-      wrapMode: Text.Wrap
-      horizontalAlignment: root.outgoing ? Text.AlignRight : Text.AlignLeft
-      color: Theme.secondary
-      font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption * root.textScale }
+      visible: root.readers.length > 0
+      layoutDirection: root.outgoing ? Qt.RightToLeft : Qt.LeftToRight
+      spacing: 4
+      Repeater {
+        model: root.readers
+        BeeperAvatar {
+          id: readerAvatar
+          required property var modelData
+          objectName: "beeperReaderAvatar"
+          readonly property string tooltipText: modelData.anonymous ? "Read · reader unavailable" : "Read by " + modelData.title
+          diameter: Math.round(22 * root.textScale); width: diameter; height: diameter
+          chat: modelData
+          imageEnabled: root.renderMedia
+          Accessible.role: Accessible.StaticText
+          Accessible.name: tooltipText
+          HoverHandler { id: readerHover }
+          ToolTip {
+            visible: readerHover.hovered; delay: 350
+            text: readerAvatar.tooltipText
+            contentItem: Text { text: readerAvatar.tooltipText; textFormat: Text.PlainText; color: Theme.foreground; font.pixelSize: Theme.beeperFont.caption }
+            palette.toolTipText: Theme.foreground
+            background: Rectangle { radius: 8; color: Theme.surfaceRaised }
+          }
+        }
+      }
     }
   }
 }

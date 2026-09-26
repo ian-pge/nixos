@@ -42,7 +42,7 @@ Scope {
   property real lastUnreadCountsAttempt: 0
   readonly property bool unreadCountsReady: demo || (unreadCountsLoaded && (!showArchived || archivedUnreadCountsLoaded))
   property var messages: []
-  readonly property var readReceiptLabels: Format.readReceiptLabels(messages, currentChat, accounts)
+  readonly property var readReceiptReaders: Format.readReceiptReaders(messages, currentChat, accounts)
   property var quotedMessages: ({})
   property var waveforms: ({})
   property var waveformQueue: []
@@ -617,7 +617,7 @@ Scope {
     demoMessages = {studio: [
       {id: "1", chatID: "studio", senderName: "Camille", text: "J’ai trouvé un petit atelier près du canal pour dimanche. Vous venez ?", timestamp: now.toISOString(), isSender: false},
       {id: "2", chatID: "studio", senderName: "Moi", text: "Oui ! Un carnet, un café, et rien de prévu. Ça me va très bien.", linkedMessageID: "1", timestamp: now.toISOString(), isSender: true, seen: {camille: true, noe: now.toISOString()}},
-      {id: "3", chatID: "studio", senderName: "Camille", text: "Exactement le programme 🌿", linkedMessageID: "2", timestamp: now.toISOString(), isSender: false, reactions: [{reactionKey: "♡", count: 2}]},
+      {id: "3", chatID: "studio", senderName: "Camille", text: "Exactement le programme 🌿", linkedMessageID: "2", timestamp: now.toISOString(), isSender: false, reactions: [{participantID: "self", reactionKey: "💜", emoji: true}, {participantID: "noe", reactionKey: "👍", emoji: true}]},
       {id: "4", chatID: "studio", senderName: "Noé", text: "Je vous rejoins vers 10 h. Je ramène les croissants !", timestamp: now.toISOString(), isSender: false}]};
     const illustration = '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#8aadf4"/><stop offset="1" stop-color="#f5bde6"/></linearGradient></defs><rect width="900" height="460" fill="url(#sky)"/><circle cx="685" cy="120" r="58" fill="#eed49f"/><path d="M0 285 Q180 220 400 285 T900 275 V460 H0Z" fill="#363a4f"/><path d="M0 315 Q240 260 410 320 T900 310 V460 H0Z" fill="#24273a"/><path d="M270 460 L455 292 L495 292 L655 460Z" fill="#91d7e3" opacity=".75"/><path d="M0 365 Q190 320 285 348 L205 460 H0Z" fill="#a6da95"/><path d="M675 460 L585 340 Q775 290 900 325 V460Z" fill="#8bd5ca"/><text x="40" y="70" fill="#24273a" font-family="sans-serif" font-size="17" letter-spacing="4">DIMANCHE AU CANAL</text></svg>';
     demoMessages.studio.splice(1, 0, {id: "photo", chatID: "studio", senderName: "Camille", text: "Le coin idéal pour une pause.", isSender: false, attachments: [{id: "demo-image", type: "img", mimeType: "image/svg+xml", fileName: "illustration-du-canal.svg", srcURL: "data:image/svg+xml;charset=utf-8," + encodeURIComponent(illustration)}]});
