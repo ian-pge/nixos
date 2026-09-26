@@ -90,7 +90,7 @@ try {
         try { status = JSON.parse(await ctl("liquidglass")); return status.frames >= 10 || !status.enabled; } catch { return false; }
     }, "glass frames");
     assert.equal(status.enabled, true, JSON.stringify(status));
-    const widgetConfig = path.resolve(here, "../../../home_manager/quickshell/top-bar/glass-test.qml");
+    const widgetConfig = path.resolve(here, "../../../desktop/glass-test.qml");
     const widgetEnv = {...env, LIQUID_GLASS_TEST:"1"};
     widget = spawn("qs", ["-p", widgetConfig], {env:widgetEnv, detached:true});
     for (const stream of [widget.stdout, widget.stderr]) stream.on("data", data => { sceneLog += data; });

@@ -105,6 +105,149 @@ func TestPublicRoutesPreservePaginationAndEscapedIDs(t *testing.T) {
 		t.Fatal("lost pagination")
 	}
 }
+func TestConversationSearchPreservesQueryScopeAndOpaquePagination(t *testing.T) {
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/messages/search" {
+			t.Errorf("unexpected search route: %s %s", r.Method, r.URL.Path)
+		}
+		q := r.URL.Query()
+		if q.Get("query") != "été café + / &" || q.Get("chatIDs") != "chat/#" {
+			t.Errorf("query or conversation changed: %#v", q)
+		}
+		if q.Get("cursor") != "opaque +/&=" || q.Get("direction") != "before" {
+			t.Errorf("pagination changed: %#v", q)
+		}
+		if q.Get("excludeLowPriority") != "false" || q.Get("includeMuted") != "true" {
+			t.Errorf("explicit chat search must include muted and low-priority conversations: %#v", q)
+		}
+		jsonResponse(w, object{"items": []object{{"id": "match", "chatID": "chat/#", "text": "été café"}}, "hasMore": true, "oldestCursor": "next opaque"})
+	})
+	result, err := b.handle(b.ctx, "search", parameters{ChatID: "chat/#", Query: "été café + / &", Cursor: "opaque +/&=", Direction: "before"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page object
+	if err := json.Unmarshal(result.(json.RawMessage), &page); err != nil {
+		t.Fatal(err)
+	}
+	if !boolField(page, "hasMore") || textField(page, "oldestCursor") != "next opaque" {
+		t.Fatal("search pagination was lost")
+	}
+}
+func TestUnreadUsesPublicRouteAndPreservesManualFlag(t *testing.T) {
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.EscapedPath() != "/v1/chats/chat%2F%23/unread" {
+			t.Errorf("unexpected unread route: %s %s", r.Method, r.URL.EscapedPath())
+		}
+		var body object
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body) != 0 {
+			t.Errorf("marking a conversation unread needs an empty body: %#v, %v", body, err)
+		}
+		jsonResponse(w, object{"id": "chat/#", "unreadCount": 0, "isMarkedUnread": true})
+	})
+	r, err := b.handle(b.ctx, "unread", parameters{ChatID: "chat/#"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chat object
+	if err := json.Unmarshal(r.(json.RawMessage), &chat); err != nil {
+		t.Fatal(err)
+	}
+	if !boolField(chat, "isMarkedUnread") || chat["unreadCount"] != float64(0) {
+		t.Fatal("the manual unread flag must survive without manufacturing unread messages")
+	}
+}
+
+func TestDemoUnreadPreservesMessageReceiptsAndCount(t *testing.T) {
+	b, err := newBackend(context.Background(), io.Discard, t.TempDir(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat := b.demoChats[0]
+	chatID := textField(chat, "id")
+	chat["unreadCount"] = 0
+	b.demoMessages[chatID] = []object{{"id": "already-read", "isUnread": false, "seen": true}}
+	if _, err := b.handle(b.ctx, "unread", parameters{ChatID: chatID}); err != nil {
+		t.Fatal(err)
+	}
+	if !boolField(chat, "isMarkedUnread") || chat["unreadCount"] != 0 {
+		t.Fatal("manual unread must not change the count")
+	}
+	message := b.demoMessages[chatID][0]
+	if boolField(message, "isUnread") || !boolField(message, "seen") {
+		t.Fatal("manual unread must not rewrite message receipts")
+	}
+	if _, err := b.handle(b.ctx, "read", parameters{ChatID: chatID}); err != nil {
+		t.Fatal(err)
+	}
+	if boolField(chat, "isMarkedUnread") {
+		t.Fatal("marking read must clear the manual unread flag")
+	}
+}
+
+func TestReadUsesExplicitBoundaryAndSetViewDoesNotRead(t *testing.T) {
+	for _, messageID := range []string{"", "message/#"} {
+		t.Run("through="+messageID, func(t *testing.T) {
+			var calls atomic.Int32
+			b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				if r.Method != http.MethodPost || r.URL.EscapedPath() != "/v1/chats/chat%2F%23/read" {
+					t.Errorf("unexpected read route: %s %s", r.Method, r.URL.EscapedPath())
+				}
+				var body object
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
+				}
+				if textField(body, "messageID") != messageID {
+					t.Errorf("read boundary changed: %#v", body)
+				}
+				if messageID == "" && len(body) != 0 {
+					t.Errorf("manual read should cover the whole chat: %#v", body)
+				}
+				jsonResponse(w, object{"id": "chat/#", "unreadCount": 0})
+			})
+			if _, err := b.handle(b.ctx, "setView", parameters{ChatID: "chat/#", Focused: true, AtLatest: true}); err != nil {
+				t.Fatal(err)
+			}
+			if calls.Load() != 0 {
+				t.Fatal("viewing a chat must not send a read receipt")
+			}
+			if _, err := b.handle(b.ctx, "read", parameters{ChatID: "chat/#", MessageID: messageID}); err != nil {
+				t.Fatal(err)
+			}
+			if calls.Load() != 1 {
+				t.Fatalf("expected one explicit read request, got %d", calls.Load())
+			}
+		})
+	}
+}
+
+func TestDemoReadBoundaryKeepsLaterIncomingMessagesUnread(t *testing.T) {
+	b, err := newBackend(context.Background(), io.Discard, t.TempDir(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chatID := textField(b.demoChats[0], "id")
+	b.demoChats[0]["isMarkedUnread"] = true
+	b.demoMessages[chatID] = []object{
+		{"id": "answered", "isUnread": true},
+		{"id": "reply", "isSender": true},
+		{"id": "new-arrival", "isUnread": true},
+	}
+	if _, err := b.handle(b.ctx, "read", parameters{ChatID: chatID, MessageID: "answered"}); err != nil {
+		t.Fatal(err)
+	}
+	if b.demoChats[0]["unreadCount"] != 1 || boolField(b.demoChats[0], "isMarkedUnread") {
+		t.Fatal("a reply must keep the later arrival unread and clear the manual unread flag")
+	}
+	if _, err := b.handle(b.ctx, "read", parameters{ChatID: chatID}); err != nil {
+		t.Fatal(err)
+	}
+	if b.demoChats[0]["unreadCount"] != 0 {
+		t.Fatal("manual read must clear all unread messages")
+	}
+}
+
 func TestSendNeverRetriesAnUncertainResult(t *testing.T) {
 	var calls atomic.Int32
 	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
@@ -118,6 +261,26 @@ func TestSendNeverRetriesAnUncertainResult(t *testing.T) {
 	}
 	if calls.Load() != 1 {
 		t.Fatalf("a mutation was repeated %d times", calls.Load())
+	}
+}
+
+func TestRetrieveQuotedMessageUsesPublicRouteAndPlainText(t *testing.T) {
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.EscapedPath() != "/v1/chats/chat%2F%23/messages/$original%2F%23" {
+			t.Errorf("unexpected message route %s %s", r.Method, r.URL.EscapedPath())
+		}
+		jsonResponse(w, object{"id": "$original/#", "chatID": "chat/#", "senderName": "Camille", "text": "<b>Quoted text</b> 🌿"})
+	})
+	r, err := b.handle(b.ctx, "message", parameters{ChatID: "chat/#", MessageID: "$original/#"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var message object
+	if json.Unmarshal(r.(json.RawMessage), &message) != nil {
+		t.Fatal("invalid message result")
+	}
+	if textField(message, "plainText") != "Quoted text 🌿" || textField(message, "senderName") != "Camille" {
+		t.Fatalf("quote lost original content or sender: %v", message)
 	}
 }
 
@@ -321,7 +484,7 @@ func (n *fakeNotifications) send(title, body, icon string, target object, silent
 }
 func (n *fakeNotifications) close()     {}
 func (n *fakeNotifications) count() int { n.mu.Lock(); defer n.mu.Unlock(); return len(n.items) }
-func TestNotificationsAreDurableAndRespectVisibilityAndMute(t *testing.T) {
+func TestNotificationsAreDurableAndKeepSoundForVisibleChats(t *testing.T) {
 	var isMuted atomic.Bool
 	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, object{"id": "chat", "title": "Camille", "isMuted": isMuted.Load()})
@@ -348,17 +511,17 @@ func TestNotificationsAreDurableAndRespectVisibilityAndMute(t *testing.T) {
 	}
 	b.view = parameters{ChatID: "chat", Focused: true, AtLatest: true}
 	b.considerMessage(b.ctx, "chat", m("two"), since)
-	if n.count() != 1 {
-		t.Fatal("visible message notified")
+	if n.count() != 2 || n.items[1].silent {
+		t.Fatal("the visible chat must still produce an audible arrival for the shell")
 	}
 	b.view.Focused = false
 	b.considerMessage(b.ctx, "chat", m("three"), since)
-	if n.count() != 2 {
+	if n.count() != 3 || n.items[2].silent {
 		t.Fatal("background view suppressed notification")
 	}
 	isMuted.Store(true)
 	b.considerMessage(b.ctx, "chat", m("four"), since)
-	if n.count() != 2 {
+	if n.count() != 3 {
 		t.Fatal("muted chat notified")
 	}
 }

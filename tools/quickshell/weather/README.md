@@ -93,7 +93,7 @@ nix build --no-link .#quickshellWeather
 
 Tests use local fixtures and isolated temporary caches, never live weather APIs.
 `--help` does not access the network. The QML calendar and weather-state tests live
-under `home_manager/quickshell/top-bar/tests/`.
+under `desktop/tests/`; the frontend sources are in `desktop/features/calendar/`.
 
 Sources: [fwd.gr IP API](https://fwd.gr/tools/ip-api),
 [Open-Meteo Forecast API](https://open-meteo.com/en/docs).

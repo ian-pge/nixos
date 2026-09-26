@@ -18,7 +18,12 @@ commands through `localPackages`; Home Manager selects what to install.
 | `quickshell/speedtest/` | `quickshell/speedtest.nix` | Generation-tagged Ookla JSON streaming and cancellation |
 | `quickshell/weather/` | `quickshell/weather.nix` | Rust automatic location, current temperature and daily calendar weather |
 | `quickshell/beeper/` | `quickshell/beeper.nix` | Persistent Go Beeper API client, drafts, media and local notifications |
-| `../home_manager/quickshell/top-bar/` | `quickshell/beeper-preview.nix` | Standalone messenger design preview with fictional conversations |
+| `../desktop/features/messenger/` | `quickshell/beeper-preview.nix` | Standalone messenger design preview with fictional conversations |
+
+The QML application lives in [`../desktop/`](../desktop/README.md); backend
+sources stay here. `packages/quickshell/runtime.nix` supplies the shared wrapped
+Quickshell runtime, and `desktop.nix` packages the QML sources. Home Manager only
+installs, configures and starts them; the preview uses that same runtime.
 
 The GPU collector lives in `quickshell/gpu-monitor/` and directly loads the
 NVIDIA driver's NVML library; no upstream GPU executable or wrapper is needed.
@@ -48,7 +53,7 @@ The system and GPU collectors share the central panel's demand-driven stdin
 protocol: process top fives are collected every two seconds only while the
 panel is visible; the ordinary bubble telemetry continues every second.
 After building both Cargo binaries, run
-`node home_manager/quickshell/top-bar/tests/system-process-streams_test.mjs`
+`node desktop/tests/system-process-streams_test.mjs`
 from the repository root to check subscription, cadence and pipe lifetime.
 
 The existing `tools/.envrc` selects that shell when direnv is enabled. There is
@@ -90,7 +95,7 @@ The messenger QML graph can also be compiled against a real Wayland backend
 without changing the desktop or connecting to Beeper:
 
 ```sh
-node home_manager/quickshell/top-bar/tests/messenger-wayland_test.mjs /path/to/packaged/quickshell
+node desktop/tests/messenger-wayland_test.mjs /path/to/packaged/quickshell
 ```
 
 Run this from the repository root with Node.js, Hyprland and D-Bus available

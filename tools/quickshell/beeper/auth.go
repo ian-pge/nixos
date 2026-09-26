@@ -79,7 +79,7 @@ func (secretCredentialStore) Load(ctx context.Context) (string, error) {
 }
 
 func (secretCredentialStore) Store(ctx context.Context, token string) error {
-	cmd := exec.CommandContext(ctx, "secret-tool", "store", "--label=Quickshell · API Beeper", "application", "quickshell-beeper", "service", "beeper-api")
+	cmd := exec.CommandContext(ctx, "secret-tool", "store", "--label=Quickshell · Beeper API", "application", "quickshell-beeper", "service", "beeper-api")
 	cmd.Stdin = strings.NewReader(token)
 	return cmd.Run()
 }
@@ -134,7 +134,7 @@ func (b *backend) initialize() {
 	b.restoringCredentials = true
 	b.mu.Unlock()
 	defer func() { b.mu.Lock(); b.restoringCredentials = false; b.mu.Unlock() }()
-	b.credentialStatus("loading-token", "Récupération de l’accès enregistré…")
+	b.credentialStatus("loading-token", "Restoring your saved access token…")
 	for b.ctx.Err() == nil {
 		b.mu.Lock()
 		configured := b.client != nil
@@ -158,12 +158,12 @@ func (b *backend) initialize() {
 		}
 		delay := b.credentialRetryDelay
 		if err == nil || errors.Is(err, errCredentialMissing) {
-			b.credentialStatus("needs-token", "Aucun jeton Beeper n’est enregistré dans le trousseau.")
+			b.credentialStatus("needs-token", "No Beeper token is saved in the keyring.")
 			delay = 30 * time.Second
 		} else if errors.Is(err, errCredentialLocked) {
-			b.credentialStatus("keyring-unavailable", "Déverrouille le trousseau GNOME. La connexion reprendra automatiquement.")
+			b.credentialStatus("keyring-unavailable", "Unlock the GNOME keyring. The connection will resume automatically.")
 		} else {
-			b.credentialStatus("keyring-unavailable", "Le trousseau est temporairement indisponible. Nouvelle tentative automatique…")
+			b.credentialStatus("keyring-unavailable", "The keyring is temporarily unavailable. Retrying automatically…")
 		}
 		timer := time.NewTimer(delay)
 		select {
@@ -185,7 +185,7 @@ func (b *backend) reconnect() {
 		b.installClient(token, true)
 		return
 	}
-	b.credentialStatus("loading-token", "Récupération de l’accès enregistré…")
+	b.credentialStatus("loading-token", "Restoring your saved access token…")
 	b.wakeCredentials()
 	go b.initialize()
 }

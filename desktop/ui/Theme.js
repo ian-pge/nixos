@@ -1,0 +1,55 @@
+.pragma library
+
+// Semantic palette: pink is interaction, yellow is persistent/live state.
+var action = "#ff33cc";
+var state = "#ffcc33";
+var error = "#ed8796";
+
+var foreground = "#cad3f5";
+var selectedForeground = "#ffffff";
+var secondary = "#939ab7";
+var inactive = "#6e738d";
+
+var background = "#181926";
+var surface = "#24273a";
+var surfaceRaised = "#363a4f";
+var surfaceSelected = "#494d64";
+
+// Fixed Catppuccin accents shared by side capsules and paired central controls.
+var sideApplications = "#7dc4e4";
+var sideUpdates = "#f0c6c6";
+var sideNetwork = "#ee99a0";
+var sideBluetooth = "#8aadf4";
+var sideNotifications = "#a6da95";
+var sideSystem = "#c6a0f6";
+var sideDisk = "#f5a97f";
+var sideCpu = "#91d7e3";
+var sideMemory = "#c6a0f6";
+var sideGpu = "#a6da95";
+var sideBattery = "#f4dbd6";
+var batteryPluggedIn = "#a6da95";
+var sideVolume = "#b7bdf8";
+var sideBrightness = "#eed49f";
+var sideWeather = "#f5bde6";
+var calendarSelected = "#f5a97f";
+var weatherSun = "#a6da95";
+var weatherRain = "#ed8796";
+var sideDate = "#8bd5ca";
+var sideTime = "#ed8796";
+
+// Messenger typography is independent from the compact top-bar widgets.
+var beeperUnread = "#eed49f";
+var beeperFont = {
+  caption: 14, secondary: 15, control: 16, label: 17, body: 20,
+  title: 24, subheading: 28, heading: 30, hero: 38, icon: 28, illustration: 52
+};
+var beeperSenderColors = [
+  sideApplications, sideSystem, sideDisk, sideNotifications,
+  sideWeather, sideBrightness, error, sideBluetooth,
+  sideCpu, sideVolume, sideNetwork, sideUpdates
+];
+var beeperNetworkColors = {
+  // Catppuccin Macchiato: Mauve, Green, Sapphire, Blue, Pink and Teal.
+  all: sideSystem, whatsapp: sideNotifications, telegram: sideApplications,
+  signal: sideBluetooth, instagram: sideWeather, sms: sideDate
+};

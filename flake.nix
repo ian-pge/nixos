@@ -50,6 +50,7 @@
       rust = import ./dev-shells/rust.nix {inherit pkgs;};
       cpp = import ./dev-shells/cpp.nix {inherit pkgs;};
       go = import ./dev-shells/go.nix {inherit pkgs;};
+      desktop = import ./dev-shells/desktop.nix {inherit pkgs localPackages;};
       threejs = import ./dev-shells/threejs.nix {inherit pkgs;};
     };
 

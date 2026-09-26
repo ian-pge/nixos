@@ -37,8 +37,15 @@ in {
     (utilityWindowRule "dev\\.me\\.bluetooth" 600 800)
   ];
 
-  layer_rule = {
-    match.namespace = "launcher";
-    dim_around = true;
-  };
+  layer_rule = [
+    {
+      match.namespace = "launcher";
+      dim_around = true;
+    }
+    {
+      match.namespace = "quickshell-messenger-photo";
+      blur = true;
+      ignore_alpha = 0;
+    }
+  ];
 }

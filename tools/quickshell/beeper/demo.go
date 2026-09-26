@@ -48,6 +48,23 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		return []object{{"accountID": "demo-signal", "network": "Signal", "user": object{"id": "demo-self", "fullName": "Moi"}}, {"accountID": "demo-whatsapp", "network": "WhatsApp", "user": object{"id": "demo-self", "fullName": "Moi"}}}, nil
 	case "chats":
 		return demoPage(b.demoChats), nil
+	case "unreadCounts":
+		counts := map[string]int{}
+		allCounts := map[string]int{}
+		archivedCounts := map[string]int{}
+		for _, chat := range b.demoChats {
+			count, _ := chat["unreadCount"].(int)
+			if count > 0 || boolField(chat, "isMarkedUnread") {
+				allCounts[textField(chat, "network")]++
+				if boolField(chat, "isArchived") {
+					archivedCounts[textField(chat, "network")]++
+				}
+			}
+			if countsAsUnread(boolField(chat, "isArchived"), boolField(chat, "isMarkedUnread"), count) {
+				counts[textField(chat, "network")]++
+			}
+		}
+		return object{"counts": counts, "allCounts": allCounts, "archivedCounts": archivedCounts}, nil
 	case "messages":
 		return demoPage(b.demoMessages[p.ChatID]), nil
 	case "contacts":
@@ -67,7 +84,7 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		return demoPage(items), nil
 	case "send":
 		if strings.TrimSpace(p.Text) == "" && p.Attachment == nil {
-			return nil, fail("empty_message", "Le message est vide.")
+			return nil, fail("empty_message", "The message is empty.")
 		}
 		id := fmt.Sprintf("demo-send-%d", time.Now().UnixNano())
 		now := time.Now().Format(time.RFC3339Nano)
@@ -104,20 +121,52 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		}
 		b.emit("messagesChanged", object{"chatID": p.ChatID})
 		return object{}, nil
-	case "read", "updateChat":
+	case "read", "unread", "archive", "updateChat":
+		if method == "archive" && (p.ChatID == "" || p.Archived == nil) {
+			return nil, fail("invalid_params", "Specify the conversation and archive state.")
+		}
+		var result object
 		for _, chat := range b.demoChats {
 			if textField(chat, "id") == p.ChatID {
 				if method == "read" {
-					chat["unreadCount"] = 0
+					rows := b.demoMessages[p.ChatID]
+					boundary := len(rows) - 1
+					if p.MessageID != "" {
+						boundary = -1
+						for i, message := range rows {
+							if textField(message, "id") == p.MessageID {
+								boundary = i
+								break
+							}
+						}
+						if boundary < 0 {
+							return nil, fail("not_found", "The read boundary is unavailable.")
+						}
+					}
+					unread := 0
+					for i, message := range rows {
+						if i <= boundary {
+							message["isUnread"] = false
+						} else if !boolField(message, "isSender") && message["isUnread"] != false {
+							unread++
+						}
+					}
+					chat["unreadCount"] = unread
+					chat["isMarkedUnread"] = false
+				} else if method == "unread" {
+					chat["isMarkedUnread"] = true
+				} else if method == "archive" {
+					chat["isArchived"] = *p.Archived
 				} else {
 					for key, value := range p.Changes {
 						chat[key] = value
 					}
 				}
+				result = chat
 			}
 		}
 		b.emit("chatsChanged", object{})
-		return object{}, nil
+		return result, nil
 	case "startChat":
 		id := fmt.Sprintf("demo-chat-%d", time.Now().UnixNano())
 		chat := object{"id": id, "chatID": id, "title": "Alex (fictif)", "network": "Signal", "accountID": p.AccountID, "unreadCount": 0, "type": "single"}
@@ -126,14 +175,14 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		b.emit("chatsChanged", object{})
 		return chat, nil
 	case "download", "upload":
-		return nil, fail("demo", "Les fichiers réels sont désactivés dans la démonstration.")
+		return nil, fail("demo", "Real files are disabled in the demo.")
 	case "message":
 		for _, m := range b.demoMessages[p.ChatID] {
 			if textField(m, "id") == p.MessageID {
 				return m, nil
 			}
 		}
-		return nil, fail("not_found", "Message introuvable.")
+		return nil, fail("not_found", "Message not found.")
 	}
-	return nil, fail("unknown_method", "Commande inconnue.")
+	return nil, fail("unknown_method", "Unknown command.")
 }

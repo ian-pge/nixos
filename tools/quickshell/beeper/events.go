@@ -55,7 +55,7 @@ func (b *backend) runStream(ctx context.Context, c *beeper.Client, token string)
 					response.Body.Close()
 				}
 				if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
-					err = fail("unauthorized", "Beeper refuse l’accès avec le jeton enregistré.")
+					err = fail("unauthorized", "Beeper rejected access with the saved token.")
 				}
 			}
 			if err == nil {
@@ -65,10 +65,10 @@ func (b *backend) runStream(ctx context.Context, c *beeper.Client, token string)
 				err = conn.WriteJSON(object{"type": "subscriptions.set", "requestID": "quickshell", "chatIDs": []string{"*"}})
 				if err == nil {
 					if syncErr := b.resync(ctx, c, !first, lastConnected); syncErr != nil {
-						b.emit("warning", object{"message": "La synchronisation HTTP a échoué. Les mises à jour seront retentées."})
+						b.emit("warning", object{"message": "Synchronization failed. Updates will be retried."})
 					}
 					if ctx.Err() == nil {
-						b.statusForContext(ctx, "connected", "Connecté à Beeper")
+						b.statusForContext(ctx, "connected", "Connected to Beeper")
 					}
 					first = false
 					backoff = time.Second
@@ -83,9 +83,9 @@ func (b *backend) runStream(ctx context.Context, c *beeper.Client, token string)
 			return
 		}
 		if err != nil && safeError(err).Code == "unauthorized" {
-			b.statusForContext(ctx, "invalid-token", "Beeper refuse l’accès avec le jeton enregistré. Vérifie la connexion autorisée dans Beeper.")
+			b.statusForContext(ctx, "invalid-token", "Beeper rejected the saved token. Check the approved connection in Beeper.")
 		} else {
-			b.statusForContext(ctx, "offline", "Beeper est indisponible. Reconnexion automatique avec l’accès enregistré…")
+			b.statusForContext(ctx, "offline", "Beeper is unavailable. Reconnecting automatically with your saved token…")
 		}
 		select {
 		case <-ctx.Done():
@@ -221,7 +221,7 @@ func (b *backend) resync(ctx context.Context, c *beeper.Client, summary bool, si
 		seenCursors[cursor] = true
 	}
 	if summary && chats > 0 && b.notifications != nil {
-		b.notifications.send("Messages reçus pendant la coupure", fmt.Sprintf("%d message(s) non lu(s) dans %d conversation(s)", messages, chats), "", object{}, true)
+		b.notifications.send("Messages received while disconnected", fmt.Sprintf("%d unread message(s) in %d conversation(s)", messages, chats), "", object{}, true)
 	}
 	b.emit("chatsChanged", object{})
 	b.mu.Lock()
@@ -264,9 +264,10 @@ func (b *backend) considerMessage(ctx context.Context, chatID string, m object, 
 	_, seen := b.state.Seen[key]
 	b.state.Seen[key] = time.Now().Unix()
 	err := b.persistLocked()
-	view := b.view
 	b.mu.Unlock()
-	if seen || err != nil || !notificationCandidate(m, since) || (view.ChatID == chatID && view.Focused && view.AtLatest) || b.notifications == nil {
+	// The shell suppresses chat banners while open but still plays the sound,
+	// including for the focused conversation. Do not discard that arrival here.
+	if seen || err != nil || !notificationCandidate(m, since) || b.notifications == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -285,7 +286,7 @@ func (b *backend) considerMessage(ctx context.Context, chatID string, m object, 
 		title = name + " · " + title
 	}
 	if title == "" {
-		title = "Nouveau message"
+		title = "New message"
 	}
 	body := plainText(textField(m, "text"))
 	if body == "" {
@@ -293,13 +294,13 @@ func (b *backend) considerMessage(ctx context.Context, chatID string, m object, 
 		case "IMAGE":
 			body = "Image"
 		case "VOICE":
-			body = "Message vocal"
+			body = "Voice message"
 		case "VIDEO":
-			body = "Vidéo"
+			body = "Video"
 		case "STICKER":
 			body = "Sticker"
 		default:
-			body = "Pièce jointe"
+			body = "Attachment"
 		}
 	}
 	if r := []rune(body); len(r) > 240 {
@@ -436,9 +437,9 @@ func (n *notifier) send(title, body, icon string, target object, silent bool) {
 	}
 	// Quickshell advertises plain text: entities would otherwise be visible in
 	// ordinary messages such as "L'atelier & le café".
-	err := server.CallWithContext(ctx, "org.freedesktop.Notifications.Notify", 0, "Messages", uint32(0), icon, title, body, []string{"default", "Ouvrir"}, hints, int32(-1)).Store(&id)
+	err := server.CallWithContext(ctx, "org.freedesktop.Notifications.Notify", 0, "Messages", uint32(0), icon, title, body, []string{"default", "Open"}, hints, int32(-1)).Store(&id)
 	if err != nil {
-		n.emit("warning", object{"message": "Impossible d’afficher la notification."})
+		n.emit("warning", object{"message": "Could not display the notification."})
 		return
 	}
 	n.mu.Lock()

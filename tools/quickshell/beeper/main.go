@@ -50,6 +50,7 @@ type parameters struct {
 	ReplyToMessageID string      `json:"replyToMessageID"`
 	ReactionKey      string      `json:"reactionKey"`
 	Remove           bool        `json:"remove"`
+	Archived         *bool       `json:"archived"`
 	Attachment       *attachment `json:"attachment"`
 	Changes          object      `json:"changes"`
 	Path             string      `json:"path"`
@@ -83,6 +84,7 @@ type backend struct {
 	pendingActive        map[string]bool
 	notifications        notificationSink
 	started              time.Time
+	waveformCache        map[string]waveformResult
 }
 
 func main() {
@@ -104,11 +106,11 @@ func main() {
 	if !*demo {
 		b.notifications, err = newNotifier(ctx, b.emit)
 		if err != nil {
-			b.emit("warning", object{"message": "Notifications indisponibles : connexion D-Bus impossible."})
+			b.emit("warning", object{"message": "Notifications unavailable: could not connect to D-Bus."})
 		}
 		go b.initialize()
 	} else {
-		b.status("demo", "Démonstration · conversations fictives")
+		b.status("demo", "Demo · fictional conversations")
 	}
 	go func() { <-ctx.Done(); os.Stdin.Close() }()
 	if err := b.serve(os.Stdin); err != nil {
@@ -122,7 +124,7 @@ func main() {
 
 func newBackend(ctx context.Context, out io.Writer, dir string, demo bool) (*backend, error) {
 	b := &backend{ctx: ctx, out: out, stateDir: dir, demo: demo, started: time.Now(),
-		stateName: "loading-token", stateMessage: "Récupération de l’accès enregistré…", stateRevision: 1,
+		stateName: "loading-token", stateMessage: "Restoring your saved access token…", stateRevision: 1,
 		credentials: secretCredentialStore{}, credentialWake: make(chan struct{}, 1), credentialRetryDelay: 3 * time.Second,
 		baseURL: "http://localhost:23373/"}
 	if raw := os.Getenv("BEEPER_API_URL"); raw != "" {
@@ -154,6 +156,7 @@ func (b *backend) serve(in io.Reader) error {
 	var jobs sync.WaitGroup
 	defer jobs.Wait()
 	slots := make(chan struct{}, 8)
+	waveSlots := make(chan struct{}, 2)
 	respond := func(req request, p parameters) {
 		ctx, cancel := context.WithTimeout(b.ctx, 90*time.Second)
 		defer cancel()
@@ -169,13 +172,13 @@ func (b *backend) serve(in io.Reader) error {
 	for s.Scan() {
 		var req request
 		if err := json.Unmarshal(s.Bytes(), &req); err != nil || len(req.ID) == 0 || req.Method == "" {
-			b.write(object{"id": nil, "error": &rpcError{"invalid_request", "Requête JSONL invalide."}})
+			b.write(object{"id": nil, "error": &rpcError{"invalid_request", "Invalid JSONL request."}})
 			continue
 		}
 		var p parameters
 		if len(req.Params) > 0 && string(req.Params) != "null" {
 			if err := json.Unmarshal(req.Params, &p); err != nil {
-				b.write(object{"id": req.ID, "error": &rpcError{"invalid_params", "Paramètres invalides."}})
+				b.write(object{"id": req.ID, "error": &rpcError{"invalid_params", "Invalid parameters."}})
 				continue
 			}
 		}
@@ -188,12 +191,16 @@ func (b *backend) serve(in io.Reader) error {
 				respond(req, p)
 				continue
 			}
+			pool := slots
+			if req.Method == "waveform" {
+				pool = waveSlots // Decoding must never consume messaging slots.
+			}
 			select {
-			case slots <- struct{}{}:
+			case pool <- struct{}{}:
 				jobs.Add(1)
-				go func() { defer jobs.Done(); defer func() { <-slots }(); respond(req, p) }()
+				go func() { defer jobs.Done(); defer func() { <-pool }(); respond(req, p) }()
 			default:
-				b.write(object{"id": req.ID, "error": &rpcError{"busy", "Plusieurs actions sont en cours. Réessaie dans un instant."}})
+				b.write(object{"id": req.ID, "error": &rpcError{"busy", "Several actions are running. Try again in a moment."}})
 			}
 		}
 	}
@@ -209,20 +216,20 @@ func safeError(err error) *rpcError {
 	if errors.As(err, &api) {
 		switch api.StatusCode {
 		case 401, 403:
-			return &rpcError{"unauthorized", "Jeton refusé. Vérifie l’accès à l’API dans Beeper."}
+			return &rpcError{"unauthorized", "Token rejected. Check API access in Beeper."}
 		case 404:
-			return &rpcError{"not_found", "Élément introuvable ou fonctionnalité indisponible dans cette version de Beeper."}
+			return &rpcError{"not_found", "Item not found or feature unavailable in this version of Beeper."}
 		case 400, 409, 422:
-			return &rpcError{"unsupported", "Beeper a refusé cette action. Vérifie les capacités de la conversation et les paramètres."}
+			return &rpcError{"unsupported", "Beeper rejected this action. Check the conversation capabilities and parameters."}
 		case 429:
-			return &rpcError{"rate_limit", "Trop de requêtes. Réessaie dans un instant."}
+			return &rpcError{"rate_limit", "Too many requests. Try again in a moment."}
 		}
-		return &rpcError{"api_error", fmt.Sprintf("Beeper a répondu avec une erreur HTTP %d.", api.StatusCode)}
+		return &rpcError{"api_error", fmt.Sprintf("Beeper returned HTTP error %d.", api.StatusCode)}
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return &rpcError{"timeout", "Beeper n’a pas répondu à temps."}
+		return &rpcError{"timeout", "Beeper did not respond in time."}
 	}
-	return &rpcError{"unavailable", "Action impossible. Vérifie que Beeper et son API locale sont lancés."}
+	return &rpcError{"unavailable", "Action unavailable. Check that Beeper and its local API are running."}
 }
 func (b *backend) installClient(token string, replace bool) {
 	c := apiClient(b.baseURL, token)
@@ -237,7 +244,7 @@ func (b *backend) installClient(token string, replace bool) {
 	b.client, b.token = &c, token
 	ctx, cancel := context.WithCancel(b.ctx)
 	b.streamCancel = cancel
-	state := b.setStatusLocked("connecting", "Connexion à Beeper avec l’accès enregistré…")
+	state := b.setStatusLocked("connecting", "Connecting to Beeper with your saved token…")
 	b.mu.Unlock()
 	b.emit("status", state)
 	b.wakeCredentials()
@@ -250,7 +257,7 @@ func (b *backend) api() (*beeper.Client, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.client == nil {
-		return nil, fail("needs_token", "Ajoute ton jeton Beeper pour te connecter.")
+		return nil, fail("needs_token", "Add your Beeper token to connect.")
 	}
 	return b.client, nil
 }
@@ -318,7 +325,7 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return draft{}, nil
 	case "saveDraft":
 		if p.ChatID == "" {
-			return nil, fail("invalid_params", "Conversation manquante.")
+			return nil, fail("invalid_params", "Missing conversation.")
 		}
 		b.mu.Lock()
 		defer b.mu.Unlock()
@@ -333,6 +340,11 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return b.prepareRecording()
 	case "discardAttachment":
 		return object{}, b.discard(p.Path)
+	case "waveform":
+		if b.demo {
+			return nil, fail("demo", "Real audio analysis is disabled in the demo.")
+		}
+		return b.waveform(ctx, p.URL)
 	}
 	if b.demo {
 		return b.handleDemo(method, p)
@@ -340,14 +352,14 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 	if method == "connect" {
 		token := strings.TrimSpace(p.Token)
 		if token == "" || strings.ContainsAny(token, "\r\n") {
-			return nil, fail("invalid_token", "Le jeton est vide ou invalide.")
+			return nil, fail("invalid_token", "The token is empty or invalid.")
 		}
 		c := apiClient(b.baseURL, token)
 		if _, err := c.Accounts.List(ctx); err != nil {
 			return nil, err
 		}
 		if err := b.credentials.Store(ctx, token); err != nil {
-			return nil, fail("keyring", "Le trousseau ne peut pas enregistrer le jeton. Déverrouille le trousseau GNOME.")
+			return nil, fail("keyring", "The keyring could not save the token. Unlock the GNOME keyring.")
 		}
 		b.installClient(token, true)
 		return b.statusSnapshot(), nil
@@ -369,30 +381,38 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return b.raw(ctx, "GET", "v1/accounts", nil)
 	case "chats":
 		return b.raw(ctx, "GET", "v1/chats"+pageQuery(p), nil)
+	case "unreadCounts":
+		return b.unreadCounts(ctx)
 	case "contacts":
 		if p.AccountID == "" {
-			return nil, fail("invalid_params", "Compte manquant.")
+			return nil, fail("invalid_params", "Missing account.")
 		}
 		return b.raw(ctx, "GET", "v1/accounts/"+url.PathEscape(p.AccountID)+"/contacts?query="+url.QueryEscape(p.Query), nil)
 	case "search":
 		q := url.Values{"query": {p.Query}}
 		if p.ChatID != "" {
 			q.Set("chatIDs", p.ChatID)
+			// Explicit conversation search also includes muted/low-priority chats.
+			q.Set("excludeLowPriority", "false")
+			q.Set("includeMuted", "true")
 		}
 		if p.Cursor != "" {
 			q.Set("cursor", p.Cursor)
 		}
+		if p.Direction != "" {
+			q.Set("direction", p.Direction)
+		}
 		return b.raw(ctx, "GET", "v1/messages/search?"+q.Encode(), nil)
 	case "download":
 		if p.URL == "" {
-			return nil, fail("invalid_params", "Adresse du média manquante.")
+			return nil, fail("invalid_params", "Missing media URL.")
 		}
 		return b.raw(ctx, "POST", "v1/assets/download", object{"url": p.URL})
 	case "upload":
 		return b.upload(ctx, p.Path)
 	case "startChat":
 		if p.AccountID == "" || p.UserID == "" {
-			return nil, fail("invalid_params", "Compte et contact requis.")
+			return nil, fail("invalid_params", "An account and a contact are required.")
 		}
 		r, e := b.raw(ctx, "POST", "v1/chats/start", object{"accountID": p.AccountID, "user": object{"id": p.UserID}})
 		if e == nil {
@@ -401,30 +421,55 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return r, e
 	}
 	if p.ChatID == "" {
-		return nil, fail("invalid_params", "Conversation manquante.")
+		return nil, fail("invalid_params", "Missing conversation.")
 	}
 	switch method {
 	case "messages":
 		return b.raw(ctx, "GET", chatPath(p.ChatID)+"/messages"+pageQuery(p), nil)
 	case "message":
 		if p.MessageID == "" {
-			return nil, fail("invalid_params", "Message manquant.")
+			return nil, fail("invalid_params", "Missing message.")
 		}
 		return b.raw(ctx, "GET", messagePath(p.ChatID, p.MessageID), nil)
 	case "send":
 		return b.send(ctx, p)
 	case "read":
-		r, e := b.raw(ctx, "POST", chatPath(p.ChatID)+"/read", object{})
+		body := object{}
+		if p.MessageID != "" {
+			body["messageID"] = p.MessageID
+		}
+		r, e := b.raw(ctx, "POST", chatPath(p.ChatID)+"/read", body)
 		if e == nil {
 			b.emit("chatsChanged", object{})
 		}
 		return r, e
+	case "unread":
+		r, e := b.raw(ctx, "POST", chatPath(p.ChatID)+"/unread", object{})
+		if e == nil {
+			b.emit("chatsChanged", object{})
+		}
+		return r, e
+	case "archive":
+		if p.Archived == nil {
+			return nil, fail("invalid_params", "Specify whether to archive or restore the conversation.")
+		}
+		c, e := b.api()
+		if e != nil {
+			return nil, e
+		}
+		// Archive returns no content; a JSON destination would turn a valid
+		// HTTP 204 into a decoding error after the mutation already succeeded.
+		e = c.Post(ctx, chatPath(p.ChatID)+"/archive", object{"archived": *p.Archived}, nil)
+		if e == nil {
+			b.emit("chatsChanged", object{})
+		}
+		return object{}, e
 	case "updateChat":
 		for key := range p.Changes {
 			switch key {
 			case "isMuted", "isPinned", "isArchived", "isLowPriority":
 			default:
-				return nil, fail("invalid_params", "Modification de conversation non prise en charge.")
+				return nil, fail("invalid_params", "Unsupported conversation update.")
 			}
 		}
 		r, e := b.raw(ctx, "PATCH", chatPath(p.ChatID), p.Changes)
@@ -434,7 +479,7 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return r, e
 	case "edit", "delete", "react":
 		if p.MessageID == "" {
-			return nil, fail("invalid_params", "Message manquant.")
+			return nil, fail("invalid_params", "Missing message.")
 		}
 		var r json.RawMessage
 		var e error
@@ -446,7 +491,7 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		}
 		if method == "react" {
 			if p.ReactionKey == "" {
-				return nil, fail("invalid_params", "Réaction manquante.")
+				return nil, fail("invalid_params", "Missing reaction.")
 			}
 			if p.Remove {
 				r, e = b.raw(ctx, "DELETE", messagePath(p.ChatID, p.MessageID)+"/reactions/"+url.PathEscape(p.ReactionKey), nil)
@@ -462,12 +507,12 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		}
 		return r, e
 	}
-	return nil, fail("unknown_method", "Commande inconnue.")
+	return nil, fail("unknown_method", "Unknown command.")
 }
 
 func (b *backend) send(ctx context.Context, p parameters) (any, error) {
 	if strings.TrimSpace(p.Text) == "" && p.Attachment == nil {
-		return nil, fail("empty_message", "Le message est vide.")
+		return nil, fail("empty_message", "The message is empty.")
 	}
 	body := object{"text": p.Text}
 	if p.ReplyToMessageID != "" {
@@ -483,7 +528,7 @@ func (b *backend) send(ctx context.Context, p parameters) (any, error) {
 			t = "voice-note"
 		}
 		if t != "" && !validAttachmentType(t) {
-			return nil, fail("invalid_attachment", "Type de pièce jointe invalide.")
+			return nil, fail("invalid_attachment", "Invalid attachment type.")
 		}
 		uploaded := object{"uploadID": u.UploadID}
 		if t != "" {
@@ -501,7 +546,7 @@ func (b *backend) send(ctx context.Context, p parameters) (any, error) {
 	if err != nil {
 		var api *beeper.Error
 		if !errors.As(err, &api) || api.StatusCode >= 500 {
-			return nil, fail("send_uncertain", "L’envoi n’a pas été confirmé. Vérifie la conversation avant de réessayer : le message a peut-être été envoyé.")
+			return nil, fail("send_uncertain", "Sending was not confirmed. Check the conversation before trying again: the message may have been sent.")
 		}
 		return nil, err
 	}
@@ -515,7 +560,7 @@ func (b *backend) send(ctx context.Context, p parameters) (any, error) {
 		err = b.persistLocked()
 		b.mu.Unlock()
 		if err != nil {
-			b.emit("warning", object{"message": "Message accepté mais son suivi local n’a pas pu être enregistré."})
+			b.emit("warning", object{"message": "Message accepted, but its local delivery tracking could not be saved."})
 		}
 		go b.resolvePending(b.ctx, p.ChatID, sent.PendingMessageID)
 	}

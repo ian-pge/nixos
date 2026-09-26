@@ -124,7 +124,7 @@ settings.theme = `
   #sk_editor .ace_marker-layer .ace_bracket {
     border-color: #7dc4e4;
   }
-  /* Bright yellow matches Theme.state in quickshell/top-bar/components/Theme.js. */
+  /* Bright yellow matches Theme.state in desktop/ui/Theme.js. */
   #sk_editor .ace_cursor {
     color: #ffcc33;
   }

@@ -108,12 +108,12 @@ func localPath(path string) (string, error) {
 	if strings.HasPrefix(path, "file:") {
 		u, err := url.Parse(path)
 		if err != nil || (u.Host != "" && u.Host != "localhost") {
-			return "", fail("invalid_file", "Le fichier doit être local.")
+			return "", fail("invalid_file", "The file must be local.")
 		}
 		path = u.Path
 	}
 	if !filepath.IsAbs(path) {
-		return "", fail("invalid_file", "Le fichier doit avoir un chemin absolu.")
+		return "", fail("invalid_file", "The file must have an absolute path.")
 	}
 	return filepath.Clean(path), nil
 }
@@ -140,7 +140,7 @@ func attachmentType(m string) string {
 }
 func (b *backend) stage(path, t string) (*attachment, error) {
 	if b.demo {
-		return nil, fail("demo", "Les pièces jointes réelles sont désactivées dans la démonstration.")
+		return nil, fail("demo", "Real attachments are disabled in the demo.")
 	}
 	path, err := localPath(path)
 	if err != nil {
@@ -148,12 +148,12 @@ func (b *backend) stage(path, t string) (*attachment, error) {
 	}
 	in, err := os.Open(path)
 	if err != nil {
-		return nil, fail("invalid_file", "Impossible de lire ce fichier.")
+		return nil, fail("invalid_file", "Could not read this file.")
 	}
 	defer in.Close()
 	info, err := in.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Size() > 500*1024*1024 {
-		return nil, fail("invalid_file", "Choisis un fichier ordinaire de moins de 500 Mio.")
+		return nil, fail("invalid_file", "Choose a regular file smaller than 500 MiB.")
 	}
 	header := make([]byte, 512)
 	n, _ := in.Read(header)
@@ -172,7 +172,7 @@ func (b *backend) stage(path, t string) (*attachment, error) {
 		t = "voice-note"
 	}
 	if !validAttachmentType(t) {
-		return nil, fail("invalid_file", "Type de média invalide.")
+		return nil, fail("invalid_file", "Invalid media type.")
 	}
 	out, err := os.CreateTemp(filepath.Join(b.stateDir, "attachments"), "attachment-*"+filepath.Ext(path))
 	if err != nil {
@@ -191,7 +191,7 @@ func (b *backend) stage(path, t string) (*attachment, error) {
 		return nil, err
 	}
 	if written > 500*1024*1024 {
-		return nil, fail("invalid_file", "Ce fichier dépasse 500 Mio.")
+		return nil, fail("invalid_file", "This file exceeds 500 MiB.")
 	}
 	if err = out.Sync(); err != nil {
 		return nil, err
@@ -201,14 +201,14 @@ func (b *backend) stage(path, t string) (*attachment, error) {
 }
 func (b *backend) prepareRecording() (*attachment, error) {
 	if b.demo {
-		return nil, fail("demo", "L’enregistrement réel est désactivé dans la démonstration.")
+		return nil, fail("demo", "Recording is disabled in the demo.")
 	}
 	f, err := os.CreateTemp(filepath.Join(b.stateDir, "attachments"), "vocal-*.ogg")
 	if err != nil {
 		return nil, err
 	}
 	f.Close()
-	return &attachment{Path: f.Name(), SrcURL: fileURL(f.Name()), Type: "voice-note", FileName: "Message vocal.ogg", MimeType: "audio/ogg"}, nil
+	return &attachment{Path: f.Name(), SrcURL: fileURL(f.Name()), Type: "voice-note", FileName: "Voice message.ogg", MimeType: "audio/ogg"}, nil
 }
 func (b *backend) discard(path string) error {
 	if b.demo {
@@ -219,7 +219,7 @@ func (b *backend) discard(path string) error {
 		return err
 	}
 	if filepath.Dir(path) != filepath.Join(b.stateDir, "attachments") {
-		return fail("invalid_file", "Seules les copies préparées par cette application peuvent être retirées.")
+		return fail("invalid_file", "Only copies prepared by this app can be removed.")
 	}
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -229,24 +229,24 @@ func (b *backend) discard(path string) error {
 		return err
 	}
 	if !info.Mode().IsRegular() {
-		return fail("invalid_file", "Ce chemin n’est pas une pièce jointe préparée.")
+		return fail("invalid_file", "This path is not a prepared attachment.")
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for _, d := range b.state.Drafts {
 		if d.Attachment != nil && d.Attachment.Path == path {
-			return fail("attachment_in_use", "La pièce jointe est encore utilisée par un brouillon.")
+			return fail("attachment_in_use", "The attachment is still used by a draft.")
 		}
 	}
 	return os.Remove(path)
 }
 func (b *backend) clipboard(ctx context.Context) (*attachment, error) {
 	if b.demo {
-		return nil, fail("demo", "Le presse-papiers réel est désactivé dans la démonstration.")
+		return nil, fail("demo", "Clipboard access is disabled in the demo.")
 	}
 	types, err := exec.CommandContext(ctx, "wl-paste", "--list-types").Output()
 	if err != nil {
-		return nil, fail("clipboard_empty", "Aucune image disponible dans le presse-papiers.")
+		return nil, fail("clipboard_empty", "No image is available on the clipboard.")
 	}
 	m := ""
 	ext := ""
@@ -271,7 +271,7 @@ func (b *backend) clipboard(ctx context.Context) (*attachment, error) {
 	case "image/webp":
 		ext = ".webp"
 	default:
-		return nil, fail("clipboard_empty", "Le presse-papiers ne contient pas d’image prise en charge.")
+		return nil, fail("clipboard_empty", "The clipboard does not contain a supported image.")
 	}
 	f, err := os.CreateTemp(filepath.Join(b.stateDir, "attachments"), "clipboard-*"+ext)
 	if err != nil {
@@ -299,10 +299,10 @@ func (b *backend) clipboard(ctx context.Context) (*attachment, error) {
 	}
 	err = cmd.Wait()
 	if err != nil || copyErr != nil || n > 100*1024*1024 {
-		return nil, fail("clipboard_error", "Impossible de copier cette image (limite de 100 Mio).")
+		return nil, fail("clipboard_error", "Could not copy this image (100 MiB limit).")
 	}
 	ok = true
-	return &attachment{Path: name, SrcURL: fileURL(name), Type: attachmentType(m), FileName: "Image collée" + ext, MimeType: m}, nil
+	return &attachment{Path: name, SrcURL: fileURL(name), Type: attachmentType(m), FileName: "Pasted image" + ext, MimeType: m}, nil
 }
 func (b *backend) upload(ctx context.Context, path string) (*beeper.AssetUploadResponse, error) {
 	path, err := localPath(path)
@@ -311,12 +311,12 @@ func (b *backend) upload(ctx context.Context, path string) (*beeper.AssetUploadR
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fail("invalid_file", "La pièce jointe n’est plus accessible.")
+		return nil, fail("invalid_file", "The attachment is no longer accessible.")
 	}
 	defer f.Close()
 	stat, err := f.Stat()
 	if err != nil || !stat.Mode().IsRegular() || stat.Size() > 500*1024*1024 {
-		return nil, fail("invalid_file", "Pièce jointe invalide ou trop volumineuse (500 Mio maximum).")
+		return nil, fail("invalid_file", "Invalid attachment or file too large (500 MiB maximum).")
 	}
 	c, err := b.api()
 	if err != nil {
@@ -324,7 +324,7 @@ func (b *backend) upload(ctx context.Context, path string) (*beeper.AssetUploadR
 	}
 	r, err := c.Assets.Upload(ctx, beeper.AssetUploadParams{File: f})
 	if err == nil && (r.UploadID == "" || r.Error != "") {
-		return nil, fail("upload_failed", "Beeper n’a pas pu préparer la pièce jointe.")
+		return nil, fail("upload_failed", "Beeper could not prepare the attachment.")
 	}
 	return r, err
 }

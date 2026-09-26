@@ -3,11 +3,18 @@
   pkgs,
 }: let
   tabctl = pkgs.callPackage ./tabctl.nix {src = inputs.tabctl;};
+  liquidGlassClient = pkgs.callPackage ./quickshell/liquid-glass-client.nix {};
+  quickshellRuntime = pkgs.callPackage ./quickshell/runtime.nix {inherit liquidGlassClient;};
+  quickshellBeeper = pkgs.callPackage ./quickshell/beeper.nix {};
+  quickshellSystemStats = pkgs.callPackage ./quickshell/system-stats.nix {};
+  quickshellWeather = pkgs.callPackage ./quickshell/weather.nix {};
+  quickshellDesktop = pkgs.callPackage ./quickshell/desktop.nix {
+    inherit quickshellBeeper quickshellSystemStats quickshellWeather;
+  };
 in
   {
-    inherit tabctl;
+    inherit tabctl liquidGlassClient quickshellRuntime quickshellDesktop quickshellBeeper quickshellSystemStats quickshellWeather;
     liquidGlass = pkgs.callPackage ./quickshell/liquid-glass.nix {};
-    liquidGlassClient = pkgs.callPackage ./quickshell/liquid-glass-client.nix {};
     hyprlock = pkgs.writeShellApplication {
       name = "hyprlock";
       runtimeInputs = [pkgs.hyprland pkgs.jq pkgs.coreutils];
@@ -30,12 +37,11 @@ in
     hyprlockAge = pkgs.callPackage ./hyprlock-age.nix {};
     quickshellChromeTabs = pkgs.callPackage ./quickshell/chrome-tabs.nix {inherit tabctl;};
     quickshellBrightness = pkgs.callPackage ./quickshell/brightness.nix {};
-    quickshellBeeper = pkgs.callPackage ./quickshell/beeper.nix {};
-    quickshellBeeperPreview = pkgs.callPackage ./quickshell/beeper-preview.nix {};
+    quickshellBeeperPreview = pkgs.callPackage ./quickshell/beeper-preview.nix {
+      inherit quickshellRuntime quickshellDesktop;
+    };
     quickshellNixCleaner = pkgs.callPackage ./quickshell/nix-cleaner.nix {};
-    quickshellSystemStats = pkgs.callPackage ./quickshell/system-stats.nix {};
     quickshellSpeedtest = pkgs.callPackage ./quickshell/speedtest.nix {};
     quickshellGpuMonitor = pkgs.callPackage ./quickshell/gpu-monitor.nix {};
-    quickshellWeather = pkgs.callPackage ./quickshell/weather.nix {};
   }
   // import ./quickshell/update.nix {inherit pkgs;}

@@ -6,6 +6,7 @@
   libsecret,
   wl-clipboard,
   xdg-utils,
+  ffmpeg-full,
 }:
 buildGoModule {
   pname = "quickshell-beeper";
@@ -19,10 +20,10 @@ buildGoModule {
   vendorHash = "sha256-zGPpM5JFhrfRYyGPKyI3kSg9sYjxuUmSZPOQXp/+m1Y=";
   subPackages = ["."];
   nativeBuildInputs = [makeWrapper];
-  nativeCheckInputs = [dbus];
+  nativeCheckInputs = [dbus ffmpeg-full];
   postInstall = ''
     wrapProgram "$out/bin/quickshell-beeper" \
-      --prefix PATH : ${lib.makeBinPath [libsecret wl-clipboard xdg-utils]}
+      --prefix PATH : ${lib.makeBinPath [libsecret wl-clipboard xdg-utils ffmpeg-full]}
   '';
   meta = {
     description = "Beeper Desktop API client for Quickshell";

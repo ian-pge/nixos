@@ -25,7 +25,7 @@ Au démarrage, le client attend le trousseau et distingue un jeton absent d'un
 trousseau verrouillé ou temporairement indisponible via Secret Service. Il retente
 la lecture automatiquement sans effacer ni réenregistrer le jeton. Si Beeper est
 hors ligne, le jeton reste en mémoire et la reconnexion le réutilise. Le bouton
-« Réessayer » relit réellement le trousseau ou relance la connexion existante.
+« Retry » relit réellement le trousseau ou relance la connexion existante.
 Le champ de jeton n'apparaît que si aucun jeton n'est enregistré ou si Beeper
 refuse explicitement cet accès ; une panne réseau ne demande pas un nouveau jeton.
 
@@ -47,16 +47,20 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | --- | --- |
 | `status`, `connect`, `reconnect`, `refresh` | `connect {token}` ; états `loading-token`, `keyring-unavailable`, `needs-token`, `invalid-token`, `connecting`, `connected`, `offline`, `demo` |
 | `accounts`, `chats` | Objets API bruts ; `chats {cursor?,direction?}` retourne `{items,hasMore,oldestCursor,newestCursor}` |
-| `messages`, `message`, `search` | `{chatID,cursor?,direction?}`, `{chatID,messageID}`, `{query,chatID?,cursor?}` |
+| `messages`, `message`, `search` | `{chatID,cursor?,direction?}`, `{chatID,messageID}`, `{query,chatID?,cursor?,direction?}` ; une recherche explicite dans un chat inclut aussi ses messages en sourdine/basse priorité |
 | `contacts`, `startChat` | `{accountID,query}`, `{accountID,userID}` ; retour API Chat avec `id` |
 | `send` | `{chatID,text,replyToMessageID?,attachment?:{path,type}}` ; retourne `{chatID,pendingMessageID}` |
 | `edit`, `delete`, `react` | `{chatID,messageID,text?}`, réaction `{reactionKey,remove?}` |
-| `read`, `updateChat` | `{chatID}`, `{chatID,changes:{isMuted?,isPinned?,isArchived?,isLowPriority?}}` |
+| `read`, `updateChat` | `{chatID,messageID?}`, `{chatID,changes:{isMuted?,isPinned?,isArchived?,isLowPriority?}}` |
+| `unread` | `{chatID}` ; marque manuellement la conversation non lue sans inventer de nouveaux messages |
+| `archive` | `{chatID,archived:bool}` ; POST public d'archivage/désarchivage, réponse vide normalisée en `{}` ; ne change pas les non-lus ni les messages |
+| `unreadCounts` | `{}` → `{counts:{réseau:nombre},allCounts:{réseau:nombre},archivedCounts:{réseau:nombre}}` ; `counts` donne priorité au marquage manuel et exclut les autres archives, `allCounts` inclut toutes les archives, `archivedCounts` compte uniquement les archives non lues (marquage manuel compris) ; même lecture complète des pages de l'API |
 | `getDraft`, `saveDraft` | `{chatID,text?,attachment?,replyToMessageID?}` ; retour `{text,attachment?,replyToMessageID?}` |
-| `setView` | `{chatID,focused,atLatest}` ; seuls les messages visibles dans la conversation au premier plan sont silencieux |
+| `setView` | `{chatID,focused,atLatest}` ; état de vue conservé dans le protocole, sans couper les alertes sonores |
 | `stageAttachment`, `clipboardAttachment` | `{path,type?}` ou `{}` ; copie durable et privée `{path,srcURL,type,fileName,mimeType}` |
 | `prepareRecording`, `discardAttachment` | `{}` retourne un fichier `.ogg` de type `voice-note` ; `{path}` supprime uniquement une copie de notre répertoire, non référencée par un brouillon |
 | `upload`, `download` | `{path}` retourne l’upload API ; `{url}` retourne `{srcURL,error?}` pour les URL média Beeper |
+| `waveform` | `{url}` retourne `{peaks:[0…1],durationMs}` ; analyse locale bornée, sans lecture sonore |
 
 Les événements sont `status`, `chatsChanged`, `chatsDeleted`, `messagesChanged`, `messagesDeleted`, `openChat`, `warning`,
 `sendFailed` et `pendingResolved`. `openChat` contient `chatID` et `messageID` quand
@@ -81,6 +85,18 @@ Les images collées sont limitées à 100 Mio, les fichiers au plafond API de 50
 Un envoi utilise une pièce jointe : `image`, `gif`, `video`, `audio`, `voice-note`,
 `file` ou `sticker`, selon ce qu’accepte le réseau. L’enregistrement/lecture est QML.
 
+Les vagues audio sont calculées dans Go à partir d'un décodage FFmpeg standard
+(dépendance explicite du paquet). Les URL distantes passent par le téléchargement
+public Beeper ; FFmpeg reçoit seulement un fichier local régulier et ne dispose
+pas des protocoles réseau ni des démuxeurs de playlists. Limites : 128 Mio en
+entrée, 32 Mio de PCM mono 8 kHz, 10 secondes par analyse. Le résultat contient
+96 amplitudes RMS normalisées, sans inventer de signal dans les silences.
+Cache mémoire de 128 fichiers, invalidé par taille/date de modification. Deux
+analyses au maximum ont des slots séparés des huit requêtes de messagerie ; QML
+les demande en série, avec une file bornée à 32. Une erreur conserve le lecteur
+avec sa piste simple et ne produit pas d'alerte de conversation. La démo ne
+décode aucun vrai fichier. Les tests utilisent des sons synthétiques WAV/Opus/AAC.
+
 Un succès d’envoi signifie **accepté par Beeper**, puis l’identifiant provisoire est
 résolu via l’API publique. Le statut final arrive dans `pendingResolved` ou
 `sendFailed`. Aucun envoi n’est automatiquement répété, y compris après un échec réseau
@@ -92,5 +108,9 @@ est silencieux ; les messages sortants, anciens, supprimés, lus, masqués, édi
 réactions ne génèrent pas d’alerte. La sourdine et la suspension de conversation sont
 vérifiées via l’API. Une reconnexion resynchronise les conversations et produit au
 plus un résumé silencieux pour les messages manqués ; DND ne rejoue pas les alertes.
+Les nouvelles arrivées restent sonores même dans la conversation au premier plan.
+Quand le panneau de messagerie est ouvert, le serveur de notifications Quickshell
+joue le son puis expire la notification sans afficher de bannière ; cette règle
+visuelle est indépendante du focus, et ne remplace pas DND ou la sourdine.
 Le clic revient au panneau QML, jamais à l’interface Beeper. Aucune base privée de
 Beeper, extension Chromium ou serveur Matrix interne n’est utilisée.
