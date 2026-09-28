@@ -38,26 +38,26 @@ func (e *rpcError) Error() string     { return e.Message }
 func fail(code, message string) error { return &rpcError{code, message} }
 
 type parameters struct {
-	ChatID           string      `json:"chatID"`
-	MessageID        string      `json:"messageID"`
-	AccountID        string      `json:"accountID"`
-	UserID           string      `json:"userID"`
-	Text             string      `json:"text"`
-	Query            string      `json:"query"`
-	Cursor           string      `json:"cursor"`
-	Direction        string      `json:"direction"`
-	Token            string      `json:"token"`
-	ReplyToMessageID string      `json:"replyToMessageID"`
-	ReactionKey      string      `json:"reactionKey"`
-	Remove           bool        `json:"remove"`
-	Archived         *bool       `json:"archived"`
-	Attachment       *attachment `json:"attachment"`
-	Changes          object      `json:"changes"`
-	Path             string      `json:"path"`
-	Type             string      `json:"type"`
-	URL              string      `json:"url"`
-	Focused          bool        `json:"focused"`
-	AtLatest         bool        `json:"atLatest"`
+	ChatID           string        `json:"chatID"`
+	MessageID        string        `json:"messageID"`
+	AccountID        string        `json:"accountID"`
+	UserID           string        `json:"userID"`
+	Text             string        `json:"text"`
+	Query            string        `json:"query"`
+	Cursor           string        `json:"cursor"`
+	Direction        string        `json:"direction"`
+	Token            string        `json:"token"`
+	ReplyToMessageID string        `json:"replyToMessageID"`
+	ReactionKey      string        `json:"reactionKey"`
+	Remove           bool          `json:"remove"`
+	Attachment       *attachment   `json:"attachment"`
+	SavedDrafts      *[]savedDraft `json:"savedDrafts"`
+	Changes          object        `json:"changes"`
+	Path             string        `json:"path"`
+	Type             string        `json:"type"`
+	URL              string        `json:"url"`
+	Focused          bool          `json:"focused"`
+	AtLatest         bool          `json:"atLatest"`
 }
 type backend struct {
 	mu                   sync.Mutex
@@ -329,7 +329,10 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		}
 		b.mu.Lock()
 		defer b.mu.Unlock()
-		d := draft{Text: p.Text, Attachment: p.Attachment, ReplyToMessageID: p.ReplyToMessageID}
+		d := draft{Text: p.Text, Attachment: p.Attachment, ReplyToMessageID: p.ReplyToMessageID, SavedDrafts: b.state.Drafts[p.ChatID].SavedDrafts}
+		if p.SavedDrafts != nil {
+			d.SavedDrafts = *p.SavedDrafts
+		}
 		b.state.Drafts[p.ChatID] = d
 		return d, b.persistLocked()
 	case "stageAttachment":
@@ -449,25 +452,13 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 			b.emit("chatsChanged", object{})
 		}
 		return r, e
-	case "archive":
-		if p.Archived == nil {
-			return nil, fail("invalid_params", "Specify whether to archive or restore the conversation.")
-		}
-		c, e := b.api()
-		if e != nil {
-			return nil, e
-		}
-		// Archive returns no content; a JSON destination would turn a valid
-		// HTTP 204 into a decoding error after the mutation already succeeded.
-		e = c.Post(ctx, chatPath(p.ChatID)+"/archive", object{"archived": *p.Archived}, nil)
-		if e == nil {
-			b.emit("chatsChanged", object{})
-		}
-		return object{}, e
 	case "updateChat":
-		for key := range p.Changes {
+		for key, value := range p.Changes {
 			switch key {
-			case "isMuted", "isPinned", "isArchived", "isLowPriority":
+			case "isMuted", "isPinned", "isLowPriority":
+				if _, ok := value.(bool); !ok {
+					return nil, fail("invalid_params", "Conversation flags must be booleans.")
+				}
 			default:
 				return nil, fail("invalid_params", "Unsupported conversation update.")
 			}

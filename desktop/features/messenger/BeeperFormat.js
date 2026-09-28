@@ -7,10 +7,9 @@ function orderChats(chats, unreadFirst) {
   // and leave its source list intact for the return to normal ordering.
   return unreadFirst ? chats.filter(isChatUnread).concat(chats.filter(chat => !isChatUnread(chat))) : chats;
 }
-// Beeper can report a manual unread marker together with archive state. Keep
-// that explicit reminder in our inbox without rewriting the server's archive flag.
-function isChatInInbox(chat) { return !!chat && (!chat.isArchived || chat.isMarkedUnread === true); }
-function isChatInView(chat, archivedOnly) { return archivedOnly ? chat?.isArchived === true : isChatInInbox(chat); }
+// Beeper owns priority; unread markers and incoming activity do not change it.
+function isChatInInbox(chat) { return !!chat && !chat.isLowPriority; }
+function isChatInView(chat, lowPriorityOnly) { return lowPriorityOnly ? chat?.isLowPriority === true : isChatInInbox(chat); }
 function chatSubtitle(chat) {
   if (!chat) return "All your conversations, in one place";
   let subtitle = "";
@@ -51,8 +50,19 @@ function networkBadge(network) {
   return {key: "other", name: name, glyph: Array.from(name)[0]?.toUpperCase() || "", logo: false};
 }
 function quickReactions(chat) {
-  return networkBadge(chat?.network).key === "telegram"
-    ? ["🤣", "❤️", "🔥", "💯", "🤡"] : ["😂", "💜", "🔥", "💯", "🤡"];
+  const reactions = networkBadge(chat?.network).key === "telegram"
+    ? ["👍", "🤣", "❤️", "🔥", "💯", "🤡"] : ["👍", "😂", "💜", "🔥", "💯", "🤡"];
+  return reactions.map(reaction => allowedReaction(chat, reaction) || reaction);
+}
+function reactionIdentity(reaction) {
+  // Beeper's Telegram capabilities include e.g. 👍 + VS16. Presentation
+  // selectors are not different reactions; skin tones and ZWJ sequences are.
+  return String(reaction || "").replace(/[\uFE0E\uFE0F]/g, "");
+}
+function allowedReaction(chat, reaction) {
+  const allowed = chat?.capabilities?.allowedReactions;
+  if (!Array.isArray(allowed)) return reaction;
+  return allowed.find(key => reactionIdentity(key) === reactionIdentity(reaction)) || "";
 }
 function accountConnectionIssues(accounts, chats) {
   const issues = {};
@@ -358,4 +368,34 @@ function supports(chat, operation, message) {
 }
 function links(message) {
   return (message?.links || []).filter(link => /^(https?:|mailto:)/i.test(link.url || ""));
+}
+// Keyboard activation also finds plain-text URLs without adding preview cards
+// to messages for which the API did not provide any.
+function messageLinks(message) {
+  const result = [], seen = new Set();
+  function add(value, title) {
+    if (typeof value !== "string") return;
+    let url = value.trim();
+    if (/^www\./i.test(url)) url = "https://" + url;
+    if (!/^(https?:|mailto:)/i.test(url) || seen.has(url)) return;
+    seen.add(url);
+    result.push({url: url, title: typeof title === "string" ? title : ""});
+  }
+  for (const link of Array.isArray(message?.links) ? message.links : []) add(link?.url, link?.title);
+  const candidates = text(message).match(/\b(?:https?:\/\/|mailto:|www\.)[^\s<>"'`“”‘’«»]+/gi) || [];
+  for (let url of candidates) {
+    if (seen.has(url)) continue;
+    // Strip surrounding prose punctuation, preserving balanced URL brackets
+    // such as Wikipedia's /Article_(topic) paths.
+    const counts = {}, opening = {")": "(", "]": "[", "}": "{"};
+    for (const character of url) if ("()[]{}".includes(character)) counts[character] = (counts[character] || 0) + 1;
+    while (url) {
+      const last = url.slice(-1), first = opening[last];
+      if (/[.,;:!?]/.test(last)) url = url.slice(0, -1);
+      else if (first && (counts[last] || 0) > (counts[first] || 0)) { --counts[last]; url = url.slice(0, -1); }
+      else break;
+    }
+    add(url, "");
+  }
+  return result;
 }

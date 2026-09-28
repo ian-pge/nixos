@@ -103,19 +103,20 @@ ShellRoot {
       compare(pending("unread").length, 0, "n navigates search matches without marking the conversation unread");
       keyClick(Qt.Key_Escape); verify(!search.opened); compare(panel.messageIndex, -1); compare(closed.count, 0);
     }
-    function test_search_is_to_the_right_of_the_name_without_taking_history_height() {
-      const header = findChild(panel, "beeperConversationHeader"), bar = findChild(panel, "beeperMessageSearchBar");
-      const title = findChild(panel, "beeperChatTitle"), historyView = findChild(panel, "beeperMessages");
+    function test_search_occupies_history_space_only_while_open() {
+      const column = findChild(panel, "beeperConversationColumn"), bar = findChild(panel, "beeperMessageSearchBar");
+      const historyView = findChild(panel, "beeperMessages");
+      compare(findChild(panel, "beeperConversationHeader"), null);
       for (const width of [1280, 800, 700]) {
         panel.closeConversationSearch(); panel.width = width; wait(30);
+        verify(!bar.visible);
         const before = historyView.height;
         panel.openConversationSearch(); wait(30);
-        compare(bar.parent, header);
-        const titlePoint = title.mapToItem(header, 0, 0);
-        verify(bar.x >= titlePoint.x + title.width, "Search belongs beside the name, never below it");
-        verify(bar.x + bar.width <= header.width + 0.5);
-        verify(bar.y >= 0 && bar.y + bar.height <= header.height + 0.5);
+        compare(bar.parent, column); verify(bar.visible);
+        fuzzyCompare(bar.width, column.width, 0.5);
         verify(input.width > 60, "The compact field remains usable");
+        fuzzyCompare(historyView.height, before - bar.height - 10, 0.5);
+        panel.closeConversationSearch(); wait(30);
         fuzzyCompare(historyView.height, before, 0.5);
       }
     }

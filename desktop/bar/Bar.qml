@@ -224,7 +224,9 @@ PanelWindow {
     }
 
     Pill {
-      text: services.brightness.icon(window.monitorName) + " " + services.brightness.value(window.monitorName) + "%"
+      objectName: "brightnessPill"
+      readonly property var level: services.brightness.value(window.monitorName)
+      text: services.brightness.icon(window.monitorName) + " " + (level === null ? "--" : level + "%")
       accent: Theme.sideBrightness
       forceHovered: coordinator.isOpen("brightness", window.monitorName)
       interactive: true

@@ -1,8 +1,9 @@
 // Compile the real messenger/bar graph in an isolated Wayland session.
-// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--people|--host|--desktop|--preview]
+// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--video|--people|--host|--desktop|--sidebar|--performance|--preview]
 import assert from "node:assert/strict";
 import {spawn, spawnSync, execFile} from "node:child_process";
 import {mkdtemp, mkdir, readdir, readFile, rm, writeFile} from "node:fs/promises";
+import {readFileSync} from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {promisify} from "node:util";
@@ -37,9 +38,12 @@ const quickshell = process.argv[2] || "qs";
 const renderAvatar = process.argv.includes("--avatar");
 const renderBubble = process.argv.includes("--bubble");
 const renderMedia = process.argv.includes("--media");
+const testVideo = process.argv.includes("--video");
 const renderPeople = process.argv.includes("--people");
 const testHost = process.argv.includes("--host");
 const testDesktop = process.argv.includes("--desktop");
+const testSidebar = process.argv.includes("--sidebar");
+const testPerformance = process.argv.includes("--performance");
 const renderPreview = process.argv.includes("--preview");
 if (testHost) {
   // The mask belongs to Bar, not Host. Protect that caller's public contract
@@ -68,7 +72,13 @@ const exec = promisify(execFile);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 let compositor, shell;
 let compositorLog = "", shellLog = "";
+let sidebarCpuStart, sidebarCpuTicks;
 let spawnError;
+function shellCpuTicks() {
+  const stat = readFileSync(`/proc/${shell.pid}/stat`, "utf8");
+  const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/);
+  return Number(fields[11]) + Number(fields[12]);
+}
 
 async function until(predicate, description) {
   const deadline = Date.now() + 15_000;
@@ -118,15 +128,25 @@ try {
   }, "nested compositor readiness");
   assert.equal((await exec("hyprctl", ["configerrors"], {env, timeout: 2000})).stdout.trim(), "", "Nested compositor configuration must be valid");
   const testFile = renderAvatar ? "./tst_BeeperAvatar.qml" : renderBubble ? "./tst_BeeperBubble.qml" : renderMedia ? "./tst_BeeperMedia.qml"
+    : testVideo ? "./tst_BeeperVideo.qml"
     : renderPeople ? "./tst_BeeperPeople.qml"
-    : testHost ? "./tst_MessengerHost.qml" : testDesktop ? "./tst_DesktopComposition.qml"
+    : testHost ? "./tst_MessengerHost.qml" : testDesktop ? "./tst_DesktopComposition.qml" : testSidebar ? "./tst_BeeperSidebar.qml"
+    : testPerformance ? "./tst_BeeperPerformance.qml"
     : renderPreview ? "../preview.qml" : "./messenger-load_test.qml";
   shell = spawn(quickshell, ["--path", path.join(here, testFile), "--no-color"], {env, detached: true});
-  collect(shell, data => { shellLog += data; });
+  collect(shell, data => {
+    shellLog += data;
+    if (testSidebar) {
+      try {
+        if (data.includes("Sidebar animation start")) sidebarCpuStart = shellCpuTicks();
+        if (data.includes("Sidebar animation:")) sidebarCpuTicks = shellCpuTicks() - sidebarCpuStart;
+      } catch {} // The fixture may already have exited before its final log arrives.
+    }
+  });
   await until(() => {
     if (compositor.exitCode !== null) throw new Error("Nested compositor exited during QML compilation");
     if (renderPreview && shell.exitCode === 0) return true;
-    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : /Messenger integration:/).test(shellLog)) return true;
+    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testVideo ? /BeeperVideo:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : testSidebar ? /BeeperSidebar:/ : testPerformance ? /BeeperPerformance:/ : /Messenger integration:/).test(shellLog)) return true;
     if (shell.exitCode !== null) throw new Error("Quickshell exited before reporting the compile result");
     return false;
   }, "messenger QML compilation");
@@ -135,17 +155,25 @@ try {
     assert.equal(report.expanded, true, shellLog);
     assert.equal(report.progress, Number(env.BEEPER_PREVIEW_PROGRESS || 1), shellLog);
   } else assert.match(shellLog, renderAvatar ? /BeeperAvatar: \d+ passed, 0 failed/
-    : renderBubble ? /BeeperBubble: \d+ passed, 0 failed/ : renderMedia ? /BeeperMedia: \d+ passed, 0 failed/ : renderPeople ? /BeeperPeople: \d+ passed, 0 failed/ : testHost ? /MessengerHost: \d+ passed, 0 failed/
+    : renderBubble ? /BeeperBubble: \d+ passed, 0 failed/ : renderMedia ? /BeeperMedia: \d+ passed, 0 failed/ : testVideo ? /BeeperVideo: \d+ passed, 0 failed/ : renderPeople ? /BeeperPeople: \d+ passed, 0 failed/ : testHost ? /MessengerHost: \d+ passed, 0 failed/
     : testDesktop ? /DesktopComposition: \d+ passed, 0 failed/
+    : testSidebar ? /BeeperSidebar: \d+ passed, 0 failed/
+    : testPerformance ? /BeeperPerformance: \d+ passed, 0 failed/
     : /Messenger integration: all components compile/, shellLog);
   assert.doesNotMatch(shellLog, /(?:ERROR|TypeError|ReferenceError|Binding loop|Cannot assign|Unable to assign \[undefined\])/, shellLog);
+  if (testSidebar) console.log(shellLog.split('\n').filter(line => /Sidebar animation:/.test(line)).join('\n'));
+  if (testSidebar && Number.isFinite(sidebarCpuTicks)) console.log("Sidebar animation CPU ticks:", sidebarCpuTicks);
+  if (testPerformance) console.log(shellLog.split('\n').filter(line => /Conversation performance:/.test(line)).join('\n'));
   console.log(renderAvatar
     ? "PASS: avatar photo is circular, network badge remains visible, contact fallback updates correctly"
     : renderBubble ? "PASS: independent bubble geometry, reversible animation and concurrent chat/audio focus"
     : renderMedia ? "PASS: message/media layout and native search highlight pixels"
+    : testVideo ? "PASS: native Wayland video playback, fullscreen controls and repeated inline decoder teardown"
     : renderPeople ? "PASS: per-person reaction pills, reader avatars, wrapping and live profile updates"
     : testHost ? "PASS: MessengerHost layer surface, keyboard ownership, native dialogs and focus restoration"
     : testDesktop ? "PASS: complete desktop composition and real Bar instantiate with disabled services"
+    : testSidebar ? "PASS: sidebar animation fixture"
+    : testPerformance ? "PASS: conversation performance fixture"
     : renderPreview ? "PASS: messenger preview rendered with the normal Wayland scene graph"
     : "PASS: messenger, feature controllers, shell coordinator and Bar compile in a private Wayland session");
 } catch (error) {

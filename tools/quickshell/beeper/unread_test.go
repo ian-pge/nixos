@@ -20,9 +20,10 @@ func TestUnreadCountsCoversEveryPageWithoutCountingMessagesOrDuplicates(t *testi
 		case "":
 			jsonResponse(w, object{"items": []object{
 				{"id": "a", "network": "WhatsApp", "unreadCount": 17},
-				{"id": "b", "network": "WhatsApp", "unreadCount": 0, "isMarkedUnread": true, "isArchived": true},
-				{"id": "archived", "network": "Telegram", "unreadCount": 8, "isArchived": true},
-				{"id": "muted", "network": "Signal", "unreadCount": 2, "isMarkedUnread": true, "isMuted": true, "isLowPriority": true},
+				{"id": "b", "network": "WhatsApp", "unreadCount": 0, "isMarkedUnread": true, "isLowPriority": true},
+				{"id": "low", "network": "Telegram", "unreadCount": 8, "isLowPriority": true},
+				{"id": "muted", "network": "Signal", "unreadCount": 2, "isMarkedUnread": true, "isMuted": true},
+				{"id": "quiet", "network": "Signal", "unreadCount": 2, "isLowPriority": true},
 			}, "hasMore": true, "oldestCursor": "opaque + /&"})
 		case "opaque + /&":
 			if r.URL.Query().Get("direction") != "before" {
@@ -43,17 +44,13 @@ func TestUnreadCountsCoversEveryPageWithoutCountingMessagesOrDuplicates(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]int{"WhatsApp": 2, "Telegram": 1, "Signal": 1, "Google Messages": 1}
+	want := map[string]int{"WhatsApp": 1, "Telegram": 1, "Signal": 1, "Google Messages": 1}
 	if got := result.(object)["counts"]; !reflect.DeepEqual(got, want) {
 		t.Fatalf("conversation counts: got %#v, want %#v", got, want)
 	}
-	wantAll := map[string]int{"WhatsApp": 2, "Telegram": 2, "Signal": 1, "Google Messages": 1}
-	if got := result.(object)["allCounts"]; !reflect.DeepEqual(got, wantAll) {
-		t.Fatalf("archive-inclusive counts: got %#v, want %#v", got, wantAll)
-	}
-	wantArchived := map[string]int{"WhatsApp": 1, "Telegram": 1}
-	if got := result.(object)["archivedCounts"]; !reflect.DeepEqual(got, wantArchived) {
-		t.Fatalf("archive-only counts: got %#v, want %#v", got, wantArchived)
+	wantLowPriority := map[string]int{"WhatsApp": 1, "Telegram": 1, "Signal": 1}
+	if got := result.(object)["lowPriorityCounts"]; !reflect.DeepEqual(got, wantLowPriority) {
+		t.Fatalf("low priority counts: got %#v, want %#v", got, wantLowPriority)
 	}
 	if requests.Load() != 2 {
 		t.Fatalf("expected both pages, got %d", requests.Load())
@@ -97,23 +94,23 @@ func TestUnreadCountsHonorsCancellation(t *testing.T) {
 	}
 }
 
-func TestDemoUnreadCountsSeparatesArchivesAndIncludesManualReminders(t *testing.T) {
+func TestDemoUnreadCountsSeparatesLowPriorityAndIncludesManualReminders(t *testing.T) {
 	b, err := newBackend(context.Background(), io.Discard, t.TempDir(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	b.demoChats = []object{
 		{"network": "Telegram", "unreadCount": 4},
-		{"network": "Telegram", "unreadCount": 2, "isArchived": true},
-		{"network": "WhatsApp", "isMarkedUnread": true, "isArchived": true},
-		{"network": "Signal", "isArchived": true},
+		{"network": "Telegram", "unreadCount": 2, "isLowPriority": true},
+		{"network": "WhatsApp", "isMarkedUnread": true, "isLowPriority": true},
+		{"network": "Signal", "isLowPriority": true},
 	}
 	result, err := b.handleDemo("unreadCounts", parameters{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]int{"Telegram": 1, "WhatsApp": 1}
-	if got := result.(object)["archivedCounts"]; !reflect.DeepEqual(got, want) {
-		t.Fatalf("archive-only counts: got %#v, want %#v", got, want)
+	if got := result.(object)["lowPriorityCounts"]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("low priority counts: got %#v, want %#v", got, want)
 	}
 }

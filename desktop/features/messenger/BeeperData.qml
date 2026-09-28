@@ -24,27 +24,27 @@ Scope {
   readonly property var accountConnectionIssues: Format.accountConnectionIssues(accounts, chats)
   readonly property string serviceConnectionIssue: Format.serviceConnectionIssue(state)
   property string networkFilter: "all"
-  property bool showArchived: false // Archives only, not archives added to the inbox.
+  property bool showLowPriority: false
   property bool unreadFirst: false
-  property var archivePending: ({})
-  property int archiveRevision: 0
-  property var archiveChanges: ({})
+  property var lowPriorityPending: ({})
+  property int chatsRevision: 0
   property var reactionOperations: ({})
   property var chats: []
   property var unreadCounts: ({})
-  property var archivedUnreadCounts: ({})
-  property bool archivedUnreadCountsLoaded: false
+  property var lowPriorityUnreadCounts: ({})
+  property bool lowPriorityUnreadCountsLoaded: false
   property bool unreadCountsLoaded: false
   property bool loadingUnreadCounts: false
   property bool unreadCountsDirty: false
   property bool unreadCountsUrgent: false
   property int unreadCountsGeneration: 0
   property real lastUnreadCountsAttempt: 0
-  readonly property bool unreadCountsReady: demo || (unreadCountsLoaded && (!showArchived || archivedUnreadCountsLoaded))
+  readonly property bool unreadCountsReady: demo || (unreadCountsLoaded && (!showLowPriority || lowPriorityUnreadCountsLoaded))
   property var messages: []
   readonly property var readReceiptReaders: Format.readReceiptReaders(messages, currentChat, accounts)
   property var quotedMessages: ({})
   property var waveforms: ({})
+  readonly property alias audioPlayback: audioPlayback
   property var waveformQueue: []
   property bool waveformBusy: false
   property var searchResults: []
@@ -55,6 +55,8 @@ Scope {
   property var senderColors: ({})
   property bool loading: false
   property bool loadingMessages: false
+  property int navigationLoadDelay: 90
+  readonly property bool historyLoadPending: navigationLoadTimer.running
   property bool trailingChatsRefresh: false
   property bool trailingMessagesRefresh: false
   property bool sending: false
@@ -83,6 +85,9 @@ Scope {
   property bool restoringDraft: false
   property var pending: ({})
   property var localDrafts: ({})
+  property var savedSendDrafts: ({})
+  property var retiredSendDrafts: ({})
+  readonly property var recoverableDrafts: savedSendDrafts[currentChatID] || []
   property var demoMessages: ({})
   signal openRequested(string chatID, string messageID)
   signal messagesUpdating()
@@ -91,7 +96,9 @@ Scope {
   signal quotesUpdating()
   signal quotesUpdated()
   signal tokenStored()
-  signal chatArchiveChanged(string chatID, bool archived)
+  signal chatPriorityChanged(string chatID, bool lowPriority)
+
+  BeeperAudioPlayback { id: audioPlayback; beeperData: root }
 
   PersistentProperties {
     id: preferences
@@ -133,15 +140,16 @@ Scope {
       Qt.callLater(processWaveforms);
       Qt.callLater(() => scheduleUnreadCounts(true));
     } else {
+      navigationLoadTimer.stop();
       ++accountsGeneration; loadingAccounts = false;
       ++unreadCountsGeneration; unreadCountsTimer.stop();
-      unreadCountsLoaded = false; archivedUnreadCountsLoaded = false; loadingUnreadCounts = false;
+      unreadCountsLoaded = false; lowPriorityUnreadCountsLoaded = false; loadingUnreadCounts = false;
     }
   }
   function unreadConversationCount(network) {
-    if (demo) return chats.filter(chat => Format.isChatInView(chat, showArchived) && Format.isChatUnread(chat)
+    if (demo) return chats.filter(chat => Format.isChatInView(chat, showLowPriority) && Format.isChatUnread(chat)
       && (network === "all" || Format.networkBadge(chat.network).key === network)).length;
-    const counts = showArchived ? archivedUnreadCounts : unreadCounts;
+    const counts = showLowPriority ? lowPriorityUnreadCounts : unreadCounts;
     let count = 0;
     for (const name of Object.keys(counts))
       if (network === "all" || Format.networkBadge(name).key === network) count += counts[name];
@@ -165,9 +173,9 @@ Scope {
       loadingUnreadCounts = false;
       if (!error && result?.counts && typeof result.counts === "object" && !Array.isArray(result.counts)) {
         unreadCounts = result.counts; unreadCountsLoaded = true;
-        archivedUnreadCountsLoaded = !!result.archivedCounts && typeof result.archivedCounts === "object" && !Array.isArray(result.archivedCounts);
-        if (archivedUnreadCountsLoaded) archivedUnreadCounts = result.archivedCounts;
-      } else { unreadCountsLoaded = false; archivedUnreadCountsLoaded = false; }
+        lowPriorityUnreadCountsLoaded = !!result.lowPriorityCounts && typeof result.lowPriorityCounts === "object" && !Array.isArray(result.lowPriorityCounts);
+        if (lowPriorityUnreadCountsLoaded) lowPriorityUnreadCounts = result.lowPriorityCounts;
+      } else { unreadCountsLoaded = false; lowPriorityUnreadCountsLoaded = false; }
       if (unreadCountsDirty) scheduleUnreadCounts(unreadCountsUrgent);
     }, true);
   }
@@ -285,16 +293,20 @@ Scope {
     if (loading) { if (!older) trailingChatsRefresh = true; return; }
     if (!older) chatsPaginationBlocked = false;
     const cursor = older ? chatsCursor : "";
-    const requestedArchiveRevision = archiveRevision;
+    const revision = chatsRevision;
     loading = true;
     request("chats", older ? {cursor: cursor, direction: "before"} : {}, (result, error) => {
+      // Discard a read started before a successful priority change, then read
+      // again. Later Beeper snapshots remain authoritative, including edits
+      // made from another client; no placement override is kept locally.
+      if (revision !== chatsRevision) {
+        loading = false; trailingChatsRefresh = false;
+        Qt.callLater(() => refreshChats(false));
+        return;
+      }
       if (trailingChatsRefresh) { trailingChatsRefresh = false; Qt.callLater(() => refreshChats(false)); }
       if (error || !result) { chatsPaginationBlocked = true; loading = false; return; }
-      const rows = (result.items || []).filter(chat => !deletedChatIDs[chat.id]).map(chat => {
-        const change = archiveChanges[chat.id];
-        return change && change.revision > requestedArchiveRevision
-          ? Object.assign({}, chat, {isArchived: change.archived}) : chat;
-      });
+      const rows = (result.items || []).filter(chat => !deletedChatIDs[chat.id]);
       if (older) { const ids = new Set(chats.map(chat => chat.id)); chats = chats.concat(rows.filter(chat => !ids.has(chat.id))); }
       else { const ids = new Set(rows.map(chat => chat.id)); chats = rows.concat(chats.filter(chat => !ids.has(chat.id))); }
       if (older || !chatsInitialized) {
@@ -305,14 +317,21 @@ Scope {
       loading = false;
     });
   }
-  function selectChat(chatID, messageID) {
+  function selectChat(chatID, messageID, deferHistory = false) {
     targetMessageID = messageID || "";
     if (!chatID) return;
     const chat = chats.find(item => item.id === chatID);
     // Explicit targets (including notifications) must be visible in the list.
-    if (chat && !Format.isChatInView(chat, showArchived)) showArchived = !showArchived;
+    if (chat && !Format.isChatInView(chat, showLowPriority)) showLowPriority = !showLowPriority;
     if (networkFilter !== "all" && (!chat || Format.networkBadge(chat.network).key !== networkFilter)) networkFilter = "all";
-    if (chatID === currentChatID) { if (targetMessageID) messagesLoaded(false); return; }
+    if (chatID === currentChatID) {
+      if (targetMessageID) {
+        if (historyLoadPending) loadMessages(false);
+        else if (!loadingMessages) messagesLoaded(false);
+      }
+      return;
+    }
+    navigationLoadTimer.stop();
     flushDraft();
     ++chatGeneration;
     quotedMessages = ({});
@@ -323,14 +342,24 @@ Scope {
     restoringDraft = false;
     const generation = chatGeneration, revision = draftRevision;
     request("getDraft", {chatID: chatID}, (result, error) => {
-      if (error || !result || generation !== chatGeneration || revision !== draftRevision) return;
+      if (error || !result || generation !== chatGeneration) return;
+      const recovered = mergeSavedSendDrafts(chatID, result.savedDrafts || []);
+      if (revision !== draftRevision) {
+        if (recovered) persistChatDraft(chatID);
+        return;
+      }
       restoringDraft = true;
       draftText = result.text || ""; draftAttachment = result.attachment || null; replyToMessageID = result.replyToMessageID || "";
       restoringDraft = false;
     });
-    loadMessages(false); updateView();
+    // Selection/drafts change immediately. During rapid sidebar navigation,
+    // fetch only the conversation where the user pauses, not every row crossed.
+    if (deferHistory && !demo && navigationLoadDelay > 0) navigationLoadTimer.restart();
+    else loadMessages(false);
+    updateView();
   }
   function clearSelection() {
+    navigationLoadTimer.stop();
     flushDraft();
     ++chatGeneration;
     quotedMessages = ({});
@@ -343,6 +372,7 @@ Scope {
   }
   function loadMessages(older) {
     if (!currentChatID) return;
+    if (!older) navigationLoadTimer.stop();
     if (older && (!hasOlderMessages || !oldestCursor || messagesPaginationBlocked)) return;
     if (loadingMessages) { if (!older) trailingMessagesRefresh = true; return; }
     if (!older) messagesPaginationBlocked = false;
@@ -369,7 +399,8 @@ Scope {
     const chat = currentChat, chatID = currentChatID;
     if (!connected || !message?.id || !reaction || !Format.supports(chat, "reaction", message)) return;
     if (message.chatID && message.chatID !== chatID) return;
-    if (Array.isArray(chat.capabilities?.allowedReactions) && !chat.capabilities.allowedReactions.includes(reaction)) {
+    reaction = Format.allowedReaction(chat, reaction);
+    if (!reaction) {
       lastError = "This reaction is not supported in this conversation."; return;
     }
     const key = JSON.stringify([chatID, message.id]);
@@ -381,15 +412,15 @@ Scope {
         keys: keys, desired: keys.length === 1 ? keys[0] : "", busy: false, refreshing: false, revision: 0};
       reactionOperations[key] = operation;
     }
-    operation.desired = operation.desired === reaction ? "" : reaction;
+    operation.desired = Format.reactionIdentity(operation.desired) === Format.reactionIdentity(reaction) ? "" : reaction;
     ++operation.revision;
     processReaction(operation);
   }
   function processReaction(operation) {
     if (reactionOperations[operation.key] !== operation || operation.busy) return;
     if (!connected) { delete reactionOperations[operation.key]; return; }
-    const previous = operation.keys.find(key => key !== operation.desired);
-    const reaction = previous || (operation.desired && !operation.keys.includes(operation.desired) ? operation.desired : "");
+    const previous = operation.keys.find(key => Format.reactionIdentity(key) !== Format.reactionIdentity(operation.desired));
+    const reaction = previous || (operation.desired && !operation.keys.some(key => Format.reactionIdentity(key) === Format.reactionIdentity(operation.desired)) ? operation.desired : "");
     if (!reaction) { refreshReaction(operation); return; }
     const remove = !!previous;
     operation.busy = true;
@@ -422,7 +453,8 @@ Scope {
           || result.chatID && result.chatID !== operation.chatID) return;
       // A queued API mutation may not be reflected in the first read yet.
       const keys = Format.ownReactionKeys(result, operation.selfIDs);
-      if (operation.selfIDs.length && (keys.length !== operation.keys.length || keys.some(key => !operation.keys.includes(key)))) return;
+      if (operation.selfIDs.length && (keys.length !== operation.keys.length
+          || keys.some(key => !operation.keys.some(own => Format.reactionIdentity(own) === Format.reactionIdentity(key))))) return;
       messagesUpdating();
       messages = messages.map(message => message.id === operation.messageID ? Object.assign({}, message, result) : message);
       messagesLoaded(false);
@@ -470,13 +502,53 @@ Scope {
   }
   function flushDraft(callback) {
     draftTimer.stop();
-    if (currentChatID) {
-      localDrafts[currentChatID] = draftSnapshot();
-      request("saveDraft", Object.assign({chatID: currentChatID}, localDrafts[currentChatID]), callback);
-    }
+    if (currentChatID) persistChatDraft(currentChatID, callback);
   }
   function draftSnapshot() {
     return {text: draftText, attachment: draftAttachment, replyToMessageID: replyToMessageID};
+  }
+  function persistChatDraft(chatID, callback) {
+    if (currentChatID === chatID) { draftTimer.stop(); localDrafts[chatID] = draftSnapshot(); }
+    request("saveDraft", Object.assign({chatID: chatID}, localDrafts[chatID] || {},
+      {savedDrafts: savedSendDrafts[chatID] || []}), callback);
+  }
+  function hasDraftContent(draft) {
+    return !!draft && (!!draft.text || !!draft.attachment || !!draft.replyToMessageID);
+  }
+  function replaceDraft(chatID, draft) {
+    const value = {text: draft.text || "", attachment: draft.attachment || null, replyToMessageID: draft.replyToMessageID || ""};
+    localDrafts[chatID] = value;
+    if (currentChatID !== chatID) return;
+    restoringDraft = true;
+    draftText = value.text; draftAttachment = value.attachment; replyToMessageID = value.replyToMessageID;
+    restoringDraft = false; draftChanged();
+  }
+  function saveSendDraft(chatID, draft) {
+    const saved = Object.assign({id: Date.now() + "-" + (++sequence)}, draft);
+    savedSendDrafts = Object.assign({}, savedSendDrafts, {[chatID]: (savedSendDrafts[chatID] || []).concat([saved])});
+    return saved.id;
+  }
+  function retireSendDraft(chatID, id) {
+    retiredSendDrafts[id] = true;
+    savedSendDrafts = Object.assign({}, savedSendDrafts, {[chatID]: (savedSendDrafts[chatID] || []).filter(draft => draft.id !== id)});
+  }
+  function mergeSavedSendDrafts(chatID, drafts) {
+    const existing = savedSendDrafts[chatID] || [], ids = new Set(existing.map(draft => draft.id));
+    const recovered = [];
+    for (const draft of Array.isArray(drafts) ? drafts : []) {
+      if (!draft?.id || retiredSendDrafts[draft.id] || ids.has(draft.id) || !hasDraftContent(draft)) continue;
+      recovered.push(draft); ids.add(draft.id);
+    }
+    if (recovered.length) savedSendDrafts = Object.assign({}, savedSendDrafts, {[chatID]: existing.concat(recovered)});
+    return recovered.length > 0;
+  }
+  function restoreSavedSendDraft() {
+    if (sending || !currentChatID || !recoverableDrafts.length) return;
+    const chatID = currentChatID, saved = recoverableDrafts[0], current = draftSnapshot();
+    // Explicit recovery swaps drafts; it never overwrites the next message.
+    if (hasDraftContent(current)) saveSendDraft(chatID, current);
+    retireSendDraft(chatID, saved.id);
+    replaceDraft(chatID, saved); persistChatDraft(chatID);
   }
   function markChatRead(chatID, messageID) {
     if (!chatID) return;
@@ -501,18 +573,19 @@ Scope {
     if (typeof result.isMarkedUnread === "boolean") changes.isMarkedUnread = result.isMarkedUnread;
     chats = chats.map(chat => chat.id === chatID ? Object.assign({}, chat, changes) : chat);
   }
-  function setChatArchived(chatID, archived) {
+  function setChatLowPriority(chatID, lowPriority) {
     const chat = chats.find(item => item.id === chatID);
-    if (!connected || !chat || archivePending[chatID] || typeof archived !== "boolean") return;
-    if (chat.capabilities?.archive === false) { lastError = "Archiving is not supported for this conversation."; return; }
+    if (!connected || !chat || lowPriorityPending[chatID] || typeof lowPriority !== "boolean") return;
     lastError = "";
-    archivePending = Object.assign({}, archivePending, {[chatID]: true});
-    request("archive", {chatID: chatID, archived: archived}, (result, error) => {
-      const pending = Object.assign({}, archivePending); delete pending[chatID]; archivePending = pending;
+    lowPriorityPending = Object.assign({}, lowPriorityPending, {[chatID]: true});
+    request("updateChat", {chatID: chatID, changes: {isLowPriority: lowPriority}}, (result, error) => {
+      const pending = Object.assign({}, lowPriorityPending); delete pending[chatID]; lowPriorityPending = pending;
       if (error || deletedChatIDs[chatID]) return;
-      archiveChanges = Object.assign({}, archiveChanges, {[chatID]: {revision: ++archiveRevision, archived: archived}});
-      chats = chats.map(item => item.id === chatID ? Object.assign({}, item, {isArchived: archived}) : item);
-      chatArchiveChanged(chatID, archived);
+      ++chatsRevision;
+      const changes = {isLowPriority: typeof result?.isLowPriority === "boolean" ? result.isLowPriority : lowPriority};
+      if (typeof result?.isMuted === "boolean") changes.isMuted = result.isMuted;
+      chats = chats.map(item => item.id === chatID ? Object.assign({}, item, changes) : item);
+      chatPriorityChanged(chatID, changes.isLowPriority);
       refreshChats(false); scheduleUnreadCounts(true);
     });
   }
@@ -523,17 +596,22 @@ Scope {
     // request stays unread, even if the user switches conversations meanwhile.
     const readThroughID = currentChat?.preview?.id || messages[messages.length - 1]?.id || "";
     sending = true; lastError = "";
-    request("send", {chatID: chatID, text: draftText, attachment: draftAttachment, replyToMessageID: replyToMessageID}, (result, error) => {
+    const savedID = saveSendDraft(chatID, snapshot);
+    // Start a fresh composer synchronously. Preserve the submitted payload on
+    // disk before dispatch, independently of the next draft and any late reply.
+    replaceDraft(chatID, {}); persistChatDraft(chatID);
+    request("send", Object.assign({chatID: chatID}, snapshot), (result, error) => {
       sending = false;
-      if (error) return;
-      const current = currentChatID === chatID ? draftSnapshot() : localDrafts[chatID];
-      if (JSON.stringify(current) === JSON.stringify(snapshot)) {
-        if (currentChatID === chatID) { draftText = ""; draftAttachment = null; replyToMessageID = ""; flushDraft(); }
-        else {
-          localDrafts[chatID] = {text: "", attachment: null, replyToMessageID: ""};
-          request("saveDraft", Object.assign({chatID: chatID}, localDrafts[chatID]));
+      if (error) {
+        if (!deletedChatIDs[chatID]) {
+          const current = currentChatID === chatID ? draftSnapshot() : localDrafts[chatID];
+          if (!hasDraftContent(current)) { retireSendDraft(chatID, savedID); replaceDraft(chatID, snapshot); }
+          persistChatDraft(chatID);
         }
+        return;
       }
+      retireSendDraft(chatID, savedID);
+      if (!deletedChatIDs[chatID]) persistChatDraft(chatID);
       viewPositions[chatID] = {atLatest: true};
       markChatRead(chatID, readThroughID);
       messageSent(chatID);
@@ -579,6 +657,7 @@ Scope {
     onTriggered: root.refreshAccounts()
   }
   Timer { id: unreadCountsTimer; interval: 150; onTriggered: root.refreshUnreadCounts() }
+  Timer { id: navigationLoadTimer; interval: root.navigationLoadDelay; onTriggered: root.loadMessages(false) }
   Timer { id: refreshTimer; interval: 150; onTriggered: root.refreshChats(false) }
   Timer { id: messagesTimer; interval: 100; onTriggered: root.loadMessages(false) }
   Timer { id: restartTimer; interval: 3000; onTriggered: if (root.enabled && !root.demo) backend.running = true }
@@ -662,10 +741,9 @@ Scope {
     } else if (method === "unread") {
       chats = chats.map(chat => chat.id === params.chatID ? Object.assign({}, chat, {isMarkedUnread: true}) : chat);
       result = chats.find(chat => chat.id === params.chatID) || {};
-    } else if (method === "archive") {
-      chats = chats.map(chat => chat.id === params.chatID ? Object.assign({}, chat, {isArchived: params.archived}) : chat);
     } else if (method === "updateChat") {
       chats = chats.map(chat => chat.id === params.chatID ? Object.assign({}, chat, params.changes) : chat);
+      result = chats.find(chat => chat.id === params.chatID) || {};
     } else if (method === "stageAttachment") result = {path: params.path, srcURL: params.path, type: "file", fileName: params.path.split("/").pop()};
     else if (method === "search") {
       const words = String(params.query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);

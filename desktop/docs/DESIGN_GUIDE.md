@@ -91,7 +91,7 @@ conversations partagent exactement le fond Base de Macchiato (`#24273a`,
 envoyées reprennent la couleur opaque de la plateforme de la conversation, même
 dans `All` : Sapphire pour Telegram, Green pour WhatsApp, Pink pour Instagram,
 Teal pour les SMS et Blue pour Signal (palette Catppuccin Macchiato). Un réseau
-inconnu utilise un gris neutre. Le logo `All` en haut à gauche reste Mauve, sans
+inconnu utilise un gris neutre. Le logo `All` en haut de la liste reste Mauve, sans
 transmettre cette couleur aux conversations qu'il regroupe.
 Le micro et l'envoi utilisent l'accent de la conversation ; l'arrêt d'un enregistrement reste
 rouge. Le texte et les contrôles dans les bulles envoyées sont
@@ -106,31 +106,33 @@ de la fenêtre gardent leur comportement.
 Cette règle ne réintroduit aucune bordure.
 L'en-tête de la colonne de conversations affiche `N unread`, à côté du logo.
 Le total suit le réseau sélectionné, pas la recherche de titres : `All` regroupe
-tous les réseaux. Un marquage manuel `isMarkedUnread === true` rend la conversation
-visible et la compte une fois, même si Beeper renvoie aussi `isArchived: true`.
+tous les réseaux. Un marquage manuel `isMarkedUnread === true` compte une fois
+dans la vue à laquelle appartient la conversation, sans changer sa priorité.
 Le badge jaune reste un disque de 26 px, avec ou sans compteur : le marquage
 manuel sans nouveau message masque seulement le numéro, sans réduire le disque.
-Cette combinaison a été observée via l'API réelle : l'exclusion inconditionnelle
-des archives faisait disparaître ces discussions après `n`. `isChatInInbox`
-centralise la règle dans la vue et sa démo ; `countsAsUnread` applique la même
-priorité dans le backend. Le marquage non lu ne doit pas modifier le statut d'archive dans Beeper.
-Sans marquage manuel, seules les conversations non archivées ayant
-`unreadCount > 0` sont comptées, même en sourdine/basse priorité.
-`a` affiche/masque les autres archives dans le réseau courant ; `All` les inclut
-toutes. Il s'agit d'une inclusion dans la liste, pas d'un réseau supplémentaire.
+`isChatInInbox` exclut les conversations `isLowPriority` ; le compteur principal
+applique le même filtre. Ce champ vient directement de Beeper : aucun classement
+local persistant ne le remplace. Les changements faits dans un autre client sont
+repris lors des lectures suivantes. Les anciens choix d'archives de `state.json`
+ne sont plus utilisés, sans migration automatique des conversations distantes.
+`a` passe de la boîte de réception aux seules conversations Low Priority du réseau
+courant ; `All` regroupe tous les réseaux. Les deux listes ne se mélangent pas.
 Le mode est partagé entre écrans et conservé lors d'un changement par Tab.
-Un petit badge d'archive apparaît sur le logo et une icône identifie les lignes
-archivées. Shift+A archive/désarchive la conversation sélectionnée via le POST
-public `/v1/chats/{id}/archive`, avec `archived` explicitement true ou false.
-La réponse est vide : ne pas tenter de la décoder comme un objet JSON.
-Attendre la confirmation avant de changer la liste ; dédupliquer les demandes
-en cours et protéger l'état confirmé contre un rafraîchissement antérieur.
+Un petit badge à chevrons vers le bas apparaît sur le logo et sur les lignes
+Low Priority. Shift+A déplace la conversation sélectionnée via le PATCH public
+`/v1/chats/{id}`, avec `isLowPriority` explicitement true ou false.
+Attendre le succès API avant de changer la liste ; dédupliquer les demandes en
+cours et reprendre `isMuted` si la réponse le fournit. Une révision invalide les
+lectures lancées avant un changement réussi puis relance une lecture fraîche.
+Ne pas maintenir de surcharge locale qui empêcherait les changements distants.
+Les notifications ordinaires Low Priority sont supprimées ; les mentions
+structurées visant l'utilisateur ou `@room` et les réponses à ses messages
+peuvent notifier, sauf si la conversation est suspendue.
 Préserver brouillons, marquages non lus et reçus de lecture. Un accusé tardif ne
 change jamais la sélection d'une autre conversation. Ces touches restent du texte
 dans les champs et sont inactives pendant une recherche de messages/un vocal.
-Avec les archives affichées, le compteur utilise `allCounts`, calculé dans la même
-lecture du catalogue, pour compter aussi leurs non-lus. Sans ce mode, la règle
-de priorité au marquage manuel reste inchangée.
+Dans la vue Low Priority, le compteur utilise `lowPriorityCounts`, calculé dans la
+même lecture du catalogue, et inclut leurs marquages manuels non lus.
 Le backend parcourt les vraies pages de l'API, pas seulement le cache visible.
 Une pagination invalide ou une erreur rend le compteur indisponible (`—`), sans
 afficher un faux zéro. Les changements passifs sont regroupés à trois secondes ;
@@ -145,18 +147,38 @@ vers le bord, et `Shape.CurveRenderer` assure l'anticrénelage natif sans textur
 intermédiaire ni agrandissement artificiel. Le test Wayland vérifie le moteur
 réel ; les tests logiciels ne peuvent vérifier que le moteur demandé.
 
-`BeeperAvatar` est partagé entre la liste (48 px) et l'en-tête de la conversation
-(56 px). Les photos sont découpées en cercle avec `Quickshell.Widgets.ClippingRectangle` ;
+La liste de conversations reste à gauche de l'historique. L'en-tête séparé de la
+conversation est supprimé : la ligne sélectionnée reprend son avatar, son titre
+et le nombre de membres. Sa hauteur passe de 78 à 128 px (112 px en mode compact)
+sur 200 ms avec `OutCubic`, en gardant la courbe des workspaces de la top bar
+mais avec une durée divisée par deux pour une navigation plus vive.
+Un seul progrès anime la hauteur, l'avatar (48 → 72 px, 60 px en mode compact),
+l'échelle du titre et le fondu entre aperçu et détails. La désélection inverse
+le mouvement depuis la taille courante, y compris en navigation rapide.
+Les couleurs suivent un fondu de 120 ms. Les barres latérales masquées ou
+désactivées appliquent la sélection directement, sans animer les autres écrans.
+La sélection explicite reste dans le viewport pendant sa croissance ; molette,
+scrollbar et désactivation interrompent ce suivi, sans retour automatique.
+Les dimensions internes de l'avatar et la largeur de mise en page du titre
+restent fixes pendant l'animation : seuls leur échelle et leur placement bougent.
+Ne pas animer `diameter`, la taille des polices ou la largeur du texte, ni placer
+des `RowLayout`/`ColumnLayout` imbriqués dans les lignes animées. Le suivi de la
+sélection garde une référence au delegate et corrige seulement un bord rogné,
+sans `forceLayout()` ni recherche dans tout le catalogue à chaque image.
+`BeeperAvatar.sourceDiameter` garde aussi une résolution de décodage fixe.
+Les photos sont découpées en cercle avec `Quickshell.Widgets.ClippingRectangle` ;
 un simple rectangle arrondi ne découpe pas les enfants. Le badge du réseau reste
 en dehors de ce masque, en bas à droite, avec les glyphes WhatsApp/Telegram/Instagram/SMS de la
 police Nerd Font installée. Les autres réseaux gardent une lettre identifiable et
 une infobulle. Le repli sur la photo du correspondant reste limité aux discussions
-individuelles ; les initiales gardent une couleur stable entre liste et en-tête.
+individuelles ; les initiales gardent une couleur stable lors des changements de sélection.
 Le sous-titre d'un groupe indique `participants.total` fourni par l'API publique,
 avec le singulier/pluriel anglais. La longueur de `participants.items` n'est
 utilisée que si `hasMore === false` garantit une liste complète. Sinon, afficher
 `Group conversation`, pas un nombre inventé ni le nom du réseau. Une conversation
-individuelle n'a pas de sous-titre réseau redondant ; l'état muet reste indiqué.
+individuelle sélectionnée indique `Direct message` si aucun autre détail n'est
+disponible ; l'état muet reste indiqué. Les lignes inactives conservent l'aperçu
+du dernier message.
 
 L'interface de la messagerie est en anglais, y compris les dialogues, les erreurs
 et les notifications ; les noms et contenus des conversations ne sont pas traduits.
@@ -175,12 +197,34 @@ pour remplir une liste filtrée par réseau/recherche. L'historique se charge pr
 du haut, en conservant l'identité et le décalage du message visible et la sélection.
 Une seule requête est permise à la fois ; une erreur bloque la pagination jusqu'au
 prochain rafraîchissement, et un curseur vide ou inchangé termine les pages.
+La navigation dans la liste sélectionne immédiatement le chat et son brouillon,
+mais attend 90 ms de pause avant de charger l'historique. Un nouvel appui remplace
+la destination en attente, sans créer les bulles ou décodeurs des chats traversés.
+Les ouvertures explicites (notification/message cible) et rafraîchissements
+contournent cette temporisation ; déconnexion et sélection vide l'annulent.
+Les générations de requêtes empêchent toujours une réponse ancienne de remplir
+une autre conversation. Ne pas afficher le texte de conversation vide pendant
+ce délai.
+
+`BeeperHistory` utilise un `Instantiator` asynchrone pour répartir la création des
+bulles sur plusieurs images. Leur placement repose toujours sur les hauteurs
+réelles : aucun retour aux estimations de `ListView`. Le layout est recalculé
+seulement quand ses entrées changent, y compris le zoom et les citations.
+Restaurer la position de lecture avant de révéler les nouvelles bulles et leurs
+médias. Les panneaux invisibles ont un modèle d'historique vide ; conserver celui
+d'un panneau encore visible pendant sa fermeture. Les raccourcis qui naviguent
+dans l'historique attendent la fin de sa construction.
+Le calcul de visibilité utilise une recherche binaire et les seules lignes
+proches du viewport, plutôt que des bindings au défilement sur tous les messages.
+Un ajout d'ancienne page garde les décodeurs des médias restés visibles.
+Les pièces jointes ont également un modèle à clés stables : une mise à jour de
+réaction ou de reçu de lecture ne recrée pas les lecteurs des médias inchangés.
 Pas de boutons « load more », de compteur/footer permanent ni de boutons
 recherche/actions/fermeture dans l'en-tête. `?` affiche l'aide ; `:` n'ouvre rien.
 La recherche de texte revient séparément avec `Ctrl+/`, sous forme d'une barre
-contextuelle à droite du nom dans l'en-tête, jamais sous celui-ci ni dans la palette
-supprimée. Sa largeur est plafonnée à 360 px et à la moitié de la ligne ; le nom
-s'abrège si nécessaire et le compteur devient compact. Elle garde le
+contextuelle au-dessus de l'historique, sur toute la largeur de la conversation.
+Elle ne réserve aucune hauteur lorsqu'elle est fermée ; son compteur devient
+compact sur les petites fenêtres. Elle garde le
 brouillon intact. Entrée valide, puis `n`/`N`, `j`/`k` et Ctrl+J/K parcourent les
 résultats ; les lettres restent du texte tant que le champ a le focus. `Ctrl+/`
 permet de modifier la recherche, Échap la ferme sans fermer le chat.
@@ -221,16 +265,20 @@ retirés, Échap revient à la liste de gauche, puis ferme le panneau à l'appui
 suivant. Hors saisie, `j/k` parcourt les
 conversations ; Ctrl+J/K parcourt toujours les messages et révèle celui sélectionné,
 y compris depuis le composeur,
-sans perdre le brouillon. `l` sélectionne un message, `h` revient à la liste.
+sans perdre le brouillon. `l` donne le focus à la saisie de la conversation
+sélectionnée, comme Entrée ; `h` revient à la liste.
 Revenir à la liste, reprendre la saisie (au clavier ou à la souris), envoyer une
 réponse ou quitter le chat efface la sélection et son ancre de restauration.
-La prochaine entrée par Ctrl+J/K ou `l` sélectionne toujours le message le plus
+La prochaine entrée par Ctrl+J/K sélectionne toujours le message le plus
 récent ; les appuis suivants parcourent normalement l'historique. Ouvrir puis
 fermer l'aperçu d'un média conserve la sélection du média.
-Les chiffres `1` à `5` utilisent respectivement 😂, 💜, 🔥, 💯 et 🤡. Dans les
-conversations Telegram, `1` utilise 🤣 et `2` utilise ❤️ ; la conversation active
+Les chiffres `1` à `6` utilisent respectivement 👍, 😂, 💜, 🔥, 💯 et 🤡. Dans les
+conversations Telegram, `2` utilise 🤣 et `3` utilise ❤️ ; la conversation active
 détermine ces équivalences, même sous le filtre `All`, et l'aide suit cette même
-liste. Un autre chiffre remplace notre réaction, le même la retire. Les réactions des autres
+liste. Les sélecteurs Unicode de présentation ne distinguent pas deux réactions :
+comparer sans VS15/VS16, puis envoyer la variante exacte de `allowedReactions`
+(notamment 👍 suivi de VS16 sur Telegram). Ne pas retirer les tons de peau ni
+les jointures ZWJ. Un autre chiffre remplace notre réaction, le même la retire. Les réactions des autres
 participants sont conservées : l'identité vient de `participants.items.isSelf`
 ou de `accounts.user.id`. `BeeperData` ordonne les suppressions/ajouts par message
 et retient le dernier choix lors d'appuis rapides. Le rafraîchissement cible ce
@@ -238,10 +286,25 @@ message précis, même dans une ancienne page, et ignore les réponses périmée
 Les réactions respectent les capacités du réseau et ne rafraîchissent pas une
 autre conversation après un changement de sélection. Les chiffres restent du
 texte dans les champs ; ni l'autorepeat ni Ctrl/Alt/Meta+chiffre n'envoient de réaction.
-Espace lit/met en pause l'audio sélectionné, ou ouvre/referme sa photo/GIF en grand. Le
+Espace ouvre d'abord les liens du message sélectionné : ouverture directe s'il
+n'y a qu'une URL distincte, sinon un sélecteur avec `j/k`, Entrée et Échap. La liste
+combine les métadonnées Beeper et les URL du texte, sans doublons, et affiche les
+adresses réelles. Seuls HTTP(S) et mailto sont proposés ; `www.` utilise HTTPS.
+Le sélecteur conserve sa liste pendant le choix et se ferme si la conversation
+change. Les cartes de liens existantes dans les bulles gardent leur présentation.
+Sans lien, Espace lit/met en pause l'audio sélectionné, ou ouvre/referme sa photo/GIF en grand. Le
 lecteur existant est réutilisé ; un message hors champ est révélé avant d'activer
 son média. Si le téléchargement est en cours, la lecture attend son résultat et
-un second appui l'annule. Fermer le panneau annule aussi cette lecture différée.
+un second appui l'annule. `BeeperAudioPlayback`, possédé par le `BeeperData`
+partagé, conserve le lecteur audio et son téléchargement indépendamment des
+bulles, du viewport, de la conversation, des modales et du panneau ouvert/fermé.
+Les contrôles recréés se rattachent par conversation/message/index de pièce jointe,
+sans réinitialiser la position ni la vitesse. Aucun événement de visibilité ou
+de rafraîchissement ne doit mettre ce lecteur en pause. Échap le met d'abord en
+pause depuis le panneau ou ses modales ; les Échap suivants naviguent normalement.
+Espace sur le vocal sélectionné ou son bouton Pause font aussi une pause explicite.
+Un autre vocal ne peut remplacer celui en cours avant cette pause.
+La fermeture d'une vidéo plein écran continue d'annuler sa lecture différée.
 Espace garde son rôle normal dans les champs ; l'autorepeat ne relance pas le média.
 Les photos utilisent `MessengerPhotoWindow`, une surface Overlay sur le moniteur
 du chat, ancrée aux quatre bords sans marge ni zone exclusive. `BeeperPhotoViewer`
@@ -267,9 +330,32 @@ du texte ou une pièce jointe. Pendant l'enregistrement, il devient Arrêter et 
 actionnable même si la connexion tombe. Aucun bouton d'ajout de fichier ni ligne
 d'aide permanente : collage et glisser-déposer restent disponibles.
 
+Ctrl+S ouvre/ferme le sélecteur d'emojis, depuis la navigation ou la saisie.
+Le focus commence dans la grille : H/J/K/L utilisent les mêmes déplacements
+que les flèches, sans boucler aux limites. `/` donne le focus à la recherche
+français/anglais ; H/J/K/L y restent du texte. Bas ou Tab revient aux résultats,
+Entrée insère l'emoji (Espace aussi depuis la grille). Échap ou Ctrl+S annule en
+préservant le texte et sa sélection. Les raccourcis sont limités au chat actif,
+mais restent utilisables dans son Popup.Item, y compris depuis sa recherche.
+
+Ctrl+D démarre/termine un vocal sans envoyer le message. Le texte du brouillon
+reste intact ; une pièce jointe ou une modification en cours n'est pas remplacée.
+Un second appui pendant la préparation l'annule. Invalider aussi cette préparation
+quand le panneau se ferme ou que le chat change : une réponse tardive ne doit
+jamais ouvrir le micro après coup. Hors connexion, en lecture seule, pendant un
+envoi ou une dictée, le raccourci ne démarre rien ; un vocal actif peut toujours
+être terminé si la connexion tombe. Le test utilise un recorder injecté, sans
+CaptureSession réel ni envoi. Ctrl+D ne fait plus défiler les conversations.
+
+`?` hors saisie affiche l'aide complète, regroupée par contexte : navigation,
+composeur, emojis, Low Priority/non-lus, réactions, recherche, liens, médias et taille
+du texte. La vue défilante a une vraie hauteur de viewport bornée ; J/K, flèches,
+Page Up/Down et Home/End permettent de lire toute l'aide, Échap ou `?` la ferme.
+Garder `?` comme ponctuation ordinaire dans les champs de texte.
+
 Ctrl+molette au-dessus de la conversation et Ctrl+plus/moins changent la taille
 du texte des messages et de la saisie, de 14 à 36 px par pas de 2 ; Ctrl+0 revient
-à 20 px. Ni la colonne de conversations, ni l'en-tête, ni la top bar ne changent.
+à 20 px. Ni la colonne de conversations ni la top bar ne changent.
 La préférence appartient à `BeeperData`, partagée entre écrans et conservée lors
 des rechargements par `PersistentProperties`. La position de lecture et le
 brouillon sont préservés. Le `WheelHandler` ne capture que Ctrl+molette et se
@@ -310,7 +396,7 @@ appeler `positionViewAtIndex` pour restaurer une ancienne ancre : Qt garde les
 éléments visibles, et le geste doit continuer. La pagination utilise un throttle,
 pas un debounce qui attendrait la fin du défilement. Les listes sont verticales,
 sans rebond aux limites ni glisser-souris façon écran tactile (`Qt.NoButton`).
-Ctrl+D/U utilise `Flickable.flickTo` (Qt 6.11) ; ne pas ajouter de `Behavior on
+Ctrl+U utilise `Flickable.flickTo` (Qt 6.11) pour remonter d'une demi-page ; ne pas ajouter de `Behavior on
 contentY`, qui entrerait en conflit avec le moteur de défilement natif.
 
 `ui/AcceleratedScroll` garde son nom d'import, mais n'applique plus de gain ×4,5.
@@ -325,7 +411,8 @@ natif ; cette animation s'arrête avant de lui rendre la main. Pas de `Behavior`
 global sur `contentY`. Le zoom Ctrl+molette et la saisie ne sont pas interceptés.
 
 `BeeperHistory` remplace la ListView à hauteurs variables par un Flickable dont
-le contenu a une hauteur exacte (Column/Repeater alimenté par KeyedListModel).
+le contenu a une hauteur exacte (`Instantiator` asynchrone alimenté par
+`KeyedListModel`, puis placement explicite à partir des hauteurs réelles).
 Qt documente que l'estimation de hauteur de ListView fait varier son curseur de
 scroll quand de nouveaux délégués entrent dans le viewport. Les mises en page
 des messages chargés restent présentes ; seuls les médias/photos/citations
@@ -1085,6 +1172,7 @@ Conventions :
 - Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
 - La luminosité passe par `quickshell-brightness` : `brightnessctl` pour la dalle interne, `ddcutil` pour un écran externe identifié par connecteur, modèle et numéro de série. Les touches ciblent le moniteur focalisé ; la molette cible celui de la barre. Pour un écran externe, les appuis sont regroupés jusqu’à une pause de 180 ms, avec conservation des inversions de sens et saturation à chaque pas. L’OSD affiche immédiatement la consigne dès qu’une valeur est connue, puis se recale sur la réponse. Le bus est mémorisé en RAM et invalidé lors d’un changement de moniteurs ; une génération permet d’ignorer les réponses antérieures au changement. La dernière valeur vérifiée est réutilisée pendant deux secondes, puis relue à la prochaine interaction. Une seule écriture vérifiée est effectuée par groupe d’appuis, sans polling DDC ni modification du pilote.
 - Le volume utilise `Theme.sideVolume` pour son icône et son remplissage.
+- Chaque barre affiche la luminosité de son propre moniteur. Le contrôleur effectue une lecture sans écriture ni OSD au démarrage et après un changement de moniteurs. La télémétrie système ne fournit que la luminosité de la dalle interne ; elle ne sert jamais de repli pour un écran externe. Une valeur externe encore inconnue ou indisponible est affichée `--`. Les mesures internes continuent de suivre les changements hors de la barre sans écraser un réglage en attente.
 - La luminosité utilise `Theme.sideBrightness` pour son icône et son remplissage.
 - Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage coloré indique le niveau.
 - Chaque indicateur central apparaît uniquement sur le moniteur qui a reçu la touche ou le geste de molette.

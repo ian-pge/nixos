@@ -78,7 +78,6 @@ ShellRoot {
   QtObject {
     id: brightness
     function queueChange(monitor, delta) { fixture.events.push("brightness:" + monitor + ":" + delta); }
-    function reset() { fixture.events.push("brightness-reset"); }
   }
   QtObject { id: media; property var player: ({name: "Fake player"}) }
   QtObject { id: dictation; property bool active: false }
@@ -354,14 +353,15 @@ ShellRoot {
       auth.active = false; verify(controller.systemProcessListsWanted);
       controller.open("audio", "A"); verify(!controller.systemProcessListsWanted);
     }
-    function test_unplug_closes_only_target_and_resets_brightness_queue() {
+    function test_unplug_closes_only_target() {
       messenger.visible = true;
       controller.open("wifi", "B"); controller.dictationTargetMonitor = "B";
       verify(!messenger.visible); fixture.events = [];
       controller.monitors = ["A"];
       compare(controller.mode, "workspaces"); compare(controller.dictationTargetMonitor, "");
       verify(!network.active); verify(!messenger.visible);
-      compare(events(), "brightness-reset");
+      // BrightnessController owns device invalidation and re-reading on hotplug.
+      compare(events(), "");
       controller.open("system", "A"); controller.monitors = ["A", "C"];
       verify(controller.isOpen("system", "A"));
     }

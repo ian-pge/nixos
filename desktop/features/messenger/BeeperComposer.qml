@@ -189,13 +189,20 @@ Rectangle {
           radius: width / 2
           color: Qt.alpha(root.recording ? Theme.error : root.networkAccent,
             actionButton.down ? 0.28 : actionButton.hovered || actionButton.activeFocus ? 0.2 : 0.1)
+          Rectangle {
+            objectName: "beeperComposerStopIcon"
+            anchors.centerIn: parent
+            width: 16; height: 16
+            color: Theme.error
+            visible: root.recording && !root.busy
+          }
         }
         contentItem: Item {
           Text {
             objectName: "beeperComposerMicrophone"
-            anchors.centerIn: parent; text: root.recording ? "■" : "󰍬"
-            color: root.recording ? Theme.error : root.networkAccent
-            opacity: root.busy ? 0 : root.recording ? 1 : 1 - root.sendReveal
+            anchors.centerIn: parent; text: "󰍬"
+            color: root.networkAccent
+            opacity: root.busy || root.recording ? 0 : 1 - root.sendReveal
             scale: 0.8 + 0.2 * opacity
             font { family: "Ubuntu Nerd Font"; pixelSize: 23 }
           }

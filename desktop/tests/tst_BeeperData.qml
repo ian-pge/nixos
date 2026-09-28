@@ -124,6 +124,18 @@ ShellRoot {
       verify(!fixture.format.supports({capabilities: {edit: 2, editMaxAge: 1}}, "edit", {timestamp: "2020-01-01T00:00:00Z"}));
       compare(fixture.format.links({links: [{url: "javascript:alert(1)"}, {url: "https://example.test"}]}).length, 1);
     }
+    function test_links_merge_metadata_and_plain_text_without_duplicates() {
+      const links = fixture.format.messageLinks({
+        links: [{url: "https://example.test/page", title: "Page title"}, {url: "https://example.test/page"}, {url: "file:///tmp/private"}],
+        plainText: "Read https://example.test/page, then (https://en.example/wiki/Article_(topic)). Also www.example.test/info!"
+      });
+      compare(links.length, 3);
+      compare(links[0].url, "https://example.test/page"); compare(links[0].title, "Page title");
+      compare(links[1].url, "https://en.example/wiki/Article_(topic)");
+      compare(links[2].url, "https://www.example.test/info");
+      compare(fixture.format.messageLinks({text: "mailto:hello@example.test"})[0].url, "mailto:hello@example.test");
+      compare(fixture.format.messageLinks({text: "javascript:alert(1) file:///tmp/file data:text/plain,hello"}).length, 0);
+    }
     function test_sender_photo_comes_from_the_person_not_the_group() {
       const chat = {id: "g", type: "group", imgURL: "file:///group.png", accountID: "account", participants: {items: [
         {id: "person", imgURL: "file:///person.png", fullName: "Person"}

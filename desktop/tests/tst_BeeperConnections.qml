@@ -61,7 +61,6 @@ ShellRoot {
       compare(child("beeperChatRow-work").platformAccent, unaffected);
       compare(message.bubbleColor.toString(), "#ed8796");
       compare(child("beeperComposerSurface").networkAccent.toString(), "#ed8796");
-      compare(findChild(child("beeperHeaderAvatar"), "beeperNetworkBadge").color.toString(), "#ed8796");
       compare(findChild(child("beeperChatAvatar-personal"), "beeperNetworkBadge").color.toString(), "#ed8796");
       verify(child("beeperNetworkConnectionWarning").visible);
       setStatus("wa-personal", "connected");

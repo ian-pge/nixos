@@ -7,6 +7,13 @@ The command uses the existing nixpkgs Beeper launcher and the same arguments as
 its desktop entry. No new Beeper package, CLI, private API or window-hiding script
 is introduced; Desktop still runs and consumes its normal resources.
 
+The native **Keep Beeper minimized on launch** preference prevents the startup
+window from being shown. The service must remain running for the Quickshell
+messenger's API; disabling Beeper autostart entirely would disconnect it.
+Hyprland's `special:Chat silent` rule with no initial focus is only a fallback:
+moving a window out of view is not equivalent to suppressing its opening.
+The native window can still be opened explicitly for account or API settings.
+
 ## One-time Beeper preferences
 
 In Beeper Desktop's own settings:
@@ -17,9 +24,15 @@ In Beeper Desktop's own settings:
 - Keep the local API enabled and Desktop notification sounds/alerts disabled:
   the Quickshell client handles notifications.
 
-These preferences are not injected into private profile files. The service alone
-does not hide the window if the native minimized preference is off. Tokens remain
-in the keyring and are not included in the unit or Nix store.
+These native preferences remain in the persistent user profile, outside Nix:
+`launch_app_minimized = true` and `quit_on_close = false` in
+`~/.config/BeeperTexts/config.json`. Nix does not replace that file or rewrite it
+at every login. Beeper 4.3.73 reads these options before showing its main window;
+it has no supported `--hidden` or `--minimized` launch flag. The normal preference
+also suppresses restoration of subwindows at startup. If repairing the preference
+file outside Beeper, stop its service first, preserve a private backup, change only
+these options and restart it. Do not touch account databases or credentials.
+Tokens remain in the keyring and are not included in the unit or Nix store.
 
 Before the first rebuild, set these preferences and quit any manually launched
 Beeper instance once. Home Manager activation can start the new service immediately

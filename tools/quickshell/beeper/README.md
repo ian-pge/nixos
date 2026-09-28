@@ -46,16 +46,15 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | Méthode | Paramètres / résultat |
 | --- | --- |
 | `status`, `connect`, `reconnect`, `refresh` | `connect {token}` ; états `loading-token`, `keyring-unavailable`, `needs-token`, `invalid-token`, `connecting`, `connected`, `offline`, `demo` |
-| `accounts`, `chats` | Objets API bruts ; `chats {cursor?,direction?}` retourne `{items,hasMore,oldestCursor,newestCursor}` |
+| `accounts`, `chats` | Objets API ; `chats {cursor?,direction?}` retourne `{items,hasMore,oldestCursor,newestCursor}`, avec le classement natif `isLowPriority` de Beeper |
 | `messages`, `message`, `search` | `{chatID,cursor?,direction?}`, `{chatID,messageID}`, `{query,chatID?,cursor?,direction?}` ; une recherche explicite dans un chat inclut aussi ses messages en sourdine/basse priorité |
 | `contacts`, `startChat` | `{accountID,query}`, `{accountID,userID}` ; retour API Chat avec `id` |
 | `send` | `{chatID,text,replyToMessageID?,attachment?:{path,type}}` ; retourne `{chatID,pendingMessageID}` |
 | `edit`, `delete`, `react` | `{chatID,messageID,text?}`, réaction `{reactionKey,remove?}` |
-| `read`, `updateChat` | `{chatID,messageID?}`, `{chatID,changes:{isMuted?,isPinned?,isArchived?,isLowPriority?}}` |
+| `read`, `updateChat` | `{chatID,messageID?}`, `{chatID,changes:{isMuted?,isPinned?,isLowPriority?}}` |
 | `unread` | `{chatID}` ; marque manuellement la conversation non lue sans inventer de nouveaux messages |
-| `archive` | `{chatID,archived:bool}` ; POST public d'archivage/désarchivage, réponse vide normalisée en `{}` ; ne change pas les non-lus ni les messages |
-| `unreadCounts` | `{}` → `{counts:{réseau:nombre},allCounts:{réseau:nombre},archivedCounts:{réseau:nombre}}` ; `counts` donne priorité au marquage manuel et exclut les autres archives, `allCounts` inclut toutes les archives, `archivedCounts` compte uniquement les archives non lues (marquage manuel compris) ; même lecture complète des pages de l'API |
-| `getDraft`, `saveDraft` | `{chatID,text?,attachment?,replyToMessageID?}` ; retour `{text,attachment?,replyToMessageID?}` |
+| `unreadCounts` | `{}` → `{counts:{réseau:nombre},lowPriorityCounts:{réseau:nombre}}` ; deux compteurs disjoints selon `isLowPriority`, marquage manuel compris ; lecture complète des pages de l'API |
+| `getDraft`, `saveDraft` | `{chatID,text?,attachment?,replyToMessageID?,savedDrafts?:[{id,text,attachment?,replyToMessageID?}]}` ; retour `{text,attachment?,replyToMessageID?,savedDrafts?}` ; copies locales de récupération séparées du brouillon courant, conservées si le champ est omis et retirées avec `[]` |
 | `setView` | `{chatID,focused,atLatest}` ; état de vue conservé dans le protocole, sans couper les alertes sonores |
 | `stageAttachment`, `clipboardAttachment` | `{path,type?}` ou `{}` ; copie durable et privée `{path,srcURL,type,fileName,mimeType}` |
 | `prepareRecording`, `discardAttachment` | `{}` retourne un fichier `.ogg` de type `voice-note` ; `{path}` supprime uniquement une copie de notre répertoire, non référencée par un brouillon |
@@ -76,6 +75,16 @@ processus. QML ignore une réponse ancienne arrivée après un état plus récen
 et remet ce compteur à zéro lorsque le processus Go redémarre.
 
 ## Fiabilité et médias
+
+Les listes et les compteurs suivent directement `isLowPriority` renvoyé par
+Beeper. Aucun classement de conversations n'est persisté dans `state.json`.
+L'ancienne commande d'archivage et sa politique locale sont supprimées ; les
+anciens fichiers version 1 restent compatibles et leur champ `archives` est
+ignoré, sans perdre les brouillons ni les envois en attente. Aucun choix local
+n'est converti automatiquement en modification distante. Seules les actions
+explicites envoient un PATCH `isLowPriority`, sans modifier les non-lus.
+Les changements faits dans un autre client Beeper sont repris à la prochaine
+lecture ; les drapeaux natifs d'archive n'interviennent pas dans nos deux vues.
 
 Les brouillons et copies de pièces jointes sont dans
 `$XDG_STATE_HOME/quickshell-beeper` (sinon `~/.local/state/quickshell-beeper`). Les
@@ -106,7 +115,9 @@ envoi. Les identifiants encore provisoires sont conservés au redémarrage.
 Les notifications sont dédupliquées sur disque pendant 30 jours. Le premier chargement
 est silencieux ; les messages sortants, anciens, supprimés, lus, masqués, éditions et
 réactions ne génèrent pas d’alerte. La sourdine et la suspension de conversation sont
-vérifiées via l’API. Une reconnexion resynchronise les conversations et produit au
+vérifiées via l’API. Low Priority supprime les alertes ordinaires ; les mentions
+structurées visant l'utilisateur ou `@room` et les réponses à ses messages restent
+autorisées, sauf pendant une suspension. Une reconnexion resynchronise les conversations et produit au
 plus un résumé silencieux pour les messages manqués ; DND ne rejoue pas les alertes.
 Les nouvelles arrivées restent sonores même dans la conversation au premier plan.
 Quand le panneau de messagerie est ouvert, le serveur de notifications Quickshell

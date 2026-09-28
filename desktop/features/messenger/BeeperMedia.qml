@@ -15,11 +15,18 @@ Item {
   property bool renderEnabled: true
   property color accent: Theme.sideApplications
   property bool accentBackground: false
+  property string audioKey: ""
   readonly property string kind: Format.attachmentType(attachment)
+  readonly property var sharedAudio: kind === "audio" ? beeperData?.audioPlayback || null : null
+  readonly property string effectiveAudioKey: audioKey || JSON.stringify(["attachment", attachment.id || attachment.path || Format.attachmentSource(attachment)])
+  readonly property bool currentAudio: sharedAudio !== null && sharedAudio.key === effectiveAudioKey
+  readonly property bool mediaDownloading: currentAudio ? sharedAudio.downloading : downloading
+  readonly property string mediaError: currentAudio ? sharedAudio.errorText : errorText
   property string sourceUrl: Format.attachmentSource(attachment)
   property bool downloading: false
   property int resolutionGeneration: 0
-  property bool playWhenReady: false
+  property bool inlinePlayWhenReady: false
+  readonly property bool playWhenReady: sharedAudio ? currentAudio && sharedAudio.playWhenReady : inlinePlayWhenReady
   property string errorText: ""
   readonly property bool sourceReady: /^(file:|https?:|data:)/.test(sourceUrl)
   readonly property var waveformPeaks: beeperData?.demo ? attachment.previewWaveform || []
@@ -40,7 +47,7 @@ Item {
     : kind === "audio" ? 392 : fileRow.implicitWidth
   signal previewRequested(var attachment)
   implicitHeight: Math.max(visual ? Math.min(maximumVisualHeight, naturalSize.height, width / aspectRatio) : kind === "audio" ? 48 : 64,
-    downloading || errorText ? statusColumn.implicitHeight : 0)
+    mediaDownloading || mediaError ? statusColumn.implicitHeight : 0)
   clip: true
 
   function validSize(width, height) { return typeof width === "number" && typeof height === "number" && isFinite(width) && isFinite(height) && width > 0 && height > 0; }
@@ -50,21 +57,29 @@ Item {
     decodedSource = sourceUrl;
   }
   function playPendingMedia() {
+    if (sharedAudio) return;
     if (!playWhenReady || !playbackEnabled || !renderEnabled || !visible || downloading || errorText || !sourceReady || !mediaLoader?.item) return;
     mediaLoader.item.play();
   }
   function play() {
+    if (sharedAudio) { sharedAudio.play(effectiveAudioKey, attachment); return; }
     if ((kind !== "audio" && kind !== "video") || !playbackEnabled || !renderEnabled || !visible || errorText) return;
     if (playWhenReady || mediaLoader?.item?.playing) return;
-    playWhenReady = true;
+    inlinePlayWhenReady = true;
     resolveIfNeeded(); playPendingMedia();
   }
   function pause() {
-    playWhenReady = false;
+    if (sharedAudio) { if (currentAudio) sharedAudio.pause(); return; }
+    pauseInline();
+  }
+  function pauseInline() {
+    if (sharedAudio) return;
+    inlinePlayWhenReady = false;
     if (mediaLoader?.item) mediaLoader.item.stop();
   }
   function togglePlayback() {
     if ((kind !== "audio" && kind !== "video") || !playbackEnabled || !renderEnabled || !visible) return;
+    if (sharedAudio) { sharedAudio.toggle(effectiveAudioKey, attachment); return; }
     if (playWhenReady || mediaLoader?.item?.playing) pause();
     else play();
   }
@@ -82,13 +97,13 @@ Item {
     beeperData.request("download", {url: url}, (result, error) => {
       if (generation !== resolutionGeneration) return;
       downloading = false;
-      if (error || !result || result.error) { playWhenReady = false; errorText = error ? error.message : result?.error || "Preview unavailable"; return; }
+      if (error || !result || result.error) { inlinePlayWhenReady = false; errorText = error ? error.message : result?.error || "Preview unavailable"; return; }
       sourceUrl = result.srcURL || "";
       Qt.callLater(playPendingMedia);
     });
   }
   onPlaybackEnabledChanged: {
-    if (!playbackEnabled) pause();
+    if (!playbackEnabled) pauseInline();
     else { resolveIfNeeded(); requestWaveform(); }
   }
   function requestWaveform() {
@@ -99,10 +114,10 @@ Item {
     target: root.beeperData
     function onConnectedChanged() { Qt.callLater(root.requestWaveform); }
   }
-  onRenderEnabledChanged: if (renderEnabled) { resolveIfNeeded(); requestWaveform(); } else pause()
-  function resolveIfNeeded() { if (visible && playbackEnabled && renderEnabled && sourceUrl && !sourceReady) resolve(); }
-  onVisibleChanged: { if (!visible) pause(); else { resolveIfNeeded(); requestWaveform(); } }
-  onAttachmentChanged: { ++resolutionGeneration; downloading = false; pause(); sourceUrl = Format.attachmentSource(attachment); errorText = ""; resolveIfNeeded(); }
+  onRenderEnabledChanged: if (renderEnabled) { resolveIfNeeded(); requestWaveform(); } else pauseInline()
+  function resolveIfNeeded() { if (!sharedAudio && visible && playbackEnabled && renderEnabled && sourceUrl && !sourceReady) resolve(); }
+  onVisibleChanged: { if (!visible) pauseInline(); else { resolveIfNeeded(); requestWaveform(); } }
+  onAttachmentChanged: { ++resolutionGeneration; downloading = false; pauseInline(); sourceUrl = Format.attachmentSource(attachment); errorText = ""; resolveIfNeeded(); }
   Component.onCompleted: { resolveIfNeeded(); requestWaveform(); }
 
   Loader {
@@ -126,10 +141,43 @@ Item {
   Loader {
     id: mediaLoader
     anchors.fill: parent
-    visible: !root.downloading && !root.errorText
+    visible: !root.mediaDownloading && !root.mediaError
     active: root.renderEnabled && (root.kind === "audio" || root.kind === "video")
     onLoaded: root.playPendingMedia()
-    sourceComponent: Item {
+    sourceComponent: root.sharedAudio ? sharedAudioComponent : inlineMediaComponent
+  }
+  Component {
+    id: sharedAudioComponent
+    Item {
+      property alias player: audioControls
+      readonly property bool playing: root.currentAudio && root.sharedAudio.active
+      QtObject {
+        id: audioControls
+        objectName: "beeperMediaPlayer"
+        readonly property var audioOutput: root.sharedAudio?.player.audioOutput || null
+        readonly property int playbackState: root.currentAudio ? root.sharedAudio.player.playbackState : MediaPlayer.StoppedState
+        readonly property real duration: root.currentAudio ? root.sharedAudio.player.duration : 0
+        readonly property real position: root.currentAudio ? root.sharedAudio.player.position : 0
+        readonly property real playbackRate: root.currentAudio ? root.sharedAudio.player.playbackRate : 1
+        readonly property bool seekable: root.currentAudio && root.sharedAudio.player.seekable
+        function play() { root.play(); }
+        function pause() { root.pause(); }
+        function setPosition(value) { if (root.currentAudio) root.sharedAudio.player.setPosition(value); }
+        function setPlaybackRate(value) { if (root.currentAudio) root.sharedAudio.player.playbackRate = value; }
+      }
+      BeeperPlaybackControls {
+        anchors.fill: parent
+        player: audioControls
+        accent: root.accent; accentBackground: root.accentBackground
+        enabled: root.playbackEnabled
+        fallbackDuration: (root.attachment.duration || 0) * 1000
+        peaks: root.waveformPeaks
+      }
+    }
+  }
+  Component {
+    id: inlineMediaComponent
+    Item {
       property alias player: mediaPlayer
       readonly property bool playing: mediaPlayer.playbackState === MediaPlayer.PlayingState
       function play() { mediaPlayer.play(); }
@@ -137,13 +185,16 @@ Item {
       MediaPlayer {
         id: mediaPlayer
         objectName: "beeperMediaPlayer"
-        source: root.sourceReady && !root.downloading ? root.sourceUrl : ""
+        // Loading a source already starts decoding even without autoPlay.
+        // Inactive monitor panels and hidden previews must not create decoders.
+        // Persistent voice playback is owned separately by BeeperAudioPlayback.
+        source: root.playbackEnabled && root.visible && root.sourceReady && !root.downloading ? root.sourceUrl : ""
         audioOutput: AudioOutput {}
         videoOutput: video
         loops: root.attachment.isGif ? MediaPlayer.Infinite : 1
         autoPlay: !!root.attachment.isGif && !root.expanded && root.playbackEnabled && root.visible
-        onPlaybackStateChanged: if (playbackState === MediaPlayer.PlayingState) root.playWhenReady = false
-        onErrorOccurred: (error, errorString) => { root.playWhenReady = false; root.errorText = errorString; }
+        onPlaybackStateChanged: if (playbackState === MediaPlayer.PlayingState) root.inlinePlayWhenReady = false
+        onErrorOccurred: (error, errorString) => { root.inlinePlayWhenReady = false; root.errorText = errorString; }
       }
       VideoOutput {
         id: video; anchors.fill: parent; visible: root.kind === "video"
@@ -190,13 +241,13 @@ Item {
     } }
   }
   Rectangle {
-    anchors.fill: parent; visible: root.downloading || !!root.errorText
+    anchors.fill: parent; visible: root.mediaDownloading || !!root.mediaError
     color: "transparent"
     Column {
       id: statusColumn
       anchors.centerIn: parent; width: parent.width - 20; spacing: 5
-      Text { width: parent.width; text: root.downloading ? "Loading…" : root.errorText; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter; color: root.accentBackground ? Theme.background : Theme.secondary; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary } }
-      BeeperButton { anchors.horizontalCenter: parent.horizontalCenter; visible: !root.downloading; text: "Retry"; prominent: root.accentBackground; accent: root.accent; onClicked: { root.errorText = ""; root.resolve(); } }
+      Text { width: parent.width; text: root.mediaDownloading ? "Loading…" : root.mediaError; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter; color: root.accentBackground ? Theme.background : Theme.secondary; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary } }
+      BeeperButton { anchors.horizontalCenter: parent.horizontalCenter; visible: !root.mediaDownloading; text: "Retry"; prominent: root.accentBackground; accent: root.accent; onClicked: { if (root.sharedAudio) root.play(); else { root.errorText = ""; root.resolve(); } } }
     }
   }
 }

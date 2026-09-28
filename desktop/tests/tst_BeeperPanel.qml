@@ -9,6 +9,7 @@ ShellRoot {
   property var panel: null
   property var otherPanel: null
   property var format: null
+  property string animationStage: ""
   Component.onCompleted: {
     if (Quickshell.env("QT_QPA_PLATFORM") !== "offscreen") { Qt.exit(1); return; }
     const dc = Qt.createComponent("file://" + Quickshell.shellDir + "/../features/messenger/BeeperData.qml");
@@ -30,19 +31,23 @@ ShellRoot {
     name: "BeeperPanel"
     when: window.visible && fixture.panel !== null && beeperData.messages.length > 0
     function cleanupTestCase() { wait(100); console.log("BeeperPanel: " + results.passCount + " passed, " + results.failCount + " failed"); Qt.exit(results.failCount ? 1 : 0); }
-    function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName); }
+    function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName, fixture.animationStage); }
     function child(name) { return findChild(panel, name); }
     function init() {
+      fixture.animationStage = "";
       otherPanel.active = false; otherPanel.visible = false;
       panel.active = true; panel.windowFocused = true;
       panel.closeModal(); panel.editMessageID = "";
       panel.pinLatest = false;
       beeperData.setChatTextSize(20);
       beeperData.selectChat("studio"); beeperData.draftText = ""; beeperData.draftAttachment = null; beeperData.replyToMessageID = "";
+      // Earlier tests may assign text directly and replace its QML binding.
+      panel.composer.text = Qt.binding(() => panel.editMessageID ? panel.editText : beeperData.draftText);
       panel.width = 1280; panel.messageIndex = -1; panel.chatIndex = 0;
       child("beeperSearch").text = "";
       panel.closeChatSearch();
       panel.focusNavigation(); closeSpy.clear(); wait(30);
+      tryCompare(panel, "restoringView", false);
     }
     function test_enter_sends_once_and_preserves_unicode() {
       panel.compose();
@@ -73,6 +78,7 @@ ShellRoot {
       verify(!panel.canCycleNetwork); verify(!panel.canNavigateMessages);
       keyClick(Qt.Key_J, Qt.ControlModifier); keyClick(Qt.Key_K, Qt.ControlModifier);
       compare(panel.messageIndex, -1);
+      keyClick(Qt.Key_Slash);
       keyClick(Qt.Key_N); keyClick(Qt.Key_M);
       compare(child("beeperEmojiSearch").text, "nm");
       compare(beeperData.currentChat.isMarkedUnread, unread);
@@ -140,13 +146,17 @@ ShellRoot {
     function test_navigation_and_escape_hierarchy() {
       keyClick(Qt.Key_J); compare(beeperData.currentChatID, "lea");
       keyClick(Qt.Key_K); compare(beeperData.currentChatID, "studio");
-      keyClick(Qt.Key_L); compare(panel.navigation, "messages");
-      compare(panel.modal, "");
       keyClick(Qt.Key_I); verify(!child("beeperComposer").activeFocus);
-      keyClick(Qt.Key_Return); verify(child("beeperComposer").activeFocus);
+      const draft = beeperData.draftText;
+      keyClick(Qt.Key_L); compare(panel.navigation, "compose");
+      verify(child("beeperComposer").activeFocus); compare(beeperData.currentChatID, "studio");
+      compare(child("beeperComposer").text, draft); compare(panel.modal, "");
       keyClick(Qt.Key_Escape); verify(!child("beeperComposer").activeFocus); compare(closeSpy.count, 0);
       compare(panel.navigation, "chats");
       keyClick(Qt.Key_J); compare(beeperData.currentChatID, "lea");
+      keyClick(Qt.Key_L); verify(child("beeperComposer").activeFocus);
+      compare(beeperData.currentChatID, "lea");
+      keyClick(Qt.Key_Escape); compare(panel.navigation, "chats");
       keyClick(Qt.Key_K); compare(beeperData.currentChatID, "studio"); wait(20);
       keyClick(Qt.Key_Return); verify(child("beeperComposer").activeFocus);
       keyClick(Qt.Key_Escape); compare(panel.navigation, "chats");
@@ -154,25 +164,81 @@ ShellRoot {
       keyClick(Qt.Key_Escape); compare(panel.modal, ""); compare(closeSpy.count, 0);
       keyClick(Qt.Key_Escape); compare(closeSpy.count, 1);
     }
-    function test_header_avatar_tracks_selected_conversation_and_network() {
-      const header = child("beeperHeaderAvatar");
-      verify(header.visible);
-      compare(header.chat.id, "studio");
-      panel.chooseChat(1); wait(10);
-      compare(header.chat.id, "lea"); compare(header.network.key, "whatsapp");
-      const rowAvatar = child("beeperChatAvatar-lea");
-      verify(rowAvatar !== null);
-      compare(header.avatarSource, rowAvatar.avatarSource);
-      compare(header.accent, rowAvatar.accent);
-      panel.chooseChat(2); wait(10);
-      compare(header.chat.id, "design"); compare(header.network.key, "telegram");
+    function test_selected_row_replaces_the_header_and_sidebar_stays_on_the_left() {
+      compare(child("beeperHeaderAvatar"), null);
+      compare(child("beeperConversationHeader"), null);
+      const sidebar = child("beeperSidebar"), column = child("beeperConversationColumn");
+      verify(sidebar.x + sidebar.width < column.x);
+      verify(child("beeperMessages").mapToItem(panel, 0, 0).y <= 21);
+      const row = child("beeperChatRow-studio"), avatar = child("beeperChatAvatar-studio");
+      tryCompare(row, "selectionProgress", 1);
+      compare(row.height, 128); fuzzyCompare(avatar.diameter * avatar.scale, 72, 0.1);
+      compare(child("beeperChatPreview-studio").visible, false);
+      compare(child("beeperChatDetails-studio").text, "3 members");
+      compare(child("beeperChatDetails-studio").opacity, 1);
+      compare(child("beeperChatTitle-studio").scale, 1.25);
+      panel.chooseChat(1);
+      const next = child("beeperChatRow-lea");
+      tryCompare(next, "selectionProgress", 1);
+      compare(row.height, 78); compare(next.height, 128);
+      fuzzyCompare(avatar.diameter * avatar.scale, 48, 0.1);
+      compare(child("beeperChatAvatar-lea").network.key, "whatsapp");
+      compare(child("beeperChatDetails-lea").text, "Direct message");
+      verify(child("beeperChatPreview-studio").visible);
+      compare(child("beeperChatPreview-lea").visible, false);
     }
-    function test_header_uses_total_members_not_the_truncated_participant_list() {
+    function test_selection_growth_and_shrink_reverse_from_the_current_size() {
+      fixture.animationStage = "initial endpoints";
+      const first = child("beeperChatRow-studio"), next = child("beeperChatRow-lea");
+      tryCompare(first, "selectionProgress", 1); tryCompare(next, "selectionProgress", 0);
+      const photo = findChild(child("beeperChatAvatar-lea"), "beeperAvatarPhoto");
+      const imageSize = photo.sourceSize;
+      panel.chooseChat(1);
+      fixture.animationStage = "intermediate sizes";
+      tryVerify(() => first.height < 128 && first.height > 78 && next.height > 78 && next.height < 128);
+      const firstHeight = first.height, nextHeight = next.height;
+      panel.chooseChat(0);
+      fixture.animationStage = "no jump on reverse: " + first.height + ", " + firstHeight + ", " + next.height + ", " + nextHeight;
+      fuzzyCompare(first.height, firstHeight, 0.1);
+      fuzzyCompare(next.height, nextHeight, 0.1);
+      fixture.animationStage = "reversed endpoints";
+      // Qt's property comparisons can finish just before the final animation
+      // tick. Check rendered geometry with a subpixel tolerance instead.
+      tryVerify(() => Math.abs(first.height - 128) < 0.1 && Math.abs(next.height - 78) < 0.1);
+      fixture.animationStage = "avatar image resolution";
+      compare(photo.sourceSize, imageSize, "Resizing must not reload the avatar image");
+    }
+    function test_expanding_selection_stays_visible_at_the_bottom_of_the_list() {
+      const chats = beeperData.chats;
+      try {
+        fixture.animationStage = "bottom setup";
+        beeperData.chats = Array.from({length: 30}, (_, index) => ({id: "row-" + index,
+          title: "Conversation " + index, network: "Telegram", type: "group", participants: {total: 12}}));
+        panel.chooseChat(0); wait(450);
+        const list = panel.chatList;
+        list.positionViewAtIndex(12, ListView.End); list.forceLayout(); wait(20);
+        const selected = list.itemAtIndex(12);
+        verify(selected !== null);
+        fixture.animationStage = "bottom initial height: " + selected.height;
+        compare(selected.height, 78);
+        panel.chooseChat(12);
+        for (let frame = 0; frame < 6; ++frame) {
+          wait(80); list.forceLayout();
+          fixture.animationStage = "bottom frame " + frame + ": " + selected.y + ", " + selected.height + ", " + list.contentY + ", " + list.height + ", " + child("beeperSidebar").revealTarget + ", " + list.moving;
+          tryVerify(() => selected.y >= list.contentY - 1
+            && selected.y + selected.height <= list.contentY + list.height + 1);
+        }
+        fixture.animationStage = "bottom final height: " + selected.height;
+        compare(selected.height, 128);
+        compare(beeperData.currentChatID, "row-12");
+      } finally { beeperData.chats = chats; beeperData.selectChat("studio"); }
+    }
+    function test_selected_row_uses_total_members_not_the_truncated_participant_list() {
       const chats = beeperData.chats;
       try {
         beeperData.chats = chats.map(chat => chat.id === "studio" ? Object.assign({}, chat,
           {participants: {total: 234, hasMore: true, items: [{id: "one"}]}}) : chat);
-        compare(child("beeperChatSubtitle").text, "234 members");
+        compare(child("beeperChatDetails-studio").text, "234 members");
         compare(fixture.format.chatSubtitle({type: "group", participants: {total: 1}}), "1 member");
         compare(fixture.format.chatSubtitle({type: "group", participants: {items: [{id: "a"}], hasMore: true}}), "Group conversation");
         compare(fixture.format.chatSubtitle({type: "single", network: "Telegram"}), "");
@@ -189,7 +255,7 @@ ShellRoot {
       compare(panel.modal, "");
     }
     function test_text_zoom_shortcuts_only_resize_messages_and_composer() {
-      const title = child("beeperChatTitle"), titleSize = title.font.pixelSize;
+      const title = child("beeperChatTitle-studio"), titleSize = title.font.pixelSize;
       const sidebar = child("beeperChats"), sidebarWidth = sidebar.width;
       panel.compose();
       const composer = child("beeperComposer");
@@ -316,7 +382,7 @@ ShellRoot {
           compare(child("beeperNetworkFilter").accent.toString(), "#c6a0f6");
           const row = child("beeperChatRow-" + item.id);
           verify(row !== null); verify(row.chosen);
-          compare(row.color.toString(), item.color);
+          tryVerify(() => row.color.toString() === item.color);
           compare(child("beeperComposerMicrophone").color.toString(), item.color);
           compare(child("beeperComposerSendIcon").color.toString(), item.color);
           compare(otherPanel.conversationAccent.toString(), item.color);
@@ -551,22 +617,22 @@ ShellRoot {
         keyClick(Qt.Key_N); verify(!beeperData.currentChat.isMarkedUnread);
       } finally { panel.closeModal(); panel.closeChatSearch(); beeperData.chats = chats; }
     }
-    function test_unread_header_keeps_manual_flags_even_with_archive_state() {
+    function test_unread_header_counts_lowPriority_manual_flags_only_in_low_priority() {
       const chats = beeperData.chats;
       try {
         beeperData.chats = [
           {id: "studio", title: "One", network: "Telegram", unreadCount: 50},
-          {id: "manual", title: "Two", network: "WhatsApp", unreadCount: 0, isMarkedUnread: true, isArchived: true},
+          {id: "manual", title: "Two", network: "WhatsApp", unreadCount: 0, isMarkedUnread: true, isLowPriority: true},
           {id: "both", title: "Three", network: "WhatsApp", unreadCount: 3, isMarkedUnread: true},
-          {id: "archive", title: "Archived", network: "Telegram", unreadCount: 7, isArchived: true}
+          {id: "updateChat", title: "LowPriority", network: "Telegram", unreadCount: 7, isLowPriority: true}
         ];
         beeperData.networkFilter = "all";
         const counter = child("beeperUnreadConversationCount"), logo = child("beeperNetworkFilter");
-        compare(counter.text, "3 unread"); compare(counter.parent, logo.parent);
-        verify(panel.filteredChats.some(chat => chat.id === "manual"));
-        verify(!panel.filteredChats.some(chat => chat.id === "archive"));
+        compare(counter.text, "2 unread"); compare(counter.parent, logo.parent);
+        verify(!panel.filteredChats.some(chat => chat.id === "manual"));
+        verify(!panel.filteredChats.some(chat => chat.id === "updateChat"));
         verify(counter.x > logo.x);
-        beeperData.networkFilter = "whatsapp"; compare(counter.text, "2 unread");
+        beeperData.networkFilter = "whatsapp"; compare(counter.text, "1 unread");
         beeperData.networkFilter = "all";
       } finally { beeperData.chats = chats; }
     }

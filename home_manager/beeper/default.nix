@@ -4,9 +4,9 @@
     force = true;
   };
 
-  # Beeper's public local API is served by Desktop. Its native "Keep Beeper
-  # minimized on launch" preference controls visibility; do not edit the app's
-  # private settings or hide/move its windows with compositor commands.
+  # Beeper's public local API is served by Desktop. Its native minimized-on-launch
+  # preference suppresses the startup window; the silent Hyprland rule is only
+  # a fallback. Keep the native preferences in the persistent user profile.
   systemd.user.services.beeper = {
     Unit = {
       Description = "Beeper Desktop — local messaging API";

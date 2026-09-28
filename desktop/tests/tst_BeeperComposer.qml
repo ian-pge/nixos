@@ -87,6 +87,8 @@ ShellRoot {
       mouseClick(child("beeperComposerEmoji"));
       tryCompare(fixture.composer, "emojiPickerOpen", true);
       const picker = child("beeperEmojiPicker");
+      tryVerify(() => picker.grid.activeFocus);
+      keyClick(Qt.Key_Slash);
       tryVerify(() => picker.searchInput.activeFocus);
       picker.searchInput.text = query;
       return picker;

@@ -42,6 +42,16 @@ bool supported(PHLLS layer) {
     return layer && (layer->m_namespace == "quickshell-top-bar" || layer->m_namespace == "liquid-glass-test");
 }
 
+bool desktopHiddenByLock() {
+    // Match Hyprland's renderAllClientsForWorkspace handoff: a lock request
+    // precedes the locker's first submitted frame. During that short interval
+    // the compositor still renders the desktop. Dropping the glass immediately
+    // exposes the 12%-alpha QML background and produces a bright flash.
+    return g_pSessionLockManager->isSessionLocked() &&
+           (g_pSessionLockManager->clientLocked() || g_pSessionLockManager->clientDenied() ||
+            g_pSessionLockManager->shallConsiderLockMissing());
+}
+
 void announce(bool ready) {
     if (g_pEventManager)
         g_pEventManager->postEvent({"custom", ready ? "liquid-glass:ready" : "liquid-glass:disabled"});
@@ -271,7 +281,7 @@ CBox effectArea(PHLLS layer, PHLMONITOR monitor) {
 }
 
 void prepareMonitor(PHLMONITOR monitor) {
-    if (!enabled || !monitor->m_damage.hasChanged() || g_pSessionLockManager->isSessionLocked())
+    if (!enabled || !monitor->m_damage.hasChanged() || desktopHiddenByLock())
         return;
     const auto changed = monitor->m_damage.getBufferDamage(1);
     for (auto& [_, entry] : resources) {
@@ -677,7 +687,8 @@ class GlassPass final : public IPassElement {
 void renderLayer(IHyprRenderer* renderer, PHLLS layer, PHLMONITOR monitor, const Time::steady_tp& now, bool popups,
                  bool lockscreen) {
     if (!enabled || !supported(layer) || popups || lockscreen || !layer->visible() || renderer->m_bRenderingSnapshot ||
-        g_pSessionLockManager->isSessionLocked()) {
+        desktopHiddenByLock() ||
+        (g_pSessionLockManager->isSessionLocked() && layer->m_ruleApplicator->aboveLock().valueOrDefault())) {
         reinterpret_cast<LayerFunction>(hook->m_original)(renderer, layer, monitor, now, popups, lockscreen);
         return;
     }

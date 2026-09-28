@@ -32,9 +32,9 @@ ShellRoot {
         {id: "read-a", title: "Read A", network: "Telegram", isPinned: true},
         {id: "unread-b", title: "Unread B", network: "WhatsApp", unreadCount: 2},
         {id: "read-c", title: "Read C", network: "Telegram"},
-        {id: "manual-d", title: "Manual D", network: "Telegram", unreadCount: 0, isMarkedUnread: true, isArchived: true},
+        {id: "manual-d", title: "Manual D", network: "Telegram", unreadCount: 0, isMarkedUnread: true},
         {id: "unread-e", title: "Unread E", network: "Telegram", unreadCount: 4},
-        {id: "archive-f", title: "Archive F", network: "Telegram", isArchived: true, unreadCount: 2},
+        {id: "priority-f", title: "Priority F", network: "Telegram", isLowPriority: true, unreadCount: 2},
         {id: "read-g", title: "Read G", network: "Signal"}
       ];
       panel.chooseChat(0);
@@ -80,17 +80,17 @@ ShellRoot {
       compare(ids(panel.filteredChats), "unread-e,read-c,read-a,unread-b,manual-d,read-g");
       compare(beeperData.currentChatID, "read-a"); compare(panel.chatIndex, 2);
     }
-    function test_network_archive_and_search_filters_keep_the_unread_order() {
+    function test_network_priority_and_search_filters_keep_the_unread_order() {
       keyClick(Qt.Key_U); keyClick(Qt.Key_Tab);
       compare(panel.networkFilter, "telegram"); verify(panel.unreadFirst);
       compare(ids(panel.filteredChats), "manual-d,unread-e,read-a,read-c");
       keyClick(Qt.Key_A);
-      compare(ids(panel.filteredChats), "manual-d,archive-f");
-      panel.openChatSearch(); wait(0); panel.searchField.text = "archive";
-      compare(ids(panel.filteredChats), "archive-f");
+      compare(ids(panel.filteredChats), "priority-f");
+      panel.openChatSearch(); wait(0); panel.searchField.text = "priority";
+      compare(ids(panel.filteredChats), "priority-f");
       keyClick(Qt.Key_Escape); keyClick(Qt.Key_Tab);
       compare(panel.networkFilter, "whatsapp"); compare(panel.filteredChats.length, 0); verify(panel.unreadFirst);
-      keyClick(Qt.Key_U); verify(!panel.unreadFirst); compare(panel.networkFilter, "whatsapp"); verify(panel.showArchived);
+      keyClick(Qt.Key_U); verify(!panel.unreadFirst); compare(panel.networkFilter, "whatsapp"); verify(panel.showLowPriority);
       keyClick(Qt.Key_A); compare(ids(panel.filteredChats), "unread-b");
     }
     function test_typing_search_modals_and_modifiers_do_not_toggle_the_order() {
@@ -107,6 +107,7 @@ ShellRoot {
       panel.preparingRecording = true; keyClick(Qt.Key_U); verify(!panel.unreadFirst); panel.preparingRecording = false;
       panel.windowFocused = false; keyClick(Qt.Key_U); verify(!panel.unreadFirst); panel.windowFocused = true;
       panel.compose(); mouseClick(findChild(panel, "beeperComposerEmoji")); tryCompare(panel, "emojiPickerOpen", true);
+      keyClick(Qt.Key_Slash);
       keyClick(Qt.Key_U); compare(findChild(panel, "beeperEmojiSearch").text, "u"); verify(!panel.unreadFirst);
       keyClick(Qt.Key_Escape); panel.focusNavigation(); keyClick(Qt.Key_U); verify(panel.unreadFirst);
     }

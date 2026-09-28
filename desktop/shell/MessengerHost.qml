@@ -91,6 +91,7 @@ Item {
     parent: bubble.contentItem
     anchors.fill: parent
     beeperData: root.controller.beeperData
+    dictating: root.dictating
     externalPhotoPreview: true
     active: root.active && !root.controller.blocked
     windowFocused: root.windowFocused && (activeFocus || emojiPickerOpen) && !root.nativeDialogOpen && !root.controller.blocked

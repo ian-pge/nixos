@@ -5,9 +5,16 @@ import "../../features/messenger"
 BeeperData {
   enabled: false
   state: "connected"
+  // Most interaction tests control replies directly. Navigation performance
+  // tests opt into the production delay explicitly.
+  navigationLoadDelay: 0
   property var requests: []
+  property bool deferDrafts: false
+  property bool deferRecording: false
   function request(method, params, callback, quiet) {
-    if (["accounts", "chats", "unreadCounts", "messages", "message", "search", "send", "read", "unread", "archive", "react", "download"].includes(method))
+    if (["accounts", "chats", "unreadCounts", "messages", "message", "search", "send", "read", "unread", "updateChat", "react", "download"].includes(method)
+        || (deferDrafts && ["getDraft", "saveDraft"].includes(method))
+        || (deferRecording && ["prepareRecording", "discardAttachment"].includes(method)))
       requests = requests.concat([{method: method, params: params, callback: callback, quiet: quiet === true}]);
     else if (callback) Qt.callLater(() => callback({}, null));
   }
@@ -16,6 +23,6 @@ BeeperData {
     if (index < 0) throw new Error("No pending " + method + " request");
     const request = requests[index];
     requests = requests.filter((_, i) => i !== index);
-    request.callback(result, error || null);
+    if (request.callback) request.callback(result, error || null);
   }
 }

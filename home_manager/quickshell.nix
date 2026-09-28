@@ -28,7 +28,13 @@
   # Qt otherwise selects the single-threaded basic render loop on this
   # NVIDIA/Wayland setup, making high-refresh QML animations visibly uneven.
   systemd.user.services.quickshell = {
-    Unit.X-Restart-Triggers = ["${localPackages.quickshellDesktop}"];
+    Unit = {
+      X-Restart-Triggers = ["${localPackages.quickshellDesktop}"];
+      # WantedBy starts the shell, but does not stop it at logout. Without
+      # PartOf, it can survive `uwsm stop` connected to the old compositor,
+      # and the next login sees an already-running (but invisible) service.
+      PartOf = ["graphical-session.target"];
+    };
     Service.Environment = ["QSG_RENDER_LOOP=threaded"];
   };
 }

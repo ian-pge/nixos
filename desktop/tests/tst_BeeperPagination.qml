@@ -6,8 +6,10 @@ ShellRoot {
   id: fixture
   property var beeperData: null
   property var panel: null
+  property string stage: ""
   Window { id: window; width: 1280; height: 900; visible: true }
   TestResult { id: results }
+  SignalSpy { id: mediaVisibility; signalName: "renderMediaChanged" }
   TestCase {
     name: "BeeperPagination"
     when: window.visible
@@ -18,12 +20,14 @@ ShellRoot {
       verify(item !== null); return item;
     }
     function init() {
+      fixture.stage = "";
+      mediaVisibility.target = null; mediaVisibility.clear();
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true});
     }
     function cleanup() {
-      if (results.failed) console.error("FAILED", qtest_results.functionName);
+      if (results.failed) console.error("FAILED", qtest_results.functionName, fixture.stage);
       panel.active = false; panel.destroy(); beeperData.destroy(); wait(0);
     }
     function cleanupTestCase() {
@@ -58,7 +62,7 @@ ShellRoot {
       beeperData.refreshChats(false);
       compare(beeperData.currentChatID, ""); compare(pending("messages").length, 0);
       beeperData.respond("chats", {items: [
-        {id: "archived", network: "WhatsApp", title: "Archived", isArchived: true},
+        {id: "lowPriority", network: "WhatsApp", title: "LowPriority", isLowPriority: true},
         {id: "other-network", network: "Telegram", title: "Elsewhere"},
         {id: "first", network: "WhatsApp", title: "First visible", unreadCount: 3},
         {id: "second", network: "WhatsApp", title: "Second visible"}
@@ -142,21 +146,21 @@ ShellRoot {
       compare(beeperData.currentChat.network, "Telegram"); verify(beeperData.currentChat.isMarkedUnread);
       verify(panel.filteredChats.some(chat => chat.id === "chat-0"));
     }
-    function test_n_does_not_hide_a_conversation_reported_as_both_archived_and_manually_unread() {
-      const original = {id: "chat-0", title: "Conversation", network: "Google Messages", isArchived: false, isMarkedUnread: false, unreadCount: 0};
+    function test_n_preserves_the_backend_priority_placement_of_an_inbox_conversation() {
+      const original = {id: "chat-0", title: "Conversation", network: "Google Messages", isLowPriority: false, isMarkedUnread: false, unreadCount: 0};
       beeperData.chats = [original]; beeperData.networkFilter = "sms";
       panel.chooseChat(0); beeperData.respond("messages", {items: messages(0, 3), hasMore: false});
       tryCompare(panel, "restoringView", false); panel.focusNavigation();
       keyClick(Qt.Key_N); waitRequest("unread");
-      // This flag combination was observed in both list and retrieve responses
-      // from the real API. It is not a deletion or just a change in list order.
-      const marked = Object.assign({}, original, {isArchived: true, isMarkedUnread: true});
+      // Read-state updates leave Beeper's priority flag untouched.
+      const marked = Object.assign({}, original, {isLowPriority: false, isMarkedUnread: true});
       beeperData.respond("unread", marked); waitRequest("chats");
       beeperData.respond("chats", {items: [marked], hasMore: false});
       wait(40); panel.chatList.forceLayout();
-      verify(panel.filteredChats.some(chat => chat.id === "chat-0"), "The manual unread marker must take precedence over archive filtering");
+      verify(panel.filteredChats.some(chat => chat.id === "chat-0"));
       compare(beeperData.currentChatID, "chat-0"); compare(beeperData.messages.length, 3);
-      verify(beeperData.currentChat.isArchived, "Keep Beeper's archive state intact; do not silently unarchive it");
+      verify(!beeperData.currentChat.isLowPriority, "Marking unread must not move an inbox chat into low_priority");
+      compare(pending("updateChat").length, 0);
       const row = findChild(panel, "beeperChatRow-chat-0"); verify(row !== null); verify(row.unread);
       beeperData.refreshChats(false); beeperData.respond("chats", {items: [marked], hasMore: false});
       compare(panel.filteredChats.length, 1, "Subsequent refreshes must not hide it again");
@@ -304,13 +308,22 @@ ShellRoot {
       panel.messageIndex = 1;
       compare(waitRequest("messages").params.cursor, "history-30");
       const anchorID = beeperData.messages[Math.max(0, list.indexAt(1, list.contentY + 12))].id;
+      const anchorRow = list.itemAtIndex(0);
+      verify(anchorRow.renderMedia);
+      mediaVisibility.target = anchorRow; mediaVisibility.clear();
       beeperData.respond("messages", {items: messages(0, 30), oldestCursor: "history-0", hasMore: true});
       tryCompare(panel, "restoringView", false); wait(180);
+      fixture.stage = "prepend anchor " + anchorID + " / " + beeperData.messages[Math.max(0, list.indexAt(1, list.contentY + 12))].id + ", y=" + list.contentY;
       compare(beeperData.messages[Math.max(0, list.indexAt(1, list.contentY + 12))].id, anchorID);
+      fixture.stage = "prepend selection " + panel.messageIndex;
       compare(beeperData.messages[panel.messageIndex].id, "message-31");
+      compare(list.itemAtIndex(30), anchorRow);
+      compare(mediaVisibility.count, 0, "Prepending preserves visible media instead of restarting their decoders");
+      fixture.stage = "prepend pending " + JSON.stringify(pending("messages").map(request => request.params));
       compare(pending("messages").length, 0); verify(!list.atYEnd);
       const before = beeperData.viewPositions["chat-0"].messageID;
       panel.changeTextSize(2); tryCompare(panel, "restoringView", false); wait(30);
+      fixture.stage = "zoom anchor " + before + " / " + beeperData.messages[Math.max(0, list.indexAt(1, list.contentY + 12))].id;
       compare(beeperData.messages[Math.max(0, list.indexAt(1, list.contentY + 12))].id, before);
     }
     function test_short_history_fills_automatically_and_stops_at_end() {
@@ -455,21 +468,18 @@ ShellRoot {
       for (let i = 0; i < 12; ++i) { panel.schedulePagination(); wait(20); }
       compare(pending("chats").length, 1, "Fetch during the gesture, not only after its end");
     }
-    function test_vim_half_page_uses_native_animation_and_mouse_drag_does_not_scroll() {
+    function test_ctrl_u_half_page_uses_native_animation_and_mouse_drag_does_not_scroll() {
       seedHistory();
       const list = findChild(panel, "beeperMessages");
       list.positionViewAtIndex(15, ListView.Beginning); list.forceLayout();
       const before = list.contentY;
       panel.focusNavigation(); panel.navigation = "messages";
-      keyClick(Qt.Key_D, Qt.ControlModifier); wait(20);
+      keyClick(Qt.Key_U, Qt.ControlModifier); wait(20);
       verify(list.moving); tryCompare(list, "moving", false, 2000);
-      fuzzyCompare(list.contentY, before + list.height / 2, 2);
-      keyClick(Qt.Key_U, Qt.ControlModifier);
-      tryCompare(list, "moving", false, 2000);
-      fuzzyCompare(list.contentY, before, 2);
+      fuzzyCompare(list.contentY, before - list.height / 2, 2);
       compare(list.acceptedButtons, Qt.NoButton);
       mouseDrag(list, list.width / 2, list.height / 2, 0, -100);
-      fuzzyCompare(list.contentY, before, 2);
+      fuzzyCompare(list.contentY, before - list.height / 2, 2);
     }
     function test_mixed_heights_do_not_resize_the_scrollbar_when_scrolling() {
       beeperData.chats = chats(0, 1); beeperData.selectChat("chat-0");

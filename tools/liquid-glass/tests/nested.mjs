@@ -18,7 +18,7 @@ const env = {...process.env, XDG_RUNTIME_DIR: runtime, WAYLAND_DISPLAY: parentDi
     HYPRLAND_NO_RT: "1", AQ_DRM_DEVICES: "/dev/null", AQ_NO_MODIFIERS: "1"};
 delete env.HYPRLAND_INSTANCE_SIGNATURE;
 delete env.NOTIFY_SOCKET;
-let compositor, scene, widget;
+let compositor, scene, widget, pendingLock;
 let log = "", sceneLog = "";
 const exec = promisify(execFile);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -290,6 +290,43 @@ try {
         await sceneCall("traffic", "false");
         await until(async () => JSON.parse(await ctl("liquidglass")).surfaces === 2, "glass restored after unrelated animation");
     }
+    // A real locker requests the lock before its first image is ready. During
+    // that interval Hyprland still draws the desktop: its glass must not switch
+    // to the bright, translucent QML source for one or more frames.
+    const protocols = (await exec("pkg-config", ["--variable=pkgdatadir", "wayland-protocols"])).stdout.trim();
+    const lockProtocol = path.join(protocols, "staging/ext-session-lock/ext-session-lock-v1.xml");
+    await exec("wayland-scanner", ["client-header", lockProtocol, path.join(runtime, "session-lock-client.h")]);
+    await exec("wayland-scanner", ["private-code", lockProtocol, path.join(runtime, "session-lock-protocol.c")]);
+    const clientFlags = (await exec("pkg-config", ["--cflags", "--libs", "wayland-client"])).stdout.trim().split(/\s+/);
+    const lockClient = path.join(runtime, "pending-lock");
+    await exec("cc", ["-Wall", "-Wextra", "-Werror", "-I", runtime, path.join(here, "pending-lock.c"),
+        path.join(runtime, "session-lock-protocol.c"), ...clientFlags, "-o", lockClient]);
+    // Keep the fixture's preparation interval long enough to observe, without
+    // changing any policy on the parent compositor.
+    await ctl("eval", "hl.config({misc={lockdead_screen_delay=1200}})");
+    pendingLock = spawn(lockClient, [], {env:{...env, GLASS_LOCK_TEST_RUNTIME:runtime}, detached:true});
+    let pendingLog = "";
+    pendingLock.stdout.on("data", data => { pendingLog += data; });
+    pendingLock.stderr.on("data", data => { sceneLog += data; });
+    await until(async () => pendingLog.includes("pending"), "private pending session lock");
+    assert.equal((await ctl("locked")).trim(), "true", "The private compositor must have received the lock request");
+    // Cursor damage generates real desktop repaint work while the first lock
+    // surface is pending; a static scene alone could legitimately stay idle.
+    const beforeLockFrames = JSON.parse(await ctl("liquidglass")).frames;
+    for (let i = 0; i < 6; i++) {
+        await ctl("dispatch", `hl.dsp.cursor.move({x=${45 + i * 3},y=55})`);
+        await delay(30);
+    }
+    const pendingFrames = JSON.parse(await ctl("liquidglass")).frames;
+    assert.ok(pendingFrames > beforeLockFrames,
+        "Glass must remain rendered until Hyprland stops drawing the desktop for the lock");
+    await delay(1300);
+    const lockedFrames = JSON.parse(await ctl("liquidglass")).frames;
+    await ctl("dispatch", "hl.dsp.cursor.move({x=120,y=55})");
+    await delay(120);
+    assert.equal(JSON.parse(await ctl("liquidglass")).frames, lockedFrames,
+        "No desktop glass may be rendered after Hyprland secures the lock");
+    console.log("Lock handoff: glass preserved while pending; desktop absent once secured");
     assert.match(await ctl("plugin", "unload", plugin), /ok/i);
     await delay(300);
     assert.equal(compositor.exitCode, null, "Unloading must not crash Hyprland");
@@ -304,6 +341,6 @@ try {
     console.error(sceneLog.slice(-3000));
     throw error;
 } finally {
-    await stop(widget); await stop(scene); await stop(compositor);
+    await stop(pendingLock); await stop(widget); await stop(scene); await stop(compositor);
     await rm(runtime, {recursive:true, force:true});
 }

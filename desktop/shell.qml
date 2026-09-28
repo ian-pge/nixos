@@ -86,6 +86,7 @@ ShellRoot {
   BrightnessController {
     id: brightnessFeature
     enabled: desktop.servicesEnabled
+    monitors: panels.monitors
     onFeedbackRequested: monitor => panels.showBrightness(monitor, false)
     onFeedbackUpdated: monitor => panels.brightnessUpdated(monitor)
     onFeedbackFailed: monitor => panels.brightnessFailed(monitor)
@@ -102,7 +103,7 @@ ShellRoot {
     id: systemFeature
     enabled: desktop.servicesEnabled
     topRequested: panels.systemProcessListsWanted
-    onBrightnessSample: value => { if (panels.mode !== "brightness") brightnessFeature.sample = value; }
+    onBrightnessSample: value => brightnessFeature.sample = value
   }
   PowerController { id: powerFeature; enabled: desktop.servicesEnabled; telemetry: systemFeature.telemetry }
   NotificationData {

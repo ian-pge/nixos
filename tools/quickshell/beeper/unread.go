@@ -5,12 +5,6 @@ import (
 	"time"
 )
 
-// Match the UI inbox: an explicit unread reminder takes precedence over Beeper's
-// archive flag. Ordinary archived chats remain out of the inbox/count.
-func countsAsUnread(archived, marked bool, messages int) bool {
-	return marked || (!archived && messages > 0)
-}
-
 // Count conversations, not messages. Scan the public catalog rather than just
 // the UI's loaded pages, including manual unread flags with a zero message count.
 func (b *backend) unreadCounts(ctx context.Context) (object, error) {
@@ -25,7 +19,7 @@ func (b *backend) unreadCounts(ctx context.Context) (object, error) {
 		Network        string `json:"network"`
 		UnreadCount    int    `json:"unreadCount"`
 		IsMarkedUnread bool   `json:"isMarkedUnread"`
-		IsArchived     bool   `json:"isArchived"`
+		IsLowPriority  bool   `json:"isLowPriority"`
 	}
 	byID := map[string]chat{}
 	seenCursors := map[string]bool{}
@@ -54,18 +48,15 @@ func (b *backend) unreadCounts(ctx context.Context) (object, error) {
 		seenCursors[cursor] = true
 	}
 	counts := map[string]int{}
-	allCounts := map[string]int{}
-	archivedCounts := map[string]int{}
+	lowPriorityCounts := map[string]int{}
 	for _, row := range byID {
 		if row.UnreadCount > 0 || row.IsMarkedUnread {
-			allCounts[row.Network]++
-			if row.IsArchived {
-				archivedCounts[row.Network]++
+			if row.IsLowPriority {
+				lowPriorityCounts[row.Network]++
+			} else {
+				counts[row.Network]++
 			}
 		}
-		if countsAsUnread(row.IsArchived, row.IsMarkedUnread, row.UnreadCount) {
-			counts[row.Network]++
-		}
 	}
-	return object{"counts": counts, "allCounts": allCounts, "archivedCounts": archivedCounts}, nil
+	return object{"counts": counts, "lowPriorityCounts": lowPriorityCounts}, nil
 }

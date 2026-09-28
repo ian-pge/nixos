@@ -8,7 +8,7 @@ Rectangle {
   required property var controller
   property string targetMonitor: ""
   signal changeRequested(int delta)
-  readonly property real level: Math.max(0, Math.min(1, controller.value(targetMonitor) / 100))
+  readonly property real level: Math.max(0, Math.min(1, (controller.value(targetMonitor) ?? 0) / 100))
   property real displayedLevel: level
 
   implicitWidth: 280

@@ -82,6 +82,13 @@ le mélange charbon représente environ 62–75 %, sans assombrir les textes.
 Le plugin restaure les états de rendu via Hyprland
 pour conserver la cohérence de ses caches, notamment pour le curseur logiciel.
 
+Lors du verrouillage, le matériau reste actif pendant les dernières images du
+bureau que Hyprland autorise à afficher, avant la première image de Hyprlock.
+Il ne disparaît donc plus dès la demande de verrouillage, ce qui exposait
+brièvement les fonds QML très transparents et provoquait un flash clair.
+Le plugin ne dessine aucun widget au-dessus du verrouillage et ne prolonge pas
+la visibilité du bureau : le compositeur garde la décision de masquer celui-ci.
+
 ### Géométrie synchronisée et compatibilité
 
 Le module `Local.LiquidGlass` lit les formes pendant `beforeSynchronizing`,
@@ -319,6 +326,11 @@ de renouveler `cushion-source.json` (pas de simple mise à jour aveugle du hash)
 Les deux tests `pebble-*` et leurs 286 sondes restent disponibles pour l'archive.
 Le test imbriqué vérifie aussi que les champs restent en cache au repos et
 pendant le rebond uniforme de sélection.
+Il termine par un verrouillage de son seul compositeur privé, avec un client
+volontairement lent : le verre doit rester présent avant la première image du
+verrouillage, puis cesser d'être dessiné dès que Hyprland masque le bureau.
+Le client de test refuse de démarrer hors du répertoire runtime privé créé
+par ce test ; la session de travail n'est jamais verrouillée.
 
 ### Comparaison du temps GPU du matériau
 

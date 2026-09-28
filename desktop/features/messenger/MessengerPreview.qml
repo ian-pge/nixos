@@ -113,9 +113,9 @@ ShellRoot {
     Timer {
       interval: 150; running: true
       onTriggered: {
-        if (Quickshell.env("BEEPER_PREVIEW_ARCHIVES") === "1") {
-          data.chats = data.chats.map(chat => chat.id === "design" ? Object.assign({}, chat, {isArchived: true}) : chat);
-          data.showArchived = true;
+        if (Quickshell.env("BEEPER_PREVIEW_LOW_PRIORITY") === "1") {
+          data.chats = data.chats.map(chat => chat.id === "design" ? Object.assign({}, chat, {isLowPriority: true}) : chat);
+          data.showLowPriority = true;
         }
         if (Quickshell.env("BEEPER_PREVIEW_MEDIA") === "1") {
           data.demoMessages.studio = data.demoMessages.studio.concat([{id: "preview-audio", chatID: "studio", senderName: "Noé", timestamp: new Date().toISOString(),

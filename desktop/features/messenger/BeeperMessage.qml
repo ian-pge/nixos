@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
+import "../../ui"
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
 
@@ -13,6 +14,7 @@ Item {
   property bool playbackEnabled: true
   property bool renderMedia: true
   property bool viewportReady: true
+  property bool inViewport: true
   property real textScale: 1
   property color networkAccent: Theme.secondary
   property string searchQuery: ""
@@ -151,11 +153,20 @@ Item {
         }
         Repeater {
           id: attachments
-          model: root.message.attachments || []
+          // Read receipts/reactions replace the message snapshot, not its
+          // unchanged media. Keep those delegates and their decoders alive.
+          model: KeyedListModel {
+            rows: (root.message.attachments || []).map((attachment, index) => ({
+              id: JSON.stringify([attachment.id || Format.attachmentSource(attachment), index]),
+              attachment: attachment
+            }))
+          }
           BeeperMedia {
-            required property var modelData
+            required property var row
+            required property int index
             width: bubble.width
-            attachment: modelData; beeperData: root.beeperData
+            attachment: row.attachment; beeperData: root.beeperData
+            audioKey: JSON.stringify([root.message.chatID || root.beeperData?.currentChatID || "", root.message.id, index])
             playbackEnabled: root.playbackEnabled
             renderEnabled: root.renderMedia
             accent: root.contentAccent

@@ -8,7 +8,9 @@ Scope {
   property bool enabled: true
   property list<string> command: ["quickshell-brightness"]
   property var executor: helper
-  property int sample: 0
+  // System telemetry measures only the laptop's backlight.
+  property int sample: -1
+  property var monitors: []
   property var pendingChanges: []
   property var values: ({})
   property var states: ({})
@@ -21,12 +23,41 @@ Scope {
   signal stateReset()
   onEnabledChanged: {
     if (!enabled) { dispatchTimer.stop(); helper.running = false; reset(); }
-    else dispatch();
+    else { refreshMonitors(); dispatch(); }
   }
+  onMonitorsChanged: {
+    reset();
+    Qt.callLater(root.refreshMonitors);
+  }
+  onSampleChanged: {
+    if (sample < 0) return;
+    const values = Object.assign({}, root.values);
+    for (const monitor of Object.keys(values)) {
+      if (isInternal(monitor) && !busy(monitor))
+        values[monitor] = sample;
+    }
+    root.values = values;
+  }
+  Component.onCompleted: Qt.callLater(root.refreshMonitors)
 
-  function value(monitor) { return values[monitor] ?? sample; }
+  function isInternal(monitor) { return /^(eDP|LVDS|DSI)-/.test(monitor); }
+  function busy(monitor) {
+    return (executor.running && requestGeneration === generation && requestMonitor === monitor)
+      || pendingChanges.some(change => change.monitor === monitor);
+  }
+  function refreshMonitors() {
+    if (!enabled) return;
+    for (const monitor of monitors) {
+      if (values[monitor] === undefined && !busy(monitor))
+        queueChange(monitor, 0);
+    }
+  }
+  function value(monitor) {
+    return values[monitor] ?? (isInternal(monitor) && sample >= 0 ? sample : null);
+  }
   function icon(monitor = "") {
     const level = value(monitor);
+    if (level === null) return "󰃠";
     return level < 34 ? "󰃞" : level < 67 ? "󰃟" : "󰃠";
   }
   function change(delta, monitor) {
@@ -72,7 +103,7 @@ Scope {
     const steps = index >= 0 ? queue[index].steps.concat([delta]) : [delta];
     // Keep every direction reversal for correct clamping, but send only the
     // final level after the external monitor's key-repeat burst has ended.
-    const internal = /^(eDP|LVDS|DSI)-/.test(monitor);
+    const internal = isInternal(monitor);
     const deadline = Date.now() + (internal || delta === 0 ? 0 : 180);
     const change = {monitor: monitor, steps: steps, deadline: deadline};
     if (index >= 0)

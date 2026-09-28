@@ -135,7 +135,6 @@ Scope {
     authRequestForUpdate = false;
   }
   onMonitorsChanged: {
-    if (services) services.brightness.reset();
     close("brightness");
     if (mode !== "workspaces" && !monitors.includes(targetMonitor)) close(mode);
     if (!monitors.includes(dictationTargetMonitor)) dictationTargetMonitor = "";

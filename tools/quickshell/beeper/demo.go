@@ -29,7 +29,7 @@ func (b *backend) initDemo() {
 		messages := []object{makeMessage(row.id+"-1", "Salut ! Comment se passe ta journée ?", false, when.Add(-time.Hour)), makeMessage(row.id+"-2", "Bien, je prends un peu le temps aujourd’hui.", true, when.Add(-55*time.Minute)), makeMessage(row.id+"-3", row.initial, false, when.Add(-10*time.Minute)), makeMessage(row.id+"-4", row.reply, true, when.Add(-8*time.Minute)), makeMessage(row.id+"-5", "Parfait ✨", false, when)}
 		messages[3]["reactions"] = []object{{"id": "demo-reaction", "participantID": "camille", "reactionKey": "💙", "emoji": true}}
 		b.demoMessages[row.id] = messages
-		b.demoChats = append(b.demoChats, object{"id": row.id, "title": row.title, "network": row.network, "accountID": "demo-" + strings.ToLower(row.network), "type": "single", "unreadCount": row.unread, "lastActivity": when.Format(time.RFC3339Nano), "preview": messages[len(messages)-1], "isMuted": false, "isPinned": i == 0, "isArchived": false, "participants": object{"items": []object{{"id": row.id + "-user", "fullName": row.title}}, "total": 1, "hasMore": false}, "capabilities": object{"archive": true, "delete": 2, "edit": 2, "reaction": 2, "reply": 2, "attachments": object{}}})
+		b.demoChats = append(b.demoChats, object{"id": row.id, "title": row.title, "network": row.network, "accountID": "demo-" + strings.ToLower(row.network), "type": "single", "unreadCount": row.unread, "lastActivity": when.Format(time.RFC3339Nano), "preview": messages[len(messages)-1], "isMuted": false, "isPinned": i == 0, "isLowPriority": false, "participants": object{"items": []object{{"id": row.id + "-user", "fullName": row.title}}, "total": 1, "hasMore": false}, "capabilities": object{"delete": 2, "edit": 2, "reaction": 2, "reply": 2, "attachments": object{}}})
 	}
 }
 func demoPage(items any) object {
@@ -50,21 +50,18 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		return demoPage(b.demoChats), nil
 	case "unreadCounts":
 		counts := map[string]int{}
-		allCounts := map[string]int{}
-		archivedCounts := map[string]int{}
+		lowPriorityCounts := map[string]int{}
 		for _, chat := range b.demoChats {
 			count, _ := chat["unreadCount"].(int)
 			if count > 0 || boolField(chat, "isMarkedUnread") {
-				allCounts[textField(chat, "network")]++
-				if boolField(chat, "isArchived") {
-					archivedCounts[textField(chat, "network")]++
+				if boolField(chat, "isLowPriority") {
+					lowPriorityCounts[textField(chat, "network")]++
+				} else {
+					counts[textField(chat, "network")]++
 				}
 			}
-			if countsAsUnread(boolField(chat, "isArchived"), boolField(chat, "isMarkedUnread"), count) {
-				counts[textField(chat, "network")]++
-			}
 		}
-		return object{"counts": counts, "allCounts": allCounts, "archivedCounts": archivedCounts}, nil
+		return object{"counts": counts, "lowPriorityCounts": lowPriorityCounts}, nil
 	case "messages":
 		return demoPage(b.demoMessages[p.ChatID]), nil
 	case "contacts":
@@ -121,10 +118,7 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		}
 		b.emit("messagesChanged", object{"chatID": p.ChatID})
 		return object{}, nil
-	case "read", "unread", "archive", "updateChat":
-		if method == "archive" && (p.ChatID == "" || p.Archived == nil) {
-			return nil, fail("invalid_params", "Specify the conversation and archive state.")
-		}
+	case "read", "unread", "updateChat":
 		var result object
 		for _, chat := range b.demoChats {
 			if textField(chat, "id") == p.ChatID {
@@ -155,8 +149,6 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 					chat["isMarkedUnread"] = false
 				} else if method == "unread" {
 					chat["isMarkedUnread"] = true
-				} else if method == "archive" {
-					chat["isArchived"] = *p.Archived
 				} else {
 					for key, value := range p.Changes {
 						chat[key] = value

@@ -398,6 +398,68 @@ func TestDraftsStagingAndDeletionBoundaries(t *testing.T) {
 		t.Fatal("original modified")
 	}
 }
+func TestSavedSendDraftsSurviveRestartAndAreNotOverwrittenByLegacyDraftUpdates(t *testing.T) {
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) { t.Error("drafts must stay local") })
+	saved := []savedDraft{{ID: "in-flight", Text: "Original é🙂", ReplyToMessageID: "original-message"}}
+	if _, err := b.handle(b.ctx, "saveDraft", parameters{ChatID: "chat", Text: "Next draft", SavedDrafts: &saved}); err != nil {
+		t.Fatal(err)
+	}
+	// Recording and older callers may update the live draft without supplying backups.
+	if _, err := b.handle(b.ctx, "saveDraft", parameters{ChatID: "chat", Text: "Newer next draft"}); err != nil {
+		t.Fatal(err)
+	}
+	state, err := loadState(b.stateDir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := state.Drafts["chat"]
+	if d.Text != "Newer next draft" || len(d.SavedDrafts) != 1 || d.SavedDrafts[0].Text != "Original é🙂" || d.SavedDrafts[0].ReplyToMessageID != "original-message" {
+		t.Fatalf("draft and submitted payload were not kept separate: %#v", d)
+	}
+	b.state = state
+	result, err := b.handle(b.ctx, "getDraft", parameters{ChatID: "chat"})
+	if err != nil || len(result.(draft).SavedDrafts) != 1 {
+		t.Fatal("backup unavailable after restart", err)
+	}
+	empty := []savedDraft{}
+	if _, err := b.handle(b.ctx, "saveDraft", parameters{ChatID: "chat", Text: d.Text, SavedDrafts: &empty}); err != nil {
+		t.Fatal(err)
+	}
+	state, err = loadState(b.stateDir, false)
+	if err != nil || len(state.Drafts["chat"].SavedDrafts) != 0 || state.Drafts["chat"].Text != d.Text {
+		t.Fatal("confirmation must remove only its backup", err)
+	}
+}
+
+func TestSubmittedDraftAttachmentRemainsProtectedUntilItsBackupIsRetired(t *testing.T) {
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) { t.Error("unexpected network") })
+	original := filepath.Join(t.TempDir(), "saved.png")
+	if err := os.WriteFile(original, []byte("fixture image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	a, err := b.stage(original, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := []savedDraft{{ID: "pending", Attachment: a}}
+	if _, err := b.handle(b.ctx, "saveDraft", parameters{ChatID: "chat", SavedDrafts: &saved}); err != nil {
+		t.Fatal(err)
+	}
+	if b.discard(a.Path) == nil {
+		t.Fatal("must not delete an attachment used by an in-flight or recoverable send")
+	}
+	empty := []savedDraft{}
+	if _, err := b.handle(b.ctx, "saveDraft", parameters{ChatID: "chat", SavedDrafts: &empty}); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.discard(a.Path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(original); err != nil {
+		t.Fatal("original user file was touched", err)
+	}
+}
+
 func TestSendPreservesOriginalAttachmentName(t *testing.T) {
 	var received object
 	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {

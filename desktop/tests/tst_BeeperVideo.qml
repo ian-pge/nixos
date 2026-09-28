@@ -10,6 +10,8 @@ ShellRoot {
   id: fixture
   property var beeperData: null
   property var viewer: null
+  property var inlineMedia: null
+  property var messageView: null
   readonly property string videoSource: "file://" + Quickshell.shellDir + "/fixtures/fullscreen-video.mp4"
   Window { id: window; width: 900; height: 600; visible: true }
   SignalSpy { id: closed; target: fixture.viewer; signalName: "closeRequested" }
@@ -28,10 +30,14 @@ ShellRoot {
         {width: 900, height: 600, beeperData: beeperData, visible: false, active: false});
       viewer.closeRequested.connect(() => { viewer.active = false; viewer.visible = false; });
       closed.clear();
+      inlineMedia = null;
     }
     function cleanup() {
       if (results.failed) console.error("FAILED", qtest_results.functionName);
-      viewer.active = false; viewer.destroy(); beeperData.destroy(); wait(0);
+      viewer.active = false; viewer.destroy();
+      if (inlineMedia) { inlineMedia.destroy(); inlineMedia = null; wait(0); }
+      if (messageView) { messageView.destroy(); messageView = null; wait(0); }
+      beeperData.destroy(); wait(0);
     }
     function cleanupTestCase() {
       console.log("BeeperVideo: " + results.passCount + " passed, " + results.failCount + " failed");
@@ -99,6 +105,67 @@ ShellRoot {
       compare(media().sourceUrl, "mxc://fixture/new"); verify(media().downloading);
       beeperData.respond("download", {srcURL: fixture.videoSource});
       waitPlaying(); compare(media().sourceUrl, fixture.videoSource); compare(media().errorText, "");
+    }
+    function test_hidden_inline_video_never_loads_a_decoder() {
+      inlineMedia = create("../features/messenger/BeeperMedia.qml", window.contentItem,
+        {width: 400, height: 250, attachment: {type: "video", srcURL: fixture.videoSource, isGif: true},
+          beeperData: beeperData, playbackEnabled: false});
+      const decoder = findChild(inlineMedia, "beeperMediaPlayer"); verify(decoder !== null);
+      compare(decoder.source.toString(), "");
+      inlineMedia.playbackEnabled = true;
+      tryCompare(decoder, "playbackState", MediaPlayer.PlayingState, 3000);
+      inlineMedia.playbackEnabled = false;
+      tryCompare(decoder, "playbackState", MediaPlayer.StoppedState);
+      compare(decoder.source.toString(), "");
+      inlineMedia.visible = false; inlineMedia.playbackEnabled = true;
+      compare(decoder.source.toString(), "");
+    }
+    function test_video_frames_render_with_the_real_wayland_scene_graph() {
+      if (Quickshell.env("QT_QUICK_BACKEND") === "software") skip("Run with --video for the normal Wayland scene graph");
+      show(fixture.videoSource); waitPlaying();
+      verify(waitForRendering(media()));
+      tryVerify(() => {
+        const frame = grabImage(media()), x = Math.floor(frame.width / 2), y = Math.floor(frame.height / 2);
+        return Math.abs(frame.red(x, y) - 64) < 8 && Math.abs(frame.green(x, y) - 128) < 8
+          && Math.abs(frame.blue(x, y) - 192) < 8;
+      }, 3000, "PlayingState is not enough: the decoded blue frame must actually reach the screen");
+    }
+    function test_inline_gif_refresh_and_viewport_unloads_keep_event_loop_responsive() {
+      inlineMedia = create("../features/messenger/BeeperMedia.qml", window.contentItem,
+        {width: 400, height: 250, attachment: {type: "video", srcURL: fixture.videoSource, isGif: true}, beeperData: beeperData});
+      for (let i = 0; i < 8; ++i) {
+        inlineMedia.renderEnabled = true; inlineMedia.playbackEnabled = true; inlineMedia.visible = true;
+        tryVerify(() => findChild(inlineMedia, "beeperMediaPlayer") !== null);
+        tryCompare(findChild(inlineMedia, "beeperMediaPlayer"), "playbackState", MediaPlayer.PlayingState, 3000);
+        inlineMedia.attachment = Object.assign({}, inlineMedia.attachment);
+        wait(20);
+        if (i % 2) inlineMedia.renderEnabled = false;
+        else inlineMedia.playbackEnabled = false;
+        wait(20);
+      }
+    }
+    function test_message_metadata_refresh_preserves_the_inline_decoder() {
+      const original = {id: "video-message", chatID: "chat", text: "A clip", attachments: [
+        {id: "clip", type: "video", srcURL: fixture.videoSource, isGif: true, size: {width: 320, height: 180}}
+      ]};
+      messageView = create("../features/messenger/BeeperMessage.qml", window.contentItem,
+        {width: 700, message: original, beeperData: beeperData});
+      const media = findChild(messageView, "beeperMedia");
+      verify(media !== null);
+      const decoder = findChild(media, "beeperMediaPlayer");
+      verify(decoder !== null);
+      tryCompare(decoder, "playbackState", MediaPlayer.PlayingState, 3000);
+      for (let index = 0; index < 5; ++index) {
+        messageView.message = JSON.parse(JSON.stringify(Object.assign({}, original, {
+          isUnread: false, reactions: [{participantID: "friend", reactionKey: index % 2 ? "💙" : "👍", emoji: true}]
+        })));
+        wait(20);
+        compare(findChild(messageView, "beeperMedia"), media);
+        compare(findChild(media, "beeperMediaPlayer"), decoder);
+        compare(decoder.playbackState, MediaPlayer.PlayingState, "Metadata must not interrupt the GIF");
+      }
+      messageView.message = Object.assign({}, original, {attachments: []});
+      compare(findChild(messageView, "beeperMedia"), null, "Removed attachments must still release their players");
     }
   }
 }

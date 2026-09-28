@@ -15,7 +15,10 @@ in {
   window_rule = [
     {
       match.class = "^(Beeper)$";
-      workspace = "special:Chat";
+      # Desktop supplies the Quickshell messenger's local API. Keep its window
+      # out of the login workspace without disabling the background service.
+      workspace = "special:Chat silent";
+      no_initial_focus = true;
     }
     (pwaWindowRule "Chat" pwaAppIds.whatsapp)
     (pwaWindowRule "Chat" pwaAppIds.mattermost)

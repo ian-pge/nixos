@@ -49,13 +49,99 @@ ShellRoot {
     }
     function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName); }
     function init() {
-      brightness.enabled = false; brightness.reset(); brightness.sample = 30;
+      brightness.enabled = false; brightness.monitors = []; brightness.reset(); brightness.sample = 30;
       executor.running = false; executor.calls = [];
       dictation.setState("stopped"); dictation.audioConnected = false; dictation.resetAudio();
       system.topRequested = false; system.telemetry.invalidateSystem(); system.telemetry.invalidateGpu();
       media.players = []; feedback = []; mediaActions = []; sampledBrightness = -1;
       power.battery = null; power.onBattery = true; power.powerDevices = []; power.bluetoothDevices = [];
       telemetry.systemFresh = true; telemetry.usbDevices = [];
+    }
+    function test_brightness_values_belong_to_each_monitor() {
+      compare(brightness.value("eDP-1"), 30);
+      compare(brightness.value("DP-1"), null);
+      compare(brightness.value("HDMI-A-1"), null);
+      compare(brightness.value(""), null);
+      brightness.requestGeneration = brightness.generation;
+      brightness.parseStatus('{"monitor":"DP-1","brightness":80}');
+      brightness.parseStatus('{"monitor":"HDMI-A-1","brightness":0}');
+      brightness.sample = 45;
+      compare(brightness.value("eDP-1"), 45);
+      compare(brightness.value("DP-1"), 80);
+      compare(brightness.value("HDMI-A-1"), 0);
+      brightness.requestMonitor = "DP-1"; brightness.fail();
+      compare(brightness.value("DP-1"), null, "An unavailable display never uses the laptop's reading");
+    }
+    function test_brightness_startup_reads_all_monitors_without_osd_or_writes() {
+      brightness.monitors = ["eDP-1", "DP-1", "HDMI-A-1"];
+      brightness.refreshMonitors();
+      compare(executor.calls.length, 0);
+      compare(brightness.pendingChanges.length, 0);
+      brightness.enabled = true;
+      compare(executor.calls[0], ["quickshell-brightness", "eDP-1", "[0]", "null"]);
+      brightness.refreshMonitors(); // A deferred startup callback must not duplicate requests.
+      compare(brightness.pendingChanges.length, 2);
+      for (const monitor of brightness.monitors) {
+        compare(brightness.requestMonitor, monitor);
+        brightness.parseStatus(JSON.stringify({monitor: monitor, brightness: 65}));
+        executor.running = false; brightness.dispatch();
+      }
+      compare(executor.calls.length, 3);
+      for (const command of executor.calls) compare(command[2], "[0]");
+      brightness.refreshMonitors(); compare(executor.calls.length, 3);
+      compare(feedback, []);
+      compare(brightness.value("DP-1"), 65);
+      compare(brightness.value("HDMI-A-1"), 65);
+    }
+    function test_brightness_hotplug_reads_new_topology_and_discards_old_result() {
+      brightness.monitors = ["DP-1"];
+      brightness.enabled = true;
+      compare(executor.calls.length, 1);
+      brightness.monitors = ["eDP-1", "DP-2"];
+      brightness.refreshMonitors();
+      brightness.parseStatus('{"monitor":"DP-1","brightness":80}');
+      compare(brightness.value("DP-1"), null);
+      compare(brightness.pendingChanges.map(change => change.monitor), ["eDP-1", "DP-2"]);
+      executor.running = false; brightness.dispatch();
+      compare(executor.calls[1], ["quickshell-brightness", "eDP-1", "[0]", "null"]);
+      brightness.parseStatus('{"monitor":"eDP-1","brightness":30}');
+      executor.running = false; brightness.dispatch();
+      compare(executor.calls[2], ["quickshell-brightness", "DP-2", "[0]", "null"]);
+      brightness.parseStatus('{"monitor":"DP-2","brightness":90}');
+      compare(brightness.value("DP-2"), 90);
+      compare(feedback, []);
+    }
+    function test_brightness_telemetry_updates_internal_panel_after_a_helper_read() {
+      brightness.values = {"eDP-1": 50, "DP-1": 80};
+      brightness.sample = 40;
+      compare(brightness.value("eDP-1"), 40);
+      compare(brightness.value("DP-1"), 80);
+      brightness.values = {"eDP-1": 50, "DP-1": 80};
+      brightness.change(5, "eDP-1");
+      brightness.sample = 45;
+      compare(brightness.value("eDP-1"), 55, "Telemetry must not erase a queued adjustment");
+      brightness.enabled = true;
+      brightness.sample = 50;
+      compare(brightness.value("eDP-1"), 55, "Telemetry must not erase an in-flight adjustment");
+      brightness.parseStatus('{"monitor":"eDP-1","brightness":55}');
+      executor.running = false;
+      brightness.sample = 55;
+      compare(brightness.value("eDP-1"), 55);
+      brightness.sample = 60;
+      compare(brightness.value("eDP-1"), 60);
+      compare(brightness.value("DP-1"), 80);
+    }
+    function test_brightness_change_during_initial_read_is_preserved() {
+      brightness.monitors = ["DP-1"];
+      brightness.enabled = true;
+      brightness.change(5, "DP-1");
+      brightness.parseStatus('{"monitor":"DP-1","brightness":70}');
+      compare(brightness.value("DP-1"), 75);
+      executor.running = false; brightness.dispatch();
+      tryCompare(executor, "running", true, 1000);
+      compare(executor.calls.length, 2);
+      compare(executor.calls[1][2], "[5]");
+      compare(feedback, ["DP-1"]);
     }
     function test_brightness_queue_preserves_clamped_direction_reversals() {
       brightness.values = {"DP-1": 95};

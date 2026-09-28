@@ -233,10 +233,53 @@ func (b *backend) resync(ctx context.Context, c *beeper.Client, summary bool, si
 	return nil
 }
 func muted(chat object) bool {
-	if boolField(chat, "isMuted") {
+	if boolField(chat, "isMuted") || boolField(chat, "isLowPriority") {
 		return true
 	}
 	return dateField(mapField(chat, "snooze"), "snoozeUntil").After(time.Now())
+}
+
+// Low Priority silences ordinary messages, but Beeper still allows mentions
+// and replies to our own messages. Use API identities, never display names.
+func (b *backend) priorityAttention(ctx context.Context, chatID string, chat, message object) bool {
+	if dateField(mapField(chat, "snooze"), "snoozeUntil").After(time.Now()) {
+		return false
+	}
+	mentions, _ := message["mentions"].([]any)
+	selfIDs := map[string]bool{}
+	participants, _ := mapField(chat, "participants")["items"].([]any)
+	for _, item := range participants {
+		person, _ := item.(map[string]any)
+		if boolField(person, "isSelf") && textField(person, "id") != "" {
+			selfIDs[textField(person, "id")] = true
+		}
+	}
+	for _, value := range mentions {
+		id, _ := value.(string)
+		if id == "@room" || selfIDs[id] {
+			return true
+		}
+	}
+	if len(mentions) > 0 && len(selfIDs) == 0 && textField(chat, "accountID") != "" {
+		if raw, err := b.raw(ctx, "GET", "v1/accounts/"+url.PathEscape(textField(chat, "accountID")), nil); err == nil {
+			var account object
+			if json.Unmarshal(raw, &account) == nil {
+				self := textField(mapField(account, "user"), "id")
+				for _, id := range mentions {
+					if self != "" && id == self {
+						return true
+					}
+				}
+			}
+		}
+	}
+	if linked := textField(message, "linkedMessageID"); linked != "" {
+		if raw, err := b.raw(ctx, "GET", messagePath(chatID, linked), nil); err == nil {
+			var replyTo object
+			return json.Unmarshal(raw, &replyTo) == nil && boolField(replyTo, "isSender")
+		}
+	}
+	return false
 }
 func notificationCandidate(m object, since time.Time) bool {
 	if textField(m, "id") == "" || boolField(m, "isSender") || boolField(m, "isDeleted") || boolField(m, "isHidden") || !dateField(m, "editedTimestamp").IsZero() {
@@ -277,7 +320,10 @@ func (b *backend) considerMessage(ctx context.Context, chatID string, m object, 
 		return
 	}
 	var chat object
-	if json.Unmarshal(raw, &chat) != nil || muted(chat) {
+	if json.Unmarshal(raw, &chat) != nil {
+		return
+	}
+	if muted(chat) && (!boolField(chat, "isLowPriority") || !b.priorityAttention(ctx, chatID, chat, m)) {
 		return
 	}
 	name := textField(m, "senderName")

@@ -7,7 +7,9 @@ import "./BeeperFormat.js" as Format
 Item {
   id: root
   property var chat: null
-  property int diameter: 48
+  property real diameter: 48
+  // A growing sidebar avatar keeps one decoded image throughout the animation.
+  property int sourceDiameter: Math.ceil(diameter)
   property bool imageEnabled: true
   property bool accentBackground: false
   property bool connectionProblem: false
@@ -42,9 +44,10 @@ Item {
     visible: root.imageReady
     Image {
       id: photo
+      objectName: "beeperAvatarPhoto"
       anchors.fill: parent
       source: root.imageEnabled ? root.avatarSource : ""
-      sourceSize: Qt.size(root.diameter * 2, root.diameter * 2)
+      sourceSize: Qt.size(root.sourceDiameter * 2, root.sourceDiameter * 2)
       fillMode: Image.PreserveAspectCrop
       asynchronous: true
     }

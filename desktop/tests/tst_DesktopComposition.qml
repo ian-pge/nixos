@@ -48,6 +48,23 @@ ShellRoot {
       verify(capsule.width > 0); verify(capsule.width <= capsule.maximumWidth);
       verify(capsule.visible);
     }
+    function test_bar_brightness_uses_its_monitor_reading() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], brightness = app.services.brightness;
+      const pill = findChild(bar.contentItem, "brightnessPill");
+      verify(pill !== null);
+      compare(brightness.monitors, app.coordinator.monitors);
+      brightness.sample = 30;
+      brightness.values = {};
+      compare(pill.text, brightness.icon(bar.monitorName) + " --");
+      brightness.values = {[bar.monitorName]: 80, "eDP-1": 30};
+      compare(pill.text, brightness.icon(bar.monitorName) + " 80%");
+      brightness.sample = 45;
+      compare(pill.text, brightness.icon(bar.monitorName) + " 80%");
+      brightness.values = {[bar.monitorName]: 0};
+      compare(pill.text, brightness.icon(bar.monitorName) + " 0%");
+      brightness.reset();
+    }
     function test_chat_weather_handoff_has_one_material_and_one_endpoint() {
       tryVerify(() => app.bars.length > 0);
       const bar = app.bars[0], capsule = bar.capsule, host = capsule.messengerHost;

@@ -25,6 +25,13 @@ type attachment struct {
 	MimeType string `json:"mimeType,omitempty"`
 }
 type draft struct {
+	Text             string       `json:"text"`
+	Attachment       *attachment  `json:"attachment,omitempty"`
+	ReplyToMessageID string       `json:"replyToMessageID,omitempty"`
+	SavedDrafts      []savedDraft `json:"savedDrafts,omitempty"`
+}
+type savedDraft struct {
+	ID               string      `json:"id"`
 	Text             string      `json:"text"`
 	Attachment       *attachment `json:"attachment,omitempty"`
 	ReplyToMessageID string      `json:"replyToMessageID,omitempty"`
@@ -236,6 +243,11 @@ func (b *backend) discard(path string) error {
 	for _, d := range b.state.Drafts {
 		if d.Attachment != nil && d.Attachment.Path == path {
 			return fail("attachment_in_use", "The attachment is still used by a draft.")
+		}
+		for _, saved := range d.SavedDrafts {
+			if saved.Attachment != nil && saved.Attachment.Path == path {
+				return fail("attachment_in_use", "The attachment is still used by a saved draft.")
+			}
 		}
 	}
 	return os.Remove(path)

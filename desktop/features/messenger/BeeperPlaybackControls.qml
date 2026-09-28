@@ -108,6 +108,10 @@ RowLayout {
     font.pixelSize: Theme.beeperFont.caption
     prominent: root.accentBackground; accent: root.accent
     Accessible.name: "Playback speed " + root.player.playbackRate + " times"
-    onClicked: root.player.playbackRate = root.player.playbackRate >= 2 ? 1 : root.player.playbackRate + 0.5
+    onClicked: {
+      const rate = root.player.playbackRate >= 2 ? 1 : root.player.playbackRate + 0.5;
+      if (typeof root.player.setPlaybackRate === "function") root.player.setPlaybackRate(rate);
+      else root.player.playbackRate = rate;
+    }
   }
 }

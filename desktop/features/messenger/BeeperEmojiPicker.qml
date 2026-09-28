@@ -26,11 +26,12 @@ Popup {
     const entry = matches[index];
     if (visible && entry) emojiSelected(entry.emoji);
   }
+  function search() { searchField.forceActiveFocus(); searchField.selectAll(); }
   onMatchesChanged: {
     emojiGrid.currentIndex = matches.length ? 0 : -1;
     emojiGrid.positionViewAtBeginning();
   }
-  onOpened: { searchField.text = ""; catalogLoaded = true; searchField.forceActiveFocus(); }
+  onOpened: { searchField.text = ""; catalogLoaded = true; emojiGrid.forceActiveFocus(); }
   contentItem: FocusScope {
     Keys.onEscapePressed: event => { root.cancelRequested(); event.accepted = true; }
     ColumnLayout {
@@ -39,7 +40,7 @@ Popup {
         id: searchField
         objectName: "beeperEmojiSearch"
         Layout.fillWidth: true; implicitHeight: 40
-        placeholderText: "Search emoji…"
+        placeholderText: "Search emoji…  /"
         color: Theme.foreground; placeholderTextColor: Theme.secondary
         selectionColor: Qt.alpha(root.accent, 0.4); selectedTextColor: Theme.foreground
         font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control }
@@ -63,17 +64,28 @@ Popup {
         clip: true; reuseItems: true
         model: root.matches
         keyNavigationEnabled: true
+        keyNavigationWraps: false
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.VerticalFlick
         acceptedButtons: Qt.NoButton
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         AcceleratedScroll { flickable: emojiGrid; inputEnabled: root.visible }
         Keys.onPressed: event => {
+          if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return;
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
             if (!event.isAutoRepeat) root.choose(currentIndex);
             event.accepted = true;
           } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-            searchField.forceActiveFocus(); event.accepted = true;
+            root.search(); event.accepted = true;
+          } else if (event.key === Qt.Key_Slash || event.text === "/") {
+            root.search(); event.accepted = true;
+          } else if (event.key === Qt.Key_H || event.key === Qt.Key_J || event.key === Qt.Key_K || event.key === Qt.Key_L) {
+            if (event.key === Qt.Key_H) moveCurrentIndexLeft();
+            else if (event.key === Qt.Key_J) moveCurrentIndexDown();
+            else if (event.key === Qt.Key_K) moveCurrentIndexUp();
+            else moveCurrentIndexRight();
+            if (currentIndex >= 0) positionViewAtIndex(currentIndex, GridView.Contain);
+            event.accepted = true;
           }
         }
         delegate: Button {
@@ -107,6 +119,13 @@ Popup {
           text: "No emoji found"; color: Theme.secondary
           font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control }
         }
+      }
+      Text {
+        Layout.fillWidth: true
+        text: "H J K L / arrows · Move    / · Search\nEnter / Space · Insert    Esc · Cancel"
+        color: Theme.secondary
+        font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption }
+        wrapMode: Text.Wrap
       }
     }
   }

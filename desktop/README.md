@@ -127,10 +127,33 @@ nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs
 
 # Complete object graph, with helpers/auth disabled, in the private compositor.
 nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs --desktop
+
+# Rapid sidebar selection over 500 synthetic conversations, without Beeper.
+nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs --sidebar
+
+# Full history loading and rapid conversation changes, with a fake transport.
+nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs --performance
 ```
 
+The sidebar fixture verifies that animation does not resize text layout or the
+avatar's internal geometry. Its frame timings and CPU ticks are diagnostics,
+not portable pass/fail thresholds. Set `BEEPER_SIDEBAR_SOURCE` to the absolute
+path of a previous packaged `BeeperSidebar.qml` to collect a comparison sample.
+The conversation fixture measures the synchronous cost of applying 150 messages,
+event-loop pauses, work on a hidden second monitor, and history requests during
+rapid navigation. `BEEPER_PERFORMANCE_SOURCE` can point to a previous packaged
+`BeeperPanel.qml`; timings are diagnostic, while cancellation and counts are
+asserted. No real messages, credentials or notifications are used.
+
 Use the wrapped runtime for previews and tests, not bare `pkgs.quickshell`, so
-Liquid Glass and Qt Multimedia resolve identically. Do not launch `shell.qml`
+Liquid Glass and Qt Multimedia resolve identically. On this NVIDIA/Wayland
+desktop the wrapper defaults Qt/FFmpeg video decoding to software
+(`QT_FFMPEG_DECODING_HW_DEVICE_TYPES=,`): the native VAAPI texture-export path
+fails and can leave the whole shell unresponsive. Qt Quick and Liquid Glass
+still use GPU rendering and the threaded scene graph. Validate actual decoded
+pixels and player teardown with `messenger-wayland_test.mjs qs --video`, not
+just a successful QML compile or a player's `PlayingState`.
+Do not launch `shell.qml`
 alongside the installed session merely to validate compilation: it starts real
 services and helpers. The harnesses provide isolated fixtures/private sessions.
 The `--desktop` fixture uses the production composition with `servicesEnabled:
@@ -177,22 +200,30 @@ selects conversations on the left. `Ctrl+J/K` enters message selection at the
 newest message, then selects and reveals the next/previous message. Returning to
 conversations, focusing the composer, sending a reply, or leaving the chat clears
 that selection, so the next entry starts at the newest message again. Draft text
-is preserved. `l` also enters selection; `h` returns to conversations.
+is preserved. `l` focuses the composer in the selected conversation, like Enter;
+`h` returns to conversations.
 The `i` shortcut and action palette are removed.
-With a message selected, `1` reacts with 😂, `2` with 💜, `3` with 🔥, `4` with 💯,
-and `5` with 🤡. Telegram uses its standard equivalents 🤣 and ❤️ for `1` and `2`,
+With a message selected, `1` reacts with 👍, `2` with 😂, `3` with 💜, `4` with 🔥,
+`5` with 💯 and `6` with 🤡. Telegram uses its standard equivalents 🤣 and ❤️ for `2` and `3`,
 including when the sidebar shows All; the keyboard help follows the current chat.
+Reaction matching ignores Unicode presentation selectors and sends the exact
+variant advertised by Beeper (Telegram's 👍 includes VS16).
 A different digit replaces your reaction; pressing the same digit
 again removes it. Other participants' reactions stay intact. Changes are sent in
 order per message, including rapid key presses, and refresh that exact message
-even outside the newest history page. Space plays/pauses the selected audio message or opens its photo,
+even outside the newest history page. Space opens a selected message's link directly
+when there is one distinct URL. With several links, it opens a chooser: `j/k`
+selects, Enter opens, and Escape cancels. It includes links supplied by Beeper and
+URLs in the message text, deduplicates them, and leaves typing unchanged. Links
+take priority over attachments; `o` still opens an attachment directly.
+Without links, Space plays/pauses the selected audio message or opens its photo,
 GIF or video. Photos and videos fill the selected monitor as far as their aspect ratio allows,
 including the top-bar area, without a title or frame. Videos keep playback
 controls along the bottom; photos have no toolbar. The desktop and
 messenger behind them are blurred by the `quickshell-messenger-photo` layer rule.
 For photos, Space or Escape returns to the same chat and message selection.
 Videos start playing on opening: Space toggles play/pause, `h/l` seek backwards
-or forwards by five seconds, and Escape closes the viewer. The inline players
+or forwards by five seconds, and Escape closes the viewer. The inline video players
 are paused while a video is fullscreen; closing also stops the fullscreen player,
 including when a download finishes later. A paused video stays paused after seeking.
 The viewer owns a
@@ -201,11 +232,23 @@ Both surfaces stay in the focus whitelist. Closing the photo retires its old gra
 before hiding the window, then creates a new grab for the chat, so a delayed
 compositor event cannot discard keyboard focus after the return.
 It reveals an offscreen selection before starting
-playback; a second press cancels playback waiting for a download. These keys remain
+playback; a second press cancels playback waiting for a download.
+Audio has one shared player, independent of message delegates and monitors.
+Reactions, history refreshes, scrolling, typing, switching conversations, opening
+media and hiding the messenger do not interrupt it, including during a download.
+The first Escape pauses the audio before normal Escape navigation resumes;
+Space on its selected message and its pause button also pause it. Another voice
+note cannot replace an active one until it has been explicitly paused.
+Recreated controls reattach to the same playback position and speed. These keys remain
 ordinary characters in text fields; `?` shows the help.
 Opening the panel with no selected conversation automatically selects the first
-visible chat once the list is available. Network/archive filters still apply;
+visible chat once the list is available. Network/priority filters still apply;
 an existing selection or an explicit notification target takes precedence.
+Sidebar navigation selects the chat and restores its draft immediately, but
+waits 90 ms before requesting history. Further navigation restarts that delay,
+so conversations crossed during key repeat do not load messages or decoders.
+Explicit notification targets and refreshes bypass the delay. Clearing selection
+or disconnecting cancels it, and request generations still reject late replies.
 Opening a conversation, scrolling to its latest messages, or typing a draft
 does not mark it read. Only a successfully accepted reply or the `m` shortcut
 outside text input does so, on every network. Replies mark through the last
@@ -213,13 +256,22 @@ known message at send time so incoming messages arriving during the request stay
 unread. Failed/uncertain sends leave the read state unchanged. Chat-banner
 suppression follows whether the messenger is open, independently of keyboard
 focus and the unread badge; notification sounds continue.
+Submitting a message immediately moves its text, attachment and reply target
+out of the composer into a separate, locally saved send snapshot. Typing can
+continue at once; a late success never clears or rewrites the next draft, even
+if its text is identical. Only one send is dispatched at a time. On failure,
+the original is restored if the composer is still empty; otherwise it stays
+separate behind a `Saved draft` / `Restore` control. Restore swaps with an
+existing draft without discarding it or sending anything. These recovery
+snapshots survive restarts and keep their attachments protected. Unconfirmed
+messages must be checked in the conversation before resending.
 Outside text input and conversation search, `n` marks the current conversation
 unread again. A blank yellow badge, with the same 26 px diameter as numbered badges,
 represents the manual unread flag when there are no new messages to count;
 `m` clears it by marking the conversation read.
 Outside text input and conversation search, `u` toggles unread-first sorting;
 pressing it again restores Beeper's current normal order. Manual unread reminders
-are included. Each group's original order and the network/archive/search filters
+are included. Each group's original order and the network/priority/search filters
 are preserved, as are the open conversation, draft, message selection and read
 state. The sidebar returns to the top and an arrow beside the unread counter
 indicates the mode. This view preference is shared across monitors. While active,
@@ -230,26 +282,33 @@ The sidebar keeps an already-visible selection on screen when the API reorders
 it after a read-state change. It does not return to an offscreen selection or
 interrupt wheel/scrollbar navigation during background refreshes. Read-state
 replies update only read fields in place, preserving title/network metadata.
-The top row shows the number of unread conversations in the selected network
-(`All` sums all networks), including manual unread flags and muted/low-priority
-chats. A manual unread marker takes precedence over the archive filter in both
-the list and counter: Beeper can return `isArchived: true` together with
-`isMarkedUnread: true`. We keep that reminder visible without unarchiving the
-conversation in Beeper. `a` switches from the inbox to **only archived chats**
-in the current network; pressing `a` again returns to the inbox. It does not mix
-ordinary inbox chats into the archive view. This view preference
-is shared across monitors and follows Tab network switching. An archive badge on
-the network logo indicates the mode, and archived rows have a small archive icon.
-`Shift+A` archives/restores the selected conversation through the
-[public archive endpoint](https://developers.beeper.com/desktop-api-reference/resources/chats/methods/archive/).
-The UI waits for success, preserves drafts/unread state, and ignores stale list
-responses that predate a confirmed archive. Errors keep the conversation in place.
-The manual unread reminder exception above remains intentional. Escape hides
-archives before closing the messenger, once out of text/message navigation.
-The counter shows only archived unread conversations in the archive view,
-including manually marked unread archives. It uses a dedicated count rather
-than subtracting the overlapping inbox and total counts. Restoring a conversation
-removes it from this view and selects the next archive, or leaves an empty view.
+The top row counts unread conversations in the selected network and priority
+view (`All` sums all networks), including manual unread flags and muted chats.
+`a` switches between the inbox and **Low Priority** in the current network;
+`Shift+A` moves the selected conversation to the other view. These shortcuts,
+Tab network switching and Escape keep their existing navigation behavior.
+The view preference is shared across monitors. A downward-chevron badge on the
+network logo and conversation rows identifies Low Priority.
+
+Priority comes directly from Beeper's `isLowPriority` field. `Shift+A` sends
+`PATCH /v1/chats/{id}` with that boolean through the
+[public update endpoint](https://developers.beeper.com/desktop-api-reference/resources/chats/methods/update/).
+The UI waits for API success, preserves drafts/read state and blocks duplicate
+requests. Reads started before a successful change are discarded and refreshed;
+later native changes from other Beeper clients are accepted normally.
+No local classification or background priority writes are kept. Incoming
+messages remain in Low Priority according to Beeper's own state. Ordinary
+notifications from these chats are suppressed; structured mentions of the user
+or `@room`, and replies to the user's messages, can still notify unless snoozed.
+
+The former local archive policy and archive actions are removed. Older
+`state.json` files remain readable: drafts and pending sends are preserved,
+and obsolete archive choices are ignored without changing any chat in Beeper.
+The two views depend only on `isLowPriority`; native archive flags do not hide
+conversations in this client.
+The counter uses `lowPriorityCounts` in the Low Priority view, including manual
+unread reminders. Moving a conversation out selects the next one or leaves an
+empty view. Escape returns to the inbox before closing the messenger.
 Explicit chat targets switch views when needed to keep the selection visible.
 It counts each conversation once, not its unread
 messages. The Go helper scans the full public chat catalog, independently of the
@@ -259,9 +318,9 @@ the label shows a dash, never a fabricated zero or a partial total.
 `Tab` cycles All → Telegram → WhatsApp → Instagram → SMS, and `Shift+Tab` reverses
 that order. SMS includes Beeper's Google Messages conversations.
 `/` opens conversation search beside the network logo. Tab retains its
-normal editing/dialog behaviour while typing. `Ctrl+/` opens a compact text
-search bar to the right of the conversation name, within the existing header.
-It uses a compact counter on narrow windows, without taking height from history.
+normal editing/dialog behaviour while typing. `Ctrl+/` opens a text search bar
+above the history. It spans the conversation width and only occupies height
+while open; closing it returns that space to the messages.
 Type, then Enter to select the first
 match; `n`/`N`, `j`/`k` or Ctrl+J/K move between matches outside the input.
 Ctrl+/ edits the query again and Escape closes the search without closing chat.
@@ -301,7 +360,7 @@ Message bubbles have a small tail and the sender's name inside. Received message
 have a circular participant photo beside them (initials when the API provides no
 photo); sent messages align to the right margin without a self avatar. The
 tail is a curved vector path rendered with Qt's native CurveRenderer for smooth
-edges at any display scale. Group headers show the public API's participant
+edges at any display scale. Selected group rows show the public API's participant
 total, never the length of a potentially partial participant list; when the
 total is unavailable, the subtitle stays generic.
 The messenger is borderless throughout: selection and keyboard focus use fills.
@@ -313,10 +372,25 @@ connection to Beeper affects every conversation. Account status is refreshed
 every five seconds through the public accounts endpoint while connected, with
 one shared request at a time. Recovery restores the normal palette automatically;
 history backfilling and unrelated action errors do not trigger this warning.
-The conversation list shows each network through its avatar badge, without a
+The conversation list stays on the left. The separate conversation header is
+removed: the selected row carries the title, avatar and member count instead.
+Rows grow from 78 to 128 px when selected and shrink on deselection, with the
+same OutCubic easing as the top-bar workspaces, shortened to 200 ms (112 px in
+compact mode). Colors settle in 120 ms. Hidden or disabled sidebars update
+directly without running selection animations on the other monitors.
+The avatar scales from 48 to 72 px (60 px compact) and the title scales up with
+the row; the last-message preview crossfades to the member count, or a direct
+message label. Text width, avatar geometry and image resolution stay fixed
+throughout the animation: only transforms, opacity and the row height change.
+The delegate uses direct positioning without nested layouts. Following a growing
+selection only adjusts a clipped viewport edge; it never forces another layout
+or scans the chat catalog per frame.
+An explicitly selected row stays visible as it grows; wheel and scrollbar
+input cancel that follow behavior. Rapid selection changes reverse from the
+current size. Each network appears through its avatar badge, without a
 repeated network label. The selected conversation, sent bubbles and composer
 microphone/send icon use the conversation's platform color, even in All. The
-top-left All logo alone keeps its Mauve accent. Network accents use Catppuccin
+All logo above the list alone keeps its Mauve accent. Network accents use Catppuccin
 Macchiato: Sapphire for Telegram, Green for WhatsApp, Pink for Instagram, Teal
 for SMS and Blue for Signal; unknown platforms use a neutral fallback. Sent
 bubbles keep dark text and controls for contrast; active recording retains
@@ -332,7 +406,7 @@ No manual load-more actions
 or permanent keyboard/status footer are shown, with help under `?` and closing
 under Escape / Cmd+D. Enter, `l`, `:` and right-click never open an action menu.
 Ctrl+wheel over the conversation and Ctrl+plus/minus change only message text and
-the composer (14–36 px, 2 px steps); Ctrl+0 resets it. The sidebar, header and bar
+the composer (14–36 px, 2 px steps); Ctrl+0 resets it. The sidebar and bar
 keep their normal sizes. The setting is shared across monitors and retained on
 live Quickshell reloads. Notifications never render inside the chat and do not
 take its typing focus; their usual Escape dismissal remains available.
@@ -341,14 +415,28 @@ Sending successfully always returns that conversation to the latest message,
 without scrolling another chat if you switched while the request was in flight.
 The composer is one line (48 px at the default font size) at rest and grows with
 multiline text. Its caret is 3 px wide and follows the platform blink interval.
-The circular smiley at the left opens an offline emoji grid with English/French
-search. Choosing an emoji inserts it at the saved caret or replaces the selected
+The circular smiley at the left and Ctrl+S open an offline emoji grid with
+English/French search. The grid starts with keyboard focus: H/J/K/L or arrow
+keys move through it, `/` focuses search, and Down or Tab returns to the results.
+Letters remain ordinary text in search. Enter inserts the selection (Space also
+works in the grid); Escape or Ctrl+S cancels and restores the draft selection.
+Choosing an emoji inserts it at the saved caret or replaces the selected
 text, then restores typing focus without sending. Escape closes the picker first.
 The Unicode Emoji 17.0 / CLDR 48 catalogue and license are included in
 `features/messenger/BeeperEmojiData.js`; `generate-emojis.mjs` beside it prints
 its regeneration patch. Its right-hand microphone crossfades to Send when text or an
 attachment is ready, and becomes Stop while recording. There is no attachment
 button; files remain available through paste and drag/drop.
+Ctrl+D starts a voice recording from navigation or the composer, even when
+there is draft text. Pressing it again finishes the recording into the draft;
+it never sends automatically. A second press during preparation cancels it, and
+closing the panel or switching chats prevents a late microphone start. Existing
+attachments and edits are not replaced; read-only, disconnected, sending and
+dictating states cannot start a recording. An active recording can still be
+finished if the connection drops. Tests inject a recorder without opening a mic.
+`?` outside text input shows all messenger shortcuts, grouped by context, with
+J/K, arrows, Page Up/Down and Home/End scrolling; Escape or `?` closes the help.
+Question marks remain normal punctuation while writing.
 Replies quote their original author/text above the body, both incoming and
 outgoing, and in the composer before sending. Quotes keep a dark opaque background
 tinted with the original author's accent, a matching name/stripe and secondary
@@ -363,7 +451,8 @@ players are not restarted by unchanged snapshots. Restoring a reading anchor
 never cancels an ongoing wheel/touchpad gesture. Pagination is throttled during
 scrolling rather than postponed until the gesture ends. Mouse dragging is not
 used to scroll desktop lists; wheel, trackpad, scrollbar and Vim keys remain.
-Ctrl+D/U use Qt's native animated half-page movement. These policies are local
+Ctrl+U uses Qt's native animated half-page movement upwards; Ctrl+D is reserved
+for voice recording. These policies are local
 to the messenger and do not change Hyprland's input configuration.
 Wheel input uses Qt's usual distance (`wheelScrollLines × 24`, normally 72 logical
 pixels per notch) and a retargetable 150 ms ease-out. Rapid events accumulate
@@ -372,8 +461,18 @@ Trackpad pixel deltas keep the platform's motion, and Ctrl+wheel remains text zo
 
 The history uses `BeeperHistory`, a Flickable with exact message layout heights.
 This avoids the variable-delegate content-height estimate that makes ListView
-scrollbar thumbs resize while scrolling. Layout items remain for loaded messages;
-avatars, media loaders and quote fetching are enabled only near the viewport.
+scrollbar thumbs resize while scrolling. A native asynchronous `Instantiator`
+creates the message components across frames. Existing rows keep their identity;
+new rows become visible together after their geometry and reading position are
+ready. Unchanged layout is cached; zoom and quote updates explicitly invalidate it.
+Hidden panels do not build duplicate histories, while the closing morph keeps its
+content until it is no longer visible.
+Layout items remain for loaded messages; avatars, media loaders and quote fetching
+are enabled only near the viewport. A binary search finds that range and updates
+only the current and previous visible rows. Media activation happens after the
+viewport is restored, so adding older messages does not restart visible decoders.
+Attachment delegates also use a keyed model: reaction and read-receipt updates
+reuse an unchanged image/video/player instead of decoding it again.
 The scrollbar may change when content is actually loaded or resized, not just
 because a different-height message enters view. Times/reactions are inside the
 bubble, with 12 logical pixels between bubbles and unchanged text sizes.
