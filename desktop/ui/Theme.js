@@ -36,6 +36,8 @@ var weatherSun = "#a6da95";
 var weatherRain = "#ed8796";
 var sideDate = "#8bd5ca";
 var sideTime = "#ed8796";
+// Central plan-limit panel (Cmd+T), without a side capsule: Catppuccin Teal.
+var usageAccent = "#8bd5ca";
 
 // Messenger typography is independent from the compact top-bar widgets.
 var beeperUnread = "#eed49f";

@@ -27,6 +27,7 @@ desktop/
     power/                   # laptop and peripheral battery presentation
     system/                  # collector lifetime, telemetry and process subscriptions
     updates/                 # checker/build/install/cleanup state machine and view
+    usage/                   # Claude and Codex plan limits through their official CLIs
     workspaces/
   previews/                  # isolated visual playgrounds
   tests/                     # QML tests and integration harnesses
@@ -76,6 +77,7 @@ Domain state and operations now have explicit owners:
 | Collector processes and telemetry model | `features/system/SystemController.qml` / `SystemData.qml` |
 | Laptop and peripheral battery state | `features/power/PowerController.qml` |
 | Application and Chrome-tab search | `features/launchers/AppLauncherController.qml` / `ChromeTabsController.qml` |
+| Claude and Codex plan limits | `features/usage/UsageController.qml` / `UsageSource.qml` |
 | Messenger presentation and surface | `shell/MessengerController.qml` / `MessengerHost.qml` |
 
 The old shared state facade and its compatibility aliases are removed. Keep
@@ -561,6 +563,48 @@ access; its entry point is `preview.qml`, with its implementation in
 `features/messenger/MessengerPreview.qml`. The
 [Go backend README](../tools/quickshell/beeper/README.md) describes protocol,
 credential handling and backend verification.
+
+## Plan limits
+
+Cmd+T (`topbar.toggleUsage`) transforms the central capsule into the Claude
+and Codex usage panel on the focused monitor, with the System panel's width
+and a height derived from its rows. Escape or `q` closes it; `r` refreshes.
+Each window shows its label, used percentage, a gauge and its reset time:
+a delay under 24 hours, otherwise the local day and time. Claude lists the
+current session, the week across all models and each per-model weekly window;
+Codex lists its rolling windows, shortest first, the ChatGPT plan and any
+available reset credits. Percentages are rounded down, so `100 %` and the
+Catppuccin Red gauge mean the limit is actually reached. A failed refresh
+keeps the last reading with an explicit note; without one, the section shows
+the error. The panel uses its own accent, `Theme.usageAccent` (Teal), and has
+no side capsule.
+
+The data comes from the official CLIs, already signed in with the user's
+subscriptions, never from their credential files or private endpoints:
+
+- `claude -p` in stream-json mode answers the `initialize` and `get_usage`
+  control requests. No prompt is sent, so no tokens are used; the session is
+  not saved (`--no-session-persistence`), and MCP servers and hooks are not
+  started (`--strict-mcp-config`, `disableAllHooks`). Snapshot answers without
+  server rows fall back to the named five-hour, seven-day and per-model windows.
+- `codex app-server` answers `initialize`, then `account/rateLimits/read` after
+  the `initialized` notification. Only the main `codex` bucket is shown;
+  experimental reserve buckets are not presented as ordinary limits, and reset
+  credits are never consumed.
+
+Both interfaces are marked experimental upstream. `UsageLimits.js` validates
+every field: an unexpected shape becomes an error, never an invented value.
+The CLIs start only when the panel opens, at most once a minute (or on `r`),
+and every five minutes or after a displayed reset while it stays open. Each
+conversation answers in one to two seconds; an unanswered CLI is stopped after
+30 seconds (SIGTERM, then SIGKILL). `desktop.nix` pins the same `claude-code`
+and `codex` builds as the Home Manager profile, so they share its sign-in state.
+
+`tests/usage-limits_test.mjs` checks both protocols, validation and French
+formatting. `tests/tst_UsageController.qml` drives the controller through fake
+CLIs in `tests/fixtures/` (timeouts, missing or silent binaries, refusals,
+reached limits). `tests/tst_UsagePanel.qml` checks the view with
+`qmltestrunner`. None of them contacts Anthropic or OpenAI.
 
 ## HHKB shortcut sheet
 

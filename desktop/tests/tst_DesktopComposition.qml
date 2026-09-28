@@ -38,6 +38,7 @@ ShellRoot {
       verify(!app.services.system.enabled); verify(!app.services.dictation.enabled);
       verify(!app.services.auth.serviceEnabled); verify(!app.services.updates.autoCheckEnabled);
       verify(!app.services.network.active); verify(!app.services.bluetooth.active);
+      verify(!app.services.usage.enabled);
       verify(app.coordinator.messenger.beeperData.demo);
       tryVerify(() => app.bars.length > 0);
       const capsule = app.bars[0].capsule;
@@ -174,6 +175,26 @@ ShellRoot {
         capsule.services = Qt.binding(() => app.services);
         app.coordinator.services = Qt.binding(() => app.services);
       }
+    }
+    function test_usage_panel_takes_the_capsule_without_starting_clis() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], capsule = bar.capsule, usage = app.services.usage;
+      const panel = findChild(capsule, "usagePanel");
+      verify(panel !== null);
+      try {
+        app.coordinator.toggle("usage", bar.monitorName);
+        tryCompare(capsule, "targetMode", "usage");
+        verify(capsule.keyboardSelectorActive);
+        compare(capsule.targetWidth, capsule.maximumWidth);
+        compare(capsule.targetHeight, panel.implicitHeight);
+        tryCompare(capsule, "height", panel.implicitHeight, 1000);
+        tryVerify(() => panel.opacity > 0.99, 1000);
+        verify(usage.active); verify(!usage.loading);
+        compare(usage.claude.run, 0); compare(usage.codex.run, 0);
+        app.coordinator.toggle("usage", bar.monitorName);
+        compare(app.coordinator.mode, "workspaces");
+        verify(!usage.active);
+      } finally { app.coordinator.close("usage"); }
     }
     function test_scrolling_history_does_not_resize_the_top_bar_or_panel() {
       tryVerify(() => app.bars.length > 0);

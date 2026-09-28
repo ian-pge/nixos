@@ -8,8 +8,10 @@
   quickshellBeeper = pkgs.callPackage ./quickshell/beeper.nix {};
   quickshellSystemStats = pkgs.callPackage ./quickshell/system-stats.nix {};
   quickshellWeather = pkgs.callPackage ./quickshell/weather.nix {};
+  llmAgents = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
   quickshellDesktop = pkgs.callPackage ./quickshell/desktop.nix {
     inherit quickshellBeeper quickshellSystemStats quickshellWeather;
+    inherit (llmAgents) claude-code codex;
   };
 in
   {

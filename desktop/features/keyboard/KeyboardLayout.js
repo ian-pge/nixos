@@ -78,7 +78,7 @@ var rows = [
   [key("Tab", "Dictée", "system", 1.5),
    key("Q", "Config Nix", "app"), key("W", "Fermer", "window"),
    key("E", "Calendrier", "system"), key("R", "Audio", "system"),
-   key("T"), key("Y"), key("U", "Mises à jour", "system"),
+   key("T", "Limites IA", "system"), key("Y"), key("U", "Mises à jour", "system"),
    key("I"), key("O"), key("P", "Onglets", "app"),
    key("["), key("]"), key("Backspace", "", "", 1.5)],
   [key("Control", "", "modifier", 1.75),

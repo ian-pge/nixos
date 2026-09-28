@@ -16,6 +16,7 @@ import "./features/notifications"
 import "./features/power"
 import "./features/system"
 import "./features/updates"
+import "./features/usage"
 import "./features/workspaces"
 import "./shell"
 
@@ -55,6 +56,7 @@ ShellRoot {
     readonly property var power: powerFeature
     readonly property var system: systemFeature
     readonly property var updates: updatesFeature
+    readonly property var usage: usageFeature
     readonly property var spinner: spinnerFeature
   }
   ShellCoordinator {
@@ -99,6 +101,11 @@ ShellRoot {
     onPlayerChanged: if (!player) panels.close("media")
   }
   CalendarController { id: calendarFeature; enabled: desktop.servicesEnabled }
+  UsageController {
+    id: usageFeature
+    enabled: desktop.servicesEnabled
+    active: panels.mode === "usage"
+  }
   SystemController {
     id: systemFeature
     enabled: desktop.servicesEnabled

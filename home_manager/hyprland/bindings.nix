@@ -186,6 +186,7 @@ in {
       (mkBind (mainKey "N") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleWifi") {})
       (mkBind (mainKey "B") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleBluetooth") {})
       (mkBind (mainKey "U") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleUpdates") {})
+      (mkBind (mainKey "T") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleUsage") {})
       (mkBind (mainKey "Q") (mkExec "zeditor /home/ian/.config/nixos") {})
       (mkBind (mainKey "SHIFT + Q") "hl.dsp.exec_cmd(settings)" {})
       (mkBind (mainKey "R") "hl.dsp.exec_cmd(audio)" {})

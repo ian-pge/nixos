@@ -6,6 +6,8 @@
   quickshellSystemStats,
   quickshellWeather,
   quickshellBeeper,
+  claude-code,
+  codex,
 }: let
   source = lib.cleanSourceWith {
     src = ../../desktop;
@@ -42,6 +44,10 @@ in
       --replace-fail '"quickshell-weather"' '"${quickshellWeather}/bin/quickshell-weather"'
     substituteInPlace "$out/features/messenger/BeeperData.qml" \
       --replace-fail '"quickshell-beeper"' '"${quickshellBeeper}/bin/quickshell-beeper"'
+    # The same CLI builds as the user's profile, so they share its sign-in state.
+    substituteInPlace "$out/features/usage/UsageController.qml" \
+      --replace-fail 'claudeCommand: ["claude",' 'claudeCommand: ["${claude-code}/bin/claude",' \
+      --replace-fail 'codexCommand: ["codex",' 'codexCommand: ["${codex}/bin/codex",'
     substituteInPlace "$out/features/audio/AudioAvailability.qml" \
       --replace-fail '"pw-dump"' '"${pipewire}/bin/pw-dump"'
     substituteInPlace "$out/features/notifications/NotificationData.qml" \

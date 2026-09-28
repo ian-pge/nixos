@@ -11,6 +11,7 @@ import "../features/network"
 import "../features/notifications"
 import "../features/system"
 import "../features/updates"
+import "../features/usage"
 import "../features/workspaces"
 
 // Geometry and content crossfades only; panel lifetime belongs to ShellCoordinator.
@@ -31,6 +32,7 @@ Rectangle {
   readonly property bool audioSelectorActive: coordinator.isOpen("audio", monitorName)
   readonly property bool calendarActive: coordinator.isOpen("calendar", monitorName)
   readonly property bool systemPanelActive: coordinator.isOpen("system", monitorName)
+  readonly property bool usagePanelActive: coordinator.isOpen("usage", monitorName)
   readonly property bool brightnessOverlayActive: coordinator.isOpen("brightness", monitorName)
   readonly property bool mediaOverlayActive: coordinator.isOpen("media", monitorName)
   readonly property bool wifiSelectorActive: coordinator.isOpen("wifi", monitorName)
@@ -41,18 +43,20 @@ Rectangle {
   readonly property bool audioSelectorKeyboardActive: audioSelectorActive && !services.dictation.active
   readonly property bool calendarKeyboardActive: calendarActive && !services.dictation.active
   readonly property bool systemPanelKeyboardActive: systemPanelActive && !services.dictation.active
+  readonly property bool usagePanelKeyboardActive: usagePanelActive && !services.dictation.active
   readonly property bool wifiSelectorKeyboardActive: wifiSelectorActive
   readonly property bool bluetoothSelectorKeyboardActive: bluetoothSelectorActive
   readonly property bool updateSelectorKeyboardActive: updateSelectorActive
   readonly property bool appLauncherKeyboardActive: appLauncherActive
   readonly property bool chromeTabsKeyboardActive: chromeTabsActive && !services.chromeTabs.actionPending
   readonly property bool keyboardSelectorActive: audioSelectorKeyboardActive || calendarKeyboardActive
-    || systemPanelKeyboardActive || wifiSelectorKeyboardActive || bluetoothSelectorKeyboardActive
+    || systemPanelKeyboardActive || usagePanelKeyboardActive
+    || wifiSelectorKeyboardActive || bluetoothSelectorKeyboardActive
     || updateSelectorKeyboardActive || appLauncherKeyboardActive || chromeTabsKeyboardActive
   function restoreFocus() {
     if (!keyboardSelectorActive || notificationActive) return;
     const widget = ({audio: audioSelector, calendar: calendarPanel, system: systemPanel,
-      wifi: wifiSelector, bluetooth: bluetoothSelector, updates: updateSelector,
+      usage: usagePanel, wifi: wifiSelector, bluetooth: bluetoothSelector, updates: updateSelector,
       launcher: appLauncher, tabs: chromeTabsLauncher})[coordinator.mode];
     if (widget) widget.forceActiveFocus();
   }
@@ -61,7 +65,7 @@ Rectangle {
   z: 2
   GlassShape { objectName: "capsuleGlassShape"; anchors.fill: parent; radius: root.radius; enabled: GlassState.enabled && root.drawBackground }
   readonly property bool overlayVisible: root.notificationActive || root.volumeOverlayActive
-    || root.audioSelectorActive || root.calendarActive || root.systemPanelActive
+    || root.audioSelectorActive || root.calendarActive || root.systemPanelActive || root.usagePanelActive
     || root.brightnessOverlayActive || root.mediaOverlayActive
     || root.appLauncherActive || root.chromeTabsActive
     || root.wifiSelectorActive || root.bluetoothSelectorActive
@@ -78,6 +82,7 @@ Rectangle {
   readonly property string targetMode: root.notificationActive ? "notification"
     : root.dictationOverlayActive
     ? "dictation" : root.systemPanelActive ? "system"
+    : root.usagePanelActive ? "usage"
     : root.calendarActive ? "calendar"
     : root.audioSelectorActive ? "audio"
     : root.appLauncherActive ? "launcher"
@@ -92,6 +97,7 @@ Rectangle {
     ? notificationPopup.implicitWidth : root.dictationOverlayActive
     ? voiceDictationIndicator.implicitWidth
     : root.systemPanelActive ? workspaceSwitcher.expandedImplicitWidth
+    : root.usagePanelActive ? workspaceSwitcher.expandedImplicitWidth
     : root.calendarActive ? workspaceSwitcher.expandedImplicitWidth
     : root.audioSelectorActive ? audioSelector.implicitWidth
     : root.appLauncherActive ? appLauncher.implicitWidth
@@ -107,6 +113,7 @@ Rectangle {
     ? notificationPopup.implicitHeight : root.dictationOverlayActive
     ? voiceDictationIndicator.implicitHeight
     : root.systemPanelActive ? systemPanel.implicitHeight
+    : root.usagePanelActive ? usagePanel.implicitHeight
     : root.calendarActive ? calendarPanel.implicitHeight
     : root.audioSelectorActive ? audioSelector.implicitHeight
     : root.appLauncherActive ? appLauncher.implicitHeight
@@ -115,7 +122,7 @@ Rectangle {
     : root.wifiSelectorActive ? wifiSelector.implicitHeight : 36
   readonly property var contentModes: ["workspaces", "volume", "audio",
     "brightness", "dictation", "media", "wifi", "bluetooth",
-    "launcher", "tabs", "updates", "notification", "calendar", "system"]
+    "launcher", "tabs", "updates", "notification", "calendar", "system", "usage"]
   property string visualSourceMode: "workspaces"
   property string visualTargetMode: "workspaces"
   property real transitionProgress: 1
@@ -125,6 +132,7 @@ Rectangle {
 
   function modeHeight(mode) {
     if (mode === "system") return systemPanel.implicitHeight;
+    if (mode === "usage") return usagePanel.implicitHeight;
     if (mode === "notification") return notificationPopup.implicitHeight;
     if (mode === "calendar") return calendarPanel.implicitHeight;
     if (mode === "audio") return audioSelector.implicitHeight;
@@ -463,6 +471,22 @@ Rectangle {
     opacity: root.contentOpacity("system")
     visible: opacity > 0
     enabled: root.systemPanelKeyboardActive
+  }
+
+  UsagePanel {
+    id: usagePanel
+    objectName: "usagePanel"
+    controller: root.services.usage
+    onCloseRequested: root.coordinator.close("usage")
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    implicitWidth: workspaceSwitcher.expandedImplicitWidth
+    height: implicitHeight
+    transform: Translate { y: root.contentOffset("usage") }
+    opacity: root.contentOpacity("usage")
+    visible: opacity > 0
+    enabled: root.usagePanelKeyboardActive
   }
 
   CalendarPanel {

@@ -29,7 +29,7 @@ hl = setmetatable({
 
 assert(loadfile(assert(arg[1], "provide the generated Hyprland config")))()
 local show, next_page, previous_page, stop_voice
-local chromeTabs, releases = 0, {}
+local chromeTabs, usage, releases = 0, 0, {}
 for _, binding in ipairs(bindings) do
   local action, options = binding.action, binding.options
   if binding.key == "SUPER + apostrophe" and not options.release then
@@ -53,6 +53,11 @@ for _, binding in ipairs(bindings) do
       assert(binding.key == "SUPER + P", "Chrome tabs must move to Cmd+P")
       assert(not options.release and not options.repeating)
     end
+    if action.path == "hl.dsp.exec_cmd" and action.args[1]:find("topbar toggleUsage", 1, true) then
+      usage = usage + 1
+      assert(binding.key == "SUPER + T", "Plan limits must open with Cmd+T")
+      assert(not options.release and not options.repeating)
+    end
   elseif options.release and options.submap_universal then
     assert(not releases[binding.key], "duplicate sheet release binding")
     releases[binding.key] = action
@@ -62,6 +67,7 @@ for _, binding in ipairs(bindings) do
 end
 assert(show and next_page and previous_page and stop_voice)
 assert(chromeTabs == 1, "exactly one Chrome tabs binding is required")
+assert(usage == 1, "exactly one plan-limits binding is required")
 assert(not releases.P, "releasing P must no longer hide the sheet")
 assert(not releases.ISO_Level5_Latch, "the Lafayette latch must not control the sheet")
 

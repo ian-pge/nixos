@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Stand-in for `codex app-server`: JSON-RPC over stdio with fixed rate limits,
+# never contacting OpenAI. Reads are refused before `initialized`, as upstream.
+# Modes: ok, error, reached, hang.
+mode=${1:-ok}
+initialized=false
+now=$(date +%s)
+printf '%s\n' '{"method":"remoteControl/status/changed","params":{"status":"disabled"}}'
+while IFS= read -r line; do
+  id=$(printf '%s' "$line" | sed -n 's/^{"id":\([0-9]*\),.*/\1/p')
+  case "$line" in
+    *'"method":"initialize"'*)
+      printf '{"id":%s,"result":{"userAgent":"fake","codexHome":"/nonexistent","platformFamily":"unix","platformOs":"linux"}}\n' "$id" ;;
+    *'"method":"initialized"'*) initialized=true ;;
+    *'"method":"account/rateLimits/read"'*)
+      if [ "$initialized" != true ]; then
+        printf '{"id":%s,"error":{"code":-32002,"message":"Not initialized"}}\n' "$id"
+        continue
+      fi
+      case "$mode" in
+        ok) printf '{"id":%s,"result":{"ordinaryUsageAllowed":true,"accountId":"fake","rateLimits":{"limitId":"codex","planType":"prolite","rateLimitReachedType":null,"primary":{"usedPercent":94,"windowDurationMins":10080,"resetsAt":%s},"secondary":{"usedPercent":12,"windowDurationMins":300,"resetsAt":%s}},"rateLimitResetCredits":{"availableCount":1,"credits":null}}}\n' "$id" "$((now + 400000))" "$((now + 9000))" ;;
+        reached) printf '{"id":%s,"result":{"ordinaryUsageAllowed":false,"rateLimits":{"planType":"plus","rateLimitReachedType":"rate_limit_reached","primary":{"usedPercent":100,"windowDurationMins":10080,"resetsAt":%s},"secondary":null}}}\n' "$id" "$((now + 400000))" ;;
+        error) printf '{"id":%s,"error":{"code":-32600,"message":"authentication required"}}\n' "$id" ;;
+      esac ;;
+  esac
+done
+exit 0

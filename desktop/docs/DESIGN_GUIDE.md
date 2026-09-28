@@ -8,7 +8,7 @@ La barre doit donner l’impression d’être un seul système animé, pas une c
 
 Principes fondamentaux :
 
-- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, panneau audio, calendrier météo, luminosité, dictée vocale, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth, mises à jour et notifications éphémères.
+- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, panneau audio, calendrier météo, luminosité, dictée vocale, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth, mises à jour, limites d’utilisation Claude/Codex et notifications éphémères.
 - Les changements de taille utilisent une interpolation monotone sans rebond.
 - Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
 - Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
@@ -561,6 +561,7 @@ son indication à l'intérieur du panneau.
 - `../features/updates/UpdateSelector.qml` : présentation des updates et du formulaire d’authentification, sans accès au shell entier.
 - `../features/auth/PolkitController.qml` : agent Polkit générique, cycle de vie des demandes et réponse temporaire ; aucune dépendance aux updates.
 - `../features/system/SystemController.qml` / `SystemData.qml` / `SystemPanel.qml` : durée de vie des collecteurs, abonnement aux tops, mesures partagées et panneau CPU/RAM/GPU.
+- `../features/usage/UsageController.qml` / `UsageSource.qml` / `UsageLimits.js` / `UsagePanel.qml` : conversations courtes avec les CLI Claude Code et Codex, validation de leurs réponses et panneau des limites d’abonnement.
 - `../features/power/PowerController.qml` : état des batteries PC et claviers, corrélation USB/Bluetooth sans nouveau collecteur.
 - `../features/system/ProcessList.qml` : cinq processus maximum, sans collecte propre.
 - `../ui/Theme.js` : source unique des couleurs QML et des tokens typographiques, y compris les accents partagés entre capsules latérales et widgets centraux correspondants.
@@ -641,6 +642,7 @@ Conséquences :
 | Plafond souhaité média / updates | `480px`, limité par le plafond commun |
 | Largeur souhaitée notification | `160–480px` selon le texte, limitée par le plafond commun |
 | Largeur calendrier | Exactement le plafond commun des workspaces |
+| Largeur limites d’utilisation | Exactement le plafond commun des workspaces |
 | Hauteur calendrier | Ajustée aux 4–6 semaines et à leur contenu météo, au plus `492px` |
 | Hauteur lanceur applications / onglets | `398px` |
 | Hauteur d’une ligne update | `30px` |
@@ -838,7 +840,7 @@ Règle sémantique de la capsule centrale :
 - **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
 - **rouge** : échec explicite, sauf l’exception volontaire du microphone pendant l’enregistrement.
 
-Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume, luminosité et calendrier sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume`, `Theme.sideBrightness` et `Theme.sideWeather`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Pendant une notification, les accents internes utilisent `Theme.state`.
+Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume, luminosité, calendrier et limites d’utilisation sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume`, `Theme.sideBrightness`, `Theme.sideWeather` et `Theme.usageAccent`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Pendant une notification, les accents internes utilisent `Theme.state`.
 
 Le panneau Système utilise `Theme.sideSystem` pour ses accents,
 y compris pendant sa sortie animée. Une notification conserve la priorité jaune.
@@ -1347,6 +1349,11 @@ avec des processus et flux Polkit entièrement fictifs ; le démarrage automatiq
 du checker et l’agent natif y sont désactivés. Aucun build, nettoyage,
 authentification système ou installation n’est exécuté par cette suite.
 
+### Limites d’utilisation — `Super+T`
+
+- `r` : relire immédiatement les deux CLI
+- `q/Esc` : fermeture
+
 ## 16. Pièges connus
 
 1. **Animer la hauteur du `PanelWindow`** : provoque un glitch vertical du reste de la barre.
@@ -1455,6 +1462,7 @@ qs --config top-bar ipc call topbar toggleBluetooth
 qs --config top-bar ipc call topbar toggleUpdates
 qs --config top-bar ipc call topbar toggleLauncher
 qs --config top-bar ipc call topbar toggleChromeTabs
+qs --config top-bar ipc call topbar toggleUsage
 ```
 
 ### Validation TabCtl
@@ -1703,7 +1711,58 @@ qs -p tests/tst_WeatherData.qml` depuis `desktop/` vérifie température nulle/z
 cache, expiration et erreurs. Les tests Rust du dossier de l’outil vérifient la
 validation, l’horizon demandé et la cohérence localisation/cache hors ligne.
 
-## 20. Règle finale pour une future IA
+## 20. Limites d’utilisation Claude et Codex
+
+`Super+T` (`Cmd+T`) appelle `topbar.toggleUsage` et transforme la capsule
+centrale en panneau des limites d’abonnement sur l’écran focalisé ; un second
+appui, `q` ou Échap le ferme, `r` relit les données. Aucune capsule latérale ne
+lui correspond. Comme Système, il prend exactement
+`WorkspaceSwitcher.expandedImplicitWidth` ; sa hauteur est calculée depuis les
+lignes, les notes et les messages, sans passe de layout, et suit l’animation
+commune de `360ms`. Il utilise `Theme.usageAccent` (Teal) pour l’icône, les
+titres et les jauges, les neutres habituels pour le texte, et `Theme.error`
+uniquement pour une limite atteinte, un blocage signalé ou un échec explicite.
+Les compteurs ne changent pas de couleur avant `100 %` : les pourcentages sont
+arrondis à l’inférieur, donc `100 %` signifie réellement atteint.
+
+Chaque section (Claude, puis Codex) affiche le forfait à droite, puis une ligne
+par fenêtre : libellé, pourcentage, jauge sans curseur et réinitialisation
+(délai sous 24 h, sinon jour et heure locaux). Claude présente la session en
+cours, la semaine tous modèles et chaque fenêtre hebdomadaire par modèle ;
+Codex présente ses fenêtres de la plus courte à la plus longue, le forfait
+ChatGPT et les crédits de réinitialisation disponibles, jamais consommés. Un
+échec d’actualisation conserve la dernière lecture avec la note
+`Échec de l’actualisation` ; sans lecture, la section affiche l’erreur.
+
+Les données viennent uniquement des CLI officiels déjà connectés aux comptes de
+l’utilisateur : requêtes de contrôle `initialize` puis `get_usage` de
+`claude -p` en stream-json, et `initialize`, `initialized` puis
+`account/rateLimits/read` de `codex app-server`. Ne jamais lire
+`~/.claude/.credentials.json`, `~/.claude.json` ou `~/.codex/auth.json`, ni
+appeler les endpoints privés : les conditions d’Anthropic interdisent de
+réutiliser les jetons Claude.ai hors de Claude Code, et les CLI gèrent eux-mêmes
+le renouvellement de leurs jetons. Claude ne reçoit aucun prompt ; sa session
+n’est pas enregistrée, sans serveur MCP ni hook. Ne pas ajouter
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` : Claude Code répondrait alors depuis
+son cache local au lieu de relire l’usage. Les deux interfaces sont marquées
+expérimentales en amont ; `UsageLimits.js` valide chaque champ et transforme une
+forme inattendue en erreur, jamais en valeur inventée.
+
+Les CLI ne démarrent qu’à l’ouverture du panneau, au plus une fois par minute
+hors `r`, puis toutes les cinq minutes ou après une réinitialisation affichée
+tant qu’il reste ouvert ; aucun polling permanent. Une conversation répond en
+une à deux secondes (environ 200 Mo de mémoire pendant ce temps). Après la
+réponse, stdin est fermé et le CLI se termine seul ; sans réponse, il est arrêté
+après 30 secondes par SIGTERM puis SIGKILL.
+
+Tests : `node tests/usage-limits_test.mjs` vérifie les deux protocoles, la
+validation, le repli sur les fenêtres nommées de Claude et les textes français.
+`tst_UsageController.qml` avec `qs` offscreen pilote le contrôleur avec les faux
+CLI de `tests/fixtures/`, y compris timeout, CLI absent ou muet, refus et limite
+atteinte. `tst_UsagePanel.qml` avec `qmltestrunner` vérifie la vue, ses couleurs,
+sa hauteur et ses touches. Aucun test ne contacte Anthropic ou OpenAI.
+
+## 21. Règle finale pour une future IA
 
 Avant toute modification visuelle, identifier clairement :
 

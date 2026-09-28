@@ -16,13 +16,13 @@ assert.match(capsule, /y: root\.barTopInset/);
 assert.match(capsule, /Math\.max\(root\.messengerHost\.originContentOpacity, overlayReveal\)/);
 assert.match(capsule, /drawBackground: !root\.messengerHost\.presented \|\| \(root\.messengerHost\.active && overlayReveal > 0\)/);
 assert.match(capsule, /returningFromChat: root\.messengerHost\.presented && !root\.messengerHost\.active/);
-assert.match(host, /windowFocused: root\.windowFocused && activeFocus/);
+assert.match(host, /windowFocused: root\.windowFocused && \(activeFocus \|\| emojiPickerOpen\)/);
 assert.doesNotMatch(host, /NotificationPopup|notificationData/,
   "The chat never owns a notification surface");
 assert.doesNotMatch(shell + capsule, /inlineMonitor|inlinePresentation/);
 for (const type of ["NetworkController", "BluetoothController", "UpdateController", "PolkitController",
   "BrightnessController", "DictationController", "CalendarController", "SystemController", "MediaController",
-  "PowerController", "ShellCoordinator", "BeeperData", "MessengerController"]) {
+  "PowerController", "UsageController", "ShellCoordinator", "BeeperData", "MessengerController"]) {
   assert.equal((shell.match(new RegExp("\\b" + type + "\\s*\\{", "g")) || []).length, 1, type + " must be unique per session");
 }
 const ipc = read("shell/ShellIntegration.qml");
@@ -32,7 +32,7 @@ for (const name of ["toggleBeeper", "dismissNotification", "toggleDoNotDisturb",
   "mediaPlayPause", "mediaNext", "mediaPrevious", "volumeUp", "volumeDown", "toggleAudioMute",
   "toggleAudio", "toggleCalendar", "toggleMicrophoneMute", "showVolume", "showBrightness",
   "brightnessUp", "brightnessDown", "toggleWifi", "toggleBluetooth", "toggleUpdates",
-  "toggleLauncher", "toggleChromeTabs"])
+  "toggleLauncher", "toggleChromeTabs", "toggleUsage"])
   assert.ok(ipc.includes("function " + name + "("), "Stable IPC command " + name);
 assert.match(ipc, /target: "topbar"/);
 console.log("PASS: controller ownership, narrow central capsule, independent messenger and stable IPC contracts");

@@ -179,7 +179,7 @@ ShellRoot {
       verify(events().indexOf("messenger-hide") < 0);
     }
     function test_other_widgets_replace_chat_and_chat_replaces_them() {
-      for (const kind of ["audio", "wifi", "bluetooth", "calendar", "system", "launcher", "tabs", "updates", "media"]) {
+      for (const kind of ["audio", "wifi", "bluetooth", "calendar", "system", "usage", "launcher", "tabs", "updates", "media"]) {
         messenger.visible = true;
         controller.open(kind, "A");
         verify(!messenger.visible, kind + " replaces the chat");
@@ -267,7 +267,7 @@ ShellRoot {
       compare(events(), "tabs-query:,tabs-request");
     }
     function test_media_suppression_under_interactive_panels() {
-      for (const kind of ["audio", "calendar", "system", "wifi", "bluetooth", "updates", "launcher", "tabs"]) {
+      for (const kind of ["audio", "calendar", "system", "usage", "wifi", "bluetooth", "updates", "launcher", "tabs"]) {
         controller.open(kind, "A"); controller.showMedia("B");
         verify(controller.isOpen(kind, "A"));
       }

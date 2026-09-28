@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Stand-in for `claude -p --input-format stream-json`: answers the usage
+# control requests with fixed data and never contacts Anthropic.
+# Modes: ok, snapshot, api-key, refused, exit, hang, stubborn.
+mode=${1:-ok}
+case "$mode" in
+  exit) exit 3 ;;
+  stubborn) trap '' TERM; while :; do sleep 0.1; done ;;
+esac
+now=$(date +%s)
+iso() { date -u -d "@$((now + $1))" +%Y-%m-%dT%H:%M:%S.000000+00:00; }
+session=$(iso 15000) week=$(iso 345600)
+printf '%s\n' '{"type":"system","subtype":"hook_started","hook_name":"SessionStart:startup"}'
+while IFS= read -r line; do
+  id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\([^"]*\)".*/\1/p')
+  case "$line" in
+    *'"subtype":"initialize"'*)
+      [ "$mode" = hang ] && continue
+      printf '{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"account":{"email":"fake@example.org","subscriptionType":"Claude Max"}}}}\n' "$id" ;;
+    *'"subtype":"get_usage","skip_behaviors":true'*)
+      case "$mode" in
+        ok) printf '{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"subscription_type":"max","rate_limits_available":true,"behaviors":null,"rate_limits":{"limits":[{"kind":"session","group":"session","percent":3,"resets_at":"%s","scope":null},{"kind":"weekly_all","group":"weekly","percent":10,"resets_at":"%s","scope":null},{"kind":"weekly_scoped","group":"weekly","percent":15,"resets_at":"%s","scope":{"model":{"display_name":"Fable"}}}]}}}}\n' "$id" "$session" "$week" "$week" ;;
+        snapshot) printf '{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"subscription_type":"max","rate_limits_available":true,"rate_limits":{"limits":[],"five_hour":{"utilization":9,"resets_at":"%s"},"seven_day":{"utilization":10,"resets_at":"%s"},"model_scoped":[{"display_name":"Fable","utilization":15,"resets_at":"%s"}]}}}}\n' "$id" "$session" "$week" "$week" ;;
+        api-key) printf '{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"subscription_type":null,"rate_limits_available":false,"rate_limits":null}}}\n' "$id" ;;
+        refused) printf '{"type":"control_response","response":{"subtype":"error","request_id":"%s","error":"Unsupported control request"}}\n' "$id" ;;
+      esac ;;
+    *) printf '{"type":"control_response","response":{"subtype":"error","request_id":"%s","error":"unexpected request"}}\n' "$id" ;;
+  esac
+done
+exit 0
