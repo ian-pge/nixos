@@ -60,6 +60,7 @@ ShellRoot {
         screen: window.screen
         visible: bubble.expanded && panel.photoPreviewOpen
         beeperData: data; attachment: panel.previewAttachment
+        previewOrigin: panel.previewOrigin
         onVisibleChanged: if (visible) Qt.callLater(() => photoWindow.viewer.forceActiveFocus())
         onCloseRequested: { panel.closeModal(); panel.forceActiveFocus(); }
       }

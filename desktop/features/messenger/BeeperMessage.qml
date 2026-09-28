@@ -15,6 +15,10 @@ Item {
   property bool renderMedia: true
   property bool viewportReady: true
   property bool inViewport: true
+  property bool inVisibleViewport: true
+  property real arrivalProgress: 1
+  property string arrivalMessageID: ""
+  readonly property bool arriving: arrivalMotion.running
   property real textScale: 1
   property color networkAccent: Theme.secondary
   property string searchQuery: ""
@@ -44,15 +48,33 @@ Item {
     return widest;
   }
   signal selectedRequested()
-  signal previewRequested(var attachment)
+  signal previewRequested(var attachment, var sourceItem)
+  function attachmentItem(index) { return attachments.itemAt(index); }
+  function playArrival() {
+    if (!visible || !playbackEnabled || !viewportReady || !inVisibleViewport) return;
+    arrivalMessageID = String(message.id || "");
+    arrivalMotion.stop(); arrivalProgress = 0; arrivalMotion.start();
+  }
+  function finishArrival() { arrivalMotion.stop(); arrivalProgress = 1; arrivalMessageID = ""; }
+  onMessageChanged: if (arrivalMessageID && arrivalMessageID !== String(message?.id || "")) finishArrival()
+  onVisibleChanged: if (!visible && arrivalProgress < 1) finishArrival()
+  onInVisibleViewportChanged: if (!inVisibleViewport && arrivalProgress < 1) finishArrival()
+  onPlaybackEnabledChanged: if (!playbackEnabled && arrivalProgress < 1) finishArrival()
+  opacity: arrivalProgress
+  transform: Translate { y: (1 - root.arrivalProgress) * 8 }
+  NumberAnimation {
+    id: arrivalMotion
+    target: root; property: "arrivalProgress"; to: 1
+    duration: 140; easing.type: Easing.OutCubic
+  }
   function activateMedia() {
     for (let i = 0; i < attachments.count; ++i) {
       const media = attachments.itemAt(i);
       if (media?.kind === "audio") { media.togglePlayback(); return; }
       if (media?.kind === "image" || media?.kind === "gif" || media?.kind === "video") {
-        const attachment = media.kind === "video" && media.sourceReady
+        const attachment = media.sourceReady
           ? Object.assign({}, media.attachment, {srcURL: media.sourceUrl}) : media.attachment;
-        previewRequested(attachment); return;
+        previewRequested(attachment, media); return;
       }
     }
   }
@@ -171,7 +193,7 @@ Item {
             renderEnabled: root.renderMedia
             accent: root.contentAccent
             accentBackground: root.outgoing
-            onPreviewRequested: attachment => root.previewRequested(attachment)
+            onPreviewRequested: (attachment, sourceItem) => root.previewRequested(attachment, sourceItem)
           }
         }
         Repeater {
@@ -191,107 +213,26 @@ Item {
           id: metadata
           objectName: "beeperMessageMeta"
           width: parent.width
-          readonly property bool hasReactions: root.reactionPeople.length > 0
-          readonly property real reactionWidth: {
-            let width = 0, count = 0;
-            for (const child of reactions.children) {
-              if (child.objectName !== "beeperMessageReaction") continue;
-              width += child.implicitWidth; ++count;
-            }
-            return width + Math.max(0, count - 1) * reactions.spacing;
-          }
-          readonly property real reactionLineHeight: {
-            let height = messageDetails.implicitHeight;
-            for (const child of reactions.children)
-              if (child.objectName === "beeperMessageReaction") height = Math.max(height, child.implicitHeight);
-            return height;
-          }
-          readonly property real widestReaction: {
-            let width = 0;
-            for (const child of reactions.children)
-              if (child.objectName === "beeperMessageReaction") width = Math.max(width, child.implicitWidth);
-            return width;
-          }
+          readonly property bool hasReactions: reactions.count > 0
+          readonly property real reactionWidth: reactions.totalWidth
+          readonly property real reactionLineHeight: Math.max(messageDetails.implicitHeight, reactions.tallestChip)
+          readonly property real widestReaction: reactions.widestChip
           readonly property bool separateTimeRow: hasReactions && width < widestReaction + messageDetails.implicitWidth + 12
           implicitWidth: messageDetails.implicitWidth + (hasReactions ? reactionWidth + 12 : 0)
           implicitHeight: separateTimeRow ? reactions.implicitHeight + 4 + messageDetails.implicitHeight
             : Math.max(hasReactions ? reactions.implicitHeight : 0, messageDetails.implicitHeight)
           function forceLayout() { messageDetails.forceLayout(); reactions.forceLayout(); }
-          Flow {
+          BeeperReactions {
             id: reactions
-            objectName: "beeperMessageReactions"
             visible: metadata.hasReactions
             width: Math.max(0, parent.width - (metadata.separateTimeRow ? 0 : messageDetails.implicitWidth + 12))
-            layoutDirection: Qt.LeftToRight
-            spacing: 8
-            Repeater {
-              model: root.reactionPeople
-              Rectangle {
-                id: reactionChip
-                required property var modelData
-                objectName: "beeperMessageReaction"
-                readonly property string tooltipText: (modelData.person.anonymous ? "Participant unavailable" : modelData.person.title)
-                  + " · " + modelData.key + (modelData.count > 1 ? " × " + modelData.count : "")
-                implicitWidth: reactionContents.implicitWidth + 12
-                implicitHeight: reactionContents.implicitHeight + 8
-                width: Math.min(implicitWidth, reactions.width)
-                height: metadata.reactionLineHeight
-                radius: height / 2
-                color: Qt.alpha(root.outgoing ? Theme.background : root.networkAccent, 0.16)
-                antialiasing: true
-                Accessible.role: Accessible.StaticText
-                Accessible.name: tooltipText
-                Row {
-                  id: reactionContents
-                  anchors.centerIn: parent
-                  spacing: 5
-                  Item {
-                    width: 26 * root.textScale
-                    height: reactionAvatar.height
-                    Text {
-                      objectName: "beeperReactionEmoji"
-                      anchors.centerIn: parent; width: parent.width
-                      visible: reactionImage.status !== Image.Ready
-                      text: reactionChip.modelData.key; textFormat: Text.PlainText
-                      horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
-                      color: root.outgoing ? Theme.background : Theme.foreground
-                      font { family: "Ubuntu Nerd Font"; pixelSize: 22 * root.textScale }
-                    }
-                    Image {
-                      id: reactionImage
-                      objectName: "beeperReactionImage"
-                      anchors.fill: parent
-                      source: root.renderMedia ? Format.chatAvatarSource({imgURL: reactionChip.modelData.imgURL}) : ""
-                      sourceSize: Qt.size(width * 2, height * 2)
-                      visible: status === Image.Ready; asynchronous: true; fillMode: Image.PreserveAspectFit
-                    }
-                  }
-                  BeeperAvatar {
-                    id: reactionAvatar
-                    objectName: "beeperReactionAvatar"
-                    diameter: Math.round(26 * root.textScale); width: diameter; height: diameter
-                    chat: reactionChip.modelData.person
-                    imageEnabled: root.renderMedia
-                    accentBackground: root.outgoing
-                  }
-                  Text {
-                    visible: reactionChip.modelData.count > 1
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: reactionChip.modelData.count; textFormat: Text.PlainText
-                    color: root.outgoing ? Theme.background : Theme.foreground
-                    font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption * root.textScale }
-                  }
-                }
-                HoverHandler { id: reactionHover }
-                ToolTip {
-                  visible: reactionHover.hovered; delay: 350
-                  text: reactionChip.tooltipText
-                  contentItem: Text { text: reactionChip.tooltipText; textFormat: Text.PlainText; color: Theme.foreground; font.pixelSize: Theme.beeperFont.caption }
-                  palette.toolTipText: Theme.foreground
-                  background: Rectangle { radius: 8; color: Theme.surfaceRaised }
-                }
-              }
-            }
+            people: root.reactionPeople
+            messageIdentity: JSON.stringify([root.message.chatID || root.beeperData?.currentChatID || "", root.message.id])
+            renderMedia: root.renderMedia
+            outgoing: root.outgoing
+            textScale: root.textScale
+            networkAccent: root.networkAccent
+            lineHeight: metadata.reactionLineHeight
           }
           Row {
             id: messageDetails

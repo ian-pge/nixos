@@ -12,7 +12,10 @@ ShellRoot {
   property var viewer: null
   property var inlineMedia: null
   property var messageView: null
+  property string photoStage: ""
   readonly property string videoSource: "file://" + Quickshell.shellDir + "/fixtures/fullscreen-video.mp4"
+  readonly property var photoAttachment: ({type: "image", size: {width: 400, height: 200},
+    srcURL: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="#4080c0"/></svg>')})
   Window { id: window; width: 900; height: 600; visible: true }
   SignalSpy { id: closed; target: fixture.viewer; signalName: "closeRequested" }
   TestResult { id: results }
@@ -25,6 +28,7 @@ ShellRoot {
       const item = component.createObject(parent, props); verify(item !== null); return item;
     }
     function init() {
+      fixture.photoStage = "";
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       viewer = create("../features/messenger/BeeperPhotoViewer.qml", window.contentItem,
         {width: 900, height: 600, beeperData: beeperData, visible: false, active: false});
@@ -33,7 +37,8 @@ ShellRoot {
       inlineMedia = null;
     }
     function cleanup() {
-      if (results.failed) console.error("FAILED", qtest_results.functionName);
+      if (results.failed) console.error("FAILED", qtest_results.functionName, fixture.photoStage,
+        "origin", viewer.originRect, "scale", viewer.originScale, "progress", viewer.progress, "closed", closed.count);
       viewer.active = false; viewer.destroy();
       if (inlineMedia) { inlineMedia.destroy(); inlineMedia = null; wait(0); }
       if (messageView) { messageView.destroy(); messageView = null; wait(0); }
@@ -54,6 +59,144 @@ ShellRoot {
       tryVerify(() => player() !== null);
       tryCompare(player(), "playbackState", MediaPlayer.PlayingState, 3000);
       verify(!media().playWhenReady);
+    }
+    function showPhoto(waitForImage = true) {
+      inlineMedia = create("../features/messenger/BeeperMedia.qml", window.contentItem,
+        {x: 80, y: 100, width: 200, height: 180, attachment: fixture.photoAttachment, beeperData: beeperData});
+      tryCompare(findChild(inlineMedia, "beeperMediaImage"), "status", Image.Ready);
+      viewer.animationDuration = 300;
+      viewer.previewOrigin = inlineMedia;
+      viewer.attachment = fixture.photoAttachment;
+      viewer.visible = true; viewer.active = true; viewer.forceActiveFocus();
+      tryCompare(viewer, "presented", true);
+      if (waitForImage) { tryCompare(media(), "previewReady", true); tryCompare(viewer, "waitingForPreview", false); }
+    }
+    function test_photo_waits_for_fullscreen_decode_before_starting_shared_motion() {
+      media().renderEnabled = false;
+      showPhoto(false);
+      verify(viewer.waitingForPreview); verify(viewer.sharedOrigin);
+      wait(350);
+      compare(viewer.progress, 0); verify(!viewer.transitionRunning);
+      media().renderEnabled = true;
+      tryCompare(media(), "previewReady", true);
+      tryCompare(viewer, "waitingForPreview", false);
+      tryVerify(() => viewer.progress > 0 && viewer.progress < 1);
+      tryCompare(viewer, "transitionRunning", false); compare(viewer.progress, 1);
+    }
+    function test_photo_escape_during_decode_cancels_without_late_open_or_close() {
+      media().renderEnabled = false;
+      showPhoto(false); verify(viewer.waitingForPreview);
+      keyClick(Qt.Key_Escape);
+      verify(!viewer.visible); verify(!viewer.waitingForPreview); compare(closed.count, 1);
+      media().renderEnabled = true;
+      wait(350);
+      verify(!viewer.visible); verify(!viewer.transitionRunning); compare(closed.count, 1);
+    }
+    function test_photo_decode_failure_reveals_error_and_can_still_close() {
+      media().renderEnabled = false;
+      showPhoto(false); verify(viewer.waitingForPreview);
+      media().errorText = "Fixture decoder failure";
+      tryCompare(viewer, "waitingForPreview", false); verify(!viewer.sharedOrigin);
+      tryCompare(viewer, "progress", 1);
+      keyClick(Qt.Key_Escape); tryCompare(viewer, "visible", false); compare(closed.count, 1);
+    }
+    function test_resolved_thumbnail_opens_without_a_second_download() {
+      const attachment = {id: "resolved-photo", type: "image", srcURL: "mxc://fixture/photo", size: {width: 400, height: 200}};
+      inlineMedia = create("../features/messenger/BeeperMedia.qml", window.contentItem,
+        {x: 80, y: 100, width: 200, height: 180, attachment: attachment, beeperData: beeperData});
+      tryCompare(inlineMedia, "downloading", true);
+      compare(downloads().length, 1);
+      beeperData.respond("download", {srcURL: fixture.photoAttachment.srcURL});
+      tryCompare(inlineMedia, "previewReady", true);
+      inlineMedia.previewRequested.connect((resolved, origin) => {
+        viewer.previewOrigin = origin; viewer.attachment = resolved;
+        viewer.active = true; viewer.visible = true;
+      });
+      inlineMedia.requestPreview();
+      tryCompare(viewer, "presented", true); verify(viewer.sharedOrigin);
+      compare(viewer.attachment.id, attachment.id);
+      compare(viewer.attachment.srcURL, fixture.photoAttachment.srcURL);
+      tryCompare(media(), "previewReady", true);
+      tryCompare(viewer, "waitingForPreview", false);
+      compare(downloads().length, 0, "Reuse the completed thumbnail download without another request");
+      viewer.requestClose(); tryCompare(viewer, "visible", false);
+    }
+    function test_photo_grows_from_painted_thumbnail_without_resizing_or_recreating_image() {
+      fixture.photoStage = "show";
+      showPhoto(); verify(viewer.sharedOrigin);
+      fixture.photoStage = "origin";
+      compare(viewer.originRect, Qt.rect(80, 140, 200, 100), "Use painted bounds, including thumbnail letterboxing");
+      fuzzyCompare(viewer.originScale, 200 / 900, 0.001);
+      const image = findChild(viewer, "beeperMediaImage"), originalSource = image.source.toString();
+      fixture.photoStage = "image";
+      tryCompare(image, "status", Image.Ready);
+      compare(image.width, 900); compare(image.height, 600);
+      tryCompare(viewer, "progress", 1);
+      tryCompare(viewer, "transitionRunning", false);
+      viewer.progress = 0;
+      const fitted = media().previewRect;
+      const painted = media().mapToItem(viewer, fitted.x, fitted.y);
+      fuzzyCompare(painted.x, viewer.originRect.x, 0.5, "The scene graph transform starts at the thumbnail pixels");
+      fuzzyCompare(painted.y, viewer.originRect.y, 0.5);
+      viewer.progress = 1;
+      fixture.photoStage = "close";
+      inlineMedia.x += 25;
+      viewer.requestClose();
+      verify(viewer.closing); verify(viewer.visible); compare(closed.count, 0);
+      compare(viewer.originRect.x, 105, "A visible moved thumbnail remains the correct destination");
+      wait(35);
+      fixture.photoStage = "midclose";
+      compare(findChild(viewer, "beeperMediaImage"), image);
+      compare(image.source.toString(), originalSource);
+      compare(image.width, 900); compare(image.height, 600);
+      verify(viewer.progress > 0 && viewer.progress < 1);
+      viewer.requestClose();
+      fixture.photoStage = "closed";
+      tryCompare(viewer, "visible", false); compare(closed.count, 1, "Repeated Escape emits one completed close");
+    }
+    function test_photo_close_reverses_opening_and_cancelled_close_cannot_close_reopened_photo() {
+      showPhoto();
+      tryVerify(() => viewer.progress > 0 && viewer.progress < 1);
+      const progress = viewer.progress, scale = viewer.imageScale, offset = viewer.imageOffsetX;
+      viewer.requestClose();
+      compare(viewer.progress, progress); compare(viewer.imageScale, scale); compare(viewer.imageOffsetX, offset);
+      verify(viewer.closing);
+      viewer.active = false; viewer.visible = false;
+      wait(0);
+      viewer.attachment = Object.assign({}, fixture.photoAttachment, {id: "another-photo"});
+      viewer.active = true; viewer.visible = true; viewer.forceActiveFocus();
+      tryCompare(viewer, "progress", 1); wait(40);
+      verify(viewer.visible); verify(!viewer.closing); compare(closed.count, 0);
+      keyClick(Qt.Key_Escape); tryCompare(viewer, "visible", false); compare(closed.count, 1);
+    }
+    function test_photo_missing_offscreen_or_recycled_origin_fades_out_safely() {
+      fixture.photoStage = "offscreen";
+      showPhoto(); tryCompare(viewer, "transitionRunning", false);
+      inlineMedia.y = -500;
+      viewer.requestClose(); verify(!viewer.sharedOrigin); compare(viewer.imageScale, 1);
+      tryCompare(viewer, "visible", false); compare(closed.count, 1);
+      fixture.photoStage = "recycled";
+      viewer.visible = true; viewer.active = true; viewer.forceActiveFocus();
+      tryCompare(viewer, "presented", true); verify(!viewer.sharedOrigin);
+      tryCompare(viewer, "transitionRunning", false);
+      inlineMedia.y = 100;
+      inlineMedia.attachment = {type: "image", srcURL: fixture.photoAttachment.srcURL + "#different"};
+      viewer.requestClose(); verify(!viewer.sharedOrigin);
+      tryCompare(viewer, "visible", false); compare(closed.count, 2);
+      fixture.photoStage = "missing";
+      viewer.previewOrigin = null; viewer.visible = true; viewer.active = true; viewer.forceActiveFocus();
+      tryCompare(viewer, "presented", true); verify(!viewer.sharedOrigin);
+      keyClick(Qt.Key_Space); tryCompare(viewer, "visible", false); compare(closed.count, 3);
+    }
+    function test_photo_lost_thumbnail_during_opening_keeps_current_transform_and_fades() {
+      showPhoto(); tryVerify(() => viewer.progress > 0 && viewer.progress < 1);
+      viewer.previewOrigin = null;
+      const scale = viewer.imageScale, offset = viewer.imageOffsetX;
+      viewer.requestClose();
+      compare(viewer.imageScale, scale); compare(viewer.imageOffsetX, offset);
+      compare(media().opacity, 1, "Losing the thumbnail must not jump the current image or opacity");
+      verify(viewer.closeFadeStart > 0);
+      tryCompare(viewer, "visible", false); compare(closed.count, 1);
     }
     function test_video_autoplays_space_pauses_and_escape_stops() {
       show(fixture.videoSource); waitPlaying();

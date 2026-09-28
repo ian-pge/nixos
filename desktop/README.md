@@ -136,8 +136,10 @@ nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs --perf
 ```
 
 The sidebar fixture verifies that animation does not resize text layout or the
-avatar's internal geometry. Its frame timings and CPU ticks are diagnostics,
-not portable pass/fail thresholds. Set `BEEPER_SIDEBAR_SOURCE` to the absolute
+avatar's internal geometry. It also covers interrupted selection movement,
+passive reordering, counter changes and rapid network switching. Its frame
+timings and CPU ticks are diagnostics, not portable pass/fail thresholds.
+Set `BEEPER_SIDEBAR_SOURCE` to the absolute
 path of a previous packaged `BeeperSidebar.qml` to collect a comparison sample.
 The conversation fixture measures the synchronous cost of applying 150 messages,
 event-loop pauses, work on a hidden second monitor, and history requests during
@@ -222,6 +224,13 @@ including the top-bar area, without a title or frame. Videos keep playback
 controls along the bottom; photos have no toolbar. The desktop and
 messenger behind them are blurred by the `quickshell-messenger-photo` layer rule.
 For photos, Space or Escape returns to the same chat and message selection.
+Photos grow from their visible thumbnail and return to it in 180 ms. The opening
+waits until the fullscreen image is ready to paint, then animates scale and
+translation while keeping the final image geometry and decoder size fixed.
+Closing during the opening reverses from the current position. A missing,
+clipped or recycled thumbnail uses a fade instead; the viewer never flies
+towards an unrelated image. The window and focus remain present until closing
+finishes. These transitions do not change fullscreen video playback.
 Videos start playing on opening: Space toggles play/pause, `h/l` seek backwards
 or forwards by five seconds, and Escape closes the viewer. The inline video players
 are paused while a video is fullscreen; closing also stops the fullscreen player,
@@ -350,6 +359,8 @@ avatar with a `Read · reader unavailable` tooltip. Delivery success alone never
 counts as a read receipt. Both rows wrap at narrow widths and follow text zoom;
 when a reaction and the timestamp cannot fit side by side, the time stays on the
 right of its own final row. Offscreen rows do not load these images.
+Reaction additions and removals apply immediately, with no pop, fade or shrink.
+Pills retain their keyed identity and avatars when existing reactions refresh.
 The current user's own receipts are hidden on every network; anonymous receipts
 on received messages are hidden too. Named readers use the same public API data
 on all networks, subject to what each bridge and conversation actually provide.
@@ -376,8 +387,12 @@ The conversation list stays on the left. The separate conversation header is
 removed: the selected row carries the title, avatar and member count instead.
 Rows grow from 78 to 128 px when selected and shrink on deselection, with the
 same OutCubic easing as the top-bar workspaces, shortened to 200 ms (112 px in
-compact mode). Colors settle in 120 ms. Hidden or disabled sidebars update
-directly without running selection animations on the other monitors.
+compact mode). One shared background glides between the selected delegates over
+200 ms, following their geometry without restarting when row heights or the
+model order change. Colors settle in 120 ms; text stays light until the moving
+background covers it, and becomes light immediately on deselection.
+Hidden or disabled sidebars update directly without running selection animations
+on the other monitors.
 The avatar scales from 48 to 72 px (60 px compact) and the title scales up with
 the row; the last-message preview crossfades to the member count, or a direct
 message label. Text width, avatar geometry and image resolution stay fixed
@@ -395,6 +410,15 @@ Macchiato: Sapphire for Telegram, Green for WhatsApp, Pink for Instagram, Teal
 for SMS and Blue for Signal; unknown platforms use a neutral fallback. Sent
 bubbles keep dark text and controls for contrast; active recording retains
 its red stop indicator.
+Unread totals and row badges roll their digits vertically over 140 ms without
+changing the 26 px badge diameter. Loading and unavailable states keep their
+distinct ellipsis and dash. Tab/Shift+Tab and clicking the network selector
+animate the logo and give the updated list a 140 ms fade with a 6 px horizontal
+movement. The logo is not clipped to its text box, so wide Nerd Font glyphs
+remain intact. Filtering and selection happen immediately; these transitions never
+delay input, keep an old list alive or load conversations crossed during key
+repeat. Rapid changes follow the latest state, and hidden sidebars settle at
+once. Text layouts remain fixed during both kinds of animation.
 
 Conversation pages load automatically near the bottom of the sidebar, including
 when the network/search filter leaves it empty. Older messages load near the top
@@ -467,6 +491,13 @@ new rows become visible together after their geometry and reading position are
 ready. Unchanged layout is cached; zoom and quote updates explicitly invalidate it.
 Hidden panels do not build duplicate histories, while the closing morph keeps its
 content until it is no longer visible.
+Only newly appended messages that are visible while reading the bottom of an
+already open conversation fade in with an 8 px upward movement over 140 ms.
+The animation starts after layout and viewport restoration; opening a chat,
+loading older pages, refreshing existing messages or returning to an old message
+does not replay it. Opacity and translation leave message dimensions, scroll
+anchors and media decoders unchanged. Leaving the viewport or closing the panel
+settles the effect immediately.
 Layout items remain for loaded messages; avatars, media loaders and quote fetching
 are enabled only near the viewport. A binary search finds that range and updates
 only the current and previous visible rows. Media activation happens after the

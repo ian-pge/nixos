@@ -8,6 +8,7 @@ PanelWindow {
   objectName: "messengerPhotoWindow"
   required property var beeperData
   property var attachment: null
+  property Item previewOrigin: null
   property alias viewer: photo
   signal closeRequested()
   anchors { top: true; bottom: true; left: true; right: true }
@@ -21,6 +22,7 @@ PanelWindow {
     anchors.fill: parent
     beeperData: root.beeperData
     attachment: root.attachment
+    previewOrigin: root.previewOrigin
     active: root.visible
     focus: true
     onCloseRequested: root.closeRequested()

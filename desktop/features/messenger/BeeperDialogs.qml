@@ -11,6 +11,7 @@ Rectangle {
   property string mode: ""
   property bool active: false
   property var previewAttachment: null
+  property Item previewOrigin: null
   property var linkChoices: []
   property color accent: Theme.sideApplications
   property bool externalPhotoPreview: false
@@ -19,6 +20,10 @@ Rectangle {
   readonly property Item surface: photoPreview ? photoViewer : modalSurface
   signal closeRequested()
   signal linkSelected(string url)
+  function requestClose() {
+    if (photoPreview && !externalPhotoPreview) photoViewer.requestClose();
+    else closeRequested();
+  }
   readonly property string shortcutsHelp: [
     "GENERAL · outside text input",
     "Super / Cmd + D     Show / hide messenger",
@@ -103,7 +108,7 @@ Rectangle {
   onLinkChoicesChanged: linksList.currentIndex = linkChoices.length ? 0 : -1
   visible: root.mode === "help" || root.mode === "links" || root.mode === "media" && !(photoPreview && externalPhotoPreview)
   color: photoPreview ? "transparent" : Qt.alpha(Theme.background, 0.55)
-  MouseArea { anchors.fill: parent; onClicked: root.closeRequested() }
+  MouseArea { anchors.fill: parent; onClicked: root.requestClose() }
   Rectangle {
     id: modalSurface
     objectName: "beeperModalSurface"
@@ -242,6 +247,7 @@ Rectangle {
     active: root.active && visible
     beeperData: root.beeperData
     attachment: root.previewAttachment
+    previewOrigin: root.previewOrigin
     onCloseRequested: root.closeRequested()
   }
   AcceleratedScroll { id: helpWheel; flickable: helpScroll; inputEnabled: root.mode === "help" }

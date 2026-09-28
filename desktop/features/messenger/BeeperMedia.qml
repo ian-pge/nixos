@@ -45,11 +45,25 @@ Item {
   readonly property real aspectRatio: naturalSize.width / naturalSize.height
   implicitWidth: visual ? Math.max(kind === "video" ? 240 : 0, Math.min(naturalSize.width, maximumVisualHeight * aspectRatio))
     : kind === "audio" ? 392 : fileRow.implicitWidth
-  signal previewRequested(var attachment)
+  signal previewRequested(var attachment, var sourceItem)
+  // The painted image may be letterboxed inside this item. Capture these
+  // bounds once when opening/closing; never resize a decoder during a morph.
+  readonly property rect previewRect: {
+    const fittedWidth = Math.min(width, height * aspectRatio);
+    const fittedHeight = Math.min(height, width / aspectRatio);
+    return Qt.rect((width - fittedWidth) / 2, (height - fittedHeight) / 2, fittedWidth, fittedHeight);
+  }
+  readonly property bool previewReady: imageLoader.item?.status === Image.Ready
   implicitHeight: Math.max(visual ? Math.min(maximumVisualHeight, naturalSize.height, width / aspectRatio) : kind === "audio" ? 48 : 64,
     mediaDownloading || mediaError ? statusColumn.implicitHeight : 0)
   clip: true
 
+  function requestPreview() {
+    // An already resolved thumbnail must not ask Beeper to download the same
+    // image again when the fullscreen view creates its own image item.
+    const preview = visual && sourceReady ? Object.assign({}, attachment, {srcURL: sourceUrl}) : attachment;
+    previewRequested(preview, root);
+  }
   function validSize(width, height) { return typeof width === "number" && typeof height === "number" && isFinite(width) && isFinite(height) && width > 0 && height > 0; }
   function rememberSize(width, height) {
     if (!validSize(width, height)) return;
@@ -121,6 +135,7 @@ Item {
   Component.onCompleted: { resolveIfNeeded(); requestWaveform(); }
 
   Loader {
+    id: imageLoader
     anchors.fill: parent
     visible: !root.downloading && !root.errorText
     active: root.renderEnabled && (root.kind === "image" || root.kind === "gif")
@@ -135,7 +150,7 @@ Item {
         if (status === Image.Error) root.errorText = "Preview unavailable";
         else if (status === Image.Ready) root.rememberSize(implicitWidth, implicitHeight);
       }
-      MouseArea { anchors.fill: parent; onClicked: root.previewRequested(root.attachment) }
+      MouseArea { anchors.fill: parent; onClicked: root.requestPreview() }
     }
   }
   Loader {

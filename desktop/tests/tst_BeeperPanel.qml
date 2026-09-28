@@ -382,7 +382,8 @@ ShellRoot {
           compare(child("beeperNetworkFilter").accent.toString(), "#c6a0f6");
           const row = child("beeperChatRow-" + item.id);
           verify(row !== null); verify(row.chosen);
-          tryVerify(() => row.color.toString() === item.color);
+          const selection = child("beeperChatSelection");
+          tryVerify(() => selection.targetItem === row && selection.color.toString() === item.color);
           compare(child("beeperComposerMicrophone").color.toString(), item.color);
           compare(child("beeperComposerSendIcon").color.toString(), item.color);
           compare(otherPanel.conversationAccent.toString(), item.color);

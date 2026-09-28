@@ -182,6 +182,36 @@ ShellRoot {
         }
       }
     }
+    function test_reactions_stay_still_while_message_arrival_animates() {
+      show({reactions: []});
+      // This message is within the media prefetch band, but below the viewport.
+      messageItem.inViewport = true; messageItem.renderMedia = true;
+      messageItem.inVisibleViewport = false;
+      messageItem.message = Object.assign({}, messageItem.message, {
+        reactions: [{participantID: "camille", reactionKey: "👍"}]
+      });
+      compare(chips().length, 1); compare(chips()[0].scale, 1); compare(chips()[0].opacity, 1);
+      messageItem.inVisibleViewport = true; wait(20);
+      compare(chips()[0].scale, 1); compare(chips()[0].opacity, 1);
+      const existing = chips()[0];
+      messageItem.message = Object.assign({}, messageItem.message, {
+        reactions: [{participantID: "camille", reactionKey: "👍"}, {participantID: "noe", reactionKey: "💜"}]
+      });
+      compare(chips()[0], existing); compare(existing.scale, 1);
+      const added = chips()[1]; compare(added.scale, 1); compare(added.opacity, 1);
+      messageItem.playArrival(); verify(messageItem.arriving);
+      messageItem.forceMessageLayout();
+      const height = messageItem.implicitHeight, chipWidth = added.width;
+      wait(35);
+      verify(messageItem.arriving); compare(added.scale, 1); compare(added.opacity, 1);
+      compare(messageItem.implicitHeight, height); compare(added.width, chipWidth);
+      messageItem.inVisibleViewport = false;
+      verify(messageItem.inViewport, "Leaving the viewport need not disable nearby media prefetch");
+      verify(!messageItem.arriving);
+      compare(added.opacity, 1); compare(added.scale, 1); compare(messageItem.opacity, 1);
+      messageItem.message = Object.assign({}, messageItem.message, {reactions: []});
+      compare(chips().length, 0, "Offscreen removals must release immediately");
+    }
     function test_z_visual_preview() {
       const path = Quickshell.env("BEEPER_PEOPLE_SCREENSHOT");
       if (!path) return;

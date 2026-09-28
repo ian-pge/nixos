@@ -30,6 +30,7 @@ FocusScope {
   property string editMessageID: ""
   property string editText: ""
   property var previewAttachment: null
+  property Item previewOrigin: null
   property var linkChoices: []
   property var linkOpener: url => Qt.openUrlExternally(url)
   property bool externalPhotoPreview: false
@@ -48,6 +49,8 @@ FocusScope {
   property int targetPageCount: 0
   property bool restoringView: false
   property bool historyUpdatePending: false
+  property var arrivalBaseline: null
+  property string arrivalReadyChatID: ""
   property bool pinLatest: false
   readonly property bool historyInteracting: messageWheel.driving || messageList.moving || historyWheelTimer.running || historyScrollBar.pressed
   property string selectedMessageIDBeforeUpdate: ""
@@ -216,7 +219,23 @@ FocusScope {
     if (photoPreviewOpen && externalPhotoPreview) return;
     Qt.callLater(() => modalSurface.forceActiveFocus());
   }
-  function closeModal() { modal = ""; navigationFocus.forceActiveFocus(); }
+  function closeModal() { modal = ""; previewOrigin = null; navigationFocus.forceActiveFocus(); }
+  function requestModalClose() {
+    if (photoPreviewOpen && !externalPhotoPreview) dialogs.requestClose();
+    else closeModal();
+  }
+  function openMedia(attachment, sourceItem = null) {
+    previewOrigin = sourceItem;
+    previewAttachment = attachment;
+    openModal("media");
+  }
+  function openFirstAttachment() {
+    if (!selectedMessage?.attachments?.length) return;
+    const media = messageList.itemAtIndex(messageIndex)?.attachmentItem(0) || null;
+    const attachment = media?.sourceReady
+      ? Object.assign({}, selectedMessage.attachments[0], {srcURL: media.sourceUrl}) : selectedMessage.attachments[0];
+    openMedia(attachment, media);
+  }
   function submitMessage() {
     if (recording || preparingRecording || composer.inputMethodComposing) return;
     if (editMessageID) {
@@ -331,6 +350,24 @@ FocusScope {
     const index = Math.max(0, messageList.indexAt(1, messageList.contentY + 12)), item = messageList.itemAtIndex(index);
     beeperData.viewPositions[displayedChatID] = {atLatest: pinLatest || messageList.atYEnd, messageID: beeperData.messages[index]?.id || "", offset: item ? messageList.contentY - item.y : 0, contentY: messageList.contentY};
   }
+  function captureArrivals() {
+    const messages = beeperData.messages;
+    arrivalBaseline = active && visible && !!beeperData.currentChatID
+      && (messages.length || arrivalReadyChatID === beeperData.currentChatID)
+      && displayedChatID === beeperData.currentChatID
+      && (pinLatest || (!historyInteracting && messageList.atYEnd))
+      ? {chatID: beeperData.currentChatID, tail: messages.length ? messages[messages.length - 1].id : null,
+          ids: new Set(messages.map(message => message.id))} : null;
+  }
+  function collectArrivals(older) {
+    const before = arrivalBaseline;
+    arrivalBaseline = null;
+    if (older || !active || !before || before.chatID !== beeperData.currentChatID) return;
+    const tail = before.tail === null ? -1 : beeperData.messages.findIndex(message => message.id === before.tail);
+    if (before.tail !== null && tail < 0) return;
+    const added = beeperData.messages.slice(tail + 1).filter(message => !before.ids.has(message.id));
+    if (added.length) messageList.queueArrivals(added.map(message => message.id));
+  }
   function restorePosition() {
     if (!active) return;
     if (historyInteracting && !pinLatest && displayedChatID === beeperData.currentChatID) {
@@ -362,6 +399,7 @@ FocusScope {
     } else if (beeperData.viewOwner === root) { beeperData.viewOwner = null; beeperData.viewFocused = false; }
   }
   onActiveChanged: {
+    if (!active) { arrivalBaseline = null; messageList.clearArrivals(); }
     if (!active) { rememberPosition(); clearMessageSelection(); closeConversationSearch(false); messageWheel.reset(); messageList.cancelFlick(); historyWheelTimer.stop(); pinLatest = false; stopRecording(); beeperData.flushDraft(); modal = ""; closeChatSearch(); }
     else { reconcilePrioritySelection(); restoringView = true; Qt.callLater(ensureInitialChat); Qt.callLater(restorePosition); }
     updateView(); schedulePagination();
@@ -419,11 +457,14 @@ FocusScope {
     function onConnectedChanged() { root.schedulePagination(); Qt.callLater(root.ensureInitialChat); }
     function onMessagesUpdating() {
       if (!root.active) return;
+      root.captureArrivals();
       root.selectedMessageIDBeforeUpdate = root.selectedMessage?.id || "";
       if (root.historyInteracting) messageList.captureMovingAnchor();
       else { root.rememberPosition(); root.restoringView = true; }
     }
     function onCurrentChatIDChanged() {
+      root.arrivalBaseline = null; messageList.clearArrivals();
+      root.arrivalReadyChatID = "";
       root.historyUpdatePending = false;
       if (root.preparingRecording) root.stopRecording();
       if (root.modal === "links") root.closeModal();
@@ -435,6 +476,10 @@ FocusScope {
       messageWheel.reset(); messageList.cancelFlick(); historyWheelTimer.stop(); root.pinLatest = false;
     }
     function onMessagesLoaded(older) {
+      root.collectArrivals(older);
+      // An empty successful history is a baseline too. Record it only after
+      // collecting, so opening a conversation never animates its first page.
+      root.arrivalReadyChatID = root.beeperData.currentChatID;
       root.historyUpdatePending = true;
       root.finishHistoryUpdate();
     }
@@ -565,7 +610,7 @@ FocusScope {
       event.accepted = true; return;
     }
     if (event.key === Qt.Key_Escape) {
-      if (modal) closeModal();
+      if (modal) requestModalClose();
       else if (messageSearch.opened) closeConversationSearch();
       else if (searchOpen) { closeChatSearch(); navigation = "chats"; }
       else if (beeperData.replyToMessageID || editMessageID) { beeperData.replyToMessageID = ""; editMessageID = ""; }
@@ -609,7 +654,7 @@ FocusScope {
     else if (key === "n" && beeperData.currentChatID) { if (!event.isAutoRepeat) beeperData.markChatUnread(beeperData.currentChatID); event.accepted = true; }
     else if (key === "r" && selectedMessage) { replyToSelectedMessage(); event.accepted = true; }
     else if (key === "e" && selectedMessage?.isSender) { editSelectedMessage(); event.accepted = true; }
-    else if (key === "o" && selectedMessage?.attachments?.length) { previewAttachment = selectedMessage.attachments[0]; openModal("media"); event.accepted = true; }
+    else if (key === "o" && selectedMessage?.attachments?.length) { openFirstAttachment(); event.accepted = true; }
     else if (event.key === Qt.Key_Space && selectedMessage) { if (!event.isAutoRepeat) activateSelectedMessage(); event.accepted = true; }
     else if (/^[1-6]$/.test(key) && selectedMessage) { if (!event.isAutoRepeat) reactToSelectedMessage(quickReactions[Number(key) - 1]); event.accepted = true; }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { compose(); event.accepted = true; }
@@ -695,9 +740,10 @@ FocusScope {
             playbackEnabled: root.active && !root.videoPreviewOpen
             viewportReady: false
             inViewport: false
+            inVisibleViewport: false
             renderMedia: viewportReady && root.visible && inViewport
             onSelectedRequested: { root.messageIndex = index; root.navigation = "messages"; navigationFocus.forceActiveFocus(); }
-            onPreviewRequested: attachment => { root.previewAttachment = attachment; root.openModal("media"); }
+            onPreviewRequested: (attachment, sourceItem) => root.openMedia(attachment, sourceItem)
           }
         }
         Column {
@@ -807,6 +853,7 @@ FocusScope {
     mode: root.modal
     active: root.active
     previewAttachment: root.previewAttachment
+    previewOrigin: root.previewOrigin
     linkChoices: root.linkChoices
     accent: root.conversationAccent
     onLinkSelected: url => {

@@ -155,8 +155,15 @@ mais avec une durée divisée par deux pour une navigation plus vive.
 Un seul progrès anime la hauteur, l'avatar (48 → 72 px, 60 px en mode compact),
 l'échelle du titre et le fondu entre aperçu et détails. La désélection inverse
 le mouvement depuis la taille courante, y compris en navigation rapide.
-Les couleurs suivent un fondu de 120 ms. Les barres latérales masquées ou
-désactivées appliquent la sélection directement, sans animer les autres écrans.
+Un seul fond partagé glisse entre les delegates sélectionnés sur 200 ms. Il
+suit leur géométrie par binding : la croissance d'une ligne ou un déplacement
+passif dans le modèle ne relance pas l'animation. Une inversion reprend sa
+position et sa hauteur courantes. La sélection apparaît directement à destination
+si aucun fond précédent n'était visible dans la liste. Le texte reste clair jusqu'à ce que le fond couvre
+ses lignes, puis passe au sombre ; la désélection le rend immédiatement clair
+avant le départ du fond. Les couleurs suivent un fondu de 120 ms.
+Les barres latérales masquées ou désactivées appliquent la sélection directement,
+sans animer les autres écrans.
 La sélection explicite reste dans le viewport pendant sa croissance ; molette,
 scrollbar et désactivation interrompent ce suivi, sans retour automatique.
 Les dimensions internes de l'avatar et la largeur de mise en page du titre
@@ -180,6 +187,14 @@ individuelle sélectionnée indique `Direct message` si aucun autre détail n'es
 disponible ; l'état muet reste indiqué. Les lignes inactives conservent l'aperçu
 du dernier message.
 
+Le compteur de non-lus et les numéros des badges défilent verticalement sur
+140 ms. `BeeperRollingText` garde deux textes de dimensions fixes et n'anime
+que leur position et leur opacité. Le disque reste à 26 px, y compris lors d'un
+changement du nombre de chiffres ; le marquage manuel sans message reste un
+disque sans numéro. Les états `…` et `—` continuent de distinguer chargement et
+indisponibilité. Un changement rapide remplace la destination par la dernière
+valeur ; une vue masquée ou désactivée termine le mouvement immédiatement.
+
 L'interface de la messagerie est en anglais, y compris les dialogues, les erreurs
 et les notifications ; les noms et contenus des conversations ne sont pas traduits.
 La colonne de gauche ne garde qu'un logo en haut : deux bulles mauves pour `All`,
@@ -188,8 +203,16 @@ l'avion Telegram ou le logo WhatsApp, Instagram ou SMS. En navigation, `Tab` par
 avance aussi. Le filtre porte sur le réseau, tous ses comptes confondus, et est
 partagé entre écrans. Les conversations Beeper `Google Messages` sont classées
 dans SMS. `All` inclut aussi les autres réseaux. Aucun détournement
-de Tab pendant la saisie, les dialogues ou un enregistrement vocal. `/` affiche
-temporairement la recherche de conversations, `Esc` l'efface et la masque. Le menu
+de Tab pendant la saisie, les dialogues ou un enregistrement vocal.
+Le logo change avec un fondu et un petit déplacement sur 140 ms. Son
+icône n'est pas rognée par sa boîte de texte : les glyphes Nerd Font peuvent
+déborder de leur largeur d'avance tout en restant dans le bouton. La nouvelle
+liste apparaît avec un fondu de 140 ms et une translation horizontale de 6 px.
+Le filtre et la sélection changent immédiatement ; aucun ancien modèle ni
+instantané de la liste n'est conservé pour cette transition. Des appuis rapides
+suivent le dernier réseau demandé sans retarder le clavier ou charger les
+historiques traversés. Les autres écrans masqués appliquent l'état directement.
+`/` affiche temporairement la recherche de conversations, `Esc` l'efface et la masque. Le menu
 d'actions et ses options sont retirés, y compris leurs dialogues de recherche de
 messages, nouvelle conversation, réaction libre et suppression. Les pages de
 conversations se chargent automatiquement près du bas de la liste, y compris
@@ -219,6 +242,16 @@ proches du viewport, plutôt que des bindings au défilement sur tous les messag
 Un ajout d'ancienne page garde les décodeurs des médias restés visibles.
 Les pièces jointes ont également un modèle à clés stables : une mise à jour de
 réaction ou de reçu de lecture ne recrée pas les lecteurs des médias inchangés.
+Seuls les messages réellement ajoutés après le dernier message connu peuvent
+animer leur arrivée : fondu et translation verticale de 8 px sur 140 ms.
+La conversation doit être déjà ouverte et positionnée en bas ; l'effet attend
+la fin du layout et la restauration du viewport, puis ne touche que les nouveaux
+messages effectivement visibles. Une première ouverture, une ancienne page,
+un rafraîchissement d'un message existant ou un retour sur une bulle ne rejoue
+jamais l'entrée. La transformation laisse les hauteurs, les ancres de lecture
+et les décodeurs intacts. Sortir du viewport ou désactiver le panneau termine
+l'effet immédiatement ; aucun timer permanent ni parcours par image du catalogue
+de messages n'est ajouté.
 Pas de boutons « load more », de compteur/footer permanent ni de boutons
 recherche/actions/fermeture dans l'en-tête. `?` affiche l'aide ; `:` n'ouvre rien.
 La recherche de texte revient séparément avec `Ctrl+/`, sous forme d'une barre
@@ -286,6 +319,9 @@ message précis, même dans une ancienne page, et ignore les réponses périmée
 Les réactions respectent les capacités du réseau et ne rafraîchissent pas une
 autre conversation après un changement de sélection. Les chiffres restent du
 texte dans les champs ; ni l'autorepeat ni Ctrl/Alt/Meta+chiffre n'envoient de réaction.
+`BeeperReactions` applique les ajouts et retraits immédiatement, sans rebond,
+fondu ni rétraction. Le modèle reste à clés stables pour conserver les pastilles
+et leurs avatars lors d'un rafraîchissement. Les infobulles existantes sont conservées.
 Espace ouvre d'abord les liens du message sélectionné : ouverture directe s'il
 n'y a qu'une URL distincte, sinon un sélecteur avec `j/k`, Entrée et Échap. La liste
 combine les métadonnées Beeper et les URL du texte, sans doublons, et affiche les
@@ -314,6 +350,16 @@ la surface translucide : règle `quickshell-messenger-photo` dans les règles Hy
 La barre et le panneau ne changent pas de dimensions. Espace/Échap ferment cette
 surface et rendent le focus à la même conversation ; fermer ou bloquer le chat
 masque aussi l'aperçu. La prévisualisation locale utilise la même surface plein écran.
+L'ouverture d'une photo part du rectangle réellement peint de sa vignette et
+rejoint le plein écran sur 180 ms en `OutCubic`. Elle attend que l'image plein
+écran soit prête à être dessinée avant de lancer ce trajet. La fermeture revient
+à la vignette ; une interruption inverse le mouvement depuis la position
+courante, avec une durée proportionnelle au trajet restant. Une origine absente,
+rognée, masquée ou réaffectée à une autre pièce jointe utilise un fondu sans
+trajet géométrique. La taille finale du média et les dimensions du décodeur
+restent fixes : seules l'échelle, la translation et l'opacité sont animées.
+La surface et son focus restent présents jusqu'à la fin de la fermeture.
+Ces effets concernent les photos/GIF, sans modifier les commandes vidéo.
 Dans `MessengerHost`, les deux fenêtres restent dans la liste du même
 `HyprlandFocusGrab`, et le chat conserve `OnDemand` pendant l'aperçu. À la fermeture,
 désactiver l'ancien grab avant de masquer la photo, puis en créer un nouveau pour

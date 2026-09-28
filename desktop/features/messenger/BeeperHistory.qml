@@ -17,6 +17,7 @@ Flickable {
   property bool layingOut: false
   property var movingAnchor: null
   property var activeViewportItems: []
+  property var arrivalIds: ({})
   signal layoutReady()
   contentWidth: width
   contentHeight: 0
@@ -59,6 +60,25 @@ Flickable {
       if (item) item.visible = true;
     }
     updateViewport();
+    playArrivals();
+  }
+  function queueArrivals(ids) {
+    const queued = Object.assign({}, arrivalIds);
+    for (const id of ids) queued[id] = true;
+    arrivalIds = queued;
+    if (!loading && !finishPending) Qt.callLater(playArrivals);
+  }
+  function clearArrivals() {
+    arrivalIds = ({});
+    for (const item of activeViewportItems) if (item?.finishArrival) item.finishArrival();
+  }
+  function playArrivals() {
+    const queued = arrivalIds;
+    arrivalIds = ({});
+    if (!visible || !atYEnd) return;
+    for (const item of activeViewportItems) {
+      if (item?.inVisibleViewport && queued[item.message?.id] && item.playArrival) item.playArrival();
+    }
   }
   function updateViewport() {
     if (loading || layingOut) return;
@@ -77,10 +97,15 @@ Flickable {
         if (!item || item.y > bottom) break;
         next.push(item);
         if (item.inViewport !== undefined) item.inViewport = true;
+        if (item.inVisibleViewport !== undefined)
+          item.inVisibleViewport = item.y + item.height >= contentY && item.y <= contentY + height;
       }
     }
     for (const item of activeViewportItems) {
-      if (item && !next.includes(item) && item.inViewport !== undefined) item.inViewport = false;
+      if (item && !next.includes(item)) {
+        if (item.inViewport !== undefined) item.inViewport = false;
+        if (item.inVisibleViewport !== undefined) item.inVisibleViewport = false;
+      }
     }
     activeViewportItems = next;
   }
@@ -124,7 +149,7 @@ Flickable {
   onWidthChanged: invalidateLayout()
   onContentYChanged: Qt.callLater(updateViewport)
   onHeightChanged: Qt.callLater(updateViewport)
-  onVisibleChanged: Qt.callLater(updateViewport)
+  onVisibleChanged: { if (!visible) clearArrivals(); Qt.callLater(updateViewport); }
   onSpacingChanged: invalidateLayout()
   Connections {
     target: root.model
@@ -149,6 +174,7 @@ Flickable {
     onObjectRemoved: (index, item) => {
       if (item) {
         if (item.inViewport !== undefined) item.inViewport = false;
+        if (item.inVisibleViewport !== undefined) item.inVisibleViewport = false;
         if (root.activeViewportItems.includes(item))
           root.activeViewportItems = root.activeViewportItems.filter(active => active !== item);
         item.visible = false;

@@ -714,10 +714,10 @@ ShellRoot {
       const image = findChild(photoView, "beeperMediaImage");
       tryCompare(image, "status", Image.Ready);
       fuzzyCompare(image.paintedHeight, panel.height, 0.5);
-      keyClick(Qt.Key_Space); compare(panel.modal, "");
+      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message");
       keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
-      keyClick(Qt.Key_Escape); compare(panel.modal, "");
+      keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message");
       keyClick(Qt.Key_Return); keyClick(Qt.Key_Space);
       compare(panel.composer.text, " "); compare(panel.modal, "");
@@ -741,7 +741,7 @@ ShellRoot {
       while (pending("download").length) beeperData.respond("download", {srcURL: source});
       tryCompare(findChild(photo, "beeperMediaImage"), "status", Image.Ready);
       compare(photo.errorText, "");
-      keyClick(Qt.Key_Space); compare(panel.modal, "");
+      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "");
     }
     function test_second_space_cancels_audio_while_downloading() {
       const media = selectAttachment({type: "audio", srcURL: "mxc://preview/voice", duration: 2});

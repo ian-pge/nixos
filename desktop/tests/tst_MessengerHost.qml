@@ -187,6 +187,42 @@ ShellRoot {
       keyClick(Qt.Key_Escape); tryCompare(preview, "visible", false);
       tryCompare(panel, "windowFocused", true); tryCompare(grab, "active", true);
     }
+    function test_photo_thumbnail_maps_across_surfaces_and_closing_keeps_focus_until_return() {
+      const history = findChild(panel, "beeperMessages");
+      const index = model.messages.findIndex(message => message.id === "photo");
+      tryVerify(() => !history.loading && history.itemAtIndex(index) !== null);
+      history.positionViewAtIndex(index, ListView.Center);
+      const thumbnail = findChild(history.itemAtIndex(index), "beeperMedia");
+      tryVerify(() => findChild(thumbnail, "beeperMediaImage") !== null);
+      tryCompare(findChild(thumbnail, "beeperMediaImage"), "status", Image.Ready);
+      panel.previewOrigin = thumbnail;
+      panel.previewAttachment = model.messages[index].attachments[0];
+      panel.openModal("media");
+      const preview = host.photoPreviewWindow;
+      tryCompare(preview.viewer, "presented", true);
+      verify(preview.viewer.sharedOrigin, "A visible real thumbnail must morph across the Wayland layer surfaces");
+      const rect = thumbnail.previewRect, point = thumbnail.mapToItem(preview.viewer, rect.x, rect.y);
+      fuzzyCompare(preview.viewer.originRect.x, point.x, 1);
+      fuzzyCompare(preview.viewer.originRect.y, point.y, 1);
+      tryCompare(preview.viewer, "progress", 1);
+      tryCompare(preview.viewer, "activeFocus", true);
+      keyClick(Qt.Key_Escape);
+      verify(preview.viewer.closing); verify(preview.visible);
+      compare(panel.modal, "media", "Keep the attachment mounted until the shrinking image arrives");
+      tryCompare(preview, "visible", false);
+      tryCompare(panel, "windowFocused", true); tryCompare(grab, "active", true);
+      panel.openModal("media");
+      tryCompare(preview.viewer, "presented", true);
+      tryCompare(preview.viewer, "progress", 1);
+      preview.viewer.requestClose();
+      controller.blocked = true;
+      tryCompare(preview, "visible", false);
+      wait(220);
+      verify(!grab.active); verify(!host.wantsKeyboard);
+      controller.blocked = false;
+      controller.show(); tryCompare(panel, "windowFocused", true);
+      compare(panel.modal, "", "Cancelled photo closure cannot reopen a blocked preview");
+    }
     function test_blocked_releases_keyboard_and_preserves_draft() {
       panel.compose(); const composer = findChild(host, "beeperComposer");
       composer.text = "Preserve my draft";

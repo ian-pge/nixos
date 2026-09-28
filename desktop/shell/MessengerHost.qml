@@ -114,6 +114,7 @@ Item {
     visible: root.active && !root.controller.blocked && panel.photoPreviewOpen
     beeperData: root.controller.beeperData
     attachment: panel.previewAttachment
+    previewOrigin: panel.previewOrigin
     onVisibleChanged: if (visible) Qt.callLater(() => {
       if (photoWindow.visible) { focusGrab.active = true; photoWindow.viewer.forceActiveFocus(); }
     })
