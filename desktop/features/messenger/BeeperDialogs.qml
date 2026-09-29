@@ -13,6 +13,7 @@ Rectangle {
   property var previewAttachment: null
   property Item previewOrigin: null
   property var linkChoices: []
+  property bool vimEditing: false
   property color accent: Theme.sideApplications
   property bool externalPhotoPreview: false
   readonly property bool photoPreview: root.mode === "media"
@@ -44,11 +45,14 @@ Rectangle {
     "Ctrl + d     Start / finish a voice recording",
     "A finished recording is attached to the draft, not sent",
     "Ctrl + v     Paste text, or an image when no text is available",
-    "Ctrl + Shift + v     Paste an image attachment",
+    "Ctrl + Shift + v     Paste an image attachment"
+  ].concat(vimEditing ? vimHelp : [], [
     "",
     "EMOJI PICKER",
     "h / j / k / l or arrows     Move through the grid",
     "/     Focus emoji search (English / French)",
+    "Enter in search     Back to the results, on the first match",
+    "Enter / Space in the grid     Insert the selected emoji",
     "Tab / Shift+Tab     Switch between search and grid",
     "Down from search     Return to the results grid",
     "Enter     Insert selected emoji",
@@ -106,7 +110,30 @@ Rectangle {
     "Cancel popup, reply / edit, then remove attachment",
     "Return to conversations, leave Low Priority, then close messenger",
     "Text and unsent drafts are preserved"
-  ].join("\n")
+  ]).join("\n")
+  readonly property var vimHelp: [
+    "",
+    "COMPOSER · VIM MODE",
+    "Writing starts in insert mode",
+    "Esc     Normal mode; in normal mode, the Escape steps below",
+    "i / a / I / A / o / O     Insert here / after / line start / line end / below / above",
+    "h / j / k / l     Move; j / k follow wrapped lines",
+    "w / b / e · W / B / E     Next word / previous word / word end",
+    "0 / ^ / $ · gg / G     Line start / first letter / line end · first / last line",
+    "f / t / F / T + character, then ; / ,     Find in the line, repeat",
+    "/ + text, then Enter     Search the message, ignoring case; Esc cancels",
+    "n / N     Next / previous match",
+    "d / c / y + motion or object     Delete / change / copy, with counts like 2dw",
+    "dd / cc / yy     Whole lines",
+    "iw aw · i\" a\" · i( a( · i[ a[ · i{ a{     Word, quotes and brackets objects",
+    "x / X / s / S / D / C / Y     Short edits; Y copies to the line end",
+    "r + character / ~ / J     Replace / switch case / join lines",
+    "p / P     Paste after / before",
+    "u / Ctrl + r     Undo / redo",
+    "v / V     Select characters / lines",
+    "Enter     Send from normal mode",
+    "Copies also go to the system clipboard"
+  ]
   function scrollHelp(delta) {
     const view = helpScroll;
     helpWheel.reset(); view.cancelFlick();

@@ -136,6 +136,11 @@ ShellRoot {
       keyClick(Qt.Key_Return); verify(panel.emojiPickerOpen);
       picker.searchInput.text = "coeur"; tryVerify(() => picker.matches.length > 1);
       keyClick(Qt.Key_Down); verify(picker.grid.activeFocus);
+      keyClick(Qt.Key_Slash); tryVerify(() => picker.searchInput.activeFocus);
+      compare(picker.searchInput.text, "coeur");
+      // Enter hands the results to the keyboard instead of inserting the first one.
+      keyClick(Qt.Key_Return); verify(picker.grid.activeFocus); verify(panel.emojiPickerOpen);
+      compare(picker.grid.currentIndex, 0); compare(beeperData.draftText, "");
       keyClick(Qt.Key_L); compare(picker.grid.currentIndex, 1);
       const chosen = picker.matches[1].emoji;
       keyClick(Qt.Key_Space); tryCompare(panel, "emojiPickerOpen", false);

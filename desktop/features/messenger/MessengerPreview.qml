@@ -51,6 +51,7 @@ ShellRoot {
         parent: bubble.contentItem
         anchors.fill: parent
         beeperData: data; active: bubble.expanded
+        vimEditing: true
         externalPhotoPreview: true
         windowFocused: content.Window.active && (activeFocus || emojiPickerOpen)
         onCloseRequested: bubble.expanded = false

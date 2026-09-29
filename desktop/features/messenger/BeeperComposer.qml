@@ -19,6 +19,9 @@ Rectangle {
   property bool recording: false
   property bool preparingRecording: false
   property real recordingDuration: 0
+  // Vim-style modal editing; the owner turns it on.
+  property bool vimEditing: false
+  readonly property string vimMode: vimEditor.mode
   property alias input: composer
   readonly property bool emojiPickerOpen: emojiPicker.visible
   readonly property bool canPickEmoji: active && enabled && !!beeperData.currentChatID
@@ -31,6 +34,7 @@ Rectangle {
   signal editTextEdited(string text)
   signal draftTextEdited(string text)
   signal submitRequested()
+  signal copyRequested(string text)
   signal pasteAttachmentRequested()
   signal recordingToggleRequested()
   signal attachmentDropped(string url)
@@ -99,6 +103,13 @@ Rectangle {
       Layout.topMargin: root.beeperData.replyToMessageID || root.editMessageID ? 0 : 8
       BeeperMedia { Layout.fillWidth: true; Layout.preferredHeight: Math.min(88, implicitHeight); attachment: root.beeperData.draftAttachment || {}; beeperData: root.beeperData; playbackEnabled: root.active }
     }
+    // Vim's / search line, aligned with the text: emoji button, spacing, padding.
+    VimSearchPrompt {
+      vim: vimEditor
+      Layout.fillWidth: true
+      Layout.leftMargin: 54; Layout.rightMargin: 8; Layout.topMargin: 6
+      Layout.preferredHeight: visible ? implicitHeight : 0
+    }
     RowLayout {
       Layout.fillWidth: true; spacing: 4
       Button {
@@ -134,18 +145,22 @@ Rectangle {
           placeholderText: root.beeperData.currentChat?.isReadOnly ? "Read-only conversation"
             : root.recording ? "Recording  " + Format.duration(root.recordingDuration)
             : root.preparingRecording ? "Preparing recording…" : root.dictating ? "Dictation in progress…" : "Write a message…"
-          readOnly: root.recording || root.preparingRecording
-          leftPadding: 10; rightPadding: 6; topPadding: 8; bottomPadding: 8
+          // Outside Vim's insert mode, only Vim commands may edit the text.
+          readOnly: root.recording || root.preparingRecording || !vimEditor.inserting
+          // JetBrains Mono lines are taller than Ubuntu's: 7 + 6 px keep one
+          // line within the 40 px row, so the composer still rests at 48 px.
+          leftPadding: 10; rightPadding: 6; topPadding: 7; bottomPadding: 6
           color: Theme.foreground; placeholderTextColor: Theme.inactive
           selectionColor: Qt.alpha(Theme.sideApplications, 0.4)
           selectedTextColor: Theme.selectedForeground
-          font { family: "Ubuntu Nerd Font"; pixelSize: root.textSize }
+          // Terminal-like input: every character takes the same width.
+          font { family: "JetBrainsMono Nerd Font"; pixelSize: root.textSize }
           wrapMode: TextEdit.Wrap; selectByMouse: true
           background: null
           cursorDelegate: Rectangle {
             id: caret
             objectName: "beeperComposerCursor"
-            width: 3; radius: 1; color: composer.color
+            width: 3; radius: 1; color: Theme.textCursor
             property bool blinkOn: true
             opacity: composer.cursorVisible && !composer.readOnly && blinkOn ? 1 : 0
             function restartBlink() { blinkOn = true; if (blink.running) blink.restart(); }
@@ -168,8 +183,11 @@ Rectangle {
             else if (text !== root.beeperData.draftText) root.draftTextEdited(text);
           }
           Keys.onPressed: event => {
+            if (vimEditor.handleKeyEvent(event)) return;
             if (Format.shouldSend(event.key, event.modifiers, inputMethodComposing)) { if (!event.isAutoRepeat) root.submitRequested(); event.accepted = true; }
-            else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier) && (!canPaste || (event.modifiers & Qt.ShiftModifier))) { root.pasteAttachmentRequested(); event.accepted = true; }
+            // Normal mode is read-only, so canPaste is false there without meaning "no text".
+            else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)
+                && ((!canPaste && vimEditor.inserting) || (event.modifiers & Qt.ShiftModifier))) { root.pasteAttachmentRequested(); event.accepted = true; }
           }
         }
       }
@@ -232,4 +250,12 @@ Rectangle {
     onDropped: drop => { if (drop.hasUrls && drop.urls.length) { root.attachmentDropped(drop.urls[0].toString()); drop.acceptProposedAction(); } }
   }
   AcceleratedScroll { flickable: composerScroll.contentItem }
+  VimEditing {
+    id: vimEditor
+    objectName: "beeperComposerVim"
+    target: composer
+    active: root.vimEditing && !root.recording && !root.preparingRecording
+    onSubmitRequested: root.submitRequested()
+    onCopyRequested: text => root.copyRequested(text)
+  }
 }

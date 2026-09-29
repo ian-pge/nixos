@@ -10,6 +10,9 @@ in
   } ''
     mkdir -p xkb/symbols
     cp ${symbols} xkb/symbols/lafayette
+    # Maj+Espace produit une espace normale.
+    substituteInPlace xkb/symbols/lafayette \
+      --replace-fail 'U202F' 'space'
     xkbcli compile-keymap --include "$PWD/xkb" --include-defaults \
       --layout lafayette --variant lafayette --options compose:caps \
       --output-format 1 > "$out"

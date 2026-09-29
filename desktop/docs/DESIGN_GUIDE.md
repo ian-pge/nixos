@@ -305,6 +305,35 @@ réponse ou quitter le chat efface la sélection et son ancre de restauration.
 La prochaine entrée par Ctrl+J/K sélectionne toujours le message le plus
 récent ; les appuis suivants parcourent normalement l'historique. Ouvrir puis
 fermer l'aperçu d'un média conserve la sélection du média.
+
+Le composeur utilise JetBrainsMono Nerd Font : tous les caractères ont la même
+largeur, comme dans un terminal. Son édition modale façon Vim vient de la brique
+partagée `ui/VimEditing.qml`, qui s'appuie sur le cœur pur `ui/VimCore.js`
+testé sous Node. `BeeperPanel.vimEditing` vaut `false` par défaut ; le shell et
+l'aperçu l'activent. La saisie démarre en mode insertion à chaque prise de focus
+depuis l'application, mais pas au simple retour dans la fenêtre. Avec Vim, le
+premier Échap passe en mode normal ; les étapes d'Échap décrites plus haut
+s'appliquent ensuite depuis le mode normal. Le curseur reprend celui de Zed et
+son remplacement `#ffcc33` (`Theme.textCursor`) : une barre qui clignote en
+insertion ; en modes normal et visuel, un bloc opaque qui clignote au même
+rythme, le caractère dessous redessiné dans la couleur de fond du composeur,
+comme le fait Zed. Tout déplacement du bloc le réaffiche plein. En mode normal,
+le champ passe en lecture seule : touches mortes, saisies
+de méthode d'entrée, collages et dépôts ne peuvent rien écrire, seules les
+commandes Vim modifient le texte. `/` ouvre une ligne de recherche au-dessus du
+texte (`ui/VimSearchPrompt.qml`) ; le motif est du texte simple, sans casse.
+Pendant la frappe, les résultats sont surlignés avec les couleurs de recherche
+du thème Catppuccin de Zed : turquoise, et rouge pour celui qu'atteindra
+Entrée. Entrée saute au résultat suivant en repartant du début, puis retire le
+surlignage ; Échap, ou Retour arrière sur un motif vide, annule ; un motif sans
+résultat passe en rouge ; `n/N` répètent la recherche. `j/k` suivent les lignes affichées d'un message
+replié, mais un opérateur comme `dj` prend des lignes entières. Chaque commande ou
+session d'insertion forme une seule étape d'annulation, car l'annulation native
+de Qt découpe un remplacement en deux. Les copies `y` vont aussi dans le
+presse-papiers système avec l'avis « Text copied » ; `p` colle le registre Vim.
+Entrée envoie depuis le mode normal puis revient en insertion ; Maj+Entrée n'y
+fait rien. La répétition `.`, les macros, les registres nommés, les marques, les
+commandes `:` et le mode bloc ne sont pas pris en charge.
 Les chiffres `1` à `6` utilisent respectivement 👍, 😂, 💜, 🔥, 💯 et 🤡. Dans les
 conversations Telegram, `2` utilise 🤣 et `3` utilise ❤️ ; la conversation active
 détermine ces équivalences, même sous le filtre `All`, et l'aide suit cette même
@@ -397,7 +426,9 @@ actif ne suffit pas : un événement `cleared` retardé peut annuler le retour d
 clavier. La régression se teste avec une autre fenêtre ouverte et le pointeur
 hors du rectangle du chat, puis en saisissant du texte après plusieurs fermetures.
 Les commandes de navigation ne doivent jamais détourner les caractères composés,
-AltGr ou les touches mortes Lafayette dans les champs de texte.
+AltGr ou les touches mortes Lafayette dans les champs de texte. Le mode normal de
+Vim lit le caractère produit, pas le code de touche ; ★ seul, sans texte, laisse
+une commande en attente intacte.
 Au repos, le composeur fait une ligne (48 px avec la police par défaut) et grandit
 avec le texte, jusqu'à 160 px de saisie avant défilement interne. Le bouton de
 40 px à droite affiche un micro, puis passe à l'envoi dès que le brouillon contient
@@ -408,8 +439,10 @@ d'aide permanente : collage et glisser-déposer restent disponibles.
 Ctrl+S ouvre/ferme le sélecteur d'emojis, depuis la navigation ou la saisie.
 Le focus commence dans la grille : H/J/K/L utilisent les mêmes déplacements
 que les flèches, sans boucler aux limites. `/` donne le focus à la recherche
-français/anglais ; H/J/K/L y restent du texte. Bas ou Tab revient aux résultats,
-Entrée insère l'emoji (Espace aussi depuis la grille). Échap ou Ctrl+S annule en
+français/anglais ; H/J/K/L y restent du texte. Bas, Tab ou Entrée revient aux
+résultats, sur le premier ; Entrée n'insère jamais depuis la recherche, pour
+laisser choisir le bon emoji. Dans la grille, Entrée ou Espace insère
+l'emoji. Échap ou Ctrl+S annule en
 préservant le texte et sa sélection. Les raccourcis sont limités au chat actif,
 mais restent utilisables dans son Popup.Item, y compris depuis sa recherche.
 

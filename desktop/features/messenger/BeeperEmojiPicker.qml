@@ -48,8 +48,10 @@ Popup {
         background: Rectangle { radius: 10; color: Theme.surface }
         Keys.onPressed: event => {
           if (inputMethodComposing) return;
+          // Enter hands the results to the keyboard, on the first match,
+          // so the right emoji can be picked; it never inserts from here.
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (!event.isAutoRepeat) root.choose(emojiGrid.currentIndex);
+            if (!event.isAutoRepeat && root.matches.length) emojiGrid.forceActiveFocus();
             event.accepted = true;
           } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
             emojiGrid.forceActiveFocus(); event.accepted = true;

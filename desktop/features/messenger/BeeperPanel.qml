@@ -45,6 +45,8 @@ FocusScope {
   property Item textSelectionOwner: null
   readonly property string selectedText: textSelectionOwner?.selectedText ?? ""
   property string notice: ""
+  // Vim-style modal editing in the composer; hosts opt in.
+  property bool vimEditing: false
   property bool externalPhotoPreview: false
   readonly property bool photoPreviewOpen: modal === "media"
     && ["image", "gif", "video"].includes(Format.attachmentType(previewAttachment || {}))
@@ -887,6 +889,8 @@ FocusScope {
         recording: root.recording
         preparingRecording: root.preparingRecording
         recordingDuration: root.recorder?.duration || 0
+        vimEditing: root.vimEditing
+        onCopyRequested: text => root.copyText(text, "Text copied")
         onEditTextEdited: text => root.editText = text
         onDraftTextEdited: text => root.beeperData.draftText = text
         onSubmitRequested: root.submitMessage()
@@ -946,6 +950,7 @@ FocusScope {
     previewAttachment: root.previewAttachment
     previewOrigin: root.previewOrigin
     linkChoices: root.linkChoices
+    vimEditing: root.vimEditing
     accent: root.conversationAccent
     onLinkSelected: url => {
       if (!root.linkChoices.some(link => link.url === url)) return;

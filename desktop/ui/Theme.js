@@ -15,6 +15,12 @@ var surface = "#24273a";
 var surfaceRaised = "#363a4f";
 var surfaceSelected = "#494d64";
 
+// Text editing, as in Zed: the cursor override from home_manager/zed/settings.nix
+// and the search match colors of Zed's Catppuccin Macchiato theme (30 % alpha).
+var textCursor = "#ffcc33";
+var searchMatch = "#4d8bd5ca";
+var searchCurrentMatch = "#4ded8796";
+
 // Fixed Catppuccin accents shared by side capsules and paired central controls.
 var sideApplications = "#7dc4e4";
 var sideUpdates = "#f0c6c6";

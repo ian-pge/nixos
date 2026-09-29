@@ -92,6 +92,7 @@ Item {
     anchors.fill: parent
     beeperData: root.controller.beeperData
     dictating: root.dictating
+    vimEditing: true
     externalPhotoPreview: true
     active: root.active && !root.controller.blocked
     windowFocused: root.windowFocused && (activeFocus || emojiPickerOpen) && !root.nativeDialogOpen && !root.controller.blocked

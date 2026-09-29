@@ -99,6 +99,10 @@ ShellRoot {
       const picker = openPicker("coeur");
       tryVerify(() => picker.matches.some(entry => entry.emoji === "❤️"));
       picker.grid.currentIndex = picker.matches.findIndex(entry => entry.emoji === "❤️");
+      // Enter in search only hands the results to the keyboard; Enter there inserts.
+      keyClick(Qt.Key_Return);
+      verify(picker.grid.activeFocus); verify(fixture.composer.emojiPickerOpen);
+      compare(model.draftText, "Salut Léa");
       keyClick(Qt.Key_Return);
       tryCompare(fixture.composer, "emojiPickerOpen", false);
       compare(model.draftText, "Salut ❤️Léa");

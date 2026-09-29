@@ -196,7 +196,9 @@ off to the capsule at the shared endpoint; no separate size animation finishes
 afterward. Opening captures the previous widget before its mode changes.
 Clicking outside leaves the chat open and
 releases keyboard focus. Enter focuses the composer; inside it, Enter sends and
-Shift+Enter adds a newline. When replying or editing, Escape first cancels that
+Shift+Enter adds a newline. With Vim editing, which the shell enables, the
+first Escape switches the composer to normal mode; the steps below then apply
+from normal mode. When replying or editing, Escape first cancels that
 mode while keeping typing focus and the draft. If an attachment remains, the
 next Escape removes it while preserving draft text and typing focus. Once these
 previews are cleared, Escape returns to the conversation list, then another
@@ -468,11 +470,38 @@ Sending successfully always returns that conversation to the latest message,
 without scrolling another chat if you switched while the request was in flight.
 The composer is one line (48 px at the default font size) at rest and grows with
 multiline text. Its caret is 3 px wide and follows the platform blink interval.
+It uses JetBrainsMono Nerd Font, so every character takes the same width.
+
+Vim editing comes from the shared `ui/VimEditing.qml` component over the pure
+`ui/VimCore.js` core, so other text fields can adopt it. `BeeperPanel.vimEditing`
+defaults to false; the shell and the preview turn it on. Writing starts in
+insert mode whenever the composer gains focus from inside the app. The cursor
+follows Zed with its `#ffcc33` override (`Theme.textCursor`): a blinking bar in
+insert mode, and in normal and visual modes an opaque blinking block with the
+character under it redrawn in the composer background. Normal mode makes the
+field read-only: dead keys, input-method commits, paste and drops cannot type
+there, while Vim commands still edit. `/` opens a search line above the text
+(`ui/VimSearchPrompt.qml`); the plain, case-insensitive pattern highlights its
+matches while typed, in the teal and red of Zed's Catppuccin theme, the red
+one being where Enter jumps. Enter wraps around the message and clears the
+highlights, Escape or Backspace on an empty pattern cancels, a pattern without
+match turns red, and `n/N` repeat. Supported: `h/j/k/l` with `j/k` following wrapped lines,
+`w/b/e/W/B/E`, `0/^/$`, `gg/G`, `f/F/t/T` with `;/,`; `d/c/y` with motions,
+counts and the `iw/aw/iW/aW`, quote and bracket objects; `dd/cc/yy`,
+`x/X/s/S/D/C/Y`, `r`, `~`, `J`, `p/P`, `u` and Ctrl+R, `i/a/I/A/o/O`, `v` and
+`V`. `Y` copies to the line end, as in Neovim. Each Vim command or insert
+session is one undo step. Yanks also reach the system clipboard with the
+"Text copied" notice; `p` pastes Vim's own register, and Ctrl+V stays the
+system paste in insert mode. Enter sends from normal mode, then returns to
+insert. Dot repeat, macros, named registers, marks, `:` commands and block
+selection are not implemented.
+
 The circular smiley at the left and Ctrl+S open an offline emoji grid with
 English/French search. The grid starts with keyboard focus: H/J/K/L or arrow
-keys move through it, `/` focuses search, and Down or Tab returns to the results.
-Letters remain ordinary text in search. Enter inserts the selection (Space also
-works in the grid); Escape or Ctrl+S cancels and restores the draft selection.
+keys move through it, `/` focuses search, and Down, Tab or Enter returns to the
+results on the first match; Enter never inserts from search. Letters remain
+ordinary text in search. In the grid, Enter or Space inserts the selection;
+Escape or Ctrl+S cancels and restores the draft selection.
 Choosing an emoji inserts it at the saved caret or replaces the selected
 text, then restores typing focus without sending. Escape closes the picker first.
 The Unicode Emoji 17.0 / CLDR 48 catalogue and license are included in
