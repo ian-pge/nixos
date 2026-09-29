@@ -16,6 +16,7 @@ import (
 
 type notificationCall struct {
 	AppName string
+	Icon    string
 	Body    string
 	Actions []string
 	Hints   map[string]dbus.Variant
@@ -34,7 +35,7 @@ func (s *notificationService) GetCapabilities() ([]string, *dbus.Error) {
 }
 
 func (s *notificationService) Notify(app string, replaces uint32, icon, summary, body string, actions []string, hints map[string]dbus.Variant, timeout int32) (uint32, *dbus.Error) {
-	s.calls <- notificationCall{app, body, actions, hints}
+	s.calls <- notificationCall{app, icon, body, actions, hints}
 	return 42, nil
 }
 
@@ -113,15 +114,21 @@ func TestDBusNotificationIdentityMarkupAndClick(t *testing.T) {
 		if len(call.Actions) != 2 || call.Actions[0] != "default" {
 			t.Fatal("default action missing")
 		}
+		if _, ok := call.Hints["image-path"]; ok || call.Icon != "" {
+			t.Fatal("a notification without a photo must not claim an image or icon")
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("no Notify call")
 	}
 	service.markup.Store(true)
-	n.send("Camille", "L'atelier & <b>texte</b>", "", object{"chatID": "chat", "messageID": "message"}, true)
+	n.send("Camille", "L'atelier & <b>texte</b>", "file:///avatars/camille.jpg", object{"chatID": "chat", "messageID": "message"}, true)
 	select {
 	case call := <-service.calls:
 		if call.Body != "L&#39;atelier &amp; &lt;b&gt;texte&lt;/b&gt;" {
 			t.Fatal("markup-enabled server must receive escaped text")
+		}
+		if call.Hints["image-path"].Value() != "file:///avatars/camille.jpg" || call.Icon != "" {
+			t.Fatal("the sender photo belongs in the image-path hint, not the application icon")
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("no markup-aware Notify call")

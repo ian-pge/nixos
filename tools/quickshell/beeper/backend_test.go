@@ -523,9 +523,9 @@ func TestUploadUsesOfficialMultipartEndpoint(t *testing.T) {
 }
 
 type capturedNotification struct {
-	title, body string
-	target      object
-	silent      bool
+	title, body, image string
+	target             object
+	silent             bool
 }
 type fakeNotifications struct {
 	mu       sync.Mutex
@@ -533,9 +533,9 @@ type fakeNotifications struct {
 	received chan struct{}
 }
 
-func (n *fakeNotifications) send(title, body, icon string, target object, silent bool) {
+func (n *fakeNotifications) send(title, body, image string, target object, silent bool) {
 	n.mu.Lock()
-	n.items = append(n.items, capturedNotification{title, body, target, silent})
+	n.items = append(n.items, capturedNotification{title, body, image, target, silent})
 	n.mu.Unlock()
 	if n.received != nil {
 		select {
@@ -585,6 +585,92 @@ func TestNotificationsAreDurableAndKeepSoundForVisibleChats(t *testing.T) {
 	b.considerMessage(b.ctx, "chat", m("four"), since)
 	if n.count() != 3 {
 		t.Fatal("muted chat notified")
+	}
+}
+func TestNotificationAvatarFollowsTheSender(t *testing.T) {
+	people := func(items ...object) object {
+		list := make([]any, len(items))
+		for i, item := range items {
+			list[i] = map[string]any(item)
+		}
+		return object{"items": list}
+	}
+	camille := object{"id": "camille", "imgURL": "/avatars/camille.jpg"}
+	self := object{"id": "me", "isSelf": true, "imgURL": "/avatars/me.jpg"}
+	for _, tc := range []struct {
+		name          string
+		chat, message object
+		want          string
+	}{
+		{"direct chat without a photo of its own", object{"type": "single", "participants": people(self, camille)},
+			object{"senderID": "camille"}, "/avatars/camille.jpg"},
+		{"unknown sender in a direct chat", object{"type": "single", "participants": people(self, camille)},
+			object{}, "/avatars/camille.jpg"},
+		{"direct chat photo", object{"type": "single", "imgURL": "/avatars/chat.jpg", "participants": people(self)},
+			object{"senderID": "camille"}, "/avatars/chat.jpg"},
+		{"group sender", object{"type": "group", "imgURL": "/avatars/group.jpg", "participants": people(self, camille)},
+			object{"senderID": "camille"}, "/avatars/camille.jpg"},
+		{"group sender without a photo", object{"type": "group", "imgURL": "/avatars/group.jpg", "participants": people(self, object{"id": "noe"})},
+			object{"senderID": "noe"}, "/avatars/group.jpg"},
+		{"group without any photo", object{"type": "group", "participants": people(self, camille)},
+			object{"senderID": "noe"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := notificationAvatar(tc.chat, tc.message); got != tc.want {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+func TestNotificationImageIsALocalFileURI(t *testing.T) {
+	dir := t.TempDir()
+	avatar := filepath.Join(dir, "Camille Martin.jpg")
+	if err := os.WriteFile(avatar, []byte("jpeg"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var downloads atomic.Int32
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		var request object
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if r.Method != "POST" || r.URL.Path != "/v1/assets/download" {
+			http.NotFound(w, r)
+			return
+		}
+		downloads.Add(1)
+		if request["url"] == "mxc://beeper.local/camille" {
+			jsonResponse(w, object{"srcURL": fileURL(avatar)})
+			return
+		}
+		jsonResponse(w, object{"error": "not found"})
+	})
+	want := "file://" + strings.ReplaceAll(avatar, " ", "%20")
+	for source, expected := range map[string]string{
+		avatar: want, fileURL(avatar): want, "mxc://beeper.local/camille": want,
+		"mxc://beeper.local/missing": "", filepath.Join(dir, "missing.jpg"): "", dir: "", "": "",
+	} {
+		if got := b.notificationImage(b.ctx, source); got != expected {
+			t.Errorf("%q: got %q, want %q", source, got, expected)
+		}
+	}
+	if downloads.Load() != 2 {
+		t.Fatalf("only media URLs use the assets endpoint, got %d downloads", downloads.Load())
+	}
+}
+func TestDirectChatNotificationUsesTheParticipantPhoto(t *testing.T) {
+	avatar := filepath.Join(t.TempDir(), "camille.jpg")
+	if err := os.WriteFile(avatar, []byte("jpeg"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		jsonResponse(w, object{"id": "chat", "title": "Camille", "type": "single", "imgURL": nil,
+			"participants": object{"items": []object{{"id": "me", "isSelf": true}, {"id": "camille", "imgURL": fileURL(avatar)}}}})
+	})
+	n := &fakeNotifications{}
+	b.notifications = n
+	b.considerMessage(b.ctx, "chat", object{"id": "one", "text": "bonjour", "senderID": "camille", "senderName": "Camille",
+		"type": "TEXT", "timestamp": time.Now().Format(time.RFC3339Nano)}, time.Now().Add(-time.Minute))
+	if n.count() != 1 || n.items[0].image != fileURL(avatar) {
+		t.Fatalf("direct chat notification must carry the contact's photo, got %+v", n.items)
 	}
 }
 func TestNotificationCandidatesExcludeHistoricalAndMutatedMessages(t *testing.T) {

@@ -96,10 +96,12 @@ FocusScope {
       width: results.width; height: 46; radius: 10
       selected: index === root.selectedIndex
       accent: Theme.sideWeather
+      solid: true
       Text {
+        objectName: "weatherName" + row.index
         x: 10; y: 4; width: parent.width - 20; height: 20
         text: row.modelData.name
-        color: row.selected ? (GlassState.enabled ? Theme.selectedForeground : Theme.sideWeather) : Theme.foreground
+        color: row.selected ? Theme.background : Theme.foreground
         Behavior on color { ColorAnimation { duration: 120 } }
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 12
@@ -110,7 +112,8 @@ FocusScope {
       Text {
         x: 10; y: 25; width: parent.width - 20; height: 16
         text: [row.modelData.region, row.modelData.country].filter(Boolean).join(" · ")
-        color: Theme.secondary
+        color: row.selected ? Theme.background : Theme.secondary
+        Behavior on color { ColorAnimation { duration: 120 } }
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 10
         elide: Text.ElideRight

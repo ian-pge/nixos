@@ -322,6 +322,19 @@ texte dans les champs ; ni l'autorepeat ni Ctrl/Alt/Meta+chiffre n'envoient de r
 `BeeperReactions` applique les ajouts et retraits immédiatement, sans rebond,
 fondu ni rétraction. Le modèle reste à clés stables pour conserver les pastilles
 et leurs avatars lors d'un rafraîchissement. Les infobulles existantes sont conservées.
+`y` copie tout le texte du message sélectionné ; sans texte, un avis
+`This message has no text` s'affiche et rien n'est copié. Glisser la souris sur
+le texte d'un message en sélectionne une partie : `y` copie alors cette sélection
+et l'efface, Ctrl+C la copie et la garde, Échap l'efface avant toute autre action
+d'Échap. Une seule sélection existe à la fois. Un bref avis `Theme.surfaceRaised`
+en bas de la conversation confirme chaque copie. La sélection ne prend jamais le
+focus clavier et un simple clic sur le texte sélectionne toujours le message.
+Elle repose sur un `TextEdit` transparent en lecture seule, posé sur le texte
+brut, chargé seulement au survol ou tant qu'il porte une sélection : l'historique
+garde des `Text` simples. Ce calque utilise le même paragraphe échappé (interligne
+120 %) que le surlignage de recherche, donc la même mise en page ligne à ligne.
+Sa couleur de sélection est l'accent de la conversation (Crust sur une bulle
+envoyée). Le texte des messages n'est jamais interprété comme du balisage.
 Espace ouvre d'abord les liens du message sélectionné : ouverture directe s'il
 n'y a qu'une URL distincte, sinon un sélecteur avec `j/k`, Entrée et Échap. La liste
 combine les métadonnées Beeper et les URL du texte, sans doublons, et affiche les
@@ -345,11 +358,27 @@ Espace garde son rôle normal dans les champs ; l'autorepeat ne relance pas le m
 Les photos utilisent `MessengerPhotoWindow`, une surface Overlay sur le moniteur
 du chat, ancrée aux quatre bords sans marge ni zone exclusive. `BeeperPhotoViewer`
 conserve les proportions et agrandit l'image à la surface disponible, sans plafond
-de 430 px, titre, cadre ou barre d'outils. Le flou vient du compositeur, derrière
-la surface translucide : règle `quickshell-messenger-photo` dans les règles Hyprland.
+de 430 px, titre, cadre ou barre d'outils. Aucun flou : le bureau et le chat
+derrière la photo sont seulement assombris (voile de 28 %), avec la même
+progression que la photo. Le flou de compositeur a été retiré volontairement ;
+ne pas le réintroduire. La surface `quickshell-messenger-photo` porte la règle
+Hyprland `no_anim` : elle ne doit jamais subir le fondu de couche (400 ms), qui
+la montrerait translucide pendant et après le trajet de 180 ms.
 La barre et le panneau ne changent pas de dimensions. Espace/Échap ferment cette
 surface et rendent le focus à la même conversation ; fermer ou bloquer le chat
 masque aussi l'aperçu. La prévisualisation locale utilise la même surface plein écran.
+Sur une photo ou un GIF, `h`/`l` affichent la photo ou le GIF précédent/suivant
+de la conversation, dans l'ordre chronologique, en sautant les vidéos, vocaux,
+fichiers et messages sans pièce jointe. La nouvelle image remplace l'ancienne
+sur place, sans rejouer le trajet depuis une vignette cachée derrière le voile.
+`BeeperPanel.stepPreview` déplace aussi la sélection de message, si bien que la
+fermeture revient à la dernière image affichée. Sur la plus ancienne image
+chargée, `h` charge jusqu'à dix pages d'historique plus anciennes. Sur une
+vidéo, `h`/`l` gardent le déplacement de cinq secondes. Entrée enregistre une
+copie du média affiché (photo, GIF ou vidéo) dans le dossier de téléchargement
+XDG, via la méthode `saveAttachment` du helper Go, sans fermer la visionneuse :
+nom d'origine si connu, jamais d'écrasement (`nom (2).jpg`), et un avis en haut
+de l'écran avec le nom enregistré, ou l'erreur en `Theme.error`.
 L'ouverture d'une photo part du rectangle réellement peint de sa vignette et
 rejoint le plein écran sur 180 ms en `OutCubic`. Elle attend que l'image plein
 écran soit prête à être dessinée avant de lancer ce trajet. La fermeture revient
@@ -571,7 +600,7 @@ son indication à l'intérieur du panneau.
 - `../../tools/quickshell/chrome-tabs/` : adaptateur Rust TabCtl et cache local des favicons Chrome.
 - `../../tools/README.md` : sources et tests organisés par outil logique.
 - `../../packages/default.nix` : catalogue des paquets exposés par `localPackages`.
-- `../../packages/quickshell/runtime.nix` / `desktop.nix` : runtime commun Quickshell avec Liquid Glass et Qt Multimedia, puis sources QML filtrées et chemins immuables des helpers.
+- `../../packages/quickshell/runtime.nix` / `desktop.nix` : runtime commun Quickshell avec Liquid Glass, Qt Multimedia et les formats d'image Qt (WebP des stickers et photos), puis sources QML filtrées et chemins immuables des helpers.
 - `../../home_manager/quickshell.nix` : installation, configuration et démarrage uniquement, sans copie des sources QML.
 
 ### Frontières entre domaines et présentation
@@ -972,12 +1001,19 @@ synthétique de bord et le contre-bord sombre du plugin Liquid Glass ont aussi
 Les sélections internes des applications, onglets Chrome, villes météo,
 périphériques audio et jours du calendrier utilisent `SelectionSurface.qml` :
 teinte de l'accent à 20 % sur le verre existant, sans bordure et avec une
-transition de couleur de 120 ms sans rebond. Ne pas ajouter de `GlassShape`,
+transition de couleur de 120 ms sans rebond. Les applications, les villes météo
+et les jours du calendrier utilisent à la place un fond en accent plein
+(`solid: true`), identique avec ou sans verre et limité aux couleurs exactes de
+Catppuccin Macchiato : Sapphire pour les applications, Pink pour les villes et
+aujourd'hui, Peach pour le jour sélectionné. Le texte, les icônes et les points
+posés sur ce fond passent en Crust (`Theme.background`). Les onglets Chrome et
+les périphériques audio gardent la teinte translucide. Ne pas ajouter de `GlassShape`,
 de shader ou de flou à ces lignes : elles ne sont pas une deuxième vitre.
-Les fonds d'icônes des deux lanceurs restent discrets (4 % au repos, 8 %
-de l'accent à la sélection). Les libellés de liste sélectionnés sont blancs ;
-les couleurs sémantiques des dates et des états actifs restent conservées.
-Sans `GlassState.enabled`, revenir aux couleurs opaques du thème. La sélection
+Les fonds d'icônes des deux lanceurs restent discrets (4 % au repos) ; à la
+sélection, 8 % de l'accent pour les onglets, transparent sur la ligne pleine
+des applications. Sur une teinte translucide, les libellés sélectionnés sont
+blancs ; les couleurs sémantiques des dates et des états actifs restent conservées.
+Sans `GlassState.enabled`, les teintes translucides reviennent aux couleurs opaques du thème. La sélection
 de texte dans les champs de recherche garde son contraste et son comportement.
 `selection-test.qml` vérifie les composants réels avec des actions simulées,
 via Quickshell offscreen (aucune application lancée ni requête météo).
@@ -1135,7 +1171,7 @@ Le speed test n’est jamais automatique. `t` étend la capsule vers le bas et l
 
 ### Panneau audio
 
-Le clic sur la capsule volume et `Super+R` appellent `topbar.toggleAudio` et
+Le clic sur la capsule volume et `Super+T` appellent `topbar.toggleAudio` et
 ouvrent `AudioSelector.qml` au centre, sur l’écran cible. L’en-tête affiche
 l’icône audio, le titre `AUDIO` et le compteur `n OUT · n IN`, puis une seule page
 affiche `OUTPUTS` et `MICROPHONE`, avec une coche sur les périphériques réellement utilisés.
@@ -1349,7 +1385,7 @@ avec des processus et flux Polkit entièrement fictifs ; le démarrage automatiq
 du checker et l’agent natif y sont désactivés. Aucun build, nettoyage,
 authentification système ou installation n’est exécuté par cette suite.
 
-### Limites d’utilisation — `Super+T`
+### Limites d’utilisation — `Super+R`
 
 - `r` : relire immédiatement les deux CLI
 - `q/Esc` : fermeture
@@ -1627,18 +1663,18 @@ contrôles, températures et aujourd’hui, les neutres habituels pour
 le texte. Les icônes météo utilisent les glyphes monochromes d’`Ubuntu Nerd Font`,
 jamais les emojis multicolores. Chaque jour couvert affiche son numéro, son
 icône et les températures mini/maxi en °C (`12°/24°`). Aujourd’hui utilise un
-fond neutre et un contour coloré. Les icônes soleil/éclaircies sont vertes
+fond Pink plein. Les icônes soleil/éclaircies sont vertes
 (`Theme.weatherSun`), celles de bruine/pluie/averses/orages rouges (`Theme.weatherRain`),
-les autres gardent `Theme.sideWeather`.
+les autres gardent `Theme.sideWeather` ; sur un fond plein, elles passent en Crust.
 
 H/J/K/L et les flèches sélectionnent les jours : gauche/droite déplacent d’un jour,
 haut/bas d’une semaine, y compris à travers les limites des mois. U/D (ou Page
 Up/Down) changent le mois en conservant le numéro du jour si possible. Home revient
-à aujourd’hui, tout comme N depuis la grille ou le détail. Sur le verre, le jour
-sélectionné prend une teinte orange `Theme.calendarSelected` à 20 % sans contour ;
-aujourd'hui garde une teinte rose à la même opacité de 20 % et son numéro gras.
-L'accent orange reste prioritaire lorsqu'aujourd'hui est sélectionné.
-Sans verre, conserver le fond opaque et les contours colorés précédents.
+à aujourd’hui, tout comme N depuis la grille ou le détail. Le jour sélectionné a
+un fond Peach plein (`Theme.calendarSelected`) et aujourd'hui un fond Pink plein
+(`Theme.sideWeather`), sans contour, avec ou sans verre ; leur numéro reste gras
+et, comme l'icône météo et les températures, passe en Crust.
+Le Peach reste prioritaire lorsqu'aujourd'hui est sélectionné.
 Un clic sur une case ou Entrée ouvre son détail horaire dans la
 même capsule. `WeatherDayDetails.qml` affiche température/ressenti, pluie en %/mm,
 vent/rafales en km/h dans une liste défilante. Les bandes alternées des heures
@@ -1713,7 +1749,7 @@ validation, l’horizon demandé et la cohérence localisation/cache hors ligne.
 
 ## 20. Limites d’utilisation Claude et Codex
 
-`Super+T` (`Cmd+T`) appelle `topbar.toggleUsage` et transforme la capsule
+`Super+R` (`Cmd+R`) appelle `topbar.toggleUsage` et transforme la capsule
 centrale en panneau des limites d’abonnement sur l’écran focalisé ; un second
 appui, `q` ou Échap le ferme, `r` relit les données. Aucune capsule latérale ne
 lui correspond. Comme Système, il prend exactement

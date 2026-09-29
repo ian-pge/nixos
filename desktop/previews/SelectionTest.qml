@@ -138,18 +138,33 @@ ShellRoot {
       compare(target.border.width, 0);
       verify(target.color.a < 0.25);
     }
-    function test_translucent_selections() {
-      checkTint(apps, "appSelection0", Theme.sideApplications);
+    // Applications, cities and days: the Catppuccin accent itself, glass or not.
+    function checkSolid(item, name, accent) {
+      const target = surface(item, name);
+      compare(target.color, accent);
+      compare(target.color.a, 1);
+      compare(target.border.width, 0);
+    }
+    function test_glass_selection_tints() {
+      checkSolid(apps, "appSelection0", Theme.sideApplications);
       checkTint(tabs, "tabSelection0", Theme.sideApplications);
-      checkTint(cities, "weatherSelection0", Theme.sideWeather);
+      checkSolid(cities, "weatherSelection0", Theme.sideWeather);
       checkTint(audio, "audioSelection-speaker", Theme.sideVolume);
-      checkTint(calendar, "2026-09-24", Theme.calendarSelected);
+      checkSolid(calendar, "2026-09-24", Theme.calendarSelected);
       compare(surface(apps, "appSelection1").color.a, 0);
       compare(surface(cities, "weatherSelection1").color.a, 0);
-      compare(surface(apps, "appIconFrame0").color, Qt.alpha(Theme.sideApplications, 0.08));
+      compare(surface(apps, "appIconFrame0").color.a, 0, "The icon sits directly on the Sapphire row");
       compare(surface(apps, "appIconFrame1").color, Qt.alpha(Theme.foreground, 0.04));
+      // Content on a solid accent switches to Crust.
+      compare(surface(apps, "appName0").color, Theme.background);
+      compare(surface(apps, "appName1").color, Theme.foreground);
+      compare(surface(cities, "weatherName0").color, Theme.background);
+      compare(surface(cities, "weatherName1").color, Theme.foreground);
+      compare(surface(surface(calendar, "2026-09-24"), "dayNumber").color, Theme.background);
+      compare(surface(surface(calendar, "2026-09-23"), "dayNumber").color, Theme.background);
+      compare(surface(surface(calendar, "2026-09-25"), "dayNumber").color, Theme.foreground);
       compare(surface(tabs, "tabIconFrame0").color, Qt.alpha(Theme.sideApplications, 0.08));
-      compare(surface(calendar, "2026-09-23").color, Qt.alpha(Theme.sideWeather, 0.20));
+      compare(surface(calendar, "2026-09-23").color, Theme.sideWeather);
       compare(surface(calendar, "2026-09-23").color.a, surface(calendar, "2026-09-24").color.a);
     }
     function test_keyboard_selection_and_action() {
@@ -157,7 +172,7 @@ ShellRoot {
       keyClick(Qt.Key_Down);
       compare(appController.selectedIndex, 1);
       wait(180);
-      checkTint(apps, "appSelection1", Theme.sideApplications);
+      checkSolid(apps, "appSelection1", Theme.sideApplications);
       compare(surface(apps, "appSelection0").color.a, 0);
       keyClick(Qt.Key_Return);
       compare(appController.launched, 1);
@@ -184,7 +199,7 @@ ShellRoot {
       keyClick(Qt.Key_Right);
       compare(state.selectedDate, "2026-09-25");
       wait(180);
-      checkTint(calendar, "2026-09-25", Theme.calendarSelected);
+      checkSolid(calendar, "2026-09-25", Theme.calendarSelected);
     }
     function test_weather_hourly_details_keep_the_glass_visible() {
       weatherData.days = ({"2026-09-24": {
@@ -212,22 +227,24 @@ ShellRoot {
       keyClick(Qt.Key_Escape);
       verify(!state.detailsOpen);
       wait(180);
-      checkTint(calendar, "2026-09-24", Theme.calendarSelected);
+      checkSolid(calendar, "2026-09-24", Theme.calendarSelected);
     }
     function test_opaque_fallback_and_restore() {
       GlassState.enabled = false;
       wait(180);
-      compare(surface(apps, "appSelection0").color, Theme.surfaceRaised);
+      checkSolid(apps, "appSelection0", Theme.sideApplications);
       compare(surface(tabs, "tabSelection0").color, Theme.surfaceRaised);
-      compare(surface(cities, "weatherSelection0").color, Theme.surfaceRaised);
+      checkSolid(cities, "weatherSelection0", Theme.sideWeather);
       compare(surface(audio, "audioSelection-speaker").color, Theme.surfaceRaised);
-      compare(surface(apps, "appIconFrame0").color, Theme.surfaceSelected);
+      compare(surface(apps, "appIconFrame0").color.a, 0);
       compare(surface(apps, "appIconFrame1").color, Theme.surface);
-      compare(surface(calendar, "2026-09-24").border.width, 1);
+      checkSolid(calendar, "2026-09-24", Theme.calendarSelected);
+      compare(surface(calendar, "2026-09-23").color, Theme.sideWeather);
       GlassState.enabled = true;
       wait(180);
-      checkTint(apps, "appSelection0", Theme.sideApplications);
-      checkTint(calendar, "2026-09-24", Theme.calendarSelected);
+      checkSolid(apps, "appSelection0", Theme.sideApplications);
+      checkSolid(calendar, "2026-09-24", Theme.calendarSelected);
+      checkTint(tabs, "tabSelection0", Theme.sideApplications);
     }
   }
 }

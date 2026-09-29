@@ -51,11 +51,14 @@ Scope {
     if (key === id && active) pause();
     else play(id, attachment);
   }
+  // This player lives as long as the shell: an AudioOutput keeps the device
+  // it was created with, so follow the default that the audio panel changes.
+  MediaDevices { id: devices }
   MediaPlayer {
     id: player
     objectName: "beeperAudioPlayer"
     source: root.sourceUrl
-    audioOutput: AudioOutput {}
+    audioOutput: AudioOutput { device: devices.defaultAudioOutput }
     onPlaybackStateChanged: if (playbackState === MediaPlayer.PlayingState) root.playWhenReady = false
     onErrorOccurred: (error, message) => { root.playWhenReady = false; root.errorText = message; }
   }

@@ -45,6 +45,7 @@
         ".config/t3code"
         ".config/T3 Code (Alpha)"
         ".local/share/zed"
+        ".local/share/direnv"
         ".local/share/systemd/timers"
         ".t3"
         ".config/gh"

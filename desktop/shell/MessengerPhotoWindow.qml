@@ -3,14 +3,20 @@ import Quickshell
 import Quickshell.Wayland
 import "../features/messenger"
 
+// No compositor blur and no layer animation (Hyprland rule `no_anim`): the
+// photo grows from its thumbnail at full opacity while the viewer fades its
+// own dimmed backdrop with the same progress.
 PanelWindow {
   id: root
   objectName: "messengerPhotoWindow"
   required property var beeperData
+  property bool open: false
   property var attachment: null
   property Item previewOrigin: null
   property alias viewer: photo
   signal closeRequested()
+  signal stepRequested(int delta)
+  visible: open
   anchors { top: true; bottom: true; left: true; right: true }
   color: "transparent"
   exclusionMode: ExclusionMode.Ignore
@@ -26,5 +32,6 @@ PanelWindow {
     active: root.visible
     focus: true
     onCloseRequested: root.closeRequested()
+    onStepRequested: delta => root.stepRequested(delta)
   }
 }

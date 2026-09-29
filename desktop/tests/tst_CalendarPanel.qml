@@ -136,12 +136,14 @@ Item {
       compare(findChild(panel, "2026-09-12").weatherIcon, "");
       compare(findChild(panel, "2026-09-30").weatherIcon, "");
       compare(findChild(panel, "2026-09-30").temperatureText, "");
+      compare(Calendar.weatherIconColor(today.forecast.code), Theme.weatherSun);
       for (const day of [today, findChild(panel, "2026-09-11")]) {
+        // Today's solid Pink cell draws its content in Crust.
         const icon = findChild(day, "weatherIcon");
-        compare(icon.color, day === today ? Theme.weatherSun : Theme.weatherRain);
+        compare(icon.color, day === today ? Theme.background : Theme.weatherRain);
         compare(icon.font.family, "Ubuntu Nerd Font");
         const temperature = findChild(day, "temperature");
-        compare(temperature.color, Theme.sideWeather);
+        compare(temperature.color, day === today ? Theme.background : Theme.sideWeather);
         verify(temperature.y + temperature.height <= day.height);
         verify(temperature.contentWidth <= temperature.width);
       }
@@ -290,15 +292,15 @@ Item {
       verify(findChild(panel, "2026-09-11").isSelected);
       const selected = findChild(panel, "2026-09-11");
       const today = findChild(panel, "2026-09-10");
-      tryCompare(selected, "color", today.color);
+      tryCompare(selected, "color", Theme.calendarSelected);
+      compare(today.color, Theme.sideWeather);
       compare(selected.radius, today.radius);
-      compare(selected.border.width, today.border.width);
-      compare(selected.border.color, Theme.calendarSelected);
-      compare(today.border.color, Theme.sideWeather);
-      compare(findChild(selected, "dayNumber").color, Theme.calendarSelected);
+      compare(selected.border.width, 0); compare(today.border.width, 0);
+      compare(findChild(selected, "dayNumber").color, Theme.background);
+      compare(findChild(today, "dayNumber").color, Theme.background);
       verify(findChild(selected, "dayNumber").font.bold);
       keyClick(Qt.Key_N);
-      compare(today.border.color, Theme.calendarSelected);
+      tryCompare(today, "color", Theme.calendarSelected);
     }
     function test_location_search_keyboard_keeps_calendar_keys_as_text() {
       keyClick(Qt.Key_S);

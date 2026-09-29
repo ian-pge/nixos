@@ -46,9 +46,10 @@ in {
       dim_around = true;
     }
     {
+      # Fullscreen chat photo, without blur: it grows from its thumbnail in
+      # 180 ms, and a layer fade would show it translucent and outlast that.
       match.namespace = "quickshell-messenger-photo";
-      blur = true;
-      ignore_alpha = 0;
+      no_anim = true;
     }
   ];
 }

@@ -124,7 +124,85 @@ ShellRoot {
         if (Math.abs(highlight.implicitHeight - size.textHeight) > 1)
           console.error("Text layer height", test.tag, scale, highlight.implicitHeight, size.textHeight);
         fuzzyCompare(highlight.implicitHeight, size.textHeight, 1, "Highlighted glyphs use the same line spacing");
+        fuzzyCompare(selectionLayer(message).implicitHeight, size.textHeight, 1, "The selection layer uses the same line spacing");
       }
+    }
+    // Hovering loads the transparent TextEdit that owns mouse selection.
+    function selectionLayer(message) {
+      const body = findChild(message, "messageBody");
+      mouseMove(body, 4, 4);
+      tryVerify(() => findChild(message, "beeperMessageTextSelection") !== null);
+      const layer = findChild(message, "beeperMessageTextSelection");
+      // The document lays out on the next polish, not at creation.
+      tryVerify(() => layer.width === body.width && layer.implicitHeight > 0);
+      return layer;
+    }
+    function dragSelect(layer, from, to) {
+      const a = layer.positionToRectangle(from), b = layer.positionToRectangle(to);
+      mousePress(layer, a.x + 1, a.y + a.height / 2);
+      mouseMove(layer, b.x + 1, b.y + b.height / 2);
+      mouseRelease(layer, b.x + 1, b.y + b.height / 2);
+    }
+    function test_mouse_selects_part_of_a_message_without_taking_focus() {
+      controls.visible = false;
+      message = create("BeeperMessage", {width: 700, message: {id: "select", text: "Bonjour tout le monde\nDeuxième <b>ligne</b>"}});
+      wait(20);
+      mouseMove(message, message.width - 2, message.height - 2); wait(20);
+      compare(findChild(message, "beeperMessageTextSelection"), null, "Plain Text items until hovered");
+      const layer = selectionLayer(message);
+      compare(layer.textFormat, TextEdit.RichText);
+      verify(!layer.text.includes("<b>"), "Message markup stays escaped");
+      dragSelect(layer, 0, 7);
+      compare(message.selectedText, "Bonjour");
+      verify(!layer.activeFocus, "Keyboard focus stays with the chat");
+      dragSelect(layer, 16, 30);
+      compare(message.selectedText, "monde\nDeuxième", "Line breaks are copied as newlines");
+      mouseMove(message, message.width - 2, message.height - 2); wait(20);
+      verify(findChild(message, "beeperMessageTextSelection") !== null, "A selection keeps its layer after the pointer leaves");
+      message.clearTextSelection();
+      compare(message.selectedText, "");
+      tryVerify(() => findChild(message, "beeperMessageTextSelection") === null);
+    }
+    function test_click_on_message_text_still_selects_the_message() {
+      controls.visible = false;
+      message = create("BeeperMessage", {width: 700, message: {id: "tap", text: "Cliquer ici"}});
+      wait(20);
+      const layer = selectionLayer(message);
+      let requests = 0;
+      message.selectedRequested.connect(() => ++requests);
+      mouseClick(layer, 10, layer.height / 2);
+      tryVerify(() => requests === 1);
+      compare(message.selectedText, "");
+    }
+    function test_text_selection_is_really_painted_for_both_message_directions() {
+      controls.visible = false;
+      for (const outgoing of [false, true]) {
+        // Incoming bubbles select in the network accent, outgoing ones in Crust.
+        const fill = outgoing ? "#181926" : "#8aadf4";
+        message = create("BeeperMessage", {width: 700, networkAccent: "#8aadf4",
+          message: {id: "painted-selection", text: "Bonjour tout le monde", isSender: outgoing}});
+        wait(20);
+        const body = findChild(message, "messageBody"), layer = selectionLayer(message);
+        const before = paintedPixels(body, fill);
+        dragSelect(layer, 0, 7);
+        compare(message.selectedText, "Bonjour");
+        wait(30);
+        const after = paintedPixels(body, fill);
+        verify(after - before > 300, "The selection needs a solid background, not only recolored text: "
+          + before + " pixels before, " + after + " after");
+        message.destroy(); message = null; wait(0);
+      }
+    }
+    // Capture the stable window origin, then sample the item's mapped bounds.
+    // Cropping a nested, right-anchored item is not reliable here.
+    function paintedPixels(item, color) {
+      const rendered = grabImage(window.contentItem), point = item.mapToItem(window.contentItem, 0, 0);
+      const scaleX = rendered.width / window.width, scaleY = rendered.height / window.height;
+      let count = 0;
+      for (let y = Math.floor(point.y * scaleY); y < (point.y + item.height) * scaleY; ++y)
+        for (let x = Math.floor(point.x * scaleX); x < (point.x + item.width) * scaleX; ++x)
+          if (rendered.pixel(x, y).toString() === color) ++count;
+      return count;
     }
     function test_highlight_background_is_really_painted_for_both_message_directions() {
       controls.visible = false;
@@ -133,15 +211,7 @@ ShellRoot {
       for (const outgoing of [false, true]) {
         message.message = {id: "paint", text: "Chat chat", isSender: outgoing};
         message.forceMessageLayout(); wait(30);
-        // Capture the stable window origin, then sample the body's mapped
-        // bounds. Cropping a nested, right-anchored item is not reliable here.
-        const rendered = grabImage(window.contentItem), point = body.mapToItem(window.contentItem, 0, 0);
-        const scaleX = rendered.width / window.width, scaleY = rendered.height / window.height;
-        let yellow = 0;
-        for (let y = Math.floor(point.y * scaleY); y < (point.y + body.height) * scaleY; ++y)
-          for (let x = Math.floor(point.x * scaleX); x < (point.x + body.width) * scaleX; ++x)
-            if (rendered.pixel(x, y).toString() === "#eed49f") ++yellow;
-        verify(yellow > 50, "The matched words must have a real yellow background, not just colored text");
+        verify(paintedPixels(body, "#eed49f") > 50, "The matched words must have a real yellow background, not just colored text");
       }
     }
     function test_selection_dot_is_outside_on_the_opposite_side_with_the_conversation_color() {
@@ -211,6 +281,21 @@ ShellRoot {
       verify(media.color === undefined); verify(media.implicitHeight > 150);
       verify(findChild(message, "beeperMessageBubble").height >= media.implicitHeight + 12);
     }
+    function test_webp_stickers_decode_and_animate_data() {
+      return [{tag: "static", file: "sticker.webp", frames: 1}, {tag: "animated", file: "sticker-animated.webp", frames: 2}];
+    }
+    // WhatsApp and Telegram stickers are WebP; the runtime must ship Qt's decoder.
+    function test_webp_stickers_decode_and_animate(data) {
+      controls.visible = false;
+      message = create("BeeperMessage", {width: 700, message: {id: "sticker-" + data.tag, attachments: [{
+        type: "img", isSticker: true, mimeType: "image/webp", size: {width: 128, height: 128},
+        srcURL: "file://" + Quickshell.shellDir + "/fixtures/" + data.file}]}});
+      const media = findChild(message, "beeperMedia");
+      const image = findChild(media, "beeperMediaImage");
+      tryCompare(image, "status", Image.Ready);
+      compare(image.frameCount, data.frames);
+      compare(media.errorText, "");
+    }
     function test_portrait_with_short_caption_fits_content_instead_of_the_whole_row() {
       controls.visible = false;
       message = create("BeeperMessage", {width: 1000, renderMedia: false, message: {
@@ -268,6 +353,8 @@ ShellRoot {
       tryCompare(media, "decodedSource", source);
       fuzzyCompare(media.implicitWidth, 125, 0.1);
       fuzzyCompare(bubble.width, 153, 0.1);
+      // The column lays out around the decoded image on the next polish.
+      tryVerify(() => message.height > media.implicitHeight);
       const height = message.height;
       message.renderMedia = false; wait(20);
       verify(findChild(media, "beeperMediaImage") === null);

@@ -109,8 +109,8 @@ try {
   if (testHost) {
     const baseConfig = await readFile(compositorConfig, "utf8");
     compositorConfig = path.join(runtime, "hyprland-photo.lua");
-    await writeFile(compositorConfig, baseConfig + '\nhl.config({ decoration = { blur = { enabled = true } } })\n'
-      + 'hl.layer_rule({ match = { namespace = "quickshell-messenger-photo" }, blur = true, ignore_alpha = 0 })\n');
+    await writeFile(compositorConfig, baseConfig
+      + '\nhl.layer_rule({ match = { namespace = "quickshell-messenger-photo" }, no_anim = true })\n');
   }
   compositor = spawn("Hyprland", ["--config", compositorConfig], {env, detached: true});
   collect(compositor, data => { compositorLog += data; });

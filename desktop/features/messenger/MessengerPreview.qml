@@ -58,11 +58,12 @@ ShellRoot {
       MessengerPhotoWindow {
         id: photoWindow
         screen: window.screen
-        visible: bubble.expanded && panel.photoPreviewOpen
+        open: bubble.expanded && panel.photoPreviewOpen
         beeperData: data; attachment: panel.previewAttachment
         previewOrigin: panel.previewOrigin
         onVisibleChanged: if (visible) Qt.callLater(() => photoWindow.viewer.forceActiveFocus())
         onCloseRequested: { panel.closeModal(); panel.forceActiveFocus(); }
+        onStepRequested: delta => panel.stepPreview(delta)
       }
       Row {
         x: 16; y: 10; spacing: 10; z: 2

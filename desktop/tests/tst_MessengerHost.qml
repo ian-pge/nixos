@@ -168,6 +168,31 @@ ShellRoot {
       keyClick(Qt.Key_Escape); tryCompare(preview, "visible", false);
       verify(host.active);
     }
+    function test_photo_window_steps_between_photos_with_h_and_l() {
+      const messages = model.messages;
+      const first = messages.find(message => message.id === "photo");
+      const next = Object.assign({}, first, {id: "photo-next", timestamp: new Date(Date.now() + 60000).toISOString(),
+        attachments: [Object.assign({}, first.attachments[0], {id: "photo-next-attachment"})]});
+      model.messages = messages.concat([next]);
+      try {
+        panel.openMedia(first.attachments[0]);
+        const preview = host.photoPreviewWindow;
+        tryCompare(preview, "visible", true);
+        tryCompare(preview.viewer, "activeFocus", true);
+        keyClick(Qt.Key_L);
+        tryCompare(panel, "previewMessageID", "photo-next");
+        compare(preview.viewer.attachment, panel.previewAttachment);
+        compare(panel.selectedMessage.id, "photo-next");
+        verify(preview.visible);
+        keyClick(Qt.Key_H);
+        tryCompare(panel, "previewMessageID", "photo");
+        keyClick(Qt.Key_Escape); tryCompare(preview, "visible", false);
+        compare(panel.selectedMessage.id, "photo");
+        tryCompare(panel, "windowFocused", true); tryCompare(grab, "active", true);
+      } finally {
+        model.messages = messages;
+      }
+    }
     function test_video_uses_full_monitor_and_space_keeps_the_viewer_open() {
       panel.previewAttachment = {type: "video", srcURL: "file://" + Quickshell.shellDir + "/fixtures/fullscreen-video.mp4", duration: 20};
       panel.openModal("media");

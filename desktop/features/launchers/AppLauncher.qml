@@ -209,9 +209,10 @@ FocusScope {
             radius: 10
             selected: appRow.selected
             accent: Theme.sideApplications
+            solid: true
           }
 
-          SelectionSurface {
+          Rectangle {
             id: iconFrame
             objectName: "appIconFrame" + appRow.index
             anchors.left: parent.left
@@ -220,11 +221,10 @@ FocusScope {
             width: 30
             height: 30
             radius: 8
-            selected: appRow.selected
-            accent: Theme.sideApplications
-            tintOpacity: 0.08
-            fallbackColor: Theme.surfaceSelected
-            idleColor: GlassState.enabled ? Qt.alpha(Theme.foreground, 0.04) : Theme.surface
+            // On the selected Sapphire row the icon sits directly on the accent.
+            color: appRow.selected ? "transparent"
+              : GlassState.enabled ? Qt.alpha(Theme.foreground, 0.04) : Theme.surface
+            Behavior on color { ColorAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
             Image {
               id: appIcon
@@ -243,7 +243,7 @@ FocusScope {
               visible: appIcon.status === Image.Error
               anchors.centerIn: parent
               text: "󰀻"
-              color: appRow.selected ? Theme.sideApplications : Theme.inactive
+              color: appRow.selected ? Theme.background : Theme.inactive
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 15
               font.bold: true
@@ -258,8 +258,9 @@ FocusScope {
             y: 4
             height: 18
             verticalAlignment: Text.AlignVCenter
+            objectName: "appName" + appRow.index
             text: appRow.entry.name
-            color: appRow.selected ? Theme.selectedForeground : Theme.foreground
+            color: appRow.selected ? Theme.background : Theme.foreground
             Behavior on color { ColorAnimation { duration: 120 } }
             elide: Text.ElideRight
             font.family: "Ubuntu Nerd Font"
@@ -277,7 +278,8 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             text: appRow.entry.genericName !== "" ? appRow.entry.genericName
               : appRow.entry.comment
-            color: Theme.secondary
+            color: appRow.selected ? Theme.background : Theme.secondary
+            Behavior on color { ColorAnimation { duration: 120 } }
             elide: Text.ElideRight
             font.family: "Ubuntu Nerd Font"
             font.pixelSize: 10
@@ -293,7 +295,7 @@ FocusScope {
             height: 7
             radius: 3.5
             visible: appRow.runningToplevel !== null
-            color: Theme.sideApplications
+            color: appRow.selected ? Theme.background : Theme.sideApplications
           }
         }
 

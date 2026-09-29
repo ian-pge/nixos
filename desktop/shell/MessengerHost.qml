@@ -111,7 +111,7 @@ Item {
   MessengerPhotoWindow {
     id: photoWindow
     screen: root.panelWindow.screen
-    visible: root.active && !root.controller.blocked && panel.photoPreviewOpen
+    open: root.active && !root.controller.blocked && panel.photoPreviewOpen
     beeperData: root.controller.beeperData
     attachment: panel.previewAttachment
     previewOrigin: panel.previewOrigin
@@ -127,6 +127,7 @@ Item {
         if (root.active && !root.controller.blocked) { focusGrab.active = true; panel.forceActiveFocus(); }
       });
     }
+    onStepRequested: delta => panel.stepPreview(delta)
   }
   Rectangle {
     parent: bubble.contentItem

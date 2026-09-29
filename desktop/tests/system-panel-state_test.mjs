@@ -28,6 +28,10 @@ for (const type of ["NetworkController", "BluetoothController", "UpdateControlle
 const ipc = read("shell/ShellIntegration.qml");
 for (const name of readdirSync(new URL("../features/messenger/", import.meta.url)).filter(name => name.endsWith('.qml')))
   assert.doesNotMatch(read("features/messenger/" + name), /\bborder(?:\.|\s*\{)/, "Borderless messenger: " + name);
+// Long-lived players must follow the output chosen in the audio panel.
+for (const name of readdirSync(new URL("../features/messenger/", import.meta.url)).filter(name => name.endsWith('.qml')))
+  for (const output of read("features/messenger/" + name).match(/AudioOutput\s*\{[^}]*\}/g) || [])
+    assert.match(output, /device:\s*\w+\.defaultAudioOutput\b/, "Messenger audio follows the default output: " + name);
 for (const name of ["toggleBeeper", "dismissNotification", "toggleDoNotDisturb", "refreshNix",
   "mediaPlayPause", "mediaNext", "mediaPrevious", "volumeUp", "volumeDown", "toggleAudioMute",
   "toggleAudio", "toggleCalendar", "toggleMicrophoneMute", "showVolume", "showBrightness",

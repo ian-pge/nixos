@@ -9,6 +9,7 @@ ShellRoot {
   property var beeperData: null
   property var panel: null
   property var openedUrls: []
+  property var copiedTexts: []
   property int recordStarts: 0
   property int recordStops: 0
   // Never instantiate the native CaptureSession or open the microphone.
@@ -68,12 +69,13 @@ ShellRoot {
       return findChild(findChild(panel, "beeperMessages").itemAtIndex(0), "beeperMedia");
     }
     function init() {
-      fixture.openedUrls = [];
+      fixture.openedUrls = []; fixture.copiedTexts = [];
       fixture.recordStarts = 0; fixture.recordStops = 0;
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true, recorderFactory: fakeRecorder,
-          linkOpener: url => { fixture.openedUrls = fixture.openedUrls.concat([url]); return true; }});
+          linkOpener: url => { fixture.openedUrls = fixture.openedUrls.concat([url]); return true; },
+          clipboardWriter: text => { fixture.copiedTexts = fixture.copiedTexts.concat([text]); }});
       beeperData.chats = [
         {id: "chat-a", title: "First chat", accountID: "account-a", capabilities: {reaction: 2}},
         {id: "chat-b", title: "Second chat", capabilities: {reaction: 2}}
@@ -721,6 +723,129 @@ ShellRoot {
       compare(panel.selectedMessage.id, "media-message");
       keyClick(Qt.Key_Return); keyClick(Qt.Key_Space);
       compare(panel.composer.text, " "); compare(panel.modal, "");
+    }
+    function picture(color) {
+      return "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="48"><rect width="64" height="48" fill="' + color + '"/></svg>');
+    }
+    function gallery() {
+      const message = (id, index, extra) => Object.assign({id: id, chatID: "chat-a", senderName: "Contact",
+        timestamp: new Date(1700000000000 + index * 60000).toISOString()}, extra);
+      return [
+        message("photo-a", 0, {attachments: [{id: "a", type: "img", srcURL: picture("red")}]}),
+        message("text", 1, {text: "No attachment"}),
+        message("video", 2, {attachments: [{id: "v", type: "video", srcURL: "mxc://preview/video"}]}),
+        message("album", 3, {attachments: [{id: "b", type: "img", srcURL: picture("green")},
+          {id: "c", type: "img", isGif: true, srcURL: "mxc://preview/gif"}]}),
+        message("photo-d", 4, {attachments: [{id: "d", type: "img", fileName: "Plage.jpg", mimeType: "image/jpeg", srcURL: picture("yellow")}]})
+      ];
+    }
+    function openFromMessage(index) {
+      waitForHistory();
+      panel.messageIndex = index; wait(20);
+      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+    }
+    function test_photo_viewer_h_l_walk_photos_and_gifs_but_not_videos() {
+      beeperData.messages = gallery();
+      openFromMessage(3);
+      compare(panel.previewAttachment.id, "b");
+      keyClick(Qt.Key_L); compare(panel.previewAttachment.id, "c"); compare(panel.selectedMessage.id, "album");
+      keyClick(Qt.Key_L); compare(panel.previewAttachment.id, "d"); compare(panel.selectedMessage.id, "photo-d");
+      keyClick(Qt.Key_L); compare(panel.previewAttachment.id, "d", "The newest photo stays shown");
+      for (const id of ["c", "b", "a"]) { keyClick(Qt.Key_H); compare(panel.previewAttachment.id, id); }
+      compare(panel.selectedMessage.id, "photo-a", "The video and the text message are skipped");
+      keyClick(Qt.Key_H); compare(panel.previewAttachment.id, "a");
+      compare(pending("messages").length, 0, "No older page exists");
+      compare(panel.modal, "media");
+      keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
+      compare(panel.selectedMessage.id, "photo-a", "Closing returns to the photo shown last");
+    }
+    function test_photo_viewer_h_loads_older_pages_at_the_oldest_photo() {
+      const messages = gallery();
+      beeperData.messages = messages.slice(3);
+      beeperData.oldestCursor = "older"; beeperData.hasOlderMessages = true;
+      openFromMessage(0);
+      compare(panel.previewAttachment.id, "b");
+      keyClick(Qt.Key_H);
+      compare(pending("messages").length, 1);
+      compare(pending("messages")[0].params.cursor, "older");
+      compare(panel.previewAttachment.id, "b", "The photo stays until the older page arrives");
+      beeperData.respond("messages", {items: messages.slice(0, 3), hasMore: false});
+      tryVerify(() => panel.previewAttachment.id === "a");
+      compare(panel.selectedMessage.id, "photo-a");
+      keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
+    }
+    function test_enter_saves_the_viewed_media_without_closing() {
+      beeperData.messages = gallery();
+      openFromMessage(4);
+      const notice = findChild(panel.modalSurface, "beeperViewerNoticeText");
+      keyClick(Qt.Key_Return);
+      compare(panel.modal, "media", "Enter keeps the photo open");
+      compare(pending("saveAttachment").length, 1);
+      compare(pending("saveAttachment")[0].params, {url: picture("yellow"), fileName: "Plage.jpg", mimeType: "image/jpeg"});
+      compare(notice.text, "Saving…");
+      keyClick(Qt.Key_Return);
+      compare(pending("saveAttachment").length, 1, "One save at a time");
+      beeperData.respond("saveAttachment", {path: "/home/user/Téléchargements/Plage (2).jpg", name: "Plage (2).jpg"});
+      compare(notice.text, "Saved to Téléchargements · Plage (2).jpg");
+      verify(!panel.modalSurface.noticeFailed);
+      keyClick(Qt.Key_Return);
+      beeperData.respond("saveAttachment", null, {code: "save_failed", message: "Could not write the file."});
+      compare(notice.text, "Could not write the file.");
+      verify(panel.modalSurface.noticeFailed, "Failures use the error color");
+      keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
+    }
+    function noticeText() { return findChild(panel, "beeperNoticeText").text; }
+    function test_y_copies_the_whole_selected_message() {
+      keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.selectedMessage.id, "message-7");
+      keyClick(Qt.Key_Y);
+      compare(fixture.copiedTexts, ["Message 7"]);
+      compare(noticeText(), "Message copied");
+      compare(panel.selectedMessage.id, "message-7", "Copying keeps the message selection");
+      compare(panel.navigation, "messages");
+    }
+    function test_y_on_a_message_without_text_says_so() {
+      selectAttachment({type: "img", srcURL: picture("red")});
+      keyClick(Qt.Key_Y);
+      compare(fixture.copiedTexts, []);
+      compare(noticeText(), "This message has no text");
+    }
+    function selectRowText(index, from, to) {
+      const row = findChild(panel, "beeperMessages").itemAtIndex(index);
+      mouseMove(findChild(row, "messageBody"), 4, 4);
+      tryVerify(() => findChild(row, "beeperMessageTextSelection") !== null);
+      const layer = findChild(row, "beeperMessageTextSelection");
+      tryVerify(() => layer.width === findChild(row, "messageBody").width && layer.implicitHeight > 0);
+      const a = layer.positionToRectangle(from), b = layer.positionToRectangle(to);
+      mousePress(layer, a.x + 1, a.y + a.height / 2);
+      mouseMove(layer, b.x + 1, b.y + b.height / 2);
+      mouseRelease(layer, b.x + 1, b.y + b.height / 2);
+      return row;
+    }
+    function test_mouse_selection_copies_with_y_or_ctrl_c_and_escape_clears_it() {
+      waitForHistory();
+      selectRowText(7, 0, 7);
+      compare(panel.selectedText, "Message");
+      keyClick(Qt.Key_C, Qt.ControlModifier);
+      compare(fixture.copiedTexts, ["Message"]);
+      compare(panel.selectedText, "Message", "Ctrl+C keeps the selection");
+      keyClick(Qt.Key_Y);
+      compare(fixture.copiedTexts, ["Message", "Message"]);
+      compare(panel.selectedText, "", "y clears the selection, like a Vim yank");
+      compare(noticeText(), "Selection copied");
+      selectRowText(7, 8, 9);
+      compare(panel.selectedText, "7");
+      keyClick(Qt.Key_Escape);
+      compare(panel.selectedText, "", "Escape first clears the selection");
+      compare(closeSpy.count, 0); verify(panel.active);
+    }
+    function test_selecting_in_another_message_replaces_the_previous_selection() {
+      waitForHistory();
+      const first = selectRowText(7, 0, 7);
+      selectRowText(6, 8, 9);
+      compare(first.selectedText, "");
+      compare(panel.selectedText, "6");
+      keyClick(Qt.Key_Y);
+      compare(fixture.copiedTexts, ["6"]);
     }
     function test_space_starts_audio_after_download_finishes() {
       const media = selectAttachment({type: "audio", srcURL: "mxc://preview/voice", duration: 2});

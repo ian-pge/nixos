@@ -7,6 +7,8 @@ import (
 	"html"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -352,7 +354,65 @@ func (b *backend) considerMessage(ctx context.Context, chatID string, m object, 
 	if r := []rune(body); len(r) > 240 {
 		body = string(r[:240]) + "…"
 	}
-	b.notifications.send(title, body, textField(chat, "imgURL"), object{"chatID": chatID, "messageID": id}, false)
+	image := b.notificationImage(ctx, notificationAvatar(chat, m))
+	b.notifications.send(title, body, image, object{"chatID": chatID, "messageID": id}, false)
+}
+
+// The person who wrote the message, as in the messenger: their participant
+// photo, else the conversation photo, else a private chat's other person.
+// A direct chat often has no photo of its own, only its participant's.
+func notificationAvatar(chat, message object) string {
+	people, _ := mapField(chat, "participants")["items"].([]any)
+	photo := func(match func(object) bool) string {
+		for _, item := range people {
+			person, _ := item.(map[string]any)
+			if person != nil && match(person) && textField(person, "imgURL") != "" {
+				return textField(person, "imgURL")
+			}
+		}
+		return ""
+	}
+	if sender := textField(message, "senderID"); sender != "" {
+		if source := photo(func(person object) bool { return textField(person, "id") == sender }); source != "" {
+			return source
+		}
+	}
+	if source := textField(chat, "imgURL"); source != "" {
+		return source
+	}
+	if textField(chat, "type") == "single" {
+		return photo(func(person object) bool { return !boolField(person, "isSelf") })
+	}
+	return ""
+}
+
+// The image-path hint takes a local file URI. Other avatar URLs go through
+// the public assets endpoint, like audio waveforms; an avatar that cannot be
+// fetched quickly leaves the notification without an image, never late.
+func (b *backend) notificationImage(ctx context.Context, source string) string {
+	if source == "" {
+		return ""
+	}
+	if !strings.HasPrefix(source, "file:") && !filepath.IsAbs(source) {
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		raw, err := b.raw(ctx, "POST", "v1/assets/download", object{"url": source})
+		var downloaded struct {
+			SrcURL string `json:"srcURL"`
+		}
+		if err != nil || json.Unmarshal(raw, &downloaded) != nil || downloaded.SrcURL == "" {
+			return ""
+		}
+		source = downloaded.SrcURL
+	}
+	path, err := localPath(source)
+	if err != nil {
+		return ""
+	}
+	if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return fileURL(path)
 }
 func (b *backend) resumePending(ctx context.Context) {
 	b.mu.Lock()
@@ -413,7 +473,7 @@ func (b *backend) resolvePending(ctx context.Context, chat, id string) {
 }
 
 type notificationSink interface {
-	send(title, body, icon string, target object, silent bool)
+	send(title, body, image string, target object, silent bool)
 	close()
 }
 type notifier struct {
@@ -466,10 +526,14 @@ func newNotifier(ctx context.Context, emit func(string, any)) (*notifier, error)
 	return n, nil
 }
 func (n *notifier) close() { _ = n.conn.Close() }
-func (n *notifier) send(title, body, icon string, target object, silent bool) {
+func (n *notifier) send(title, body, image string, target object, silent bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	hints := map[string]dbus.Variant{"desktop-entry": dbus.MakeVariant("quickshell-beeper"), "category": dbus.MakeVariant("im.received"), "suppress-sound": dbus.MakeVariant(silent)}
+	// The sender's photo is the notification image, not the application icon.
+	if image != "" {
+		hints["image-path"] = dbus.MakeVariant(image)
+	}
 	var id uint32
 	server := n.conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
 	var capabilities []string
@@ -483,7 +547,7 @@ func (n *notifier) send(title, body, icon string, target object, silent bool) {
 	}
 	// Quickshell advertises plain text: entities would otherwise be visible in
 	// ordinary messages such as "L'atelier & le café".
-	err := server.CallWithContext(ctx, "org.freedesktop.Notifications.Notify", 0, "Messages", uint32(0), icon, title, body, []string{"default", "Open"}, hints, int32(-1)).Store(&id)
+	err := server.CallWithContext(ctx, "org.freedesktop.Notifications.Notify", 0, "Messages", uint32(0), "", title, body, []string{"default", "Open"}, hints, int32(-1)).Store(&id)
 	if err != nil {
 		n.emit("warning", object{"message": "Could not display the notification."})
 		return

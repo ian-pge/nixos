@@ -56,7 +56,8 @@ The boundaries are intentional:
   the messenger backend remains in `tools/quickshell/beeper/`; it is not copied
   into `desktop/`.
 - [`../packages/quickshell/`](../packages/quickshell/) contains Nix recipes.
-  `runtime.nix` wraps Quickshell with Liquid Glass and Qt Multimedia imports;
+  `runtime.nix` wraps Quickshell with Liquid Glass, Qt Multimedia and Qt image
+  formats (WebP stickers and photos, static or animated);
   `desktop.nix` filters the application sources and pins helper paths to the Nix
   store. Tests and documentation are not part of the installed application.
 - [`../home_manager/quickshell.nix`](../home_manager/quickshell.nix) only installs,
@@ -220,12 +221,38 @@ when there is one distinct URL. With several links, it opens a chooser: `j/k`
 selects, Enter opens, and Escape cancels. It includes links supplied by Beeper and
 URLs in the message text, deduplicates them, and leaves typing unchanged. Links
 take priority over attachments; `o` still opens an attachment directly.
+`y` copies the selected message's whole text to the clipboard; a message without
+text only shows "This message has no text". Dragging the mouse over a message's
+text selects part of it; `y` then copies that selection instead (and clears
+it, like a Vim yank), while Ctrl+C copies it and keeps it. Escape clears a text
+selection before any other Escape action, and selecting in another message
+replaces the previous selection. A brief notice at the bottom of the
+conversation confirms each copy. Selecting never takes keyboard focus, so `j/k`
+and the other shortcuts keep working, and a plain click on the text still
+selects the message. The selection layer is a transparent, read-only
+`TextEdit` over the plain message text. It uses the same escaped paragraph
+markup and 120 % line height as the search highlights, so it follows the same
+line layout, and it loads only while the text is hovered or holds a
+selection. Message text is never interpreted as markup.
 Without links, Space plays/pauses the selected audio message or opens its photo,
 GIF or video. Photos and videos fill the selected monitor as far as their aspect ratio allows,
 including the top-bar area, without a title or frame. Videos keep playback
-controls along the bottom; photos have no toolbar. The desktop and
-messenger behind them are blurred by the `quickshell-messenger-photo` layer rule.
+controls along the bottom; photos have no toolbar. The desktop and messenger
+behind them are only dimmed, never blurred: the viewer fades its 28 % dim with
+the same progress as the photo. The photo layer (`quickshell-messenger-photo`)
+has Hyprland's `no_anim` rule, so the photo grows from its thumbnail at full
+opacity instead of fading in, translucent, behind a 400 ms layer fade.
 For photos, Space or Escape returns to the same chat and message selection.
+`h/l` show the previous or next photo or GIF of the conversation, oldest first;
+videos and other attachments are skipped. The new photo replaces the current
+one in place, and the message selection follows it, so closing returns to the
+photo shown last. At the oldest loaded photo, `h` loads older history pages
+(up to ten per press) until an earlier photo appears. Enter saves a copy of the
+fullscreen photo, GIF or video to the XDG download folder (`~/Downloads` by
+default) without closing the viewer. The original file name is kept when
+known, an existing file is never replaced (`name (2).jpg`), and a notice at the
+top shows the saved name or the error. The copy goes through the Go helper,
+which fetches media that is not yet local through `POST /v1/assets/download`.
 Photos grow from their visible thumbnail and return to it in 180 ms. The opening
 waits until the fullscreen image is ready to paint, then animates scale and
 translation while keeping the final image geometry and decoder size fixed.
@@ -566,7 +593,7 @@ credential handling and backend verification.
 
 ## Plan limits
 
-Cmd+T (`topbar.toggleUsage`) transforms the central capsule into the Claude
+Cmd+R (`topbar.toggleUsage`) transforms the central capsule into the Claude
 and Codex usage panel on the focused monitor, with the System panel's width
 and a height derived from its rows. Escape or `q` closes it; `r` refreshes.
 Each window shows its label, used percentage, a gauge and its reset time:

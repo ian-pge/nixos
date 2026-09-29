@@ -2,7 +2,7 @@ import QtQuick
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
 
-// Photos and videos share the same full-monitor surface and backdrop blur.
+// Photos and videos share the same full-monitor surface and dimmed backdrop.
 FocusScope {
   id: root
   objectName: "beeperPhotoViewer"
@@ -22,11 +22,17 @@ FocusScope {
   property real originOffsetX: 0
   property real originOffsetY: 0
   property real closeFadeStart: -1
+  // An h / l step replaces the photo in place instead of opening it again.
+  property bool stepping: false
+  property bool saving: false
+  property string notice: ""
+  property bool noticeFailed: false
   readonly property bool transitionRunning: transition.running
   readonly property real imageScale: sharedOrigin ? originScale + (1 - originScale) * progress : 1
   readonly property real imageOffsetX: sharedOrigin ? originOffsetX * (1 - progress) : 0
   readonly property real imageOffsetY: sharedOrigin ? originOffsetY * (1 - progress) : 0
   signal closeRequested()
+  signal stepRequested(int delta)
 
   // mapToItem also handles the separate fullscreen Wayland surface. Reject
   // missing, recycled or clipped thumbnails instead of flying off the screen.
@@ -72,11 +78,13 @@ FocusScope {
   }
   function syncPresentation() {
     if (!active || !visible || !attachment || width <= 0 || height <= 0) {
-      transition.stop(); closing = false; presented = false; waitingForPreview = false; progress = 1; return;
+      transition.stop(); closing = false; presented = false; waitingForPreview = false; stepping = false; progress = 1;
+      if (!active || !visible) notice = "";
+      return;
     }
     if (presented) return;
     presented = true; closing = false; closeFadeStart = -1;
-    if (video) { sharedOrigin = false; progress = 1; return; }
+    if (video || stepping) { stepping = false; sharedOrigin = false; progress = 1; return; }
     setOrigin(media.errorText ? null : mappedOrigin());
     progress = 0;
     // Decoding stays asynchronous. Start the short visual traversal only when
@@ -114,7 +122,23 @@ FocusScope {
   onVisibleChanged: { if (!visible) syncPresentation(); refreshPresentation(); }
   onWidthChanged: Qt.callLater(syncPresentation)
   onHeightChanged: Qt.callLater(syncPresentation)
-  onAttachmentChanged: { transition.stop(); presented = false; closing = false; waitingForPreview = false; refreshPresentation(); }
+  onAttachmentChanged: {
+    stepping = presented && !closing;
+    transition.stop(); presented = false; closing = false; waitingForPreview = false; refreshPresentation();
+  }
+  // Enter keeps a copy in the download folder; the backend never replaces a file.
+  function save() {
+    if (!active || !visible || !attachment || saving) return;
+    saving = true; notice = "Saving…"; noticeFailed = false; noticeTimer.stop();
+    const source = media.sourceReady ? media.sourceUrl : Format.attachmentSource(attachment);
+    beeperData.request("saveAttachment", {url: source, fileName: attachment.fileName || "", mimeType: attachment.mimeType || ""}, (result, error) => {
+      saving = false;
+      noticeFailed = !!error || !result?.path;
+      notice = noticeFailed ? error?.message || "Could not save this file."
+        : "Saved to " + result.path.split("/").slice(-2, -1)[0] + " · " + result.name;
+      noticeTimer.restart();
+    });
+  }
   Component.onCompleted: refreshPresentation()
   NumberAnimation {
     id: transition
@@ -129,19 +153,25 @@ FocusScope {
   }
   Shortcut {
     sequence: "H"; context: Qt.WindowShortcut
-    enabled: root.active && root.visible && root.video
-    onActivated: media.seek(-5000)
+    enabled: root.active && root.visible && !!root.attachment
+    onActivated: root.video ? media.seek(-5000) : root.stepRequested(-1)
   }
   Shortcut {
     sequence: "L"; context: Qt.WindowShortcut
-    enabled: root.active && root.visible && root.video
-    onActivated: media.seek(5000)
+    enabled: root.active && root.visible && !!root.attachment
+    onActivated: root.video ? media.seek(5000) : root.stepRequested(1)
   }
   Keys.onPressed: event => {
+    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+      if (!event.isAutoRepeat) root.save();
+      event.accepted = true;
+      return;
+    }
     if (event.key !== Qt.Key_Escape && !(event.key === Qt.Key_Space && !root.video)) return;
     if (!event.isAutoRepeat) root.requestClose();
     event.accepted = true;
   }
+  Timer { id: noticeTimer; interval: 2600; onTriggered: root.notice = "" }
   Rectangle { anchors.fill: parent; color: Qt.alpha(Theme.background, 0.28); opacity: root.progress }
   BeeperMedia {
     id: media
@@ -161,5 +191,21 @@ FocusScope {
     onPreviewReadyChanged: Qt.callLater(root.revealWhenReady)
     onErrorTextChanged: Qt.callLater(root.revealWhenReady)
     onPreviewRequested: root.requestClose()
+  }
+  Rectangle {
+    objectName: "beeperViewerNotice"
+    anchors.horizontalCenter: parent.horizontalCenter
+    y: 32
+    width: noticeLabel.implicitWidth + 40; height: 40; radius: 20
+    color: Theme.surface
+    visible: root.notice !== ""
+    Text {
+      id: noticeLabel
+      objectName: "beeperViewerNoticeText"
+      anchors.centerIn: parent
+      text: root.notice
+      color: root.noticeFailed ? Theme.error : Theme.foreground
+      font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
+    }
   }
 }

@@ -58,6 +58,13 @@
     "claude-acp" = {
       type = "registry";
       default_mode = "bypassPermissions";
+      # Scoped to Zed's Claude threads; standalone Claude Code keeps the
+      # model and effort from ~/.claude/settings.json. Zed only applies values
+      # the adapter advertises, and its `opus` alias is Opus 5.5.
+      default_config_options = {
+        model = "opus";
+        effort = "xhigh";
+      };
       env.CLAUDE_CODE_EXECUTABLE = "${profileDirectory}/bin/claude";
     };
     "codex-acp" = {

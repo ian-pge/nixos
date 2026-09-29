@@ -56,6 +56,8 @@ type parameters struct {
 	Path             string        `json:"path"`
 	Type             string        `json:"type"`
 	URL              string        `json:"url"`
+	FileName         string        `json:"fileName"`
+	MimeType         string        `json:"mimeType"`
 	Focused          bool          `json:"focused"`
 	AtLatest         bool          `json:"atLatest"`
 }
@@ -343,6 +345,8 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return b.prepareRecording()
 	case "discardAttachment":
 		return object{}, b.discard(p.Path)
+	case "saveAttachment":
+		return b.saveAttachment(ctx, p)
 	case "waveform":
 		if b.demo {
 			return nil, fail("demo", "Real audio analysis is disabled in the demo.")

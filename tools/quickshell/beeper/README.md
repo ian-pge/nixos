@@ -33,6 +33,12 @@ Désactiver **les sons et notifications de bureau de Beeper** dans ses paramètr
 Ne pas mettre les conversations en sourdine pour obtenir cet effet : la sourdine
 reste respectée par ce client. L’identité de nos notifications est `Messages`,
 avec `desktop-entry=quickshell-beeper`. Le serveur Quickshell gère le rendu et DND.
+L’image est la photo de l’expéditeur, comme dans la messagerie : son profil de
+participant, sinon la photo de la conversation, sinon, en conversation privée,
+celle de l’autre personne (une conversation directe n’a souvent pas de photo
+propre). Elle part dans l’indice `image-path` sous forme d’URI `file://` locale.
+Une URL non locale passe par `POST /v1/assets/download` (3 secondes au plus) ;
+sans photo disponible, la notification est envoyée sans image.
 
 ## Protocole QML
 
@@ -59,6 +65,7 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | `stageAttachment`, `clipboardAttachment` | `{path,type?}` ou `{}` ; copie durable et privée `{path,srcURL,type,fileName,mimeType}` |
 | `prepareRecording`, `discardAttachment` | `{}` retourne un fichier `.ogg` de type `voice-note` ; `{path}` supprime uniquement une copie de notre répertoire, non référencée par un brouillon |
 | `upload`, `download` | `{path}` retourne l’upload API ; `{url}` retourne `{srcURL,error?}` pour les URL média Beeper |
+| `saveAttachment` | `{url,fileName?,mimeType?}` copie le média dans le dossier de téléchargement XDG (`XDG_DOWNLOAD_DIR`, `user-dirs.dirs`, sinon `~/Downloads`) et retourne `{path,name}` ; nom d’origine assaini, jamais d’écrasement (`nom (2).ext`) ; une URL non locale passe par `POST /v1/assets/download`, refusée en démo |
 | `waveform` | `{url}` retourne `{peaks:[0…1],durationMs}` ; analyse locale bornée, sans lecture sonore |
 
 Les événements sont `status`, `chatsChanged`, `chatsDeleted`, `messagesChanged`, `messagesDeleted`, `openChat`, `warning`,

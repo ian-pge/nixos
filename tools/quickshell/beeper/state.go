@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -339,4 +340,132 @@ func (b *backend) upload(ctx context.Context, path string) (*beeper.AssetUploadR
 		return nil, fail("upload_failed", "Beeper could not prepare the attachment.")
 	}
 	return r, err
+}
+
+// saveAttachment copies media shown in the photo viewer into the XDG
+// download directory. An existing file is never replaced: a numbered name is
+// chosen instead. Remote media goes through the public assets endpoint.
+func (b *backend) saveAttachment(ctx context.Context, p parameters) (any, error) {
+	source := p.URL
+	if source == "" {
+		return nil, fail("invalid_params", "Missing media URL.")
+	}
+	if !strings.HasPrefix(source, "file:") && !filepath.IsAbs(source) {
+		if b.demo {
+			return nil, fail("demo", "Remote media is not available in the demo.")
+		}
+		raw, err := b.raw(ctx, "POST", "v1/assets/download", object{"url": source})
+		if err != nil {
+			return nil, err
+		}
+		var downloaded struct {
+			SrcURL string `json:"srcURL"`
+		}
+		if json.Unmarshal(raw, &downloaded) != nil || downloaded.SrcURL == "" {
+			return nil, fail("invalid_file", "This media is not available locally.")
+		}
+		source = downloaded.SrcURL
+	}
+	path, err := localPath(source)
+	if err != nil {
+		return nil, err
+	}
+	in, err := os.Open(path)
+	if err != nil {
+		return nil, fail("invalid_file", "Could not read this media.")
+	}
+	defer in.Close()
+	if info, err := in.Stat(); err != nil || !info.Mode().IsRegular() {
+		return nil, fail("invalid_file", "Could not read this media.")
+	}
+	dir := downloadDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fail("save_failed", "Could not open the download folder.")
+	}
+	out, err := createUnique(dir, saveName(p.FileName, p.MimeType, path))
+	if err != nil {
+		return nil, fail("save_failed", "Could not create the file in the download folder.")
+	}
+	name := out.Name()
+	_, err = io.Copy(out, in)
+	if closeErr := out.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		os.Remove(name)
+		return nil, fail("save_failed", "Could not write the file.")
+	}
+	return object{"path": name, "name": filepath.Base(name)}, nil
+}
+
+// The download directory configured by xdg-user-dirs, else ~/Downloads.
+func downloadDir() string {
+	home, _ := os.UserHomeDir()
+	if dir := os.Getenv("XDG_DOWNLOAD_DIR"); filepath.IsAbs(dir) {
+		return filepath.Clean(dir)
+	}
+	config := os.Getenv("XDG_CONFIG_HOME")
+	if !filepath.IsAbs(config) {
+		config = filepath.Join(home, ".config")
+	}
+	if data, err := os.ReadFile(filepath.Join(config, "user-dirs.dirs")); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			value, ok := strings.CutPrefix(strings.TrimSpace(line), "XDG_DOWNLOAD_DIR=")
+			if !ok {
+				continue
+			}
+			value = strings.Trim(value, `"`)
+			if rest, ok := strings.CutPrefix(value, "$HOME"); ok {
+				value = home + rest
+			}
+			// "$HOME/" disables the directory in xdg-user-dirs.
+			if filepath.IsAbs(value) && filepath.Clean(value) != filepath.Clean(home) {
+				return filepath.Clean(value)
+			}
+		}
+	}
+	return filepath.Join(home, "Downloads")
+}
+
+var savedExtensions = map[string]string{
+	"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif",
+	"image/heic": ".heic", "image/avif": ".avif", "video/mp4": ".mp4", "video/webm": ".webm",
+	"video/quicktime": ".mov",
+}
+
+// A plain file name: the original one when known, otherwise a dated name.
+func saveName(fileName, mimeType, source string) string {
+	name := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(filepath.Base(strings.ReplaceAll(fileName, `\`, "/"))))
+	if name == "" || name == "." || name == ".." || name == "/" {
+		name = "beeper-" + time.Now().Format("2006-01-02-150405")
+	}
+	if filepath.Ext(name) == "" {
+		ext := savedExtensions[strings.ToLower(strings.TrimSpace(strings.Split(mimeType, ";")[0]))]
+		if ext == "" {
+			ext = filepath.Ext(source)
+		}
+		name += ext
+	}
+	return name
+}
+
+func createUnique(dir, name string) (*os.File, error) {
+	ext := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, ext)
+	for i := 1; i <= 1000; i++ {
+		candidate := name
+		if i > 1 {
+			candidate = fmt.Sprintf("%s (%d)%s", stem, i, ext)
+		}
+		f, err := os.OpenFile(filepath.Join(dir, candidate), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if !errors.Is(err, os.ErrExist) {
+			return f, err
+		}
+	}
+	return nil, os.ErrExist
 }

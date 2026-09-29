@@ -641,10 +641,16 @@ ShellRoot {
       const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../features/messenger/BeeperMessage.qml");
       compare(component.status, Component.Ready, component.errorString());
       const item = component.createObject(window.contentItem, {width: 600, message: {id: "x", text: "<b>Du texte</b>", attachments: [{type: "image"}]}});
-      verify(item !== null); wait(0);
-      const body = findChild(item, "messageBody");
-      compare(body.textFormat, Text.PlainText);
-      verify(body.width > 350); verify(item.implicitHeight > 200); item.destroy();
+      verify(item !== null);
+      try {
+        const body = findChild(item, "messageBody");
+        compare(body.textFormat, Text.PlainText);
+        // The media delegate joins the bubble a frame later. A failure must
+        // not leave this row over the panel for the following tests.
+        tryVerify(() => body.width > 350 && item.implicitHeight > 200);
+      } finally {
+        item.destroy();
+      }
     }
   }
 }

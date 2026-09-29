@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 import "../../ui"
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
@@ -31,8 +32,19 @@ FocusScope {
   property string editText: ""
   property var previewAttachment: null
   property Item previewOrigin: null
+  // Where the viewed attachment sits in the history, for h / l in the viewer.
+  property string previewMessageID: ""
+  property int previewAttachmentIndex: -1
+  property int pendingPreviewStep: 0
+  property int previewPagesLeft: 0
   property var linkChoices: []
   property var linkOpener: url => Qt.openUrlExternally(url)
+  // Tests replace the system clipboard like the link opener.
+  property var clipboardWriter: text => { Quickshell.clipboardText = text; }
+  // The message holding a mouse text selection; only one at a time.
+  property Item textSelectionOwner: null
+  readonly property string selectedText: textSelectionOwner?.selectedText ?? ""
+  property string notice: ""
   property bool externalPhotoPreview: false
   readonly property bool photoPreviewOpen: modal === "media"
     && ["image", "gif", "video"].includes(Format.attachmentType(previewAttachment || {}))
@@ -227,6 +239,7 @@ FocusScope {
   function openMedia(attachment, sourceItem = null) {
     previewOrigin = sourceItem;
     previewAttachment = attachment;
+    locatePreview(sourceItem?.attachment || attachment);
     openModal("media");
   }
   function openFirstAttachment() {
@@ -236,6 +249,44 @@ FocusScope {
       ? Object.assign({}, selectedMessage.attachments[0], {srcURL: media.sourceUrl}) : selectedMessage.attachments[0];
     openMedia(attachment, media);
   }
+  // Preview copies may carry a downloaded srcURL; the history keeps the original.
+  function locatePreview(attachment) {
+    previewMessageID = ""; previewAttachmentIndex = -1;
+    for (let i = beeperData.messages.length - 1; i >= 0; --i) {
+      const index = (beeperData.messages[i].attachments || []).findIndex(item =>
+        item === attachment || !!attachment?.id && item.id === attachment.id);
+      if (index >= 0) { previewMessageID = beeperData.messages[i].id; previewAttachmentIndex = index; return; }
+    }
+  }
+  // h / l in the photo viewer walk this chat's photos and GIFs, oldest first.
+  // Videos keep h / l for seeking. The message selection follows, so closing
+  // returns to the photo shown last; older pages load when h reaches the top.
+  function stepPreview(delta) {
+    if (!photoPreviewOpen || videoPreviewOpen || !previewMessageID) return;
+    const images = [];
+    beeperData.messages.forEach((message, messageIndex) => (message.attachments || []).forEach((attachment, attachmentIndex) => {
+      if (["image", "gif"].includes(Format.attachmentType(attachment)))
+        images.push({message: message, messageIndex: messageIndex, attachment: attachment, attachmentIndex: attachmentIndex});
+    }));
+    const current = images.findIndex(image => image.message.id === previewMessageID && image.attachmentIndex === previewAttachmentIndex);
+    const image = current >= 0 ? images[current + delta] : null;
+    if (!image) {
+      if (current >= 0 && delta < 0 && beeperData.hasOlderMessages) {
+        if (!pendingPreviewStep) previewPagesLeft = 10;
+        if (previewPagesLeft-- > 0) { pendingPreviewStep = delta; beeperData.loadMessages(true); return; }
+      }
+      pendingPreviewStep = 0;
+      return;
+    }
+    pendingPreviewStep = 0;
+    previewMessageID = image.message.id; previewAttachmentIndex = image.attachmentIndex;
+    messageIndex = image.messageIndex;
+    messageList.positionViewAtIndex(image.messageIndex, ListView.Contain);
+    const media = messageList.itemAtIndex(image.messageIndex)?.attachmentItem(image.attachmentIndex) || null;
+    previewOrigin = media;
+    previewAttachment = media?.sourceReady ? Object.assign({}, image.attachment, {srcURL: media.sourceUrl}) : image.attachment;
+  }
+  function resumePreviewStep() { if (pendingPreviewStep) stepPreview(pendingPreviewStep); }
   function submitMessage() {
     if (recording || preparingRecording || composer.inputMethodComposing) return;
     if (editMessageID) {
@@ -266,6 +317,22 @@ FocusScope {
           || beeperData.currentChatID !== chatID || selectedMessage?.id !== messageID) return;
       messageList.itemAtIndex(messageIndex)?.activateMedia();
     });
+  }
+  function claimTextSelection(owner) {
+    if (textSelectionOwner && textSelectionOwner !== owner) textSelectionOwner.clearTextSelection();
+    textSelectionOwner = owner;
+  }
+  function clearTextSelection() { textSelectionOwner?.clearTextSelection(); textSelectionOwner = null; }
+  function copyText(text, confirmation) {
+    clipboardWriter(text);
+    notice = confirmation; noticeTimer.restart();
+  }
+  // y: the text selected with the mouse, else the whole selected message.
+  function yank() {
+    if (selectedText) { copyText(selectedText, "Selection copied"); clearTextSelection(); return; }
+    const text = Format.text(selectedMessage);
+    if (text) copyText(text, "Message copied");
+    else { notice = "This message has no text"; noticeTimer.restart(); }
   }
   function openMessageLink(url) {
     const link = Format.messageLinks({links: [{url: url}]})[0];
@@ -408,7 +475,7 @@ FocusScope {
     if (!windowFocused && !modal && !emojiPickerOpen) clearMessageSelection();
     updateView();
   }
-  onModalChanged: { if (modal !== "links") linkChoices = []; updateView(); }
+  onModalChanged: { if (modal !== "links") linkChoices = []; if (modal !== "media") pendingPreviewStep = 0; updateView(); }
   onFilteredChatsChanged: { syncChatIndex(); schedulePagination(); Qt.callLater(reconcilePrioritySelection); Qt.callLater(ensureInitialChat); }
   Connections {
     target: root.composer
@@ -466,6 +533,7 @@ FocusScope {
       root.arrivalBaseline = null; messageList.clearArrivals();
       root.arrivalReadyChatID = "";
       root.historyUpdatePending = false;
+      root.pendingPreviewStep = 0;
       if (root.preparingRecording) root.stopRecording();
       if (root.modal === "links") root.closeModal();
       root.closeConversationSearch(false);
@@ -482,6 +550,7 @@ FocusScope {
       root.arrivalReadyChatID = root.beeperData.currentChatID;
       root.historyUpdatePending = true;
       root.finishHistoryUpdate();
+      if (older && root.pendingPreviewStep) Qt.callLater(root.resumePreviewStep);
     }
   }
   function finishHistoryUpdate() {
@@ -611,6 +680,7 @@ FocusScope {
     }
     if (event.key === Qt.Key_Escape) {
       if (modal) requestModalClose();
+      else if (selectedText) clearTextSelection();
       else if (messageSearch.opened) closeConversationSearch();
       else if (searchOpen) { closeChatSearch(); navigation = "chats"; }
       else if (beeperData.replyToMessageID || editMessageID) { beeperData.replyToMessageID = ""; editMessageID = ""; }
@@ -627,6 +697,8 @@ FocusScope {
       pinLatest = false;
       const list = navigation === "chats" ? chatList : messageList;
       list.flickTo(Qt.point(list.contentX, Math.max(list.originY, Math.min(list.originY + list.contentHeight - list.height, list.contentY - list.height * 0.5)))); event.accepted = true;
+    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C && selectedText) {
+      copyText(selectedText, "Selection copied"); event.accepted = true;
     } else if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return;
     else if (messageSearch.opened && ["n", "N", "j", "k"].includes(key)) {
       const previous = key === "N" || key === "k" || (event.key === Qt.Key_N && (event.modifiers & Qt.ShiftModifier));
@@ -655,6 +727,7 @@ FocusScope {
     else if (key === "r" && selectedMessage) { replyToSelectedMessage(); event.accepted = true; }
     else if (key === "e" && selectedMessage?.isSender) { editSelectedMessage(); event.accepted = true; }
     else if (key === "o" && selectedMessage?.attachments?.length) { openFirstAttachment(); event.accepted = true; }
+    else if (key === "y" && (selectedText || selectedMessage)) { if (!event.isAutoRepeat) yank(); event.accepted = true; }
     else if (event.key === Qt.Key_Space && selectedMessage) { if (!event.isAutoRepeat) activateSelectedMessage(); event.accepted = true; }
     else if (/^[1-6]$/.test(key) && selectedMessage) { if (!event.isAutoRepeat) reactToSelectedMessage(quickReactions[Number(key) - 1]); event.accepted = true; }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { compose(); event.accepted = true; }
@@ -728,6 +801,7 @@ FocusScope {
             Text { anchors.centerIn: parent; visible: !root.beeperData.hasOlderMessages; text: root.beeperData.messages.length ? Format.dateLabel(root.beeperData.messages[0].timestamp) : ""; color: Theme.inactive; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption } }
           }
           delegate: BeeperMessage {
+            id: messageDelegate
             required property var row
             required property int index
             width: messageList.width
@@ -744,8 +818,25 @@ FocusScope {
             renderMedia: viewportReady && root.visible && inViewport
             onSelectedRequested: { root.messageIndex = index; root.navigation = "messages"; navigationFocus.forceActiveFocus(); }
             onPreviewRequested: (attachment, sourceItem) => root.openMedia(attachment, sourceItem)
+            onTextSelectionStarted: root.claimTextSelection(messageDelegate)
           }
         }
+        Rectangle {
+          objectName: "beeperNotice"
+          anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 24 }
+          width: noticeLabel.implicitWidth + 36; height: 36; radius: 18
+          color: Theme.surfaceRaised
+          visible: root.notice !== ""
+          Text {
+            id: noticeLabel
+            objectName: "beeperNoticeText"
+            anchors.centerIn: parent
+            text: root.notice
+            color: Theme.foreground
+            font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
+          }
+        }
+        Timer { id: noticeTimer; interval: 1600; onTriggered: root.notice = "" }
         Column {
           visible: !connectionSurface.visible && (!root.beeperData.currentChatID || (root.beeperData.messages.length === 0 && !root.beeperData.loadingMessages && !root.beeperData.historyLoadPending))
           anchors.centerIn: parent; width: Math.min(parent.width - 40, 340); spacing: 15
@@ -862,5 +953,6 @@ FocusScope {
     }
     externalPhotoPreview: root.externalPhotoPreview
     onCloseRequested: root.closeModal()
+    onPreviewStepRequested: delta => root.stepPreview(delta)
   }
 }

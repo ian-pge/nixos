@@ -47,9 +47,14 @@ Item {
     }
     return widest;
   }
+  readonly property string selectedText: selectionLayer.item?.copyText ?? ""
+  // Keeps the selection layer loaded after the pointer leaves.
+  property bool hasTextSelection: false
   signal selectedRequested()
   signal previewRequested(var attachment, var sourceItem)
+  signal textSelectionStarted()
   function attachmentItem(index) { return attachments.itemAt(index); }
+  function clearTextSelection() { selectionLayer.item?.deselect(); }
   function playArrival() {
     if (!visible || !playbackEnabled || !viewportReady || !inVisibleViewport) return;
     arrivalMessageID = String(message.id || "");
@@ -171,6 +176,34 @@ Item {
             wrapMode: body.wrapMode
             color: root.outgoing ? Theme.background : Theme.foreground
             font: body.font
+          }
+          // Mouse selection: an escaped, transparent copy with the same line
+          // layout, loaded only while hovered or holding a selection, so the
+          // history keeps plain Text items. It never takes keyboard focus.
+          HoverHandler { id: bodyHover; enabled: root.renderMedia; cursorShape: Qt.IBeamCursor }
+          Loader {
+            id: selectionLayer
+            anchors.fill: parent
+            active: body.visible && root.renderMedia && (bodyHover.hovered || root.hasTextSelection)
+            sourceComponent: TextEdit {
+              objectName: "beeperMessageTextSelection"
+              // Line breaks come back as Unicode separators from rich text.
+              readonly property string copyText: selectedText.replace(new RegExp("[\\u2028\\u2029]", "g"), "\n")
+              readOnly: true
+              selectByMouse: true
+              persistentSelection: true
+              activeFocusOnPress: false
+              textFormat: TextEdit.RichText
+              text: Format.selectableText(root.plainBody)
+              wrapMode: body.wrapMode
+              font: body.font
+              color: "transparent"
+              selectionColor: root.outgoing ? Theme.background : root.networkAccent
+              selectedTextColor: root.outgoing ? root.networkAccent : Theme.background
+              onSelectedTextChanged: { root.hasTextSelection = !!selectedText; if (selectedText) root.textSelectionStarted(); }
+              // A click without dragging still selects the message.
+              TapHandler { gesturePolicy: TapHandler.DragThreshold; onTapped: root.selectedRequested() }
+            }
           }
         }
         Repeater {

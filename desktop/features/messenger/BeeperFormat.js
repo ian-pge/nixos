@@ -285,6 +285,12 @@ function searchTextRanges(text, query) {
   }
   return merged;
 }
+// Escaped markup laid out like the plain messageBody: preserved whitespace and
+// line breaks, and the same 120 % line height.
+function paragraphMarkup(html) {
+  return '<p style="white-space:pre-wrap;line-height:120%;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">'
+    + html.replace(/\n/g, '<br/>') + '</p>';
+}
 function highlightText(text, query, background, foreground) {
   const ranges = searchTextRanges(text, query);
   if (!ranges.length) return "";
@@ -296,9 +302,12 @@ function highlightText(text, query, background, foreground) {
     start = range.end;
   }
   // Only our spans become markup: message content can never create links,
-  // images or external resource loads. Preserve whitespace and line breaks.
-  return '<p style="white-space:pre-wrap;line-height:120%;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">'
-    + (html + escapeTextMarkup(text.slice(start))).replace(/\n/g, '<br/>') + '</p>';
+  // images or external resource loads.
+  return paragraphMarkup(html + escapeTextMarkup(text.slice(start)));
+}
+// The mouse selection layer: the same escaped text, without any spans.
+function selectableText(text) {
+  return paragraphMarkup(escapeTextMarkup(text));
 }
 function quotePreview(message) {
   const body = text(message).trim();

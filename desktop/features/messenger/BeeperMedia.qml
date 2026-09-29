@@ -197,6 +197,8 @@ Item {
       readonly property bool playing: mediaPlayer.playbackState === MediaPlayer.PlayingState
       function play() { mediaPlayer.play(); }
       function stop() { mediaPlayer.pause(); }
+      // A delegate can outlive an output change made from the audio panel.
+      MediaDevices { id: mediaDevices }
       MediaPlayer {
         id: mediaPlayer
         objectName: "beeperMediaPlayer"
@@ -204,7 +206,7 @@ Item {
         // Inactive monitor panels and hidden previews must not create decoders.
         // Persistent voice playback is owned separately by BeeperAudioPlayback.
         source: root.playbackEnabled && root.visible && root.sourceReady && !root.downloading ? root.sourceUrl : ""
-        audioOutput: AudioOutput {}
+        audioOutput: AudioOutput { device: mediaDevices.defaultAudioOutput }
         videoOutput: video
         loops: root.attachment.isGif ? MediaPlayer.Infinite : 1
         autoPlay: !!root.attachment.isGif && !root.expanded && root.playbackEnabled && root.visible

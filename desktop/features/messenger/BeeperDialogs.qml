@@ -20,6 +20,7 @@ Rectangle {
   readonly property Item surface: photoPreview ? photoViewer : modalSurface
   signal closeRequested()
   signal linkSelected(string url)
+  signal previewStepRequested(int delta)
   function requestClose() {
     if (photoPreview && !externalPhotoPreview) photoViewer.requestClose();
     else closeRequested();
@@ -65,8 +66,14 @@ Rectangle {
     "r / e     Reply / edit your own message",
     "o     Open first attachment",
     "Space     Open link(s), otherwise play / open media",
+    "y     Copy the whole message text",
     Format.quickReactions(root.beeperData.currentChat).map((reaction, index) => (index + 1) + " " + reaction).join("   "),
     "Digits toggle your reaction; another digit replaces it",
+    "",
+    "TEXT SELECTION · mouse",
+    "Drag over a message     Select part of its text",
+    "y / Ctrl + c     Copy the selection (y also clears it)",
+    "Esc     Clear the selection",
     "",
     "SEARCH",
     "/     Search conversations",
@@ -85,6 +92,8 @@ Rectangle {
     "Esc while audio is playing     Pause before other Esc actions",
     "Audio continues while navigating or hiding the messenger",
     "Space / Esc on a fullscreen photo     Close photo",
+    "h / l on a fullscreen photo     Previous / next photo in this chat",
+    "Enter on fullscreen media     Save a copy to Downloads",
     "Space on fullscreen video     Play / pause",
     "h / l on fullscreen video     Back / forward 5 seconds",
     "Esc on fullscreen video     Close video",
@@ -249,6 +258,7 @@ Rectangle {
     attachment: root.previewAttachment
     previewOrigin: root.previewOrigin
     onCloseRequested: root.closeRequested()
+    onStepRequested: delta => root.previewStepRequested(delta)
   }
   AcceleratedScroll { id: helpWheel; flickable: helpScroll; inputEnabled: root.mode === "help" }
 }

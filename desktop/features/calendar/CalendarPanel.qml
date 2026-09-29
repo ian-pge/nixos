@@ -165,6 +165,8 @@ FocusScope {
             required property var modelData
             readonly property bool isToday: modelData.date === root.todayKey
             readonly property bool isSelected: modelData.date === root.controller.selectedDate
+            // Solid Peach (selected) or Pink (today): content switches to Crust.
+            readonly property bool filled: isSelected || isToday
             readonly property var forecast: root.controller.weather.days[modelData.date]
             readonly property string weatherIcon: Calendar.weatherIcon(forecast?.code)
             readonly property string temperatureText: Calendar.temperatureRange(forecast)
@@ -174,18 +176,14 @@ FocusScope {
             radius: 8
             selected: isSelected
             accent: Theme.calendarSelected
-            idleColor: isToday
-              ? (GlassState.enabled ? Qt.alpha(Theme.sideWeather, cell.tintOpacity) : Theme.surfaceRaised)
-              : "transparent"
-            border.width: !GlassState.enabled && (isSelected || isToday) ? 1 : 0
-            border.color: isSelected ? Theme.calendarSelected : Theme.sideWeather
+            solid: true
+            idleColor: isToday ? Theme.sideWeather : "transparent"
             Text {
               objectName: "dayNumber"
               anchors.horizontalCenter: parent.horizontalCenter
               y: 2; height: 18
               text: cell.modelData.day === 0 ? "" : cell.modelData.day
-              color: cell.isSelected ? Theme.calendarSelected
-                : cell.isToday ? Theme.sideWeather : Theme.foreground
+              color: cell.filled ? Theme.background : Theme.foreground
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 13
               font.bold: cell.isSelected || cell.isToday
@@ -196,7 +194,7 @@ FocusScope {
               y: 20; height: 22
               text: cell.modelData.day === 0 ? "" : cell.weatherIcon
               visible: text !== ""
-              color: Calendar.weatherIconColor(cell.forecast?.code)
+              color: cell.filled ? Theme.background : Calendar.weatherIconColor(cell.forecast?.code)
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 20
               verticalAlignment: Text.AlignVCenter
@@ -216,7 +214,7 @@ FocusScope {
               x: 2; y: 44; width: parent.width - 4; height: 14
               text: cell.modelData.day === 0 ? "" : cell.temperatureText
               visible: text !== ""
-              color: Theme.sideWeather
+              color: cell.filled ? Theme.background : Theme.sideWeather
               font.family: "Ubuntu Nerd Font"
               font.pixelSize: 10
               minimumPixelSize: 8
