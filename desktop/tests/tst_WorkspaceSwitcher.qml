@@ -129,7 +129,10 @@ ShellRoot {
         }
         verify(item !== null, "Every monitor must keep its five slots");
         compare(item.active, id === activeId);
-        tryCompare(item, "width", id === activeId ? 70 : 47);
+        tryCompare(item, "width", id === activeId ? 47 : 28);
+        compare(item.height, 28);
+        compare(item.children[0].radius, item.height / 2);
+        if (!item.active) compare(item.width, item.height, "Inactive workspaces must be circles");
       }
     }
     function test_each_monitor_has_its_own_pacman() {
@@ -158,9 +161,9 @@ ShellRoot {
       // Focusing a special workspace can leave all normal workspaces unfocused.
       workspaceSix.focused = false;
       for (const widget of [root.first, root.second]) {
-        compare(widget.naturalContentWidth, 258);
-        compare(widget.baseImplicitWidth, 272);
-        compare(widget.expandedImplicitWidth, 368);
+        compare(widget.naturalContentWidth, 159);
+        compare(widget.baseImplicitWidth, 173);
+        compare(widget.expandedImplicitWidth, 201);
       }
       verifyActive(root.first, 1);
       verifyActive(root.second, 6);
@@ -171,7 +174,7 @@ ShellRoot {
       verifyActive(root.second, 7);
       compare(label(root.second, 7).text, "󰮯");
       compare(label(root.second, 6).text, "󰊠");
-      compare(root.second.expandedImplicitWidth, 368);
+      compare(root.second.expandedImplicitWidth, 201);
     }
     function test_cross_monitor_switch_keeps_the_source_workspace() {
       setWorkspace(firstMonitor, workspaceThree);
@@ -191,15 +194,15 @@ ShellRoot {
       };
       verifyActive(root.first, 3);
       verifyActive(root.second, 7);
-      compare(root.first.expandedImplicitWidth, 368);
-      compare(root.second.expandedImplicitWidth, 368);
+      compare(root.first.expandedImplicitWidth, 201);
+      compare(root.second.expandedImplicitWidth, 201);
     }
     function test_monitor_can_disconnect_or_be_reassigned() {
       root.first.monitor = null;
       verifyActive(root.first, 0);
       compare(root.first.monitorName, "");
       verifyActive(root.second, 6);
-      compare(root.first.naturalContentWidth, 235);
+      compare(root.first.naturalContentWidth, 140);
       root.first.monitor = firstMonitor;
       verifyActive(root.first, 1);
       compare(root.first.monitorName, "DP-2");
@@ -213,7 +216,7 @@ ShellRoot {
       verifyActive(root.second, 0);
       setWorkspace(secondMonitor, {id: 11});
       verifyActive(root.second, 11);
-      compare(root.second.naturalContentWidth, 235);
+      compare(root.second.naturalContentWidth, 140);
       verifyActive(root.first, 1);
       secondMonitor.lastIpcObject = null;
       verifyActive(root.second, 0);
@@ -222,7 +225,7 @@ ShellRoot {
       root.second.workspaces = [];
       verifyActive(root.second, 6);
       compare(label(root.second, 6).text, "󰮯");
-      compare(root.second.expandedImplicitWidth, 368);
+      compare(root.second.expandedImplicitWidth, 201);
     }
     function test_special_slot_is_local_and_keeps_the_normal_pacman() {
       secondMonitor.lastIpcObject = {
@@ -235,14 +238,36 @@ ShellRoot {
       compare(root.second.specialSlotName, "Chat");
       verifyActive(root.first, 1);
       verifyActive(root.second, 6);
-      compare(root.first.implicitWidth, 272);
-      compare(root.second.implicitWidth, 368);
+      compare(root.first.implicitWidth, 173);
+      compare(root.second.implicitWidth, 173 + root.second.specialSlotWidth);
       secondMonitor.lastIpcObject = {
         activeWorkspace: {id: 6}, specialWorkspace: {id: 0, name: ""}
       };
       root.second.syncSpecialWorkspace(false);
-      compare(root.second.implicitWidth, 272);
+      compare(root.second.implicitWidth, 173);
       verifyActive(root.second, 6);
+    }
+    function test_special_capsule_fits_text_and_joins_workspace_row() {
+      const widget = root.second;
+      const slot = findChild(widget, "specialWorkspaceSlot");
+      const text = findChild(widget, "specialWorkspaceLabel");
+      const previous = button(widget, 9), last = button(widget, 10);
+      for (const name of ["A", "Chat", "Terminal"]) {
+        widget.setSpecialWorkspace("special:" + name, false);
+        compare(text.text, name);
+        compare(text.font.pixelSize, 15);
+        tryCompare(slot, "width", Math.max(28, text.implicitWidth + 14));
+        compare(slot.height, 28);
+        compare(slot.radius, slot.height / 2);
+        compare(widget.implicitWidth, widget.baseImplicitWidth + slot.width);
+        verify(text.width <= slot.width - 14);
+        const previousEnd = previous.mapToItem(widget, previous.width, 0).x;
+        const lastStart = last.mapToItem(widget, 0, 0).x;
+        const lastEnd = last.mapToItem(widget, last.width, 0).x;
+        const specialStart = slot.mapToItem(widget, 0, 0).x;
+        fuzzyCompare(specialStart - lastEnd, lastStart - previousEnd, 0.01);
+        fuzzyCompare(widget.width - specialStart - slot.width, 7, 0.01);
+      }
     }
     function test_external_output_always_uses_the_first_five_slots() {
       secondMonitor.name = "HDMI-A-1";

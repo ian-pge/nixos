@@ -8,6 +8,7 @@ var barIconSize = barSize(14);
 var barOutlineWidth = 2 * barScale;
 function barOutlineInset() { return (barSize(36) - 28 * barScale) / 2; }
 var barSelectionOpacity = 0.16;
+var barDimmedOpacity = 0.45;
 function barSelectionInset() { return (barSize(36) - barSize(32)) / 2; }
 
 // Semantic palette: pink is interaction, yellow is persistent/live state.

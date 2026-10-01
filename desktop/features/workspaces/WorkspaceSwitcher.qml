@@ -34,11 +34,14 @@ Item {
   readonly property bool specialSlotRendered: presentedSpecialWorkspace !== ""
   readonly property string specialSlotName: presentedSpecialWorkspace.startsWith("special:")
     ? presentedSpecialWorkspace.slice(8) : presentedSpecialWorkspace
-  readonly property real specialSlotWidth: Math.max(Theme.barSize(70), specialLabel.implicitWidth + Theme.barSize(24))
+  readonly property real specialSlotWidth: Math.max(workspaceButtonHeight,
+    specialLabel.implicitWidth + Theme.barSize(12))
+  readonly property real workspaceButtonHeight: Theme.barSize(24)
+  readonly property real activeButtonWidth: Theme.barSize(40)
   readonly property real naturalContentWidth: {
     let total = 0;
     for (const workspaceId of workspaceIds) {
-      total += Theme.barSize(workspaceId === activeWorkspaceId ? 60 : 40);
+      total += workspaceId === activeWorkspaceId ? activeButtonWidth : workspaceButtonHeight;
     }
     return total;
   }
@@ -121,7 +124,7 @@ Item {
 
   readonly property real baseImplicitWidth: naturalContentWidth + Theme.barSize(12)
   // Workspace capsule geometry only; expanded panels choose their own width.
-  readonly property real expandedImplicitWidth: baseImplicitWidth + specialSlotWidth + Theme.barSize(12)
+  readonly property real expandedImplicitWidth: baseImplicitWidth + specialSlotWidth
   implicitWidth: specialWorkspaceVisible ? expandedImplicitWidth : baseImplicitWidth
   implicitHeight: Theme.barSize(36)
 
@@ -192,8 +195,8 @@ Item {
             && workspace.toplevels.values.length > 0
           readonly property bool hovered: pointer.containsMouse
 
-          width: Theme.barSize(active ? 60 : 40)
-          height: Theme.barSize(24)
+          width: active ? root.activeButtonWidth : root.workspaceButtonHeight
+          height: root.workspaceButtonHeight
 
           Behavior on width {
             NumberAnimation {
@@ -204,7 +207,7 @@ Item {
 
           Rectangle {
             anchors.fill: parent
-            radius: Theme.barSize(16)
+            radius: height / 2
             color: workspaceButton.active ? Theme.action
               : workspaceButton.hovered ? Theme.surfaceRaised : "transparent"
 
@@ -256,18 +259,20 @@ Item {
 
     Rectangle {
       id: specialSlot
+      objectName: "specialWorkspaceSlot"
       visible: root.specialSlotRendered
       opacity: root.specialSlotOpacity()
       anchors.right: parent.right
       anchors.rightMargin: Theme.barSize(6)
       anchors.verticalCenter: parent.verticalCenter
       width: root.specialSlotWidth
-      height: Theme.barSize(24)
-      radius: Theme.barSize(12)
+      height: root.workspaceButtonHeight
+      radius: height / 2
       color: Theme.action
 
       Text {
         id: specialLabel
+        objectName: "specialWorkspaceLabel"
         anchors.centerIn: parent
         text: root.specialSlotName
         color: Theme.background

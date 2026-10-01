@@ -11,6 +11,9 @@ Item {
   property int textPixelSize: Theme.barSize(16)
   property color accent: Theme.foreground
   property bool inactive: false
+  property bool dimmed: false
+  readonly property color contentColor: inactive ? Theme.inactive
+    : dimmed ? Qt.alpha(accent, Theme.barDimmedOpacity) : accent
   property bool interactive: false
   property bool forceHovered: false
   property bool iconOnly: false
@@ -44,7 +47,7 @@ Item {
     visible: root.outlined
     color: "transparent"
     border.width: Theme.barOutlineWidth
-    border.color: root.inactive ? Theme.inactive : root.accent
+    border.color: root.contentColor
   }
   Row {
     id: content
@@ -55,14 +58,14 @@ Item {
       objectName: "barCellIcon"
       visible: root.iconName !== ""; name: root.iconName; size: Theme.barIconSize
       anchors.verticalCenter: parent.verticalCenter
-      color: root.inactive ? Theme.inactive : root.accent
+      color: root.contentColor
     }
     Text {
       id: label
       objectName: "barCellLabel"
       visible: root.text !== ""
       text: root.text; textFormat: root.textFormat
-      color: root.inactive ? Theme.inactive : root.accent
+      color: root.contentColor
       font { family: "Ubuntu Nerd Font"; pixelSize: root.textPixelSize; bold: true }
       Behavior on color { ColorAnimation { duration: 220 } }
     }

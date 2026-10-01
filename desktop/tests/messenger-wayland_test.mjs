@@ -80,8 +80,8 @@ function shellCpuTicks() {
   return Number(fields[11]) + Number(fields[12]);
 }
 
-async function until(predicate, description) {
-  const deadline = Date.now() + 15_000;
+async function until(predicate, description, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (spawnError) throw spawnError;
     if (await predicate()) return;
@@ -147,13 +147,15 @@ try {
       } catch {} // The fixture may already have exited before its final log arrives.
     }
   });
+  // The full desktop suite includes real hover/morph animations and multiple
+  // state transitions; its total run needs more than the compile-only budget.
   await until(() => {
     if (compositor.exitCode !== null) throw new Error("Nested compositor exited during QML compilation");
     if (renderPreview && shell.exitCode === 0) return true;
     if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testVideo ? /BeeperVideo:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : testSidebar ? /BeeperSidebar:/ : testPerformance ? /BeeperPerformance:/ : /Messenger integration:/).test(shellLog)) return true;
     if (shell.exitCode !== null) throw new Error("Quickshell exited before reporting the compile result");
     return false;
-  }, "messenger QML compilation");
+  }, testDesktop ? "desktop integration tests" : "messenger QML compilation", testDesktop ? 30_000 : 15_000);
   if (renderPreview) {
     const report = JSON.parse(shellLog.match(/Messenger preview: (\{[^\n]+\})/)?.[1] || "{}");
     assert.equal(report.expanded, true, shellLog);

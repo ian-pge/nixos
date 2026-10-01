@@ -50,6 +50,9 @@ et mises à jour restent des capsules autonomes. Un seul `GlassShape` appartient
 molette. Le bloc heure/date/météo est une seule cible de survol et de clic ;
 ses cellules sont uniquement visuelles. Bluetooth, Wi-Fi, micro et notifications
 gardent chacun leur sélection circulaire, sans teinter tout le bloc réseau.
+Le volume et la luminosité partagent leur fond, mais seule la sélection du
+cadran concerné s'allume pendant un réglage ou l'ouverture de son panneau,
+uniquement sur l'écran ciblé. Le fond du bloc commun reste inchangé.
 Heure/date/météo et mises à jour ont un liseré permanent de leur
 couleur autour de la capsule entière, en retrait du fond avec la même marge et
 la même épaisseur que les cadrans. Il réutilise la région de verre du fond,
@@ -58,6 +61,11 @@ la taille `barIconSize` de `Theme.js`.
 Le texte heure/date/météo est en 17 px gras. La connectivité garde son fond
 commun sans liseré global : chaque icône a un cercle complet, de même diamètre
 et épaisseur que les cadrans, sans région de verre supplémentaire.
+Les cercles et icônes de connectivité gardent leur bleu, atténué à 45 % quand
+Bluetooth est déconnecté, le réseau hors connexion, le micro coupé/indisponible
+ou le mode Ne pas déranger actif. Une connexion Ethernet reste pleinement
+colorée. Les icônes barrées et les zones de clic restent présentes ; le survol
+conserve son accent normal pour que ces commandes restent faciles à trouver.
 Les sélections du calendrier et des capsules autonomes sont en retrait du bord,
 avec la même marge que les cadrans. Toutes utilisent le même voile d'accent,
 défini dans `Theme.js`, par-dessus le fond existant ; le survol ne remplace pas
@@ -65,6 +73,8 @@ le matériau du bloc. Les accents propres à chaque catégorie sont conservés.
 Le centre et les capsules autonomes sont centrés verticalement dans
 la hauteur des blocs. `Bar.capsuleTopInset` fournit la même origine au centre
 et à la messagerie, tandis que la zone réservée couvre toute la barre.
+Les marges latérales sont de 10 pixels logiques sur chaque écran, comme les
+marges extérieures des fenêtres Hyprland en mosaïque.
 
 CPU, charge GPU, VRAM, RAM, stockage, batteries, son et luminosité affichent leur niveau dans
 un cadran complet autour de l'icône. La piste couvre toujours le tour entier ;
@@ -404,6 +414,11 @@ vit dans Hyprland, indépendamment de la cloche et de l'état Ne pas déranger.
 
 Chaque barre présente les cinq workspaces affectés à son moniteur par les
 règles Hyprland, avec sa sélection locale et l'occupation de ces workspaces.
+Les boutons inactifs sont circulaires ; le bouton actif est une capsule de
+largeur `barSize(40)`, pour une hauteur commune de `barSize(24)`. La largeur
+du groupe suit ces dimensions, sans modifier celle des panneaux centraux.
+La capsule spéciale épouse son texte avec une marge de `barSize(6)` de chaque
+côté, sans changer sa typographie ni ajouter d'espace après le dernier bouton.
 `workspace-policy.lua` adapte les règles aux sorties actives : seul, l'écran
 utilise 1–5 ; avec une sortie externe et l'écran intégré, l'externe utilise
 1–5 et l'intégré 6–10. DP-2 est préféré s'il existe, sinon une autre sortie

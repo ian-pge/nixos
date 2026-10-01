@@ -43,8 +43,8 @@ PanelWindow {
 
   margins {
     top: 0
-    left: 5
-    right: 5
+    left: 10
+    right: 10
   }
 
   // Keep the layer surface geometry fixed so expanding the update card cannot
@@ -163,6 +163,7 @@ PanelWindow {
           iconOnly: true
           circular: true
           iconName: services.bluetooth.connected ? "bluetooth-connected" : "bluetooth-off"
+          dimmed: !services.bluetooth.connected
           accent: connectivityBlock.accent
           forceHovered: coordinator.isOpen("bluetooth", window.monitorName)
           interactive: true
@@ -174,6 +175,7 @@ PanelWindow {
           iconOnly: true
           circular: true
           iconName: services.network.icon()
+          dimmed: services.network.type !== "wifi" && services.network.type !== "ethernet"
           accent: connectivityBlock.accent
           forceHovered: coordinator.isOpen("wifi", window.monitorName)
           interactive: true
@@ -185,7 +187,7 @@ PanelWindow {
           iconOnly: true
           circular: true
           iconName: !services.audio.microphoneAvailable || services.audio.microphoneMuted ? "mic-off" : "mic"
-          inactive: !services.audio.microphoneAvailable
+          dimmed: !services.audio.microphoneAvailable || services.audio.microphoneMuted
           accent: connectivityBlock.accent
           forceHovered: coordinator.microphoneFeedbackActive
             && window.monitorName === coordinator.microphoneFeedbackTargetMonitor
@@ -201,6 +203,7 @@ PanelWindow {
           iconOnly: true
           circular: true
           iconName: services.notifications.doNotDisturb ? "bell-off" : "bell"
+          dimmed: services.notifications.doNotDisturb
           accent: connectivityBlock.accent
           forceHovered: services.notifications.dndFeedbackActive
             && services.notifications.dndFeedbackTargetMonitor === window.monitorName
@@ -219,14 +222,14 @@ PanelWindow {
     BarBlock {
       objectName: "storageBlock"
       circularContent: true
-      accent: Theme.sideDisk
+      accent: Theme.sideSystem
       forceHovered: coordinator.isOpen("storage", window.monitorName)
       BarDial {
         objectName: "storagePill"
         iconName: "hard-drive"
         label: "Storage used"
         value: services.system.diskUsage
-        accent: Theme.sideDisk
+        accent: Theme.sideSystem
         forceHovered: coordinator.isOpen("storage", window.monitorName)
         interactive: true
         onLeftClicked: coordinator.toggle("storage", window.monitorName)
@@ -353,9 +356,6 @@ PanelWindow {
       objectName: "levelsBlock"
       circularContent: true
       accent: Theme.sideVolume
-      forceHovered: coordinator.isOpen("volume", window.monitorName)
-        || coordinator.isOpen("audio", window.monitorName)
-        || coordinator.isOpen("brightness", window.monitorName)
       Row {
         spacing: Theme.barSize(4)
         BarDial {
@@ -365,6 +365,8 @@ PanelWindow {
           value: services.audio.volume
           muted: services.audio.muted
           accent: levelsBlock.accent
+          forceHovered: coordinator.isOpen("volume", window.monitorName)
+            || coordinator.isOpen("audio", window.monitorName)
           interactive: true
           onLeftClicked: coordinator.toggle("audio", window.monitorName)
           onWheelUp: {
@@ -382,6 +384,7 @@ PanelWindow {
           label: "Brightness"
           value: services.brightness.value(window.monitorName)
           accent: levelsBlock.accent
+          forceHovered: coordinator.isOpen("brightness", window.monitorName)
           interactive: true
           onLeftClicked: coordinator.showBrightness(window.monitorName, false)
           onWheelUp: services.brightness.change(5, window.monitorName)
@@ -395,7 +398,7 @@ PanelWindow {
       objectName: "systemBlock"
       circularContent: true
       readonly property var telemetry: services.system.telemetry
-      accent: Theme.sideSystem
+      accent: Theme.sideDisk
       forceHovered: coordinator.isOpen("system", window.monitorName)
       Row {
         spacing: Theme.barSize(4)

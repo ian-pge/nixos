@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
+import Quickshell.Networking
 import Quickshell.Wayland
 
 // Instantiate the complete production composition only in a private nested
@@ -37,7 +38,7 @@ ShellRoot {
     property int volume: 65
     property bool muted: false
     readonly property real volumeStep: 0.05
-    readonly property bool microphoneAvailable: true
+    property bool microphoneAvailable: true
     property bool microphoneMuted: false
     readonly property var outputs: []
     readonly property var inputs: []
@@ -81,8 +82,9 @@ ShellRoot {
       // Negative margins also permit testing a viewport wider than the nested
       // output. QS_BAR_SCREEN_WIDTH optionally probes another display size.
       const bar = app.bars[0];
-      bar.margins.right = Qt.binding(() => bar.screen.width - screenWidth + 5);
-      tryCompare(bar.contentItem, "width", screenWidth - 10);
+      compare(bar.margins.left, 10); compare(bar.margins.right, 10);
+      bar.margins.right = Qt.binding(() => bar.screen.width - screenWidth + 10);
+      tryCompare(bar.contentItem, "width", screenWidth - 20);
     }
     function cleanupTestCase() {
       console.log("DesktopComposition: " + results.passCount + " passed, " + results.failCount + " failed");
@@ -199,6 +201,10 @@ ShellRoot {
         }
         compare(findChild(bar.contentItem, "volumePill").accent.toString(), "#eed49f");
         compare(findChild(bar.contentItem, "brightnessPill").accent.toString(), "#eed49f");
+        for (const name of ["storageBlock", "storagePill"])
+          compare(findChild(bar.contentItem, name).accent.toString(), "#c6a0f6");
+        for (const name of ["systemBlock", "systemPill", "memoryPill", "gpuPill", "vramPill"])
+          compare(findChild(bar.contentItem, name).accent.toString(), "#91d7e3");
         const expected = [[servicesText("timeText"), servicesText("dateText"), "19°"]];
         function servicesText(name) { return app.services.calendar[name]; }
         for (let i = 0; i < expected.length; ++i)
@@ -516,6 +522,90 @@ ShellRoot {
         mouseMove(bar.contentItem, bar.contentItem.width / 2, 100);
       }
     }
+    function test_connectivity_dims_off_states_without_disabling_controls() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], services = app.services;
+      const previous = {devices: services.network.devices, wifiEnabled: services.network.wifiEnabled,
+        bluetooth: services.bluetooth.nativeDevices, dnd: services.notifications.doNotDisturb,
+        microphoneAvailable: previewAudio.microphoneAvailable, microphoneMuted: previewAudio.microphoneMuted};
+      function check(name, dimmed, iconName) {
+        fixture.stage = "connectivity state " + name + ": " + iconName + ", dimmed=" + dimmed;
+        const cell = findChild(bar.contentItem, name), icon = findChild(cell, "barCellIcon");
+        const ring = findChild(cell, "barCellOutline");
+        compare(cell.dimmed, dimmed); compare(cell.iconName, iconName);
+        const color = dimmed ? Qt.alpha(cell.accent, fixture.theme.barDimmedOpacity) : cell.accent;
+        compare(icon.color, color); compare(ring.border.color, color);
+        verify(cell.visible && cell.interactive && ring.visible);
+        compare(cell.width, fixture.theme.barSize(32));
+        compare(cell.height, fixture.theme.barSize(32));
+        cell.forceHovered = true;
+        tryCompare(findChild(cell, "barCellHighlight"), "color",
+          Qt.alpha(cell.accent, fixture.theme.barSelectionOpacity));
+        compare(icon.color, color); compare(ring.border.color, color);
+        cell.forceHovered = false;
+      }
+      function wifiDevice(connected, strength) {
+        return {type: DeviceType.Wifi, networks: {values: [{name: "Preview", connected: connected,
+          signalStrength: strength, security: WifiSecurityType.Open, known: true}]}};
+      }
+      try {
+        app.coordinator.close(app.coordinator.mode);
+        bar.services = Object.assign({}, services, {audio: previewAudio});
+        services.bluetooth.nativeDevices = [];
+        check("bluetoothPill", true, "bluetooth-off");
+        services.bluetooth.nativeDevices = [{address: "00:00:00:00:00:02", name: "Preview",
+          connected: true, paired: true}];
+        check("bluetoothPill", false, "bluetooth-connected");
+        services.bluetooth.nativeDevices = [];
+        check("bluetoothPill", true, "bluetooth-off");
+
+        services.network.wifiEnabled = false; services.network.devices = [];
+        check("wifiPill", true, "wifi-off");
+        services.network.wifiEnabled = true;
+        services.network.devices = [wifiDevice(false, 0.9)];
+        check("wifiPill", true, "wifi-off");
+        services.network.devices = [wifiDevice(true, 0.9)];
+        check("wifiPill", false, "wifi");
+        services.network.devices = [wifiDevice(true, 0.1)];
+        check("wifiPill", false, "wifi-zero");
+        services.network.wifiEnabled = false;
+        services.network.devices = [{type: DeviceType.Wired, name: "eth-preview", connected: true}];
+        check("wifiPill", false, "ethernet-port");
+        services.network.devices = [];
+        check("wifiPill", true, "wifi-off");
+
+        previewAudio.microphoneAvailable = true; previewAudio.microphoneMuted = false;
+        check("microphonePill", false, "mic");
+        previewAudio.microphoneMuted = true;
+        check("microphonePill", true, "mic-off");
+        previewAudio.microphoneMuted = false; previewAudio.microphoneAvailable = false;
+        check("microphonePill", true, "mic-off");
+        previewAudio.microphoneAvailable = true;
+        check("microphonePill", false, "mic");
+
+        services.notifications.doNotDisturb = false;
+        check("doNotDisturbPill", false, "bell");
+        services.notifications.doNotDisturb = true;
+        check("doNotDisturbPill", true, "bell-off");
+        services.notifications.doNotDisturb = false;
+        check("doNotDisturbPill", false, "bell");
+      } finally {
+        services.network.devices = previous.devices; services.network.wifiEnabled = previous.wifiEnabled;
+        services.bluetooth.nativeDevices = previous.bluetooth;
+        services.notifications.doNotDisturb = previous.dnd;
+        previewAudio.microphoneAvailable = previous.microphoneAvailable;
+        previewAudio.microphoneMuted = previous.microphoneMuted;
+        // Restore the forceHovered bindings after the synthetic hover checks.
+        const block = findChild(bar.contentItem, "connectivityBlock");
+        findChild(block, "bluetoothPill").forceHovered = Qt.binding(() => app.coordinator.isOpen("bluetooth", bar.monitorName));
+        findChild(block, "wifiPill").forceHovered = Qt.binding(() => app.coordinator.isOpen("wifi", bar.monitorName));
+        findChild(block, "microphonePill").forceHovered = Qt.binding(() => app.coordinator.microphoneFeedbackActive
+          && bar.monitorName === app.coordinator.microphoneFeedbackTargetMonitor);
+        findChild(block, "doNotDisturbPill").forceHovered = Qt.binding(() => services.notifications.dndFeedbackActive
+          && services.notifications.dndFeedbackTargetMonitor === bar.monitorName);
+        bar.services = Qt.binding(() => app.services);
+      }
+    }
     function test_updates_selection_is_inset_and_does_not_move() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
       const bar = app.bars[0], pill = findChild(bar.contentItem, "updatesPill");
@@ -540,6 +630,38 @@ ShellRoot {
       } finally {
         mouseMove(bar.contentItem, bar.contentItem.width / 2, 100);
       }
+    }
+    function test_volume_and_brightness_highlight_only_their_own_dial() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], restore = fictionalReadings(bar);
+      const block = findChild(bar.contentItem, "levelsBlock");
+      const volume = findChild(block, "volumePill"), brightness = findChild(block, "brightnessPill");
+      const volumeHighlight = findChild(volume, "dialHighlight");
+      const brightnessHighlight = findChild(brightness, "dialHighlight");
+      const selection = Qt.alpha(block.accent, fixture.theme.barSelectionOpacity);
+      function check(volumeActive, brightnessActive) {
+        compare(volume.forceHovered, volumeActive);
+        compare(brightness.forceHovered, brightnessActive);
+        tryCompare(volumeHighlight, "color", volumeActive ? selection : Qt.rgba(0, 0, 0, 0));
+        tryCompare(brightnessHighlight, "color", brightnessActive ? selection : Qt.rgba(0, 0, 0, 0));
+        verify(!block.hovered);
+        tryCompare(findChild(block, "barBlockSelection"), "color", Qt.rgba(0, 0, 0, 0));
+      }
+      try {
+        app.coordinator.close(app.coordinator.mode);
+        mouseMove(bar.contentItem, bar.contentItem.width / 2, 100);
+        check(false, false);
+        fixture.stage = "volume feedback is local to the volume dial";
+        app.coordinator.showVolume(bar.monitorName); check(true, false);
+        fixture.stage = "brightness feedback replaces only the active dial";
+        app.coordinator.showBrightness(bar.monitorName, false); check(false, true);
+        fixture.stage = "audio selector highlights only volume";
+        app.coordinator.open("audio", bar.monitorName); check(true, false);
+        fixture.stage = "feedback on another monitor does not highlight this bar";
+        app.coordinator.open("volume", "other-preview-monitor"); check(false, false);
+        app.coordinator.open("brightness", "other-preview-monitor"); check(false, false);
+        app.coordinator.close(app.coordinator.mode); check(false, false);
+      } finally { app.coordinator.close(app.coordinator.mode); restore(); }
     }
     function test_grouped_controls_keep_independent_actions() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
