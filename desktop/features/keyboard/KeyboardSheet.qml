@@ -26,10 +26,10 @@ Rectangle {
     case "workspace": return Theme.sideSystem;
     case "window": return Theme.sideDisk;
     case "system": return Theme.keyboardSystem;
-    case "help": return Theme.sideWeather;
+    case "help": return Theme.pink;
     case "level3": return Theme.sideDate;
     case "navigation": return Theme.sideApplications;
-    case "tabs": return Theme.sideWeather;
+    case "tabs": return Theme.pink;
     case "edit": return Theme.sideDisk;
     case "mode": return Theme.sideSystem;
     case "search": return Theme.sideDate;
@@ -104,7 +104,7 @@ Rectangle {
         model: [
           { label: "↙ Sans modificateur", color: Theme.foreground },
           { label: "↖ Shift", color: Theme.secondary },
-          { label: "Centre : ★ / ★ puis Shift", color: Theme.sideWeather },
+          { label: "Centre : ★ / ★ puis Shift", color: Theme.pink },
           { label: "↘ AltGr", color: Theme.sideDate },
           { label: "↗ Shift + AltGr", color: Theme.sideDate }
         ]
@@ -118,7 +118,7 @@ Rectangle {
       }
       Text {
         text: "Action en bas : ⌘ Cmd + touche"
-        color: Theme.sideWeather
+        color: Theme.pink
         font.family: "Ubuntu Nerd Font"
         font.pixelSize: 13
       }
@@ -167,7 +167,7 @@ Rectangle {
                   x: index < 2 ? 7 : index < 4 ? keycap.width - width - 7 : (keycap.width - width) / 2
                   y: index % 2 === 0 ? 28 : 3
                   text: keycap.modelData.displaySymbols[index] || ""
-                  color: index >= 4 ? Theme.sideWeather : index >= 2 ? Theme.sideDate
+                  color: index >= 4 ? Theme.pink : index >= 2 ? Theme.sideDate
                     : index === 0 ? Theme.foreground : Theme.secondary
                   font.family: "Ubuntu Nerd Font"
                   font.pixelSize: 17

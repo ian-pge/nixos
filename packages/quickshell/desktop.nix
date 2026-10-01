@@ -2,6 +2,7 @@
   lib,
   runCommand,
   writeShellApplication,
+  coreutils,
   ghostty,
   yazi,
   jq,
@@ -12,7 +13,6 @@
   quickshellBeeper,
   claude-code,
   codex,
-  coreutils,
   systemd,
 }: let
   attachmentPicker = writeShellApplication {

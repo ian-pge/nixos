@@ -22,11 +22,13 @@ var searchMatch = "#4d8bd5ca";
 var searchCurrentMatch = "#4ded8796";
 
 // Fixed Catppuccin accents shared by side capsules and paired central controls.
+var pink = "#f5bde6";
+var teal = "#8bd5ca";
 var sideApplications = "#7dc4e4";
 var sideUpdates = "#91d7e3"; // Sky
 var sideNetwork = "#f0c6c6"; // Flamingo
 var sideBluetooth = "#8aadf4";
-var sideNotifications = "#8bd5ca"; // Teal
+var sideNotifications = pink;
 var sideSystem = "#c6a0f6";
 var sideDisk = "#f5a97f";
 var sideCpu = "#91d7e3";
@@ -36,7 +38,7 @@ var sideBattery = "#f4dbd6"; // Rosewater
 var batteryPluggedIn = "#a6da95";
 var sideVolume = "#b7bdf8";
 var sideBrightness = "#eed49f";
-var sideWeather = "#f5bde6";
+var sideWeather = teal;
 var calendarSelected = "#f5a97f";
 var weatherSun = "#a6da95";
 var weatherRain = "#ed8796";
@@ -54,11 +56,11 @@ var beeperFont = {
 };
 var beeperSenderColors = [
   sideApplications, sideSystem, sideDisk, "#a6da95",
-  sideWeather, sideBrightness, error, sideBluetooth,
+  pink, sideBrightness, error, sideBluetooth,
   sideCpu, sideVolume, "#ee99a0", "#f0c6c6"
 ];
 var beeperNetworkColors = {
   // Catppuccin Macchiato: Mauve, Green, Sapphire, Blue, Pink and Teal.
   all: sideSystem, whatsapp: "#a6da95", telegram: sideApplications,
-  signal: sideBluetooth, instagram: sideWeather, sms: sideDate
+  signal: sideBluetooth, instagram: pink, sms: sideDate
 };

@@ -19,7 +19,8 @@ Item {
   property real sourceWidth: 434
   property real sourceHeight: 36
   property bool nativeDialogOpen: false
-  readonly property bool active: controller.visible && monitorName === controller.targetMonitor
+  property bool restoringNativeDialog: false
+  readonly property bool active: controller.visible && monitorName === controller.targetMonitor && !nativeDialogOpen
   readonly property bool presented: bubble.visible
   // Keep the chat keyboard-capable while its fullscreen media owns focus.
   // The compositor can then return to this surface as the photo unmaps.
@@ -47,10 +48,9 @@ Item {
     else panel.focusNavigation();
   }
   onActiveChanged: {
-    if (active) Qt.callLater(focusMessenger);
+    if (active) { if (!restoringNativeDialog) Qt.callLater(focusMessenger); }
     else {
       focusGrab.active = false;
-      nativeDialogOpen = false;
       Qt.callLater(() => root.returnFocusRequested());
     }
   }
@@ -94,13 +94,16 @@ Item {
     dictating: root.dictating
     vimEditing: true
     externalPhotoPreview: true
+    attachmentPickerReady: root.nativeDialogOpen && !bubble.visible && !root.controller.blocked
     active: root.active && !root.controller.blocked
     windowFocused: root.windowFocused && (activeFocus || emojiPickerOpen) && !root.nativeDialogOpen && !root.controller.blocked
     enabled: active
     onCloseRequested: root.controller.hide()
     onNativeDialogOpened: { root.nativeDialogOpen = true; focusGrab.active = false; }
     onNativeDialogClosed: {
+      root.restoringNativeDialog = true;
       root.nativeDialogOpen = false;
+      root.restoringNativeDialog = false;
       Qt.callLater(() => {
         if (root.active && !root.controller.blocked) {
           focusGrab.active = true;

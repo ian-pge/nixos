@@ -60,9 +60,10 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | `read`, `updateChat` | `{chatID,messageID?}`, `{chatID,changes:{isMuted?,isPinned?,isLowPriority?}}` |
 | `unread` | `{chatID}` ; marque manuellement la conversation non lue sans inventer de nouveaux messages |
 | `unreadCounts` | `{}` → `{counts:{réseau:nombre},lowPriorityCounts:{réseau:nombre}}` ; deux compteurs disjoints selon `isLowPriority`, marquage manuel compris ; lecture complète des pages de l'API |
-| `getDraft`, `saveDraft` | `{chatID,text?,attachment?,replyToMessageID?,savedDrafts?:[{id,text,attachment?,replyToMessageID?}]}` ; retour `{text,attachment?,replyToMessageID?,savedDrafts?}` ; copies locales de récupération séparées du brouillon courant, conservées si le champ est omis et retirées avec `[]` |
+| `getDraft`, `saveDraft` | `{chatID,text?,attachments?,replyToMessageID?,savedDrafts?:[{id,text,attachments?,replyToMessageID?}]}` ; retour `{text,attachments?,replyToMessageID?,savedDrafts?}` ; ancien champ `attachment` toujours lisible ; copies locales de récupération séparées du brouillon courant, conservées si le champ est omis et retirées avec `[]` |
 | `setView` | `{chatID,focused,atLatest}` ; état de vue conservé dans le protocole, sans couper les alertes sonores |
 | `stageAttachment`, `clipboardAttachment` | `{path,type?}` ou `{}` ; copie durable et privée `{path,srcURL,type,fileName,mimeType}` |
+| `stageAttachments` | `{paths:[...]}` ; liste de copies privées dans l’ordre choisi ; si un fichier échoue, les copies déjà préparées pour cette sélection sont supprimées |
 | `prepareRecording`, `discardAttachment` | `{}` retourne un fichier `.ogg` de type `voice-note` ; `{path}` supprime uniquement une copie de notre répertoire, non référencée par un brouillon |
 | `upload`, `download` | `{path}` retourne l’upload API ; `{url}` retourne `{srcURL,error?}` pour les URL média Beeper |
 | `saveAttachment` | `{url,fileName?,mimeType?}` copie le média dans le dossier de téléchargement XDG (`XDG_DOWNLOAD_DIR`, `user-dirs.dirs`, sinon `~/Downloads`) et retourne `{path,name}` ; nom d’origine assaini, jamais d’écrasement (`nom (2).ext`) ; une URL non locale passe par `POST /v1/assets/download`, refusée en démo |
@@ -100,6 +101,13 @@ Les copies de fichiers originaux ne sont jamais supprimées par `discardAttachme
 Les images collées sont limitées à 100 Mio, les fichiers au plafond API de 500 Mio.
 Un envoi utilise une pièce jointe : `image`, `gif`, `video`, `audio`, `voice-note`,
 `file` ou `sticker`, selon ce qu’accepte le réseau. L’enregistrement/lecture est QML.
+Un brouillon peut contenir plusieurs fichiers. QML les envoie séquentiellement,
+avec le texte et la citation sur le premier message seulement. Après chaque
+acceptation par Beeper, la sauvegarde de récupération ne contient plus que les
+fichiers restants ; cette progression est persistée avant le prochain envoi.
+Un échec arrête la séquence sans réessai automatique et préserve le reste du lot,
+séparément d’un éventuel nouveau brouillon. Les anciens brouillons à pièce jointe
+unique restent compatibles.
 
 Les vagues audio sont calculées dans Go à partir d'un décodage FFmpeg standard
 (dépendance explicite du paquet). Les URL distantes passent par le téléchargement

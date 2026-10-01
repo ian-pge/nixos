@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import Quickshell
+import Quickshell.Wayland
 
 // Instantiate the complete production composition only in a private nested
 // Wayland session, with helper processes/agents disabled and fictional chat.
@@ -48,6 +49,36 @@ ShellRoot {
       verify(capsule.messengerHost !== null);
       verify(capsule.width > 0); verify(capsule.width <= capsule.maximumWidth);
       verify(capsule.visible);
+    }
+    function test_native_picker_hides_chat_and_restores_draft() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], host = bar.capsule.messengerHost;
+      const composer = findChild(host, "beeperComposer");
+      const panel = findChild(host, "beeperBubble").contentItem.children.find(item => typeof item.focusNavigation === "function");
+      const model = app.coordinator.messenger.beeperData;
+      try {
+        app.coordinator.messenger.show(bar.monitorName);
+        tryCompare(host, "active", true); wait(450);
+        composer.forceActiveFocus(); composer.text = "Keep the draft";
+        const layer = bar.WlrLayershell.layer;
+        verify(layer === WlrLayer.Top || layer === WlrLayer.Overlay);
+        // These are the real signals emitted for selection, cancel and failure.
+        panel.nativeDialogOpened();
+        verify(!host.wantsKeyboard); verify(!host.active); verify(host.presented);
+        verify(!panel.attachmentPickerReady);
+        tryCompare(host, "presented", false, 1000);
+        verify(panel.attachmentPickerReady);
+        verify(!composer.visible); compare(bar.WlrLayershell.layer, layer);
+        compare(model.draftText, "Keep the draft");
+        panel.nativeDialogClosed();
+        verify(host.active); verify(host.presented);
+        compare(bar.WlrLayershell.layer, layer); verify(host.wantsKeyboard);
+        panel.compose(); tryCompare(composer, "activeFocus", true);
+        compare(model.draftText, "Keep the draft");
+      } finally {
+        host.nativeDialogOpen = false;
+        app.coordinator.messenger.hide();
+      }
     }
     function test_bar_brightness_uses_its_monitor_reading() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
@@ -195,6 +226,26 @@ ShellRoot {
         compare(app.coordinator.mode, "workspaces");
         verify(!usage.active);
       } finally { app.coordinator.close("usage"); }
+    }
+    function test_storage_opens_from_the_pill_without_starting_a_scan_in_preview() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], capsule = bar.capsule, storage = app.services.storage;
+      const pill = findChild(bar.contentItem, "storagePill");
+      const panel = findChild(capsule, "storagePanel");
+      verify(pill !== null); verify(panel !== null); verify(pill.interactive);
+      try {
+        pill.leftClicked();
+        tryCompare(capsule, "targetMode", "storage");
+        verify(capsule.keyboardSelectorActive);
+        compare(capsule.targetWidth, capsule.maximumWidth);
+        compare(capsule.targetHeight, panel.implicitHeight);
+        tryCompare(capsule, "height", panel.implicitHeight, 1000);
+        tryVerify(() => panel.opacity > 0.99, 1000);
+        verify(storage.active); verify(!storage.enabled); verify(!storage.loading);
+        compare(storage.scanCount, 0);
+        pill.leftClicked();
+        compare(app.coordinator.mode, "workspaces"); verify(!storage.active);
+      } finally { app.coordinator.close("storage"); }
     }
     function test_scrolling_history_does_not_resize_the_top_bar_or_panel() {
       tryVerify(() => app.bars.length > 0);

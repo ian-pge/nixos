@@ -1,1856 +1,565 @@
-# Guide visuel et conventions d’animation — barre Quickshell
-
-Ce document décrit les décisions visuelles, les conventions d’animation et les pièges déjà rencontrés pour l’application `desktop/`, notamment sa barre et sa messagerie. Il est destiné en priorité à une future IA qui devra modifier ces interfaces sans casser leur cohérence. Les chemins de la liste d’architecture sont relatifs à ce document ; les commandes de validation indiquent leur dossier de lancement.
-
-## 1. Intention générale
-
-La barre doit donner l’impression d’être un seul système animé, pas une collection de popups indépendants.
-
-Principes fondamentaux :
-
-- La capsule centrale est un objet unique qui **se transforme** entre workspaces, volume, panneau audio, calendrier météo, luminosité, dictée vocale, média MPRIS, lanceur d’applications, Wi-Fi, Bluetooth, mises à jour, limites d’utilisation Claude/Codex et notifications éphémères.
-- Les changements de taille utilisent une interpolation monotone sans rebond.
-- Le contenu source et le contenu destination coexistent brièvement dans une transition croisée pilotée par la même progression que la capsule.
-- Une transformation doit entraîner son contenu avec elle. Les éléments ne doivent pas sembler flotter indépendamment de leur capsule.
-- Tous les overlays sont visibles uniquement sur l’écran qui les a activés ; les workspaces restent visibles sur les autres écrans.
-- Le style conserve les neutres sombres de Catppuccin ; la capsule centrale utilise une palette sémantique rose/jaune, sauf les lanceurs applications/onglets et les widgets updates, Wi-Fi, Bluetooth, volume et luminosité qui utilisent leurs accents dédiés. Aucun liseré animé ne tourne autour des widgets.
-
-### Messagerie Beeper
-
-Cmd+D transforme visuellement la capsule centrale en panneau de messagerie.
-Seuls les notifications, l'OSD de volume et celui de luminosité peuvent coexister
-avec le chat sans le fermer, déplacer ni redimensionner. Les autres panneaux
-centraux (météo, périphériques audio, réseau, système, lanceurs, mises à jour,
-lecteur média explicite) le remplacent. Réciproquement, ouvrir le chat les ferme.
-Cette politique appartient à `ShellCoordinator`, pas aux vues. Les brouillons
-sont conservés. Un changement de morceau passif n'ouvre pas d'OSD média pendant
-le chat. Tous les widgets gardent leur plafond `WorkspaceSwitcher.expandedImplicitWidth`.
-
-`BeeperBubble` commence à la position et aux dimensions de la capsule centrale,
-puis devient le panneau au centre de la zone de travail. Il n'y a plus de petite
-bulle détachée ni de col de liaison. La surface et le contenu de la capsule
-source s'effacent pendant l'expansion ; seuls les widgets actifs peuvent ensuite
-réapparaître indépendamment dans la barre. L'animation complète dure 360 ms,
-avec `OutCubic` à l'ouverture **et** à la fermeture : départ rapide, puis
-décélération à l'arrivée, sans rebond. La fermeture inverse la destination,
-pas le temps de la courbe ; elle ne doit pas accélérer à la fin (`InCubic`).
-Une `NumberAnimation` Qt native anime directement la progression géométrique ;
-une inversion conserve la position courante et réduit la durée au trajet restant.
-Les dimensions source sont figées à l'ouverture pour qu'un OSD apparaissant en
-cours d'animation ne change pas sa trajectoire. Une fermeture complète repart
-vers les dimensions courantes de la capsule ; une inversion à mi-course garde
-la géométrie courante sans saut. Le contenu conserve sa mise en page finale
-pendant l'animation, avec un fondu.
-Pour passer du chat à un autre widget, `ShellCoordinator` établit d'abord le mode
-et les dimensions cibles, puis ferme le chat. `BeeperBubble` interpole le rectangle
-effectivement rendu vers cette destination, même en cas d'interruption. Pendant
-ce retour, lui seul peint le verre : `CentralCapsule` désactive son fond et ses
-`Behavior` de dimensions jusqu'au relais au même rectangle final. Une seconde
-surface ou une animation de hauteur indépendante provoquerait un dernier mouvement
-parasite après l'apparition du widget. À l'ouverture, `MessengerController.aboutToShow`
-permet de capturer le widget précédent avant que le coordinateur change son mode.
-Les workspaces masqués ne participent jamais à l'entrée d'un widget volume ou
-luminosité, même avant le callback différé de transition. Ils restent masqués
-pendant l'expiration de l'OSD si le chat est ouvert, puis réapparaissent lors du
-retour réel du panneau vers la capsule. Cela évite un flash du contenu précédent.
-La largeur du chat reste plafonnée à 1280 pixels logiques. Sa hauteur est celle
-d'une fenêtre Hyprland prenant toute la hauteur de travail, moins 100 px :
-hauteur d'écran − réserve de barre (46 px) − marges externes haut/bas (10 + 10 px)
-− 100 px. Il n'y a plus de plafond fixe de 900 px. La surface est centrée dans
-cette zone de fenêtres, avec 50 px supplémentaires en haut et en bas.
-Les propriétés `windowTopGap`/`windowBottomGap` de `BeeperBubble` correspondent
-aux `general.gaps_out` de `home_manager/hyprland/settings.nix` (cadre externe,
-bordures comprises) ; les tenir synchronisées si ces marges changent.
-
-La surface Wayland reste fixe, haute comme le moniteur, avec une zone exclusive
-de 46 px. Le panneau et la barre sont des éléments frères dans le graphe de
-scène ; leur apparence partagée ne couple pas leurs états. La barre est dessinée
-au-dessus du panneau pour que ses widgets
-restent accessibles même s'ils la recouvrent. Le masque ne capture que la barre
-et le panneau visible ; l'espace entre les deux reste traversable aux clics.
-Aucun nouveau paquet ni modification de Quickshell n'est nécessaire.
-
-Pendant la fermeture, désactiver seulement `BeeperBubble.contentItem`, jamais
-le conteneur visuel `BeeperBubble` lui-même. Le collecteur natif de `GlassShape`
-ignore les éléments effectivement désactivés, y compris par un parent : couper
-ce parent ferait disparaître le verre avant la fin du morphing, même si les
-dimensions continuent à s'animer. Le test de fermeture vérifie donc aussi
-l'état effectif du `GlassShape`, pas seulement la géométrie sur fond opaque.
-
-La typographie de la messagerie est regroupée dans `Theme.beeperFont` : corps et
-saisie à 20 px, contrôles à 16 px, indications secondaires à 14–15 px. Les listes
-et boutons grandissent avec ces textes. Dans les groupes, les noms utilisent
-une couleur par identité de participant. Les
-couleurs déjà attribuées sont conservées pendant la navigation, les transferts
-entre écrans et le chargement de l'historique ; elles ne dépendent pas du numéro
-de ligne ni du nom affiché lorsque `senderID` est fourni.
-
-Les fonds des bulles reçues (pointe comprise), du composeur et de la colonne des
-conversations partagent exactement le fond Base de Macchiato (`#24273a`,
-`Theme.surface`), entièrement opaque. La conversation sélectionnée et les bulles
-envoyées reprennent la couleur opaque de la plateforme de la conversation, même
-dans `All` : Sapphire pour Telegram, Green pour WhatsApp, Pink pour Instagram,
-Teal pour les SMS et Blue pour Signal (palette Catppuccin Macchiato). Un réseau
-inconnu utilise un gris neutre. Le logo `All` en haut de la liste reste Mauve, sans
-transmettre cette couleur aux conversations qu'il regroupe.
-Le micro et l'envoi utilisent l'accent de la conversation ; l'arrêt d'un enregistrement reste
-rouge. Le texte et les contrôles dans les bulles envoyées sont
-sombres pour rester lisibles. La liste n'affiche plus de nom de réseau sous
-l'aperçu : le badge de l'avatar l'identifie déjà.
-Un point plein de 12 px, dans la couleur de la plateforme de la conversation,
-identifie la sélection à l'extérieur de la bulle : à droite pour les messages
-reçus, à gauche pour les messages envoyés. Il est centré verticalement et séparé
-du bord de 6 px, sans modifier la largeur, la hauteur ni le fond du message ;
-le focus de saisie ne recolore pas le composeur. Le fond général et l'animation
-de la fenêtre gardent leur comportement.
-Cette règle ne réintroduit aucune bordure.
-L'en-tête de la colonne de conversations affiche `N unread`, à côté du logo.
-Le total suit le réseau sélectionné, pas la recherche de titres : `All` regroupe
-tous les réseaux. Un marquage manuel `isMarkedUnread === true` compte une fois
-dans la vue à laquelle appartient la conversation, sans changer sa priorité.
-Le badge jaune reste un disque de 26 px, avec ou sans compteur : le marquage
-manuel sans nouveau message masque seulement le numéro, sans réduire le disque.
-`isChatInInbox` exclut les conversations `isLowPriority` ; le compteur principal
-applique le même filtre. Ce champ vient directement de Beeper : aucun classement
-local persistant ne le remplace. Les changements faits dans un autre client sont
-repris lors des lectures suivantes. Les anciens choix d'archives de `state.json`
-ne sont plus utilisés, sans migration automatique des conversations distantes.
-`a` passe de la boîte de réception aux seules conversations Low Priority du réseau
-courant ; `All` regroupe tous les réseaux. Les deux listes ne se mélangent pas.
-Le mode est partagé entre écrans et conservé lors d'un changement par Tab.
-Un petit badge à chevrons vers le bas apparaît sur le logo et sur les lignes
-Low Priority. Shift+A déplace la conversation sélectionnée via le PATCH public
-`/v1/chats/{id}`, avec `isLowPriority` explicitement true ou false.
-Attendre le succès API avant de changer la liste ; dédupliquer les demandes en
-cours et reprendre `isMuted` si la réponse le fournit. Une révision invalide les
-lectures lancées avant un changement réussi puis relance une lecture fraîche.
-Ne pas maintenir de surcharge locale qui empêcherait les changements distants.
-Les notifications ordinaires Low Priority sont supprimées ; les mentions
-structurées visant l'utilisateur ou `@room` et les réponses à ses messages
-peuvent notifier, sauf si la conversation est suspendue.
-Préserver brouillons, marquages non lus et reçus de lecture. Un accusé tardif ne
-change jamais la sélection d'une autre conversation. Ces touches restent du texte
-dans les champs et sont inactives pendant une recherche de messages/un vocal.
-Dans la vue Low Priority, le compteur utilise `lowPriorityCounts`, calculé dans la
-même lecture du catalogue, et inclut leurs marquages manuels non lus.
-Le backend parcourt les vraies pages de l'API, pas seulement le cache visible.
-Une pagination invalide ou une erreur rend le compteur indisponible (`—`), sans
-afficher un faux zéro. Les changements passifs sont regroupés à trois secondes ;
-une action explicite `m`/`n` actualise le total dès que possible.
-`KeyedListModel.updating/updated` permettent à la colonne de suivre une sélection
-qui était déjà visible si le serveur la déplace après `n`. Ne jamais rappeler une
-sélection hors écran ni interrompre un geste utilisateur : ce serait réintroduire
-les retours de défilement lors des rafraîchissements passifs.
-La pointe et le corps de chaque bulle forment un seul chemin vectoriel rempli,
-sans contour. La pointe utilise deux courbes cubiques pour un retour concave
-vers le bord, et `Shape.CurveRenderer` assure l'anticrénelage natif sans texture
-intermédiaire ni agrandissement artificiel. Le test Wayland vérifie le moteur
-réel ; les tests logiciels ne peuvent vérifier que le moteur demandé.
-
-La liste de conversations reste à gauche de l'historique. L'en-tête séparé de la
-conversation est supprimé : la ligne sélectionnée reprend son avatar, son titre
-et le nombre de membres. Sa hauteur passe de 78 à 128 px (112 px en mode compact)
-sur 200 ms avec `OutCubic`, en gardant la courbe des workspaces de la top bar
-mais avec une durée divisée par deux pour une navigation plus vive.
-Un seul progrès anime la hauteur, l'avatar (48 → 72 px, 60 px en mode compact),
-l'échelle du titre et le fondu entre aperçu et détails. La désélection inverse
-le mouvement depuis la taille courante, y compris en navigation rapide.
-Un seul fond partagé glisse entre les delegates sélectionnés sur 200 ms. Il
-suit leur géométrie par binding : la croissance d'une ligne ou un déplacement
-passif dans le modèle ne relance pas l'animation. Une inversion reprend sa
-position et sa hauteur courantes. La sélection apparaît directement à destination
-si aucun fond précédent n'était visible dans la liste. Le texte reste clair jusqu'à ce que le fond couvre
-ses lignes, puis passe au sombre ; la désélection le rend immédiatement clair
-avant le départ du fond. Les couleurs suivent un fondu de 120 ms.
-Les barres latérales masquées ou désactivées appliquent la sélection directement,
-sans animer les autres écrans.
-La sélection explicite reste dans le viewport pendant sa croissance ; molette,
-scrollbar et désactivation interrompent ce suivi, sans retour automatique.
-Les dimensions internes de l'avatar et la largeur de mise en page du titre
-restent fixes pendant l'animation : seuls leur échelle et leur placement bougent.
-Ne pas animer `diameter`, la taille des polices ou la largeur du texte, ni placer
-des `RowLayout`/`ColumnLayout` imbriqués dans les lignes animées. Le suivi de la
-sélection garde une référence au delegate et corrige seulement un bord rogné,
-sans `forceLayout()` ni recherche dans tout le catalogue à chaque image.
-`BeeperAvatar.sourceDiameter` garde aussi une résolution de décodage fixe.
-Les photos sont découpées en cercle avec `Quickshell.Widgets.ClippingRectangle` ;
-un simple rectangle arrondi ne découpe pas les enfants. Le badge du réseau reste
-en dehors de ce masque, en bas à droite, avec les glyphes WhatsApp/Telegram/Instagram/SMS de la
-police Nerd Font installée. Les autres réseaux gardent une lettre identifiable et
-une infobulle. Le repli sur la photo du correspondant reste limité aux discussions
-individuelles ; les initiales gardent une couleur stable lors des changements de sélection.
-Le sous-titre d'un groupe indique `participants.total` fourni par l'API publique,
-avec le singulier/pluriel anglais. La longueur de `participants.items` n'est
-utilisée que si `hasMore === false` garantit une liste complète. Sinon, afficher
-`Group conversation`, pas un nombre inventé ni le nom du réseau. Une conversation
-individuelle sélectionnée indique `Direct message` si aucun autre détail n'est
-disponible ; l'état muet reste indiqué. Les lignes inactives conservent l'aperçu
-du dernier message.
-
-Le compteur de non-lus et les numéros des badges défilent verticalement sur
-140 ms. `BeeperRollingText` garde deux textes de dimensions fixes et n'anime
-que leur position et leur opacité. Le disque reste à 26 px, y compris lors d'un
-changement du nombre de chiffres ; le marquage manuel sans message reste un
-disque sans numéro. Les états `…` et `—` continuent de distinguer chargement et
-indisponibilité. Un changement rapide remplace la destination par la dernière
-valeur ; une vue masquée ou désactivée termine le mouvement immédiatement.
-
-L'interface de la messagerie est en anglais, y compris les dialogues, les erreurs
-et les notifications ; les noms et contenus des conversations ne sont pas traduits.
-La colonne de gauche ne garde qu'un logo en haut : deux bulles mauves pour `All`,
-l'avion Telegram ou le logo WhatsApp, Instagram ou SMS. En navigation, `Tab` parcourt
-`All → Telegram → WhatsApp → Instagram → SMS → All`, et `Shift+Tab` fait l'inverse ; cliquer le logo
-avance aussi. Le filtre porte sur le réseau, tous ses comptes confondus, et est
-partagé entre écrans. Les conversations Beeper `Google Messages` sont classées
-dans SMS. `All` inclut aussi les autres réseaux. Aucun détournement
-de Tab pendant la saisie, les dialogues ou un enregistrement vocal.
-Le logo change avec un fondu et un petit déplacement sur 140 ms. Son
-icône n'est pas rognée par sa boîte de texte : les glyphes Nerd Font peuvent
-déborder de leur largeur d'avance tout en restant dans le bouton. La nouvelle
-liste apparaît avec un fondu de 140 ms et une translation horizontale de 6 px.
-Le filtre et la sélection changent immédiatement ; aucun ancien modèle ni
-instantané de la liste n'est conservé pour cette transition. Des appuis rapides
-suivent le dernier réseau demandé sans retarder le clavier ou charger les
-historiques traversés. Les autres écrans masqués appliquent l'état directement.
-`/` affiche temporairement la recherche de conversations, `Esc` l'efface et la masque. Le menu
-d'actions et ses options sont retirés, y compris leurs dialogues de recherche de
-messages, nouvelle conversation, réaction libre et suppression. Les pages de
-conversations se chargent automatiquement près du bas de la liste, y compris
-pour remplir une liste filtrée par réseau/recherche. L'historique se charge près
-du haut, en conservant l'identité et le décalage du message visible et la sélection.
-Une seule requête est permise à la fois ; une erreur bloque la pagination jusqu'au
-prochain rafraîchissement, et un curseur vide ou inchangé termine les pages.
-La navigation dans la liste sélectionne immédiatement le chat et son brouillon,
-mais attend 90 ms de pause avant de charger l'historique. Un nouvel appui remplace
-la destination en attente, sans créer les bulles ou décodeurs des chats traversés.
-Les ouvertures explicites (notification/message cible) et rafraîchissements
-contournent cette temporisation ; déconnexion et sélection vide l'annulent.
-Les générations de requêtes empêchent toujours une réponse ancienne de remplir
-une autre conversation. Ne pas afficher le texte de conversation vide pendant
-ce délai.
-
-`BeeperHistory` utilise un `Instantiator` asynchrone pour répartir la création des
-bulles sur plusieurs images. Leur placement repose toujours sur les hauteurs
-réelles : aucun retour aux estimations de `ListView`. Le layout est recalculé
-seulement quand ses entrées changent, y compris le zoom et les citations.
-Restaurer la position de lecture avant de révéler les nouvelles bulles et leurs
-médias. Les panneaux invisibles ont un modèle d'historique vide ; conserver celui
-d'un panneau encore visible pendant sa fermeture. Les raccourcis qui naviguent
-dans l'historique attendent la fin de sa construction.
-Le calcul de visibilité utilise une recherche binaire et les seules lignes
-proches du viewport, plutôt que des bindings au défilement sur tous les messages.
-Un ajout d'ancienne page garde les décodeurs des médias restés visibles.
-Les pièces jointes ont également un modèle à clés stables : une mise à jour de
-réaction ou de reçu de lecture ne recrée pas les lecteurs des médias inchangés.
-Seuls les messages réellement ajoutés après le dernier message connu peuvent
-animer leur arrivée : fondu et translation verticale de 8 px sur 140 ms.
-La conversation doit être déjà ouverte et positionnée en bas ; l'effet attend
-la fin du layout et la restauration du viewport, puis ne touche que les nouveaux
-messages effectivement visibles. Une première ouverture, une ancienne page,
-un rafraîchissement d'un message existant ou un retour sur une bulle ne rejoue
-jamais l'entrée. La transformation laisse les hauteurs, les ancres de lecture
-et les décodeurs intacts. Sortir du viewport ou désactiver le panneau termine
-l'effet immédiatement ; aucun timer permanent ni parcours par image du catalogue
-de messages n'est ajouté.
-Pas de boutons « load more », de compteur/footer permanent ni de boutons
-recherche/actions/fermeture dans l'en-tête. `?` affiche l'aide ; `:` n'ouvre rien.
-La recherche de texte revient séparément avec `Ctrl+/`, sous forme d'une barre
-contextuelle au-dessus de l'historique, sur toute la largeur de la conversation.
-Elle ne réserve aucune hauteur lorsqu'elle est fermée ; son compteur devient
-compact sur les petites fenêtres. Elle garde le
-brouillon intact. Entrée valide, puis `n`/`N`, `j`/`k` et Ctrl+J/K parcourent les
-résultats ; les lettres restent du texte tant que le champ a le focus. `Ctrl+/`
-permet de modifier la recherche, Échap la ferme sans fermer le chat.
-Chaque occurrence visible des mots saisis reçoit un fond Yellow, y compris dans
-les messages envoyés. Le calcul ignore la casse et les accents tout en conservant
-les indices UTF-16 du texte original (emoji, accents décomposés, termes qui se
-chevauchent). Les termes restent littéraux, jamais des expressions régulières.
-Le `Text.PlainText` d'origine conserve seul les dimensions : une couche
-`Text.RichText` de même police/interligne peint les fragments entièrement échappés.
-Ne jamais faire alterner le format d'un même `Text` entre brut et riche : l'ordre
-des bindings pourrait brièvement interpréter du contenu utilisateur comme HTML.
-Le rendu enrichi est limité aux messages proches du viewport et ne doit changer
-ni le retour à la ligne, ni le gabarit des bulles, ni le curseur de défilement.
-`BeeperSearchController` possède sa pagination et sa génération de requête,
-distinctes de l'historique. L'API publique recherche uniquement le `chatID`
-courant, même en sourdine ou basse priorité. Les réponses périmées, masquées ou
-d'une autre conversation sont ignorées. Le compteur indique `+` si d'autres
-pages existent, sans prétendre connaître un total absent de l'API.
-Pour situer un résultat ancien dans son contexte, suivre les vrais curseurs de
-l'historique jusqu'à son identifiant, sans limite arbitraire de vingt pages ni
-curseur inventé depuis `sortKey`. Changer de recherche, fermer, changer de chat
-ou défiler manuellement interrompt cette localisation. Une erreur suspend le
-chargement ; Entrée permet de réessayer. Garder ces requêtes en lecture seule.
-Changer de réseau conserve les brouillons ; un
-réseau vide ne laisse pas la conversation précédente active. Ouvrir un résultat
-de recherche ou une notification hors du réseau courant rétablit `All`.
-
-Le backend Go et `BeeperData` sont uniques pour la session. Chaque écran possède
-un `BeeperPanel`, mais seul celui de l'écran cible est actif. La fermeture, le
-transfert d'écran et les demandes polkit conservent les brouillons. Le
-composeur est une `TextArea` QML classique : Entrée lui donne le focus depuis la
-navigation, puis envoie depuis la saisie ; Maj+Entrée ajoute une ligne. `i` n'est
-plus un raccourci. Les aperçus de réponse et de pièce jointe restent en retrait
-de l'arrondi du composeur, sans croix de fermeture. Échap annule d'abord la réponse
-ou la modification, puis retire la pièce jointe s'il en reste une, en gardant le
-focus de saisie et le texte du brouillon à chaque appui. Une fois les aperçus
-retirés, Échap revient à la liste de gauche, puis ferme le panneau à l'appui
-suivant. Hors saisie, `j/k` parcourt les
-conversations ; Ctrl+J/K parcourt toujours les messages et révèle celui sélectionné,
-y compris depuis le composeur,
-sans perdre le brouillon. `l` donne le focus à la saisie de la conversation
-sélectionnée, comme Entrée ; `h` revient à la liste.
-Revenir à la liste, reprendre la saisie (au clavier ou à la souris), envoyer une
-réponse ou quitter le chat efface la sélection et son ancre de restauration.
-La prochaine entrée par Ctrl+J/K sélectionne toujours le message le plus
-récent ; les appuis suivants parcourent normalement l'historique. Ouvrir puis
-fermer l'aperçu d'un média conserve la sélection du média.
-
-Le composeur utilise JetBrainsMono Nerd Font : tous les caractères ont la même
-largeur, comme dans un terminal. Son édition modale façon Vim vient de la brique
-partagée `ui/VimEditing.qml`, qui s'appuie sur le cœur pur `ui/VimCore.js`
-testé sous Node. `BeeperPanel.vimEditing` vaut `false` par défaut ; le shell et
-l'aperçu l'activent. La saisie démarre en mode insertion à chaque prise de focus
-depuis l'application, mais pas au simple retour dans la fenêtre. Avec Vim, le
-premier Échap passe en mode normal ; les étapes d'Échap décrites plus haut
-s'appliquent ensuite depuis le mode normal. Le curseur reprend celui de Zed et
-son remplacement `#ffcc33` (`Theme.textCursor`) : une barre qui clignote en
-insertion ; en modes normal et visuel, un bloc opaque qui clignote au même
-rythme, le caractère dessous redessiné dans la couleur de fond du composeur,
-comme le fait Zed. Tout déplacement du bloc le réaffiche plein. En mode normal,
-le champ passe en lecture seule : touches mortes, saisies
-de méthode d'entrée, collages et dépôts ne peuvent rien écrire, seules les
-commandes Vim modifient le texte. `/` ouvre une ligne de recherche au-dessus du
-texte (`ui/VimSearchPrompt.qml`) ; le motif est du texte simple, sans casse.
-Pendant la frappe, les résultats sont surlignés avec les couleurs de recherche
-du thème Catppuccin de Zed : turquoise, et rouge pour celui qu'atteindra
-Entrée. Entrée saute au résultat suivant en repartant du début, puis retire le
-surlignage ; Échap, ou Retour arrière sur un motif vide, annule ; un motif sans
-résultat passe en rouge ; `n/N` répètent la recherche. `j/k` suivent les lignes affichées d'un message
-replié, mais un opérateur comme `dj` prend des lignes entières. Chaque commande ou
-session d'insertion forme une seule étape d'annulation, car l'annulation native
-de Qt découpe un remplacement en deux. Les copies `y` vont aussi dans le
-presse-papiers système avec l'avis « Text copied » ; `p` colle le registre Vim.
-Entrée envoie depuis le mode normal puis revient en insertion ; Maj+Entrée n'y
-fait rien. La répétition `.`, les macros, les registres nommés, les marques, les
-commandes `:` et le mode bloc ne sont pas pris en charge.
-Les chiffres `1` à `6` utilisent respectivement 👍, 😂, 💜, 🔥, 💯 et 🤡. Dans les
-conversations Telegram, `2` utilise 🤣 et `3` utilise ❤️ ; la conversation active
-détermine ces équivalences, même sous le filtre `All`, et l'aide suit cette même
-liste. Les sélecteurs Unicode de présentation ne distinguent pas deux réactions :
-comparer sans VS15/VS16, puis envoyer la variante exacte de `allowedReactions`
-(notamment 👍 suivi de VS16 sur Telegram). Ne pas retirer les tons de peau ni
-les jointures ZWJ. Un autre chiffre remplace notre réaction, le même la retire. Les réactions des autres
-participants sont conservées : l'identité vient de `participants.items.isSelf`
-ou de `accounts.user.id`. `BeeperData` ordonne les suppressions/ajouts par message
-et retient le dernier choix lors d'appuis rapides. Le rafraîchissement cible ce
-message précis, même dans une ancienne page, et ignore les réponses périmées.
-Les réactions respectent les capacités du réseau et ne rafraîchissent pas une
-autre conversation après un changement de sélection. Les chiffres restent du
-texte dans les champs ; ni l'autorepeat ni Ctrl/Alt/Meta+chiffre n'envoient de réaction.
-`BeeperReactions` applique les ajouts et retraits immédiatement, sans rebond,
-fondu ni rétraction. Le modèle reste à clés stables pour conserver les pastilles
-et leurs avatars lors d'un rafraîchissement. Les infobulles existantes sont conservées.
-`y` copie tout le texte du message sélectionné ; sans texte, un avis
-`This message has no text` s'affiche et rien n'est copié. Glisser la souris sur
-le texte d'un message en sélectionne une partie : `y` copie alors cette sélection
-et l'efface, Ctrl+C la copie et la garde, Échap l'efface avant toute autre action
-d'Échap. Une seule sélection existe à la fois. Un bref avis `Theme.surfaceRaised`
-en bas de la conversation confirme chaque copie. La sélection ne prend jamais le
-focus clavier et un simple clic sur le texte sélectionne toujours le message.
-Elle repose sur un `TextEdit` transparent en lecture seule, posé sur le texte
-brut, chargé seulement au survol ou tant qu'il porte une sélection : l'historique
-garde des `Text` simples. Ce calque utilise le même paragraphe échappé (interligne
-120 %) que le surlignage de recherche, donc la même mise en page ligne à ligne.
-Sa couleur de sélection est l'accent de la conversation (Crust sur une bulle
-envoyée). Le texte des messages n'est jamais interprété comme du balisage.
-Espace ouvre d'abord les liens du message sélectionné : ouverture directe s'il
-n'y a qu'une URL distincte, sinon un sélecteur avec `j/k`, Entrée et Échap. La liste
-combine les métadonnées Beeper et les URL du texte, sans doublons, et affiche les
-adresses réelles. Seuls HTTP(S) et mailto sont proposés ; `www.` utilise HTTPS.
-Le sélecteur conserve sa liste pendant le choix et se ferme si la conversation
-change. Les cartes de liens existantes dans les bulles gardent leur présentation.
-Sans lien, Espace lit/met en pause l'audio sélectionné, ou ouvre/referme sa photo/GIF en grand. Le
-lecteur existant est réutilisé ; un message hors champ est révélé avant d'activer
-son média. Si le téléchargement est en cours, la lecture attend son résultat et
-un second appui l'annule. `BeeperAudioPlayback`, possédé par le `BeeperData`
-partagé, conserve le lecteur audio et son téléchargement indépendamment des
-bulles, du viewport, de la conversation, des modales et du panneau ouvert/fermé.
-Les contrôles recréés se rattachent par conversation/message/index de pièce jointe,
-sans réinitialiser la position ni la vitesse. Aucun événement de visibilité ou
-de rafraîchissement ne doit mettre ce lecteur en pause. Échap le met d'abord en
-pause depuis le panneau ou ses modales ; les Échap suivants naviguent normalement.
-Espace sur le vocal sélectionné ou son bouton Pause font aussi une pause explicite.
-Un autre vocal ne peut remplacer celui en cours avant cette pause.
-La fermeture d'une vidéo plein écran continue d'annuler sa lecture différée.
-Espace garde son rôle normal dans les champs ; l'autorepeat ne relance pas le média.
-Les photos utilisent `MessengerPhotoWindow`, une surface Overlay sur le moniteur
-du chat, ancrée aux quatre bords sans marge ni zone exclusive. `BeeperPhotoViewer`
-conserve les proportions et agrandit l'image à la surface disponible, sans plafond
-de 430 px, titre, cadre ou barre d'outils. Aucun flou : le bureau et le chat
-derrière la photo sont seulement assombris (voile de 28 %), avec la même
-progression que la photo. Le flou de compositeur a été retiré volontairement ;
-ne pas le réintroduire. La surface `quickshell-messenger-photo` porte la règle
-Hyprland `no_anim` : elle ne doit jamais subir le fondu de couche (400 ms), qui
-la montrerait translucide pendant et après le trajet de 180 ms.
-La barre et le panneau ne changent pas de dimensions. Espace/Échap ferment cette
-surface et rendent le focus à la même conversation ; fermer ou bloquer le chat
-masque aussi l'aperçu. La prévisualisation locale utilise la même surface plein écran.
-Sur une photo ou un GIF, `h`/`l` affichent la photo ou le GIF précédent/suivant
-de la conversation, dans l'ordre chronologique, en sautant les vidéos, vocaux,
-fichiers et messages sans pièce jointe. La nouvelle image remplace l'ancienne
-sur place, sans rejouer le trajet depuis une vignette cachée derrière le voile.
-`BeeperPanel.stepPreview` déplace aussi la sélection de message, si bien que la
-fermeture revient à la dernière image affichée. Sur la plus ancienne image
-chargée, `h` charge jusqu'à dix pages d'historique plus anciennes. Sur une
-vidéo, `h`/`l` gardent le déplacement de cinq secondes. Entrée enregistre une
-copie du média affiché (photo, GIF ou vidéo) dans le dossier de téléchargement
-XDG, via la méthode `saveAttachment` du helper Go, sans fermer la visionneuse :
-nom d'origine si connu, jamais d'écrasement (`nom (2).jpg`), et un avis en haut
-de l'écran avec le nom enregistré, ou l'erreur en `Theme.error`.
-L'ouverture d'une photo part du rectangle réellement peint de sa vignette et
-rejoint le plein écran sur 180 ms en `OutCubic`. Elle attend que l'image plein
-écran soit prête à être dessinée avant de lancer ce trajet. La fermeture revient
-à la vignette ; une interruption inverse le mouvement depuis la position
-courante, avec une durée proportionnelle au trajet restant. Une origine absente,
-rognée, masquée ou réaffectée à une autre pièce jointe utilise un fondu sans
-trajet géométrique. La taille finale du média et les dimensions du décodeur
-restent fixes : seules l'échelle, la translation et l'opacité sont animées.
-La surface et son focus restent présents jusqu'à la fin de la fermeture.
-Ces effets concernent les photos/GIF, sans modifier les commandes vidéo.
-Dans `MessengerHost`, les deux fenêtres restent dans la liste du même
-`HyprlandFocusGrab`, et le chat conserve `OnDemand` pendant l'aperçu. À la fermeture,
-désactiver l'ancien grab avant de masquer la photo, puis en créer un nouveau pour
-le chat au tour suivant. Réaffecter simplement `active = true` sur le grab encore
-actif ne suffit pas : un événement `cleared` retardé peut annuler le retour du
-clavier. La régression se teste avec une autre fenêtre ouverte et le pointeur
-hors du rectangle du chat, puis en saisissant du texte après plusieurs fermetures.
-Les commandes de navigation ne doivent jamais détourner les caractères composés,
-AltGr ou les touches mortes Lafayette dans les champs de texte. Le mode normal de
-Vim lit le caractère produit, pas le code de touche ; ★ seul, sans texte, laisse
-une commande en attente intacte.
-Au repos, le composeur fait une ligne (48 px avec la police par défaut) et grandit
-avec le texte, jusqu'à 160 px de saisie avant défilement interne. Le bouton de
-40 px à droite affiche un micro, puis passe à l'envoi dès que le brouillon contient
-du texte ou une pièce jointe. Pendant l'enregistrement, il devient Arrêter et reste
-actionnable même si la connexion tombe. Aucun bouton d'ajout de fichier ni ligne
-d'aide permanente : collage et glisser-déposer restent disponibles.
-
-Ctrl+S ouvre/ferme le sélecteur d'emojis, depuis la navigation ou la saisie.
-Le focus commence dans la grille : H/J/K/L utilisent les mêmes déplacements
-que les flèches, sans boucler aux limites. `/` donne le focus à la recherche
-français/anglais ; H/J/K/L y restent du texte. Bas, Tab ou Entrée revient aux
-résultats, sur le premier ; Entrée n'insère jamais depuis la recherche, pour
-laisser choisir le bon emoji. Dans la grille, Entrée ou Espace insère
-l'emoji. Échap ou Ctrl+S annule en
-préservant le texte et sa sélection. Les raccourcis sont limités au chat actif,
-mais restent utilisables dans son Popup.Item, y compris depuis sa recherche.
-
-Ctrl+D démarre/termine un vocal sans envoyer le message. Le texte du brouillon
-reste intact ; une pièce jointe ou une modification en cours n'est pas remplacée.
-Un second appui pendant la préparation l'annule. Invalider aussi cette préparation
-quand le panneau se ferme ou que le chat change : une réponse tardive ne doit
-jamais ouvrir le micro après coup. Hors connexion, en lecture seule, pendant un
-envoi ou une dictée, le raccourci ne démarre rien ; un vocal actif peut toujours
-être terminé si la connexion tombe. Le test utilise un recorder injecté, sans
-CaptureSession réel ni envoi. Ctrl+D ne fait plus défiler les conversations.
-
-`?` hors saisie affiche l'aide complète, regroupée par contexte : navigation,
-composeur, emojis, Low Priority/non-lus, réactions, recherche, liens, médias et taille
-du texte. La vue défilante a une vraie hauteur de viewport bornée ; J/K, flèches,
-Page Up/Down et Home/End permettent de lire toute l'aide, Échap ou `?` la ferme.
-Garder `?` comme ponctuation ordinaire dans les champs de texte.
-
-Ctrl+molette au-dessus de la conversation et Ctrl+plus/moins changent la taille
-du texte des messages et de la saisie, de 14 à 36 px par pas de 2 ; Ctrl+0 revient
-à 20 px. Ni la colonne de conversations ni la top bar ne changent.
-La préférence appartient à `BeeperData`, partagée entre écrans et conservée lors
-des rechargements par `PersistentProperties`. La position de lecture et le
-brouillon sont préservés. Le `WheelHandler` ne capture que Ctrl+molette et se
-trouve devant les Flickables ; les clics et la molette ordinaire les atteignent.
-
-Après un envoi accepté, `messageSent(chatID)` remet immédiatement la conversation
-concernée en bas, puis conserve cette ancre au rafraîchissement, même si une page
-ancienne était en vol. Un échec ne vide pas le brouillon et ne déplace pas la vue ;
-une réponse tardive après changement de chat ne défile jamais l'autre conversation.
-L'ancre de fin suit les changements de hauteur des bulles, puis est relâchée dès
-un défilement manuel, une navigation Vim ou l'ouverture d'un message recherché.
-
-Chaque réponse affiche `BeeperQuote` avant son texte : auteur et extrait de
-l'original, aussi bien pour les messages reçus qu'envoyés. Le composeur montre
-le même encart avant l'envoi. Le fond de la citation est toujours opaque : Base
-de Macchiato teinté de l'accent de l'auteur à 8 %. Le nom et le trait gardent cet
-accent, le texte utilise `Theme.secondary`, même dans une bulle envoyée colorée.
-Le lien officiel est `linkedMessageID` ; pour un
-original hors des pages chargées, `BeeperData` utilise la commande Go `message`
-(GET public `/v1/chats/{chatID}/messages/{messageID}`), déduplique les requêtes
-et isole leur résultat par génération de conversation. Aucun scraping ni
-chargement de tout l'historique. Les extraits sont en texte brut, avec repli pour
-photo/GIF/vocal/fichier et indication explicite si l'original est indisponible.
-La résolution d'une citation conserve aussi la position de lecture : elle peut
-changer la hauteur d'une ligne après son affichage initial.
-
-Les listes de messages, conversations et résultats utilisent `ui/KeyedListModel` :
-réconcilier les snapshots par identité au lieu de remplacer le modèle entier.
-Une réponse API inchangée ne détruit pas les délégués ni les lecteurs multimédia.
-La liste des conversations garde `currentIndex: -1` : la sélection visuelle est
-liée à l'identifiant du chat, pas au suivi automatique de la ListView. Un nouveau
-message qui réordonne les conversations ne doit jamais ramener le défilement vers
-la conversation sélectionnée. Seule une navigation explicite révèle une ligne,
-après annulation de la molette animée et du flick en cours. Désactiver la liste
-pendant un dialogue arrête également son mouvement ; la fermeture ne le relance pas.
-Pendant un défilement natif (`moving`, molette récente ou barre tirée), ne pas
-appeler `positionViewAtIndex` pour restaurer une ancienne ancre : Qt garde les
-éléments visibles, et le geste doit continuer. La pagination utilise un throttle,
-pas un debounce qui attendrait la fin du défilement. Les listes sont verticales,
-sans rebond aux limites ni glisser-souris façon écran tactile (`Qt.NoButton`).
-Ctrl+U utilise `Flickable.flickTo` (Qt 6.11) pour remonter d'une demi-page ; ne pas ajouter de `Behavior on
-contentY`, qui entrerait en conflit avec le moteur de défilement natif.
-
-`ui/AcceleratedScroll` garde son nom d'import, mais n'applique plus de gain ×4,5.
-Pas de molette : `Qt.styleHints.wheelScrollLines × 24`, soit 72 px par défaut,
-comme la conversion de Qt. Les distances s'accumulent pendant une rafale et une
-`NumberAnimation` explicite en OutCubic termine le déplacement en 150 ms après
-le dernier cran. La durée est bornée, contrairement à `flickTo` qui dérive la
-durée de la distance et de la décélération. Le nom de fichier n'est pas une
-raison pour réintroduire un multiplicateur de cadence. Une inversion abandonne
-l'ancienne destination. Le pavé tactile et ses `pixelDelta` gardent le Flickable
-natif ; cette animation s'arrête avant de lui rendre la main. Pas de `Behavior`
-global sur `contentY`. Le zoom Ctrl+molette et la saisie ne sont pas interceptés.
-
-`BeeperHistory` remplace la ListView à hauteurs variables par un Flickable dont
-le contenu a une hauteur exacte (`Instantiator` asynchrone alimenté par
-`KeyedListModel`, puis placement explicite à partir des hauteurs réelles).
-Qt documente que l'estimation de hauteur de ListView fait varier son curseur de
-scroll quand de nouveaux délégués entrent dans le viewport. Les mises en page
-des messages chargés restent présentes ; seuls les médias/photos/citations
-proches de la vue activent leurs chargements. Les insertions anciennes compensent
-la position du message visible et la destination de l'animation en cours.
-La barre peut changer avec de nouveaux messages ou un zoom, pas par simple scroll.
-La top bar et les dimensions du panneau sont également testées pendant le scroll.
-
-Espacement compact : heure/statut/réactions à l'intérieur de la bulle, padding
-vertical de 6 px, écart interne de 3 px et espace entre bulles de 12 px. La taille
-des polices ne diminue pas. Ces constantes et les décalages d'ancre sont testés.
-
-Les bulles de message utilisent un chemin `Shape` rempli d'un seul tenant,
-avec petite pointe (à gauche pour reçu, à droite pour envoyé), pour éviter les
-joints de transparence. Photo circulaire du participant à côté des messages reçus,
-nom coloré dans la bulle. Les messages envoyés n'affichent pas notre avatar et
-utilisent directement la marge droite. Ne pas utiliser l'image du groupe à la place d'un auteur absent des
-participants ; dans ce cas afficher ses initiales. Aucun contour dans la
-messagerie : ni sélection, ni saisie, ni boutons, ni badges, ni dialogues.
-Les boutons et lignes de conversation indiquent le focus par leur remplissage,
-jamais par une bordure ; le fond des bulles reçues et du composeur reste Base.
-
-`BeeperMedia` est un `Item` sans fond : seul `BeeperMessage` peint la bulle.
-Pas de carte sombre supplémentaire pour les photos, GIF, vocaux ou fichiers.
-La largeur d'une bulle suit les largeurs intrinsèques du texte, de la citation,
-des médias, des liens et de l'heure, avec les marges et le plafond de la ligne.
-La présence d'une pièce jointe ou d'une réponse ne doit jamais forcer ce plafond.
-Les dimensions publiques `attachment.size.width/height` permettent de calculer
-un aperçu proportionnel de 250 px de haut maximum (430 px dans la visionneuse),
-sans agrandir les petits fichiers. Qt complète les dimensions manquantes au
-décodage. Les conserver dans `BeeperMedia` après le déchargement du Loader hors
-écran : leur perte ferait varier les hauteurs et le curseur de défilement.
-La largeur préférée ne doit pas dépendre de celle que la bulle lui attribue,
-sinon une boucle de mise en page réintroduirait le problème.
-`BeeperPlaybackControls` partage les contrôles audio/vidéo : bouton rond, vraie
-forme d'onde pour l'audio (barres arrondies, progression teintée), temps et vitesse.
-Une piste de 4 px sert de repli si l'analyse est indisponible. Pas de libellé
-« Audio message », ni de forme d'onde inventée hors de la démo. La molette ne change
-pas la lecture. Les durées de l'API sont en secondes, celles de Qt Multimedia
-en millisecondes. Un vocal sans texte est plafonné à 420 px de large.
-
-La messagerie utilise `WlrKeyboardFocus.OnDemand`, avec `HyprlandFocusGrab`
-activé explicitement à l'ouverture clavier. Un clic extérieur libère le focus
-sans masquer le panneau. Ne jamais lier le grab à sa visibilité : cela
-reprendrait le clavier à l'autre application. Les dialogues de fichiers
-libèrent le grab et le récupèrent à leur fermeture.
-Le focus du panneau, et non celui de la seule surface Wayland partagée, active
-ses raccourcis et marque les messages comme lus. Un sélecteur de la barre remplace
-le chat ; il reçoit Tab et Échap sans déclencher ses commandes. Pendant polkit,
-le panneau d'authentification remplace le chat et empêche sa réouverture. Les
-dialogues internes et la saisie dictée appartiennent au chat, pas à un second
-panneau central. Ne jamais reprendre le focus à une autre application.
-
-Les notifications proviennent du backend Go via D-Bus freedesktop ; leur action
-ouvre la conversation dans notre panneau. Les alertes du client Beeper Desktop
-sont filtrées lorsque notre connexion est active, et ses sons doivent être
-désactivés dans ses réglages. Quand `MessengerController.visible` est vrai,
-`NotificationData.suppressChatBanners` expire les notifications de messagerie après
-avoir lancé leur son, sans les présenter ni les mettre en file d'attente. Cela
-couvre toutes les conversations et tous les écrans, même si le chat n'a pas le
-focus ou affiche une photo. Ouvrir le chat masque aussi sa carte déjà affichée,
-y compris son contenu retenu pour l'animation, sans interrompre le son.
-Le backend ne supprime plus l'arrivée de la conversation au premier plan : elle
-doit atteindre le serveur de notifications pour produire le son. Les autres
-notifications restent dans la capsule de la top bar, comme le volume et la luminosité.
-Elles ne changent pas la géométrie du chat et ne capturent pas son focus de saisie.
-Échap garde son comportement habituel de fermeture de notification. Il n'existe
-plus de popup de notification dans `MessengerHost`. Seule la dictée conserve
-son indication à l'intérieur du panneau.
-
-## 2. Architecture à préserver
-
-### Fichiers principaux
-
-- `../shell.qml` : assemblage des contrôleurs partagés, registre `services` de références uniquement et un `Bar` par écran.
-- `../shell/ShellCoordinator.qml` : un mode central et son moniteur cible, temporisations de présentation, priorités et restauration du panneau/moniteur interrompu par une demande d’authentification.
-- `../shell/ShellIntegration.qml` : commandes IPC publiques `topbar` inchangées et restauration de la bordure Hyprland ; aucun état métier ni alias de compatibilité.
-- `../shell/MessengerController.qml` / `MessengerHost.qml` : visibilité, écran cible, focus et intégration de la bulle de chat dans la surface du shell.
-- `../shell/BeeperBubble.qml` : géométrie et transformation capsule/panneau, indépendantes du protocole Beeper.
-- `../bar/Bar.qml` : surface de la barre, modules latéraux et intégration du chat.
-- `../bar/CentralCapsule.qml` : géométrie centrale, plafond de largeur, couches de contenu, morphing et transitions de focus locales.
-- `../features/messenger/` : pont `BeeperData` vers le backend Go, liste de conversations, historique, composeur, médias et dialogues ; `MessengerPreview.qml` est lancé par l’entrée `../preview.qml`.
-- `../features/notifications/NotificationData.qml` : serveur natif de notifications, carte courante et expiration, instancié une fois dans le point d’entrée.
-- `../features/notifications/NotificationPopup.qml` / `NotificationInputGuard.qml` : carte avec image et protection du focus du panneau masqué.
-- `../features/calendar/WeatherData.qml` : température et météo quotidienne partagées, actualisation et état du cache.
-- `../features/calendar/CalendarController.qml` : date consultée, navigation et état grille/détail partagés ; aucune décision de présentation du shell.
-- `../features/calendar/CalendarPanel.qml` / `Calendar.js` : calendrier mensuel et calculs de dates locales, icônes météo monochromes et températures mini/maxi.
-- `../features/workspaces/WorkspaceSwitcher.qml` / `WorkspaceMonitorSync.qml` : workspaces, slot spécial et synchronisation des instantanés Hyprland.
-- `../features/audio/AudioController.qml` / `AudioAvailability.qml` : état et commandes audio, disponibilité des périphériques.
-- `../features/audio/MediaController.qml` : choix du lecteur MPRIS, capacités et commandes ; demande d’indicateur seulement après une action explicite.
-- `../features/audio/AudioSelector.qml` / `VolumeIndicator.qml` / `NowPlayingIndicator.qml` : sorties et micro, volume temporaire et média MPRIS.
-- `../features/brightness/BrightnessController.qml` / `BrightnessIndicator.qml` : regroupement des commandes, valeurs vérifiées par moniteur et indicateur temporaire.
-- `../features/dictation/DictationController.qml` : état Voxtype, durée de vie du bridge audio et données de l’onde vocale.
-- `../features/dictation/VoiceDictationIndicator.qml` / `VoiceWaveform.qml` : présentation de la dictée et rendu de son onde.
-- `../features/launchers/AppLauncherController.qml` / `AppLauncher.qml` : état du lanceur, recherche et rendu des applications.
-- `../features/launchers/ChromeTabsController.qml` / `ChromeTabsLauncher.qml` : état de recherche et activation des onglets Chrome via TabCtl.
-- `../features/network/NetworkController.qml` / `BluetoothController.qml` : modèles natifs, scans, connexions et opérations réseau ; leurs vues reçoivent uniquement leur contrôleur.
-- `../features/network/WifiSelector.qml` / `BluetoothSelector.qml` : sélecteurs clavier réseau.
-- `../features/updates/UpdateController.qml` / `UpdateCommand.qml` : vérification, build, confirmation, installation et nettoyage exclusifs ; adaptateur de processus avec générations.
-- `../features/updates/UpdateSelector.qml` : présentation des updates et du formulaire d’authentification, sans accès au shell entier.
-- `../features/auth/PolkitController.qml` : agent Polkit générique, cycle de vie des demandes et réponse temporaire ; aucune dépendance aux updates.
-- `../features/system/SystemController.qml` / `SystemData.qml` / `SystemPanel.qml` : durée de vie des collecteurs, abonnement aux tops, mesures partagées et panneau CPU/RAM/GPU.
-- `../features/usage/UsageController.qml` / `UsageSource.qml` / `UsageLimits.js` / `UsagePanel.qml` : conversations courtes avec les CLI Claude Code et Codex, validation de leurs réponses et panneau des limites d’abonnement.
-- `../features/power/PowerController.qml` : état des batteries PC et claviers, corrélation USB/Bluetooth sans nouveau collecteur.
-- `../features/system/ProcessList.qml` : cinq processus maximum, sans collecte propre.
-- `../ui/Theme.js` : source unique des couleurs QML et des tokens typographiques, y compris les accents partagés entre capsules latérales et widgets centraux correspondants.
-- `../ui/Pill.qml` / `SelectionBounce.qml` / `SelectionSurface.qml` : capsule générique, rebond et surface de sélection partagés, sans état de service.
-- `../../tools/quickshell/beeper/` : backend Go, API officielle, secrets, brouillons, médias et notifications ; son emplacement reste inchangé.
-- `../../tools/quickshell/system-stats/` : télémétrie Rust persistante CPU, mémoire, disque et luminosité.
-- `../../tools/quickshell/chrome-tabs/` : adaptateur Rust TabCtl et cache local des favicons Chrome.
-- `../../tools/README.md` : sources et tests organisés par outil logique.
-- `../../packages/default.nix` : catalogue des paquets exposés par `localPackages`.
-- `../../packages/quickshell/runtime.nix` / `desktop.nix` : runtime commun Quickshell avec Liquid Glass, Qt Multimedia et les formats d'image Qt (WebP des stickers et photos), puis sources QML filtrées et chemins immuables des helpers.
-- `../../home_manager/quickshell.nix` : installation, configuration et démarrage uniquement, sans copie des sources QML.
-
-### Frontières entre domaines et présentation
-
-La barre transmet son ancrage géométrique au shell et peut demander l’ouverture
-du chat ; elle ne connaît pas le transport Beeper. La messagerie ne commande pas
-les widgets de la barre. `MessengerController` et `MessengerHost` portent leur
-coordination visuelle et de focus ; `BeeperData` conserve le protocole et l’état
-de présentation propres au chat. Le backend reste dans `tools/`, sans nouveau
-service ni changement de protocole.
-
-Les quatre lots de séparation sont terminés : réseau/Bluetooth, updates/Polkit,
-autres domaines et collecte, puis coordination/capsule centrale. L’ancienne
-façade d’état globale et ses alias sont supprimés. `ShellCoordinator` ne doit
-pas devenir leur remplaçant monolithique : il ne possède ni modèle de
-périphériques, ni mot de passe, ni parseur de protocole, ni processus métier.
-Le registre `services` de `shell.qml` contient seulement des références aux
-contrôleurs ; ne pas lui ajouter d’alias de champs ou de fonctions relais.
-
-Un contrôleur garde son état et ses opérations, sa vue lui parle directement et
-demande une fermeture par signal. Le coordinateur choisit où présenter la vue.
-Polkit suit ce même contrat : `PolkitController` nettoie la saisie et signale
-début/fin de demande ; `ShellCoordinator` mémorise puis restaure le panneau et
-son écran pour une demande externe. Une opération d’update conserve son propre
-processus même si sa vue est masquée. Le premier Enter lance le build, le second
-confirme explicitement l’installation ; aucune transition visuelle ne confirme
-une opération.
-
-Les noms déployés restent `top-bar` pour la configuration, `topbar` pour l’IPC et
-`quickshell.service` pour systemd. Les caches `quickshell/top-bar` et l’état
-`quickshell-beeper` ne sont pas renommés avec les sources. L’aperçu et la session
-utilisent le même `quickshellRuntime` et les sources `quickshellDesktop` ; les
-tests/docs restent dans le dépôt, hors de l’application installée.
-
-### État partagé, rendu ciblé par écran
-
-Les contrôleurs et `ShellCoordinator` sont uniques pour toute la session. Chaque
-écran possède son propre `Bar` et sa `CentralCapsule`, qui lisent les mêmes
-contrôleurs et comparent leur `monitorName` à la cible du coordinateur.
-
-Conséquences :
-
-- Wi-Fi, Bluetooth, volume, luminosité, dictée, média, lanceur, onglets Chrome et updates apparaissent uniquement sur leur moniteur cible.
-- Les autres écrans continuent d’afficher leur `WorkspaceSwitcher` et ne transforment pas leur capsule centrale.
-- Le couple `ShellCoordinator.mode` / `targetMonitor` pilote les panneaux et
-  leur focus clavier ; ne pas recréer une collection parallèle de booléens
-  `*Visible` et de moniteurs par fonctionnalité. Le chat, les notifications, la
-  dictée et le feedback micro gardent leurs cycles de présentation distincts.
-- Un clic sur une capsule latérale transmet toujours le nom du moniteur de cette barre. Un raccourci IPC sans cible utilise le moniteur Hyprland actuellement focalisé.
-- Activer un overlay déjà ouvert depuis un autre écran le déplace vers ce nouvel écran ; l’activer à nouveau sur son écran courant le ferme.
-- Tant qu’un widget central updates, Wi-Fi, Bluetooth, volume ou luminosité est visible, sa capsule latérale correspondante adopte visuellement son état hover sur le même moniteur. Les lanceurs applications et onglets Chrome n’ont aucune capsule latérale à illuminer.
-
-## 3. Géométrie canonique
-
-| Élément | Valeur |
-|---|---:|
-| Hauteur normale d’une capsule | `36px` |
-| Rayon normal | `18px` |
-| Décalage supérieur du contenu dans le panel | `10px` |
-| Marges latérales du panel | `5px` |
-| Espacement entre modules latéraux | `10px` |
-| Capsule latérale avec icône seule | `36×36px` |
-| Largeur dictée vocale | `180px` |
-| Largeur volume/luminosité | `280px` |
-| Plafond Wi-Fi/Bluetooth | `400px` |
-| Plafond commun à tous les widgets centraux | Largeur des workspaces avec un slot spécial (`WorkspaceSwitcher.expandedImplicitWidth`) |
-| Largeur souhaitée audio / lanceurs applications / onglets | `480px`, limitée par le plafond commun |
-| Plafond souhaité média / updates | `480px`, limité par le plafond commun |
-| Largeur souhaitée notification | `160–480px` selon le texte, limitée par le plafond commun |
-| Largeur calendrier | Exactement le plafond commun des workspaces |
-| Largeur limites d’utilisation | Exactement le plafond commun des workspaces |
-| Hauteur calendrier | Ajustée aux 4–6 semaines et à leur contenu météo, au plus `492px` |
-| Hauteur lanceur applications / onglets | `398px` |
-| Hauteur d’une ligne update | `30px` |
-| Hauteur d’une ligne application | `42px` |
-
-`centerMorph` limite systématiquement la largeur souhaitée du contenu à
-`WorkspaceSwitcher.expandedImplicitWidth` : les huit slots normaux, leurs marges,
-plus un slot spécial et son espacement. Ce plafond est calculé même sans special
-workspace ouvert ; le slot vide utilise alors sa largeur minimum de `70px`.
-Avec un workspace normal affiché sur cet écran et ce slot minimum, le plafond vaut `434px`.
-Si le nom du special workspace exige davantage de place, sa largeur réelle sert
-de référence. Ne pas recopier une constante en pixels dans chaque widget.
-
-Les sélecteurs textuels, le média, les updates et les notifications mesurent leur contenu avec
-`FontMetrics` et adaptent leur largeur en direct, dans leurs propres limites
-puis sous ce plafond commun. Les panneaux audio et les lanceurs de recherche
-demandent `480px`, mais occupent au maximum la largeur de référence des workspaces.
-Les contenus suivent la largeur réelle de la capsule ; les libellés trop longs
-sont élidés et les listes conservent leur défilement. Les widgets à barre longue —
-dictée vocale, volume et luminosité — conservent eux aussi leur largeur fixe ;
-le Wi-Fi reste à `400px` pendant un speed test afin de ne pas redimensionner sa
-barre de progression.
-
-Une capsule latérale composée uniquement d'une icône est toujours un cercle
-strict de `36×36px`, indépendamment de la chasse du glyphe Nerd Font.
-Updates, Wi-Fi, Bluetooth et Ne pas déranger utilisent ce mode en permanence. La
-capsule audio reste textuelle même muette, avec pourcentage et état du micro.
-Le contenu est centré horizontalement et
-verticalement dans toute la surface. La capsule update latérale conserve une
-icône statique pendant les opérations : les animations Braille sont réservées
-au widget central. Les capsules textuelles gardent `20px` de padding mais ne
-peuvent jamais mesurer moins de `36px` de large.
-
-Les indicateurs CPU, RAM et GPU forment une seule `Pill` violette, dans cet ordre,
-à gauche. Le stockage possède sa propre `Pill` pêche immédiatement après ce
-groupe, avec son icône et son pourcentage d’occupation. Température météo, date
-et heure forment une autre `Pill`, à droite.
-Chaque groupe utilise un unique libellé avec trois espaces entre les indicateurs,
-un seul fond et le rebond commun au groupe entier. Conserver les icônes, formats
-et mises à jour des données existants. La capsule système ouvre le panneau
-central Système ; celle du stockage reste sans action. Aucune ne lance
-`htop`, `nvtop` ou `ncdu`. La capsule
-température/date/heure ouvre le calendrier météo central.
-
-### Panneau Système
-
-Le clic sur CPU/RAM/GPU ouvre ou ferme `SystemPanel` sur le moniteur cliqué.
-Un clic sur l’autre écran y transfère le panneau. Il reprend exactement le
-plafond `WorkspaceSwitcher.expandedImplicitWidth`, sans largeur parallèle.
-Échap ferme le panneau ; aucun nouveau raccourci global n’est affecté.
-La bulle système reprend son accent violet tant que son panneau est ouvert.
-
-Les trois sections gardent l’ordre CPU, RAM, GPU :
-
-- CPU : charge, modèle, température package, fréquence moyenne des CPU logiques
-  et top 5 des processus par charge récente. Dans la liste, 100 % = un cœur ;
-  le pourcentage global en titre reste rapporté à l’ensemble du processeur.
-- RAM : pourcentage et mémoire utilisée/totale en Gio, top 5 par mémoire
-  résidente (RSS). Le swap n’apparaît que si une quantité non nulle est utilisée.
-- GPU : modèle, charge, température, VRAM utilisée/totale en Gio et top 5
-  par charge 3D/calcul, avec la VRAM de chaque processus. Si cette charge
-  n’est pas disponible dans le pilote, le classement devient explicitement
-  `Top VRAM`, pas une approximation de l’activité GPU.
-  Une carte suspendue indique `Veille`, pas une charge fictive de 0 %.
-
-La hauteur dérive du contenu : 720 px avec les trois listes pleines, 744 px
-avec le swap ; moins lorsque des listes sont vides ou indisponibles.
-Les libellés longs sont élidés et les mesures manquantes affichent `—`.
-Les graphiques et leur historique ont été retirés. Les tops sont collectés
-toutes les deux secondes, seulement lorsque Système est visible et non
-recouvert sur son écran (notification, dictée ou polkit). Les mesures globales
-des bulles continuent chaque seconde. `SystemData` consomme les deux flux
-déjà lancés par `SystemController`, sans processus supplémentaire ni collecte par
-écran. Les demandes passent par stdin : `0` désactive les tops, un entier
-positif identifie la nouvelle ouverture. Le premier top CPU attend deux
-lectures ; la RAM peut être affichée immédiatement. Les anciennes réponses
-en attente sont rejetées après fermeture/réouverture. Après 5 secondes sans
-mesure correspondante, les listes cessent d’être présentées comme actuelles.
-Un collecteur terminé est relancé après 5 secondes (CPU/RAM) ou 30 secondes
-(GPU), puis reçoit la demande courante.
-
-Le flux GPU vient du collecteur Rust local `tools/quickshell/gpu-monitor`,
-packagé dans `packages/quickshell/gpu-monitor.nix`. Il utilise directement
-NVML pour la NVIDIA, après vérification de l’état d’alimentation PCI dans
-sysfs ; même l’initialisation de NVML est différée tant que la carte est en
-veille. Il n’utilise ni programme Waybar, ni wrapper, ni `nvidia-smi`.
-Les erreurs de pilote donnent des données indisponibles et une nouvelle
-tentative après 30 secondes, sans arrêter le flux. AMD/Intel ne sont pas
-pris en charge par ce collecteur ; les mesures manquantes restent `—`.
-
-Les autres panneaux ferment Système à leur ouverture ; une notification ou la
-dictée le recouvre temporairement. Les tops sont rééchantillonnés à son retour.
-Les demandes polkit restaurent aussi le panneau précédent et
-le débranchement de l’écran cible ferme Système.
-
-Tests : `tst_SystemData.qml` avec `qs` offscreen, `tst_SystemPanel.qml` avec
-`qmltestrunner`, et `tst_ShellCoordinator.qml` avec des services simulés pour les
-règles de présentation. `node tests/system-panel-state_test.mjs` vérifie les
-frontières de composants, le plafond de largeur et les commandes IPC conservées.
-Aucun de ces tests ne modifie la session Hyprland.
-`node tests/system-process-streams_test.mjs` teste le protocole des deux vrais
-binaires Rust (après `cargo build`), avec une carte GPU fictive en veille.
-
-### Surface layer-shell fixe
-
-Le `PanelWindow` garde une hauteur fixe égale à celle du moniteur, même lorsque la capsule ne fait que `36px`.
-
-C’est volontaire : animer la hauteur du `PanelWindow` provoquait un léger déplacement vertical des autres modules à cause des recalculs du layer-shell et des arrondis du compositeur.
-
-À respecter :
-
-- `implicitHeight: screen.height`, avec `barTopInset: 10`
-- `exclusiveZone: 36 + barTopInset`, soit une réserve Hyprland de `46px`
-- marge supérieure du panel de `0px`, contenu décalé de `10px` à l’intérieur
-- `mask: Region` limité à `leftModules`, `centerMorph` et `rightModules`
-
-La zone transparente inutilisée doit rester click-through. **Ne pas recommencer à animer la hauteur du `PanelWindow`.** Seule la hauteur de `centerMorph` est animée.
-
-L’espace au-dessus des capsules appartient à la surface du panel afin que leur
-rebond vers le haut reste visible. Leur position au repos et la réserve pour
-les fenêtres restent identiques.
-
-### Apparition en plein écran
-
-Lorsqu’un widget central ou une notification est actif sur un écran en plein
-écran, **la barre entière de cet écran** passe de `WlrLayer.Top` à
-`WlrLayer.Overlay`. Tous les widgets utilisent la même capsule, les mêmes
-animations et le même focus clavier qu’en mode normal. Les modules latéraux
-deviennent également visibles et utilisables. Aucun OSD séparé n’est instancié.
-Après fermeture du dernier widget ou de la dernière notification, la barre
-attend la fin du morphing (`360ms`) avant de revenir sous le plein écran.
-Ouvrir un widget sur un autre écran ne fait pas apparaître cette barre.
-La géométrie et la zone réservée restent fixes pendant le changement de couche.
-
-### Croissance verticale
-
-`centerMorph` est ancré en haut :
-
-```qml
-anchors.horizontalCenter: parent.horizontalCenter
-anchors.top: parent.top
-anchors.topMargin: window.barTopInset
-```
-
-Ainsi, le widget update grandit uniquement vers le bas, jamais vers le haut.
-
-## 4. Palette visuelle
-
-Les fonds externes des capsules et du panneau central peuvent utiliser le
-plugin local Liquid Glass (`tools/liquid-glass`). `GlassState.enabled` suit sa
-disponibilité : le fond devient translucide seulement quand le plugin répond,
-et retrouve sa couleur opaque après déchargement. Les fonds redondants des
-indicateurs internes deviennent transparents pendant cet effet. Ne pas modifier
-`Theme.background` globalement : ce token sert aussi aux textes inversés.
-La géométrie, les régions d'entrée et les animations décrites ci-dessus restent
-identiques. Le plugin échantillonne le vrai bureau avant la surface de la barre.
-
-Les rectangles externes de `Pill` et `centerMorph` portent un enfant
-`GlassShape` (module natif `Local.LiquidGlass`). Celui-ci ne dessine rien : il
-transmet leur géométrie exacte avec la frame Wayland. Conserver cet enfant
-dans le rectangle qui porte les transformations, notamment le rebond, et lier
-son rayon à celui du rectangle. Le shader calcule alors le contour par pixel,
-sans carte de distance intermédiaire. Le filtre du fond reste fixe : aucun
-flou supplémentaire ou variable vers les bords n'est souhaité.
-Le paquet Quickshell enveloppé dans `quickshell.nix` fournit le chemin du
-module QML ; après modification de ce module C++, redémarrer Quickshell via
-le déploiement Nix, pas simplement recharger ses fichiers QML.
-
-Les capsules latérales survolées ou actives gardent le verre visible : leur
-accent teinte le fond à 16 % au lieu de le remplacer par un aplat. Les textes
-et icônes conservent leur accent, sans inversion sombre. Sans le plugin, la
-même teinte est composée sur le fond opaque de secours. Le rebond et les
-transitions de couleur restent inchangés.
-
-`ui/Theme.js` est l’unique source des couleurs QML de la barre :
-
-| Token | Couleur | Signification |
-|---|---|---|
-| `Theme.action` | `#ff33cc` | action, sélection, focus et valeur manipulée |
-| `Theme.state` | `#ffcc33` | état persistant, connecté, occupé, actif ou opération en cours |
-| `Theme.error` | `#ed8796` | erreur uniquement |
-| `Theme.foreground` | `#cad3f5` | texte principal |
-| `Theme.selectedForeground` | `#ffffff` | texte principal sur une ligne sélectionnée |
-| `Theme.secondary` | `#939ab7` | métadonnée, compteur ou information secondaire |
-| `Theme.inactive` | `#6e738d` | état inactif ou vide |
-| `Theme.background` | `#181926` | fond principal |
-| `Theme.surface` | `#24273a` | surface secondaire |
-| `Theme.surfaceRaised` | `#363a4f` | séparateur, piste ou survol |
-| `Theme.surfaceSelected` | `#494d64` | surface interne sélectionnée |
-
-Règle sémantique de la capsule centrale :
-
-- **rose** : ce que l’utilisateur contrôle maintenant — workspace affiché, ligne sélectionnée et action Enter hors exceptions contextuelles ;
-- **jaune** : ce qui existe ou fonctionne indépendamment de la sélection — workspace occupé, lecture et traitement en cours hors exceptions contextuelles ;
-- **gris** : compteurs, URL, métadonnées, état vide ou inactif ;
-- **rouge** : échec explicite, sauf l’exception volontaire du microphone pendant l’enregistrement.
-
-Les widgets centraux applications, onglets Chrome, updates, Wi-Fi, Bluetooth, volume, luminosité, calendrier et limites d’utilisation sont des exceptions contextuelles. Les deux lanceurs utilisent `Theme.sideApplications` ; les autres reprennent respectivement `Theme.sideUpdates`, `Theme.sideNetwork`, `Theme.sideBluetooth`, `Theme.sideVolume`, `Theme.sideBrightness`, `Theme.sideWeather` et `Theme.usageAccent`. Cela couvre les icônes, sélections, indicateurs actifs et remplissages. Ils n’utilisent ni `Theme.action` ni `Theme.state`. Pendant une notification, les accents internes utilisent `Theme.state`.
-
-Le panneau Système utilise `Theme.sideSystem` pour ses accents,
-y compris pendant sa sortie animée. Une notification conserve la priorité jaune.
-
-Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
-
-Les capsules latérales conservent les accents fixes d’origine déclarés dans `Theme.js`, à l’exception des libellés de batterie décrits ci-dessous. Les accents sont partagés avec leur widget central correspondant lorsqu’une capsule latérale existe ; `Theme.sideApplications` reste réservé aux deux lanceurs centraux. `Pill.forceHovered` maintient la légère teinte du survol pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
-
-| Capsule | Token | Couleur |
-|---|---|---|
-| Lanceurs centraux applications / onglets | `Theme.sideApplications` | `#7dc4e4` |
-| Updates | `Theme.sideUpdates` | Sky `#91d7e3` |
-| Réseau | `Theme.sideNetwork` | Flamingo `#f0c6c6` |
-| Bluetooth | `Theme.sideBluetooth` | `#8aadf4` |
-| Ne pas déranger | `Theme.sideNotifications` | Teal `#8bd5ca` |
-| Système (CPU, RAM, GPU) | `Theme.sideSystem` | `#c6a0f6` |
-| Stockage | `Theme.sideDisk` | `#f5a97f` |
-| Batterie | `Theme.sideBattery` / `Theme.batteryPluggedIn` / `Theme.error` | Rosewater `#f4dbd6` / vert / rouge selon l’état |
-| Volume | `Theme.sideVolume` | `#b7bdf8` |
-| Luminosité | `Theme.sideBrightness` | `#eed49f` |
-| Température météo, date, heure | `Theme.sideWeather` | `#f5bde6` |
-
-Ne pas écrire de nouveau littéral hexadécimal dans un fichier QML : ajouter ou réutiliser un token de `Theme.js`. Les couleurs de bordure des fenêtres Hyprland sont un système séparé.
-
-Police : `Ubuntu Nerd Font`.
-
-Les libellés importants sont en gras. Le nom d’un special workspace utilise `Font.Black`.
-
-## 5. Contrat d’animation de la capsule centrale
-
-### Transformation générale
-
-La largeur et la hauteur de `centerMorph` suivent directement leur cible avec une interpolation monotone, dans le même esprit que les animations `popin`, slide et fade de Hyprland : mouvement rapide au départ, décélération propre, aucun dépassement puis retour arrière.
-
-Pour chaque changement de géométrie, à l’ouverture comme à la fermeture :
-
-- `Behavior on width` et `Behavior on height` indépendants ;
-- durée `360ms` ;
-- `Easing.OutCubic` ;
-- aucun overshoot, rebond, ressort ou phase de stabilisation ;
-- si la cible change en cours de mouvement, Qt repart automatiquement de la valeur actuellement affichée.
-
-Une dimension qui ne change pas ne doit pas être animée. La capsule ne doit jamais franchir sa cible avant de revenir.
-
-### Convention unique pour tous les widgets
-
-Cette interpolation monotone est commune aux transformations entre workspaces, volume, luminosité, dictée, média, Wi-Fi, Bluetooth, updates, lanceur d’applications et onglets Chrome.
-
-Ne pas réintroduire :
-
-- `Easing.OutBack`, `SpringAnimation` ou une propriété `overshoot` ;
-- une cible intermédiaire au-delà de la géométrie finale ;
-- une séquence aller-retour pour simuler un rebond ;
-- un état ou timer temporaire tel que `updateMorphGentle` / `updateMorphTimer`.
-
-Les transitions secondaires suivent la même règle, avec une exception explicite
-pour le rebond de sélection demandé par l’utilisateur. `SelectionBounce.qml`
-anime uniquement les capsules latérales en état `hovered` (survol ou
-`forceHovered`). Le rebond accompagne les couleurs existantes et reste actif
-lors d’une sélection au clavier. Les workspaces, y compris les special
-workspaces, ainsi que les lignes des lanceurs applications / onglets Chrome
-ne rebondissent pas.
-
-La capsule updates suit uniquement le survol ou l’ouverture de son sélecteur
-sur le même écran. Une vérification, une installation, une attente de validation
-ou un redémarrage requis ne forcent ni la couleur de sélection ni le rebond.
-Ces états restent indiqués par l’icône et le contenu du sélecteur.
-
-Le mouvement est centré sur la position au repos : `6px` vers le haut et `6px`
-vers le bas. La montée jusqu’à `-6px` dure `300ms` en `OutQuad`, puis la chute
-accélère jusqu’à `+6px` pendant `220ms` en `InQuad`. Le changement de direction
-est immédiat en bas, comme un impact sur une surface dure ; seul le sommet
-ralentit progressivement. La boucle dure `520ms` et traverse la position au
-repos sans y marquer de pause. La désélection interrompt la
-boucle et ramène l’élément à sa position initiale en `140ms`. Une resélection
-interrompt ce retour et repart de la position courante. Seul le contenu visuel
-bouge : les zones de clic et la géométrie de mise en page restent fixes. Les
-animations sont arrêtées lorsque le composant est masqué ou désactivé.
-
-Les pulses de scale sur les icônes volume et luminosité restent supprimés. Le
-contenu central utilise une seule animation partagée, calculée depuis le widget
-source et le widget destination ; chaque composant ne relance jamais sa propre
-animation `presented`. Le rebond de sélection ne modifie pas cette transformation
-ni les interpolations monotones de largeur et de hauteur.
-
-### Transition de contenu à deux couches
-
-Les composants source et destination restent rendus simultanément pendant une courte fenêtre. Leurs opacités et translations sont calculées depuis un unique `transitionProgress` de `0` à `1`; aucun composant ne possède son propre `Behavior on opacity` ou timer d’entrée.
-
-Le conteneur, le clipping et la bordure restent persistants. Seuls les contenus se croisent à l’intérieur, comme dans une container transform. Une répétition du même mode sur le même moniteur ne redémarre pas la transition. En cas d’interruption, les opacités et offsets actuellement rendus des dix modes sont capturés dans des tables ; la nouvelle destination continue depuis sa valeur courante et toutes les autres couches encore visibles terminent leur fade au lieu de disparaître brutalement. Cette règle reste valable même pour une séquence très rapide A → B → C → D.
-
-## 6. Animation contextuelle du contenu central
-
-`ShellCoordinator` choisit le mode central et son moniteur. Chaque
-`CentralCapsule` pilote la transition depuis son mode réellement présenté vers
-son `targetMode`, avec `Qt.callLater` pour regrouper les changements synchrones.
-Un changement de panneau ne doit pas produire un passage visible par
-`workspaces`. Une notification peut masquer un overlay dont l’état continue à évoluer ;
-sa fermeture révèle directement le mode sous-jacent encore actif sur ce moniteur.
-
-Chaque `CentralCapsule` anime pendant les mêmes `360ms` que la géométrie :
-
-- contenu source : opacité `1 → 0` entre `0 %` et `48 %`, déplacement de `0 → 8px` dans le sens du changement de hauteur ;
-- contenu destination : opacité `0 → 1` entre `18 %` et `78 %`, déplacement de `10px → 0` dans ce même sens visuel ;
-- destination plus haute : flux vers le bas ;
-- destination plus basse : flux vers le haut ;
-- hauteurs égales : aucune translation verticale, seulement la transition croisée et la mise en page liée à la largeur ;
-- courbes d’opacité `smoothstep`, translations `OutCubic`, sans overshoot.
-
-Ainsi launcher → updates conserve brièvement les applications pendant que la capsule rétrécit et les masque, puis le header et les lignes updates apparaissent en remontant légèrement. La transition inverse suit le mouvement descendant. Les composants gardent leur hauteur naturelle, restent top-alignés et le `clip: true` révèle ou masque le reste.
-
-Ce système est une container transform à deux couches, pas encore un morphing élément-par-élément : les éléments partagés ne sont pas appariés individuellement.
-
-À ne pas refaire :
-
-- animation `presented` locale ignorant le widget source ;
-- passage artificiel par `workspaces` dans les métadonnées d’une transition overlay → overlay ;
-- grand déplacement proportionnel à toute la différence de hauteur ;
-- fades indépendants non synchronisés, rebond ou translation dépassant les `360ms` de géométrie ;
-- remise de `transitionProgress` à zéro sans capturer les opacités/offsets rendus lors d’une interruption.
-
-## 7. Aucun liseré d’activité
-
-Le liseré tournant a été retiré de tous les modes, notifications comprises,
-ainsi que son shader et sa compilation Qt. Ne pas le réintroduire. Le reflet
-synthétique de bord et le contre-bord sombre du plugin Liquid Glass ont aussi
-été retirés : conserver le fumé et la réfraction, sans cadre blanc ou noir ajouté.
-
-Les sélections internes des applications, onglets Chrome, villes météo,
-périphériques audio et jours du calendrier utilisent `SelectionSurface.qml` :
-teinte de l'accent à 20 % sur le verre existant, sans bordure et avec une
-transition de couleur de 120 ms sans rebond. Les applications, les villes météo
-et les jours du calendrier utilisent à la place un fond en accent plein
-(`solid: true`), identique avec ou sans verre et limité aux couleurs exactes de
-Catppuccin Macchiato : Sapphire pour les applications, Pink pour les villes et
-aujourd'hui, Peach pour le jour sélectionné. Le texte, les icônes et les points
-posés sur ce fond passent en Crust (`Theme.background`). Les onglets Chrome et
-les périphériques audio gardent la teinte translucide. Ne pas ajouter de `GlassShape`,
-de shader ou de flou à ces lignes : elles ne sont pas une deuxième vitre.
-Les fonds d'icônes des deux lanceurs restent discrets (4 % au repos) ; à la
-sélection, 8 % de l'accent pour les onglets, transparent sur la ligne pleine
-des applications. Sur une teinte translucide, les libellés sélectionnés sont
-blancs ; les couleurs sémantiques des dates et des états actifs restent conservées.
-Sans `GlassState.enabled`, les teintes translucides reviennent aux couleurs opaques du thème. La sélection
-de texte dans les champs de recherche garde son contraste et son comportement.
-`selection-test.qml` vérifie les composants réels avec des actions simulées,
-via Quickshell offscreen (aucune application lancée ni requête météo).
-
-## 8. Bordure Hyprland pendant un overlay
-
-Lorsque le centre affiche un overlay, la fenêtre normale n’est plus considérée visuellement comme la cible principale.
-
-`ShellIntegration` suit `ShellCoordinator.highlightFocusedWindow` et remplace temporairement :
-
-- bordure active verte : `rgba(33ff33ff)`
-- par la bordure inactive grise : `rgba(888888aa)`
-
-Quand l’overlay disparaît, la bordure verte est restaurée.
-
-Toujours restaurer la bordure :
-
-- au démarrage de `ShellIntegration` ;
-- à la fermeture du dernier overlay ;
-- dans `Component.onDestruction`.
-
-Cela évite de laisser Hyprland en gris après un redémarrage de Quickshell.
-
-## 9. Workspaces et special workspaces
-
-### Workspaces normaux
-
-- 8 slots.
-- Slot inactif : `40px`.
-- Slot actif : `60px`.
-- Hauteur : `24px`.
-- Slot actif rose néon `#ff33cc` avec texte sombre.
-- Les workspaces occupés utilisent le jaune ; les vides utilisent une couleur discrète.
-
-Chaque barre conserve les huit slots et son propre Pac-Man rose : le slot actif
-correspond à `HyprlandMonitor.lastIpcObject.activeWorkspace.id` du moniteur déjà
-résolu par `Bar.hyprlandMonitor` et transmis au composant, jamais à
-`workspace.focused` (focus global). `WorkspaceMonitorSync`, instancié une seule
-fois dans `shell.qml`, rafraîchit ces instantanés avec l’API native
-`Hyprland.refreshMonitors()` sur les événements de workspace, focus, special
-workspace et changement de moniteur/configuration. Les événements d’un même
-changement sont regroupés avec `Qt.callLater` ; aucun polling ni processus
-`hyprctl`. Ne pas utiliser directement `monitor.activeWorkspace` : Quickshell
-0.3.1 traite `workspacev2` sur l’ancien écran focalisé si cet événement précède
-`focusedmon`, et peut donc afficher le workspace de destination sur les deux
-barres. L’instantané conserve le bon workspace source jusqu’à confirmation
-de l’état par Hyprland. Ne pas refaire la recherche du moniteur dans chaque sélecteur : la référence
-partagée avec la barre évite une boucle de binding à l’initialisation. Passer la souris ou
-le focus clavier sur un autre écran ne change donc ni le Pac-Man ni la largeur
-de cette barre. L’occupation des huit workspaces reste globale : fantôme jaune
-si des fenêtres y sont présentes, point gris sinon. Les clics gardent leurs
-dispatchers existants ; aucun workspace n’est déplacé ou réaffecté.
-
-Le calcul de largeur et le rendu des slots utilisent le même identifiant local,
-y compris pendant un special workspace. Un moniteur absent, sans workspace ou
-sur un workspace hors des huit emplacements ne reprend jamais le focus d’un
-autre écran. `tests/tst_WorkspaceSwitcher.qml`, lancé avec `qs` en mode offscreen,
-vérifie les deux moniteurs, les changements de focus et de workspace, les
-couleurs/icônes, le plafond de largeur et les special workspaces avec des données
-simulées, sans dispatcher d’action sur la session réelle.
-`node tests/workspaces_test.mjs` teste aussi le vrai traitement IPC de Quickshell
-avec des sockets Hyprland privés et des composants offscreen : passage Dell 3
-→ laptop 6 avec `workspacev2` avant `focusedmon`, sens inverse, changement sur
-un même écran et simple changement de focus. Le test vérifie que le mauvais
-identifiant n’apparaît même pas transitoirement sur la barre source et ne touche
-jamais aux workspaces de la session réelle.
-
-Quand la capsule change de largeur, l’espacement entre les slots dépend de la largeur disponible. Les icônes suivent donc l’interpolation de largeur au lieu de rester figées au centre.
-
-### Special workspace
-
-Quand Hyprland émet `activespecial`, un slot supplémentaire apparaît à droite avec le nom sans le préfixe `special:`.
-
-Conventions :
-
-- fond `#ff33cc` ;
-- texte `#181926`, `Font.Black` ;
-- hauteur `24px`, rayon `12px` ;
-- largeur minimum `70px` ;
-- clic sur le slot : `togglespecialworkspace`.
-
-Le slot n’apparaît que sur le moniteur où le special workspace est actif.
-
-Son ouverture et sa fermeture utilisent la même timeline de `360ms` que les
-autres transformations Quickshell : la largeur de la capsule suit
-`Easing.OutCubic`, l’entrée du slot passe de `0 → 1` entre `18 %` et `78 %`, et
-sa sortie de `1 → 0` entre `0 %` et `48 %`. Comme la hauteur reste identique,
-il n’y a pas de translation verticale. Les huit slots normaux restent stables
-pendant l’élargissement, le nom du special workspace reste rendu jusqu’à la fin
-du fade de sortie, et une interruption repart de l’opacité courante.
-
-## 10. Wi-Fi et Bluetooth
-
-### Géométrie et animation de navigation
-
-Les deux sélecteurs doivent rester visuellement parallèles :
-
-- largeur minimale exacte requise par le contenu, plafonnée à `400px`, sauf
-  pendant un speed test Wi-Fi où elle reste fixée à `400px` ;
-- pendant un changement de largeur, les noms sont découpés par le viewport sans
-  afficher de points de suspension transitoires ;
-- hauteur `36px`, étendue à `94px` pendant un speed test ;
-- compteur aligné sur une hauteur fixe de `18px` ;
-- animation de roue verticale en `150ms` ;
-- déplacement de `40px` hors du viewport découpé ;
-- easing `InOutCubic`.
-
-La roue ne se déclenche que pour une navigation volontaire (`j/k/h/l`, flèches, `g/G` pour le Wi-Fi). Elle ne doit pas tourner lors de l’ouverture, de la fermeture, d’un scan ou d’un changement de message.
-
-### Services natifs et scans
-
-Le Wi-Fi utilise exclusivement `Quickshell.Networking` : devices NetworkManager, réseaux, puissance, sécurité, états, scan et connexion PSK. Aucun helper `nmcli` ne doit être réintroduit.
-
-Le Bluetooth utilise exclusivement `Quickshell.Bluetooth` : découverte BlueZ, appareils, appairage, connexion et déconnexion. Aucun helper `bluetoothctl` ne doit être réintroduit.
-
-La capsule batterie regroupe le PC (`󰌢`, pourcentage UPower) et les claviers
-Bluetooth (`󰌌`, pourcentage natif `BluetoothDevice.battery`), séparés par trois
-espaces. Chaque icône et son pourcentage partagent la même couleur : vert
-(`Theme.batteryPluggedIn`) lorsque l’appareil est branché, quel que soit son
-niveau ; sinon, rouge (`Theme.error`) pour un niveau connu strictement inférieur
-à `20 %`, Rosewater (`Theme.sideBattery`, `#f4dbd6`) à partir de `20 %` ou avec un
-niveau inconnu. Le vert est donc prioritaire sur l’alerte de batterie faible pour
-un même appareil. Aucun éclair n’est ajouté.
-Chaque appareil est évalué indépendamment, y compris au survol. La teinte au
-survol de la capsule est rouge si au moins un appareil débranché est faible,
-verte sinon si au moins un appareil est branché, Rosewater sinon.
-Pour le PC, utiliser `!UPower.onBattery` afin de couvrir aussi une batterie pleine
-ou dont la charge est limitée, mais les états `Discharging` et `PendingDischarge`
-retirent immédiatement le vert même si l’état global n’est pas encore à jour.
-Pour « Agar BLE », le Bluetooth ne fournit aucun
-état de charge : son adresse est associée à son identité USB (vendor/product et
-numéro de série), détectée via le flux système existant, sans processus ajouté.
-Cela fonctionne aussi via un hub, mais pas avec un chargeur mural sans connexion
-USB au PC. Un état UPower `Charging` ou `PendingCharge` est également accepté
-lorsqu’un clavier le fournit. Le niveau `100 %` seul n’indique jamais un branchement.
-
-Les claviers (`input-keyboard`) sont triés par adresse. Un clavier connecté en
-Bluetooth avec `batteryAvailable`, ou reconnu en USB, reste visible. En USB seul,
-une valeur inconnue s’affiche `--%` ; un clavier entièrement déconnecté disparaît.
-La télémétrie USB expirée après cinq secondes ne doit plus colorer l’icône.
-
-À l’ouverture, les modèles natifs déjà chargés s’affichent immédiatement. `WifiDevice.scannerEnabled` reste actif pendant toute la durée de vie du sélecteur, car Quickshell masque les réseaux inconnus dès que le scanner est désactivé. Le timer de rafraîchissement arrête uniquement le spinner ; la fermeture du sélecteur arrête réellement le scanner.
-
-Un vrai spinner est réservé à :
-
-- `r` pour un scan Wi-Fi explicite ;
-- `t` pendant l’exécution explicite du client Ookla ;
-- l’onglet Bluetooth `NEARBY`, via `BluetoothAdapter.discovering`.
-
-Le speed test n’est jamais automatique. `t` étend la capsule vers le bas et lance `quickshell-speedtest`, wrapper du client officiel `ookla-speedtest`. Son flux JSON progressif met à jour en direct la phase (`PING`, `DOWNLOAD`, `UPLOAD`), la valeur courante, le pourcentage global monotone et une barre de progression, puis affiche le résultat final. Une fermeture du sélecteur interrompt tout le groupe de processus et un timeout de `90s` empêche tout processus bloqué.
-
-### Couleurs d’état
-
-- Wi-Fi : icône et point de connexion utilisent `Theme.sideNetwork` ;
-- Bluetooth : icône, point de connexion et onglets `PAIRED` / `NEARBY` utilisent `Theme.sideBluetooth` ;
-- tout appareil ou réseau non connecté reste gris ;
-- cadenas Wi-Fi : même gris que le compteur (`#939ab7`).
-
-## 11. Panneau audio et lanceurs
-
-### Panneau audio
-
-Le clic sur la capsule volume et `Super+T` appellent `topbar.toggleAudio` et
-ouvrent `AudioSelector.qml` au centre, sur l’écran cible. L’en-tête affiche
-l’icône audio, le titre `AUDIO` et le compteur `n OUT · n IN`, puis une seule page
-affiche `OUTPUTS` et `MICROPHONE`, avec une coche sur les périphériques réellement utilisés.
-Largeur limitée par le plafond commun des workspaces, hauteur adaptée jusqu’à
-`398px`, puis défilement. Haut/bas ou
-`j/k` naviguent, `Tab` change de section, `Enter` choisit sans fermer et `Esc`
-ferme. Aucun volume par application ni barre de réglage supplémentaire.
-
-Le panneau utilise `Theme.sideVolume`, les transitions communes de `360ms`
-et l’exclusivité des overlays. La dictée conserve sa priorité ; le panneau
-ne prend pas le focus clavier pendant la dictée. Les touches volume et la molette
-restent actives et ne remplacent pas un panneau audio ouvert par l’OSD volume.
-
-La capsule latérale garde toujours `icône son + pourcentage + icône micro`, même
-si la sortie est muette. Le micro est barré lorsqu’il est muet, normal sinon, et
-grisé sans entrée disponible. La touche VIA `Mac Voice` du NuPhy Air60 V2
-émet `XF86VoiceCommand` sous Linux et appelle `topbar.toggleMicrophoneMute`,
-qui agit sur le micro par défaut uniquement.
-Chaque action mute ou démute active la légère teinte et le rebond de la
-capsule audio sur l’écran focalisé pendant `2000ms`, comme l’indicateur volume.
-Une nouvelle action relance ce délai. L’état muet seul n’entretient pas le rebond ;
-à la fin du délai, la capsule revient au repos, sauf si elle est survolée ou si
-son panneau/indicateur volume reste ouvert.
-L’icône reflète aussi les changements externes et ne représente pas un
-enregistrement en cours. Changer d’entrée ne modifie pas son état muet.
-
-Les périphériques et leur état sont fournis par PipeWire natif dans Quickshell,
-avec `PwObjectTracker` ; aucun helper Rust ni polling de `wpctl`. Une sélection
-écrit `preferredDefaultAudioSink` ou `preferredDefaultAudioSource`, tandis que
-les coches suivent les périphériques par défaut effectifs.
-
-`system/wireplumber/release-on-hotplug.lua` libère le choix manuel de la direction
-concernée quand les périphériques ou la disponibilité de leurs routes changent.
-WirePlumber reprend alors ses priorités habituelles. Les changements de volume,
-de mute ou les flux d’applications ne libèrent pas le choix. La désactivation de
-`node.restore-default-targets` empêche seulement la restauration des anciens
-choix : elle ne suffit pas à elle seule pour annuler une préférence courante.
-Le test isolé est `lua system/wireplumber/release-on-hotplug_test.lua`, depuis la
-racine du dépôt. Une validation matérielle doit couvrir casque filaire,
-Bluetooth, HDMI, retrait de périphérique et touche micro du laptop.
-
-### Applications
-
-Le raccourci `Super+A` ouvre `AppLauncher.qml` dans la capsule centrale. Le widget latéral avec le logo NixOS est supprimé pour libérer de la place : `Super+A` et `Super+;` conservent leurs panneaux centraux sans illuminer de widget latéral. Le lanceur utilise exclusivement `DesktopEntries.applications` et `DesktopEntry.execute()` : ne pas réintroduire Fuzzel ou une analyse périodique des fichiers `.desktop`.
-
-Conventions :
-
-- largeur souhaitée `480px`, limitée par le plafond commun des workspaces,
-  hauteur `398px` et huit lignes visibles ;
-- toutes les applications non marquées `NoDisplay` restent accessibles avec une icône issue du thème ;
-- le catalogue normalisé est construit une seule fois, puis la recherche fuzzy s’effectue en mémoire ;
-- le `ListView` virtualise les lignes pour ne charger que les icônes visibles ;
-- haut/bas, `Ctrl+n/p`, `Ctrl+j/k`, PageUp/PageDown et molette naviguent ;
-- l’icône de recherche, la sélection de texte et le point d’une application déjà ouverte utilisent `Theme.sideApplications` ;
-- aucune flèche d’action n’est affichée sur la ligne sélectionnée ;
-- `Enter` active la fenêtre ouverte la plus récemment utilisée, y compris depuis un autre workspace normal ou spécial, sinon lance l’application ;
-- `Ctrl+Enter` lance toujours une nouvelle instance et `Esc` ferme ;
-- le texte saisi doit toujours rester du texte de recherche : ne pas réserver `j`, `k` ou `q`.
-
-### Onglets Chrome
-
-`Super+;` ouvre `ChromeTabsLauncher.qml` avec la même géométrie et les mêmes conventions de recherche que le lanceur d’applications. La liste provient de TabCtl 2 via son extension Chrome Manifest V3, Native Messaging puis D-Bus.
-
-- `tabctl --format json list` est encapsulé par `quickshell-chrome-tabs` afin que QML reçoive toujours un objet JSON, y compris lorsque Chrome est fermé ou que l’extension n’est pas encore connectée ;
-- le catalogue contient le titre, l’URL, la fenêtre, l’index et les états actif/épinglé ;
-- les favicons sont extraits localement du SQLite `Default/Favicons` de Chrome vers `$XDG_CACHE_HOME/quickshell/chrome-favicons`, sans requête réseau ; si l’icône manque, le logo Chrome est gris pour un onglet inactif et `Theme.sideApplications` pour l’onglet actif ;
-- l’icône de recherche, la sélection de texte, l’épingle et le point d’onglet actif utilisent aussi `Theme.sideApplications`, comme le lanceur d’applications ;
-- aucune flèche d’action n’est affichée sur la ligne sélectionnée ;
-- la recherche fuzzy porte sur le titre et l’URL ;
-- `Enter` active l’onglet avec TabCtl puis focalise explicitement sa fenêtre via Hyprland, y compris depuis un autre workspace normal ou spécial ; `Ctrl+W` ferme l’onglet, `Ctrl+R` recharge la liste et `Esc` ferme le widget ;
-- clic gauche : activation ; clic droit : fermeture ;
-- huit lignes complètes sont visibles et le `ListView` reste virtualisé ;
-- l’extension TabCtl est installée manuellement depuis le Chrome Web Store ; seul le manifeste `tabctl_mediator.json` est géré par Home Manager, donc ne jamais exécuter `tabctl install` manuellement.
-
-## 12. Volume et luminosité
-
-- Largeur `280px`, hauteur `36px`.
-- Aucun pourcentage dans le widget central.
-- Timeout de visibilité : `2000ms`.
-- Les touches multimédia et les molettes modifient le volume par pas de `5%`.
-- La barre de progression anime sa largeur en `140ms`.
-- Les valeurs volume utilisent directement `Quickshell.Services.Pipewire`, y compris les touches XF86 et le mute ; aucun `wpctl` ne doit être réintroduit.
-- La luminosité passe par `quickshell-brightness` : `brightnessctl` pour la dalle interne, `ddcutil` pour un écran externe identifié par connecteur, modèle et numéro de série. Les touches ciblent le moniteur focalisé ; la molette cible celui de la barre. Pour un écran externe, les appuis sont regroupés jusqu’à une pause de 180 ms, avec conservation des inversions de sens et saturation à chaque pas. L’OSD affiche immédiatement la consigne dès qu’une valeur est connue, puis se recale sur la réponse. Le bus est mémorisé en RAM et invalidé lors d’un changement de moniteurs ; une génération permet d’ignorer les réponses antérieures au changement. La dernière valeur vérifiée est réutilisée pendant deux secondes, puis relue à la prochaine interaction. Une seule écriture vérifiée est effectuée par groupe d’appuis, sans polling DDC ni modification du pilote.
-- Le volume utilise `Theme.sideVolume` pour son icône et son remplissage.
-- Chaque barre affiche la luminosité de son propre moniteur. Le contrôleur effectue une lecture sans écriture ni OSD au démarrage et après un changement de moniteurs. La télémétrie système ne fournit que la luminosité de la dalle interne ; elle ne sert jamais de repli pour un écran externe. Une valeur externe encore inconnue ou indisponible est affichée `--`. Les mesures internes continuent de suivre les changements hors de la barre sans écraser un réglage en attente.
-- La luminosité utilise `Theme.sideBrightness` pour son icône et son remplissage.
-- Les barres de progression ne possèdent aucun curseur ou point blanc : seul le remplissage coloré indique le niveau.
-- Chaque indicateur central apparaît uniquement sur le moniteur qui a reçu la touche ou le geste de molette.
-- Le volume et la luminosité restent toujours dans `centerMorph`, avec le même morphing et le même fondu croisé que les autres modes. En plein écran, leur activation fait apparaître toute la barre du moniteur cible (voir « Apparition en plein écran »).
-
-## 13. Contrôles média MPRIS
-
-Les touches média utilisent `Quickshell.Services.Mpris`, jamais un processus `playerctl`.
-
-`MediaController.player` préfère le contrôleur D-Bus `playerctld`, qui conserve la notion de dernier lecteur actif lorsque plusieurs applications ou onglets publient MPRIS. En son absence, la sélection tombe sur le lecteur en cours de lecture, puis un lecteur en pause.
-
-Les raccourcis Hyprland appellent les méthodes IPC `mediaPlayPause`, `mediaNext` et `mediaPrevious`. Chaque méthode vérifie les capacités du lecteur avant l’action.
-
-La pause automatique liée à la dictée appartient à Voxtype via
-`[audio] pause_media = true`. `DictationController` ne commande donc pas les lecteurs
-MPRIS lors des changements d'état de la dictée : il fournit uniquement
-l'état et la waveform. Voxtype mémorise les lecteurs réellement en lecture,
-les met en pause pendant la dictée et les relance une fois la transcription et
-la sortie terminées.
-
-`NowPlayingIndicator.qml` ajuste sa largeur souhaitée au titre et à l'artiste entre `160px` et `480px`, puis la capsule applique le plafond commun des workspaces. Il affiche quatre petites barres d’égaliseur animées, puis le titre et l’artiste sur une seule ligne centrée au format `Titre • Artiste`, sans pochette, avec l’action play/pause à droite. Le texte utilise la même taille de `16px` que les capsules latérales et l’égaliseur garde une marge gauche de `15px`. Les barres sont jaunes et animées pendant la lecture, puis deviennent grises et restent basses en pause ; l’icône d’action play/pause reste rose. Le widget reste visible `4000ms` après une action média déclenchée par les touches Play/Pause, Suivant ou Précédent. Les signaux automatiques de changement de piste n'ouvrent jamais le widget, car les navigateurs et les applications de communication publient les vocaux et vidéos par le même protocole MPRIS que les lecteurs musicaux.
-
-## 14. Exclusivité entre overlays
-
-Un seul mode central peut être actif à la fois.
-
-Utiliser `ShellCoordinator.open()`, `close()` ou `toggle()` :
-
-- résoudre et enregistrer le moniteur cible avant de présenter le nouveau mode ;
-- remplacer le mode central précédent, sans en fermer le chat indépendant ;
-- laisser les liaisons de visibilité déclencher la fermeture et le nettoyage des contrôleurs réseau ;
-- arrêter les temporisations volume/luminosité/média lorsque leur mode est remplacé ;
-- masquer la vue updates sans interrompre son opération ;
-- laisser les workspaces inchangés sur les autres écrans.
-
-Le nettoyage Wi-Fi arrête le scanner, le timer de connexion, le speed test Ookla, le mot de passe et le réseau pending. Une génération identifie chaque speed test afin qu’une sortie tardive d’un processus annulé ne puisse jamais remplacer un résultat plus récent.
-
-Une action Bluetooth native déjà lancée continue lorsque le sélecteur est masqué. Son timer et son message restent associés à l’action afin qu’une réouverture puisse afficher son état ; seule la découverte est arrêtée.
-
-## 15. Raccourcis et contrôles
-
-`Cmd` dans les demandes utilisateur correspond à `SUPER` dans Hyprland.
-
-### Applications — `Super+A`
-
-- saisir directement pour filtrer en fuzzy
-- haut/bas, `Ctrl+n/p` ou `Ctrl+j/k` : navigation
-- PageUp/PageDown : saut de huit résultats
-- `Enter` : activer l’instance ouverte, y compris depuis un autre workspace normal ou spécial, sinon lancer
-- `Ctrl+Enter` : lancer une nouvelle instance
-- `Esc` : fermeture
-
-### Onglets Chrome — `Super+;`
-
-- saisir directement pour filtrer titre et URL
-- haut/bas, `Ctrl+n/p` ou `Ctrl+j/k` : navigation
-- PageUp/PageDown : saut de huit résultats
-- `Enter` : activer l’onglet et focaliser sa fenêtre Chrome, y compris depuis un autre workspace normal ou spécial
-- `Ctrl+W` : fermer l’onglet sélectionné
-- `Ctrl+R` : recharger la liste
-- clic droit : fermer l’onglet
-- `Esc` : fermeture
-
-### Wi-Fi — `Super+N`
-
-- `j/l` ou bas/droite : suivant
-- `k/h` ou haut/gauche : précédent
-- `g/G` : début/fin
-- `r` : rescan
-- `t` : lancer ou relancer le speed test Ookla
-- `Enter` : connexion
-- `q/Esc` : fermeture
-
-### Bluetooth — `Super+B`
-
-- `Tab` : `PAIRED` / `NEARBY`
-- `j/l` ou bas/droite : suivant
-- `k/h` ou haut/gauche : précédent
-- `r` : actualiser/scanner
-- `Enter` : connecter, déconnecter ou appairer
-- `q/Esc` : fermeture
-
-### Updates — `Super+U`
-
-Le widget central utilise `Theme.sideUpdates` pour les icônes, les états `CHECKING` / `AVAILABLE` et les points de chaque ligne. `UP TO DATE`, les dates et les états vides restent gris ; `ERROR` utilise `Theme.error` et ne doit jamais être présenté comme un système à jour.
-
-Le checker compare les anciens et nouveaux `flake.lock` comme JSON, sans analyser la sortie humaine de Nix. Il s'exécute au démarrage, toutes les 30 minutes et après une demande explicite ; son cache est invalidé immédiatement si `flake.nix` ou `flake.lock` change. L'installateur partage son verrou et restaure le lockfile précédent si le rebuild ou l'installation de la génération de démarrage échoue.
-
-Le premier `Enter` remplace la liste par une capsule compacte de `36px` contenant uniquement le spinner Braille, le message d'étape et son état. Le wrapper réutilise le `flake.lock` candidat déjà calculé par le checker si l'empreinte du `flake.nix` et du lock d'origine correspond encore ; sinon il refait proprement `nix flake update`. Il construit ensuite avec `nh os build --diff never` et conserve le résultat par un out-link temporaire. À la fin du build, un helper lit les closures via `nix path-info --json --json-format 2` et Quickshell affiche une liste structurée compacte pouvant atteindre `750px`, avec les packages ajoutés, supprimés, modifiés, mis à niveau ou rétrogradés, dans cet ordre, et `ancienne version → nouvelle version` sur la même ligne. Un second `Enter` replie le centre à la hauteur de la barre et affiche la saisie Polkit sur une seule ligne. `run0` lance ensuite un helper immuable du Nix store qui réutilise le résultat déjà construit et l'enregistre avec l'action native `boot`, sans modifier ni redémarrer la session courante. L'état final `Update ready — reboot required` persiste dans `$XDG_CACHE_HOME/quickshell/top-bar/pending-reboot.json`, y compris si QuickShell est relancé, puis disparaît automatiquement lorsque `/run/current-system` correspond à la génération attendue. Chaque état mesure son contenu : les états compacts sont plafonnés à `280px` ou `360px`, tandis que les listes et la saisie Polkit demandent jusqu’à `480px`, toujours sous le plafond commun des workspaces. Cela évite à la fois le wrapper `pkexec env` de `nh` et le binaire `pkexec` brut du Nix store, qui n'est pas setuid. Aucune fenêtre Ghostty et aucun second build complet ne sont lancés.
-
-Le processus appartient à `UpdateController`, pas au composant visible. `q`, `Esc` ou un clic sur la capsule latérale ne font donc que replier l'interface ; l'update continue et un nouveau clic retrouve l'état compact ou le résumé existant. Pendant l'installation de la génération de démarrage, la liste structurée reste visible ; après succès, une capsule compacte demande le redémarrage. Une erreur de build reste dans la capsule compacte avec son message structuré ; une erreur après le diff conserve la liste avec un état d'erreur. `Enter` relance ensuite une nouvelle tentative.
-
-Pendant `CHECKING`, `Enter` est ignoré afin de ne pas lancer l'installer contre le verrou du checker. Dans l'état compact `UP TO DATE`, `Enter` replie simplement le widget. Si un checker détient malgré tout le verrou au démarrage de l'installation, l'installer attend sa fin au lieu d'émettre une erreur transitoire persistante.
-
-Dans la vue initiale, `C` lance le nettoyage natif `nh clean all`. Le processus partage le verrou des updates, utilise la stratégie d'élévation `run0` fournie par `nh` et affiche la demande Polkit dans la barre si elle est nécessaire. Pendant le nettoyage, une capsule compacte animée reste repliable avec `Esc`; la sortie très volumineuse de `nh` est conservée dans le journal mono-exécution `$XDG_CACHE_HOME/quickshell/top-bar/clean.log` plutôt que poussée ligne par ligne dans QML. En cas d'échec, seules ses 30 dernières lignes sont affichées. À la fin, la barre affiche l'espace réellement récupéré à partir de l'espace disponible avant/après, sans analyser une sortie privée ou instable de `nh`.
-
-`PolkitController` fournit l'agent générique de la session avec
-`Quickshell.Services.Polkit`, indépendamment des mises à jour. Toute demande d'une
-autre application utilise le même formulaire central, sans stocker la réponse
-dans les arguments, l'environnement, les fichiers ou les logs. La réponse est
-effacée avant soumission, lors d’un nouveau défi, d’un échec, d’un changement de
-demande et à la fin de celle-ci. Échap efface aussi la saisie et masque le
-formulaire sans annuler la demande native. `ShellCoordinator` restaure le panneau
-et le moniteur précédents à la fin d’une demande externe, si cet écran existe
-encore ; la fermeture du formulaire ne déclenche jamais une installation.
-
-`UpdateController` possède un seul processus d’opération pour update/nettoyage
-et un processus de vérification sérialisé avec lui. Un résumé `@@QS_UPDATE@@`
-ne fait qu’actualiser l’état : seul `installUpdate()`, appelé par confirmation
-explicite, écrit `install\n`. Une fin de processus sans état terminal devient une
-erreur, même avec un code de sortie nul. Les générations empêchent les sorties
-tardives d’une ancienne opération d’affecter la suivante. Les verrous et caches
-des helpers dans `tools/` restent inchangés.
-
-- `r` : vérification forcée
-- premier `Enter` : démarre l'update et affiche la capsule compacte
-- `j/k` : fait défiler la liste structurée des changements, sans sélection
-- `Enter` sur la liste des changements : demande le mot de passe puis installe la prochaine génération de démarrage
-- `Enter` après installation : ferme la capsule `REBOOT` ; après erreur : réessaie
-- `q/Esc` : replie la capsule sans interrompre l'update
-
-Ne pas injecter `Enter` automatiquement dans la session réelle : cela lance
-réellement `nix flake update`, `nh os build`, puis l'installation privilégiée de
-la génération de démarrage. `tests/tst_UpdateControllers.qml` teste ces touches
-avec des processus et flux Polkit entièrement fictifs ; le démarrage automatique
-du checker et l’agent natif y sont désactivés. Aucun build, nettoyage,
-authentification système ou installation n’est exécuté par cette suite.
-
-### Limites d’utilisation — `Super+R`
-
-- `r` : relire immédiatement les deux CLI
-- `q/Esc` : fermeture
-
-## 16. Pièges connus
-
-1. **Animer la hauteur du `PanelWindow`** : provoque un glitch vertical du reste de la barre.
-2. **Toute courbe `OutBack`, spring ou overshoot** : franchit la cible puis inverse brièvement le mouvement, contrairement au contrat monotone inspiré de Hyprland.
-3. **Séquence géométrique aller-retour** : réintroduit un rebond même si chaque phase utilise séparément une courbe monotone.
-4. **Réintroduire un liseré** : le contour tournant, le reflet de bord et le contre-bord sombre ont été retirés volontairement ; conserver le fumé et la réfraction.
-5. **Espacement négatif des lignes update** : superpose les textes.
-6. **Liste update montant depuis le bas** : direction visuellement incohérente.
-7. **Fades indépendants par widget** : désynchronisent les couches ; toutes les opacités doivent dépendre du `transitionProgress` partagé.
-8. **Focus clavier sur tous les panels** : plusieurs surfaces se disputent le clavier.
-9. **Rendre un overlay sur tous les moniteurs** : masque inutilement les workspaces des écrans qui ne l’ont pas activé.
-10. **Contourner `ShellCoordinator` pour fermer un sélecteur réseau** : casse le lien entre présentation et nettoyage des scans, timers et états interactifs ; fermer le mode par le coordinateur.
-11. **Mot de passe Wi-Fi dans les arguments de commande** : interdit ; utiliser directement `WifiNetwork.connectWithPsk()`.
-12. **Oublier de restaurer la bordure Hyprland** : laisse les fenêtres avec une bordure grise.
-
-## 17. Procédure de validation
-
-### Tests locaux et build sans activation
-
-Depuis la racine du dépôt :
-
-```bash
-nix develop .#desktop -c node desktop/tests/run.mjs
-nix build --no-link .#quickshellDesktop .#quickshellBeeperPreview
-```
-
-Le shell `desktop` fournit le runtime enveloppé commun, Node.js, D-Bus,
-`notify-send` et Qt Test, et fixe `QMLTESTRUNNER` / `BEEPER_TEST_BACKEND` pour
-inclure les vues Qt et le protocole Go en mode démo. Aucune installation globale
-n’est nécessaire ; les shells Go, Rust et C++ sont inchangés. Si ces outils sont
-déjà disponibles, le runtime peut aussi être passé explicitement :
-
-```bash
-quickshell_runtime=$(nix build --no-link --print-out-paths .#quickshellRuntime)
-node desktop/tests/run.mjs "$quickshell_runtime/bin/quickshell"
-```
-
-Ce runner local n’est pas encore un `checks` de flake ni une configuration CI.
-Les tests spécialisés restent exécutables individuellement. Pour compiler le
-graphe réel avec le backend Wayland, sans lancer les services de la session :
-
-```bash
-nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs
-```
-
-Le harnais utilise un compositeur imbriqué et un bus privé ; il nécessite une
-session Wayland, Hyprland et D-Bus. Toujours utiliser le runtime enveloppé afin
-que Liquid Glass et Qt Multimedia soient résolus comme dans Home Manager. Ne pas
-lancer une deuxième instance de `desktop/shell.qml` pour un simple test de
-compilation : elle instancierait les vrais services et helpers.
-
-Les suites de contrôleurs utilisent des modèles natifs simulés, des commandes
-inoffensives ou des transports fictifs. Les scénarios updates/Polkit vérifient
-notamment la double confirmation, l’exclusion des opérations, les sorties
-prématurées/tardives, le nettoyage des secrets et le routage clavier sans appeler
-les vrais helpers ni enregistrer d’agent Polkit. Les tests du coordinateur
-vérifient les priorités, moniteurs, temporisations et restaurations avec des
-services fictifs. Aucun test de rangement ne doit modifier la connexion réseau,
-le système, la session ni ses identifiants.
-
-### Vérification QML rapide
-
-```bash
-env PATH="$PWD/desktop/tests/fixtures:$PATH" \
-  QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
-  QT_NO_XDG_DESKTOP_PORTAL=1 HYPRLAND_INSTANCE_SIGNATURE= \
-  timeout 15s qs --no-color -p desktop/pill-test.qml
-```
-
-Ce test vérifie le survol, l'état actif, la teinte translucide, les libellés et
-le repli opaque sans agir sur la session. Aucun shader Qt n'est à compiler.
-
-### Vérification Nix
-
-```bash
-nix-instantiate --parse home_manager/hyprland/default.nix >/dev/null
-git diff --check
-git diff --cached --check
-```
-
-### Construire et activer
-
-```bash
-activation=$(nix build --print-out-paths --no-link \
-  '.#nixosConfigurations.nixos.config.home-manager.users.ian.home.activationPackage' \
-  | tail -1)
-"$activation/activate"
-systemctl --user restart quickshell.service
-hyprctl reload
-```
-
-### Logs
-
-```bash
-systemctl --user is-active quickshell.service
-qs log -c top-bar --no-color
-```
-
-### IPC utile
-
-```bash
-qs --config top-bar ipc call topbar showVolume
-qs --config top-bar ipc call topbar showBrightness
-qs --config top-bar ipc call topbar toggleWifi
-qs --config top-bar ipc call topbar toggleBluetooth
-qs --config top-bar ipc call topbar toggleUpdates
-qs --config top-bar ipc call topbar toggleLauncher
-qs --config top-bar ipc call topbar toggleChromeTabs
-qs --config top-bar ipc call topbar toggleUsage
-```
-
-### Validation TabCtl
-
-```bash
-tabctl status
-quickshell-chrome-tabs list | jq '{ok, count: (.tabs | length), error}'
-pgrep -af tabctl-mediator
-```
-
-`tabctl status` doit annoncer la même version de protocole pour le médiateur et l’extension. Tester manuellement `Enter`, `Ctrl+W`, `Ctrl+R`, le clic droit et le déplacement de l’overlay entre les deux moniteurs ; ne jamais fermer automatiquement un onglet utilisateur pendant une validation.
-
-### Invariants à contrôler après une animation
-
-```bash
-hyprctl -j monitors | jq 'map({name,reserved})'
-hyprctl getoption general:col.active_border -j
-```
-
-La réserve supérieure doit rester `[0,46,0,0]`. Hors overlay, la bordure active doit être revenue à `ff33ff33`.
-
-## 18. Notifications éphémères
-
-Quickshell est l’unique serveur `org.freedesktop.Notifications` configuré.
-`NotificationData.qml` est instancié une seule fois dans `shell.qml`.
-
-Une seule notification est présentée, sur l’écran focalisé à la réception.
-La suivante remplace la précédente, y compris les mises à jour d’un même ID.
-Il n’y a ni historique, ni file, ni stockage de messages sur disque.
-Les notifications reçues en plein écran font apparaître toute la barre sur
-l’écran ciblé. Passer en plein écran conserve la carte courante ; la disparition
-du moniteur la ferme. Le mode Ne pas déranger reste prioritaire en plein écran.
-
-Une capsule `36×36px` de contrôle Ne pas déranger se place tout à droite,
-immédiatement après Bluetooth. Accent Teal Catppuccin Macchiato
-`Theme.sideNotifications` : cloche normale si le mode est désactivé, cloche barrée
-s’il est actif. Le clic gauche et l’IPC `topbar.toggleDoNotDisturb` basculent le même
-état global sur tous les écrans. `forceHovered` donne une légère teinte du fond
-et un rebond pendant `2000ms` à chaque activation/désactivation. Ensuite, le fond
-redevient sombre et le rebond s’arrête, sauf en cas de vrai survol ; seule la
-cloche barrée indique que le mode est encore actif. L’état actif n’entretient
-ni le fond teinté ni l’animation.
-Aucune infobulle ni notification de confirmation n’est émise.
-
-Le clic droit bascule uniquement le clavier intégré
-`at-translated-set-2-keyboard` via `hyprctl eval` et `hl.device`.
-L’état est conservé dans la variable Lua `quickshell_internal_keyboard_disabled`
-du compositeur, partagée entre les écrans et conservée lors d’un redémarrage de
-Quickshell. Le premier clic désactive le clavier, le suivant le réactive.
-Aucun indicateur, changement d’icône ou message ne représente l’état du clavier ;
-la cloche et son feedback restent liés uniquement au mode Ne pas déranger.
-
-La touche VIA `Mac Dnd` du NuPhy Air60 V2 (`XF86DoNotDisturb`) appelle ce même
-IPC, sans modificateur et sans répétition au maintien. `Mac Search`/`Super+Space`
-reste réservé à la maximisation, et `Mac Voice` conserve le mute/démute du micro.
-
-`NotificationData.doNotDisturb` conserve son état pendant un rechargement QML
-via `PersistentProperties`, mais repart désactivé au redémarrage du processus.
-L’activer expire la carte courante et arrête uniquement les lecteurs de sons de
-notifications appartenant à Quickshell. Musique, appels, volume et micro ne sont
-pas modifiés. Toutes les notifications arrivant pendant ce mode, y compris les
-critiques, sont expirées sans affichage ni son ; rien n’est rejoué à sa sortie.
-
-Chaque nouvelle notification, y compris un message dont la bannière est masquée
-par le chat ouvert, joue directement `message-new-instant.oga`
-du thème freedesktop (environ `1s`) avec `pw-play`, au volume `2.0` (200 %) et
-avec le rôle `Notification`. C’est le son « Message instantané » choisi après
-écoute : amplification directe du flux par `pw-play` (gain linéaire ×2, environ
-`+6dB`), sans conversion ni étape FFmpeg. Le fichier original et le volume général
-restent inchangés. Le lecteur et le son sont épinglés dans le Nix store. Respecter
-le hint `suppress-sound`, y compris en plein écran. Il n’y a **aucun intervalle minimum**, ni file audio : chaque arrivée
-lance son `Process` indépendant suivi par Quickshell, même pendant un son précédent.
-Chaque lecteur est libéré à sa fin, y compris après un échec de lancement ;
-ce suivi permet de couper aussi les sons déjà en cours quand on active Ne pas déranger.
-Les mises à jour
-d’une carte existante (même ID, image, texte) ne rejouent pas le son.
-
-La capsule s’étend vers le bas, sous le plafond commun des workspaces. La carte
-adapte sa largeur au nom d’application, au titre et au message : `FontMetrics`
-mesure la plus longue ligne non repliée avec la police du champ correspondant,
-puis ajoute les marges et l’avatar (`16 + 42 + 12 + texte + 16`). La largeur
-souhaitée va de `160px` à `480px`, toujours plafonnée par les workspaces dans
-`CentralCapsule.qml`. Les retours à la ligne explicites ne s’additionnent pas. Cette mesure
-ne dépend jamais de la largeur animée ni du texte déjà replié. Les messages longs
-reviennent à la ligne et les remplacements plus courts réduisent la capsule.
-Un `Text` de mesure non rendu calcule la hauteur du message à sa largeur finale,
-avec le plafond transmis par `CentralCapsule.qml` et les mêmes paramètres de texte que le
-champ affiché. Les retours à la ligne temporaires pendant l’animation ne font
-donc pas gonfler puis rétrécir la hauteur de la capsule.
-La carte mesure entre `80px` et `180px` de haut et affiche une image ronde de `42px`,
-l’application, le titre et quatre lignes de message maximum. L’image native
-peut être la photo d’un contact Beeper si l’application la transmet ; sinon,
-utiliser son icône, puis un glyphe de notification si celle-ci manque aussi.
-Le texte est rendu en `PlainText` et utilise les tokens de `Theme.js`.
-Les accents internes (dont la cloche de secours) utilisent
-le jaune vif `Theme.state`, jamais le rose `Theme.action`. Les textes neutres et
-les images/icônes fournies par les applications conservent leurs couleurs.
-
-Le timer dure `360 + 3000ms` : ouverture commune puis trois secondes de lecture,
-sans pause au survol. Il est relancé lors d’un remplacement. Échap ferme sans
-attendre ce timer. Un clic invoque l’action native `default` lorsqu’elle existe.
-La fermeture conserve brièvement l’objet avec `RetainableLock` pour terminer
-le fade et afficher son image, puis libère l’objet après `360ms`.
-
-La notification a priorité visuelle sur tous les autres modes, y compris la
-dictée. Leurs états et opérations continuent ; à la fermeture, afficher le mode
-encore actif, sans relancer un indicateur déjà expiré. Ne pas désactiver puis
-réactiver les composants masqués : cela réinitialiserait leurs sélections.
-`NotificationInputGuard.qml` intercepte leur saisie et restaure le champ focalisé.
-Une notification seule ne demande jamais de focus clavier exclusif.
-
-`topbar.dismissNotification` ferme la carte. Un bind Lua `auto_consuming` ne
-consomme Échap que lorsqu’une carte est signalée par Quickshell ; autrement,
-la touche est transmise normalement. La présence est synchronisée par `hyprctl
-eval`, avec un bail de cinq secondes pour ne pas garder Échap capturé après un
-crash. Dans le sous-mode Voxtype, fermer une notification ne doit ni annuler
-l’enregistrement ni réinitialiser le sous-mode ; l’Échap suivant reprend le
-comportement d’annulation habituel.
-
-Tests de régression : `QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
-QT_NO_XDG_DESKTOP_PORTAL=1 qs -p tests/tst_NotificationPopup.qml` depuis `desktop/`
-vérifie la largeur adaptative, les retours à la ligne, les plafonds, les textes
-Unicode et l’indépendance par rapport à la largeur rendue. Ce test QtTest utilise
-`qs`, qui embarque les plugins statiques Quickshell nécessaires à la carte.
-`tests/tst_NotificationInputGuard.qml` avec `qmltestrunner`
-vérifie le focus, la protection du texte et Échap. `tests/escape_test.lua` prend
-le fichier `hyprland.lua` généré par Home Manager et vérifie les deux raccourcis Échap,
-`Mac Dnd` et la conservation de `Mac Voice` et `Super+Space`
-dans un environnement Lua simulé. Vérifier également avec `notify-send` la
-réception native, les remplacements d’ID, l’action `default`, les images et
-l’expiration ; une notification réelle Beeper valide les données qu’il fournit.
-
-`tests/notifications_test.sh` (avec `qs`, `notify-send` et `dbus-run-session` dans
-PATH) teste le serveur natif, les rafales sans intervalle, le filtrage de toutes
-les urgences en mode Ne pas déranger, l’absence de rejeu, l’arrêt des lecteurs,
-le plein écran, `suppress-sound`, les échecs audio et le rebond borné dans les deux
-sens. Ce lanceur utilise un bus D-Bus privé, un faux lecteur silencieux et un
-`hyprctl` inoffensif : ne pas lancer directement le fichier QML sur le bus réel.
-
-## 19. Calendrier météo
-
-`Super+E` (`Cmd+E`) remplace le lancement de Zed par `topbar.toggleCalendar`.
-Le clic sur la capsule température/date/heure appelle le même panneau sur son
-moniteur. Un second clic/raccourci ou Échap ferme le calendrier. `Super+Q`
-continue d’ouvrir la configuration dans Zed ; `Super+M` garde le special
-workspace Agenda, indépendant de ce calendrier consultatif.
-
-Le mode `calendar` appartient aux transitions communes et prend exactement
-`WorkspaceSwitcher.expandedImplicitWidth`, sans plafond local de `480px` ni
-constante copiée de `434px`. Sa hauteur suit le contenu : en-tête, noms des jours,
-quatre à six semaines nécessaires au mois, puis pied de panneau. Chaque semaine
-garde sept colonnes alignées et adapte sa hauteur : `24px` pour les numéros seuls,
-`44px` avec une icône, `60px` avec les mini/maxi. Les semaines sont espacées de
-`4px`. Le pied de panneau suit la dernière semaine avec `10px` de marge, puis
-`10px` jusqu’au bas. Aucune semaine vide ni espace météo inutilisé n’est réservé.
-La hauteur est calculée depuis les données, sans attendre une passe de layout
-(y compris derrière une notification ou sur un autre écran). Elle reste
-indépendante de la largeur et utilise l’animation commune de la capsule centrale.
-Les cases hors du mois sont vides. Le mois et les jours sont en français,
-du lundi au dimanche. Utiliser la couleur météo `Theme.sideWeather` pour les
-contrôles, températures et aujourd’hui, les neutres habituels pour
-le texte. Les icônes météo utilisent les glyphes monochromes d’`Ubuntu Nerd Font`,
-jamais les emojis multicolores. Chaque jour couvert affiche son numéro, son
-icône et les températures mini/maxi en °C (`12°/24°`). Aujourd’hui utilise un
-fond Pink plein. Les icônes soleil/éclaircies sont vertes
-(`Theme.weatherSun`), celles de bruine/pluie/averses/orages rouges (`Theme.weatherRain`),
-les autres gardent `Theme.sideWeather` ; sur un fond plein, elles passent en Crust.
-
-H/J/K/L et les flèches sélectionnent les jours : gauche/droite déplacent d’un jour,
-haut/bas d’une semaine, y compris à travers les limites des mois. U/D (ou Page
-Up/Down) changent le mois en conservant le numéro du jour si possible. Home revient
-à aujourd’hui, tout comme N depuis la grille ou le détail. Le jour sélectionné a
-un fond Peach plein (`Theme.calendarSelected`) et aujourd'hui un fond Pink plein
-(`Theme.sideWeather`), sans contour, avec ou sans verre ; leur numéro reste gras
-et, comme l'icône météo et les températures, passe en Crust.
-Le Peach reste prioritaire lorsqu'aujourd'hui est sélectionné.
-Un clic sur une case ou Entrée ouvre son détail horaire dans la
-même capsule. `WeatherDayDetails.qml` affiche température/ressenti, pluie en %/mm,
-vent/rafales en km/h dans une liste défilante. Les bandes alternées des heures
-sont des repères de lecture, pas des sélections : voile neutre à 4 % sur le verre,
-sans contour, et `Theme.surface` opaque uniquement sans verre. Ne pas leur appliquer
-la teinte de sélection à 20 %. En détail, H/L changent le jour,
-J/K et la molette défilent ; Échap ou le chevron retourne à la grille, puis Échap
-ferme le calendrier. La sélection et le mode détail appartiennent au `CalendarController`
-partagé. La hauteur du détail est bornée et suit l’animation commune de la capsule.
-S ouvre `WeatherLocationSelector.qml` depuis la grille ou le détail. Le champ
-de recherche prend le focus ; les lettres H/J/K/L/U/D/N/S y restent du texte.
-Flèches haut/bas, Tab ou Ctrl-J/K sélectionnent un résultat, Entrée ou un clic le
-valide. Échap/chevron revient à la vue précédente. La recherche utilise le géocodage
-Open-Meteo, affiche région/pays et attend 350 ms après la frappe. Rejeter les
-réponses d’une ancienne requête. La liste ne contient que des villes, aucun choix
-de mode automatique/manuel. La ville recherchée est temporaire : chaque nouvelle
-ouverture du calendrier redétecte la localisation IP, même si le cache est récent.
-Restaurer après une notification/Polkit ou déplacer un calendrier déjà ouvert
-conserve la ville consultée. Aucune préférence de lieu n’est enregistrée ; les
-anciens `location.json` sont ignorés. Le cache automatique `v2.json` est séparé
-du cache de recherche `manual-v2.json`. La météo est relancée après toute requête déjà en cours.
-Vider l’ancienne météo à la sélection et ne jamais afficher le cache d’une autre
-ville ou d’un autre mode. Une ville manuelle désactive la géolocalisation IP.
-Chaque nouvelle ouverture repart sur ce mois ; le passage derrière une
-notification, la dictée ou une demande Polkit conserve le mois consulté.
-Le passage à minuit suit le nouveau jour/mois tant que l’utilisateur n’a pas
-navigué vers un autre jour. Il n’y a aucun événement d’agenda, ni infobulle.
-Le focus et les clics masqués sont protégés par le guard
-des notifications ; la dictée garde sa priorité. Une disparition du moniteur
-cible ferme le calendrier.
-
-L’outil Rust `quickshell-weather`, dans `tools/quickshell/weather/` et empaqueté
-par `packages/quickshell/weather.nix`, remplace le wrapper `wttrbar`. Il récupère
-la localisation IP automatique via `https://fwd.gr/api/tools/ip` (Cloudflare), puis une température
-actuelle et 31 jours passés / jusqu’à 16 jours de prévision chez Open-Meteo.
-Pas de compte, clé API, scan Wi-Fi ou service système supplémentaire. Conserver
-le choix IPv4/IPv6 automatique de curl : ces adresses peuvent être localisées
-différemment. Seuls ville et coordonnées sont conservées, pas l’IP ni les autres
-métadonnées réseau/client renvoyées par fwd.gr. Le changement de fournisseur
-ne modifie pas le protocole/cache v2 ; un cache existant reste utilisable en cas d’échec.
-Il fournit des codes météo et températures mini/maxi quotidiens, ainsi que les
-conditions horaires regroupées par date locale dans `days[date].hours`, via la même
-requête. Les anciennes entrées v2 sans heures restent compatibles. Les jours passés utilisent des données de modèle
-archivées et ne sont pas présentés comme des observations mesurées. Les dates
-restent des clés ISO locales sans conversion UTC. Code inconnu ou nul : pas
-d’icône. Mini/maxi incomplets : pas de température inventée. Date hors couverture :
-numéro seul, sans tiret ni météo inventée.
-
-Un seul `WeatherData` fournit température et calendrier à tous les écrans.
-Actualiser au démarrage, chaque heure et à l’ouverture si les données sont
-périmées ; ne jamais lancer une requête par jour ou écran. L’outil émet le cache
-valide immédiatement puis le résultat actualisé en JSON Lines. Le cache est
-écrit atomiquement dans `quickshell/weather/v2.json`, conservé en cas d’échec et
-rejeté au-delà de 24 heures ;
-l’interface applique aussi cette limite, même si aucun nouveau résultat n’arrive.
-Afficher la ville, Open-Meteo et l’heure de mise à jour/cache dans le pied de
-panneau. Sans données utilisables, conserver tout le calendrier et afficher `--°`
-dans la barre. La géolocalisation IP peut être erronée même en fibre, et peut
-être affectée par un VPN. Ne pas confondre ville estimée et position physique.
-
-Tests : `tst_CalendarPanel.qml` avec `qmltestrunner` vérifie la grille, les années
-bissextiles, les dates locales, les icônes/couleurs, les mini/maxi, la navigation
-clavier (H/J/K/L, U/D, Entrée, Échap), les clics, le détail horaire et son défilement,
-ainsi que la hauteur ajustée aux semaines
-et aux changements de données météo, sans variation liée à la largeur.
-`node tests/calendar-navigation_test.mjs` vérifie les fonctions réelles du
-`CalendarController` : limites de mois/années, année bissextile, changement d’heure et sélection.
-`QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QT_NO_XDG_DESKTOP_PORTAL=1
-qs -p tests/tst_WeatherData.qml` depuis `desktop/` vérifie température nulle/zéro,
-cache, expiration et erreurs. Les tests Rust du dossier de l’outil vérifient la
-validation, l’horizon demandé et la cohérence localisation/cache hors ligne.
-
-## 20. Limites d’utilisation Claude et Codex
-
-`Super+R` (`Cmd+R`) appelle `topbar.toggleUsage` et transforme la capsule
-centrale en panneau des limites d’abonnement sur l’écran focalisé ; un second
-appui, `q` ou Échap le ferme, `r` relit les données. Aucune capsule latérale ne
-lui correspond. Comme Système, il prend exactement
-`WorkspaceSwitcher.expandedImplicitWidth` ; sa hauteur est calculée depuis les
-lignes, les notes et les messages, sans passe de layout, et suit l’animation
-commune de `360ms`. Il utilise `Theme.usageAccent` (Teal) pour l’icône, les
-titres et les jauges, les neutres habituels pour le texte, et `Theme.error`
-uniquement pour une limite atteinte, un blocage signalé ou un échec explicite.
-Les compteurs ne changent pas de couleur avant `100 %` : les pourcentages sont
-arrondis à l’inférieur, donc `100 %` signifie réellement atteint.
-
-Chaque section (Claude, puis Codex) affiche son logo de 18 px à gauche du nom,
-le forfait à droite, puis une ligne
-par fenêtre : libellé, pourcentage, jauge sans curseur et réinitialisation
-(délai sous 24 h, sinon jour et heure locaux). Claude présente la session en
-cours, la semaine tous modèles et chaque fenêtre hebdomadaire par modèle ;
-Codex présente ses fenêtres de la plus courte à la plus longue, le forfait
-ChatGPT et les crédits de réinitialisation disponibles, jamais consommés. Un
-compteur Claude est lu dans les grants du statut `cedar_ember` lorsqu'il est
-fourni. Un statut absent ou `null` reste inconnu, même si un crédit est visible
-sur le web : afficher alors `Réinitialisations : voir Claude`, lien vers
-`https://claude.ai/settings/usage`, plutôt qu'un faux zéro. Aucun crédit n'est
-consommé et aucun endpoint privé n'est appelé. Un
-échec d’actualisation conserve la dernière lecture avec la note
-`Échec de l’actualisation` ; sans lecture, la section affiche l’erreur.
-
-Les données viennent uniquement des CLI officiels déjà connectés aux comptes de
-l’utilisateur : requêtes de contrôle `initialize` puis `get_usage` de
-`claude -p` en stream-json, et `initialize`, `initialized` puis
-`account/rateLimits/read` de `codex app-server`. Ne jamais lire
-`~/.claude/.credentials.json`, `~/.claude.json` ou `~/.codex/auth.json`, ni
-appeler les endpoints privés : les conditions d’Anthropic interdisent de
-réutiliser les jetons Claude.ai hors de Claude Code, et les CLI gèrent eux-mêmes
-le renouvellement de leurs jetons. Claude ne reçoit aucun prompt ; sa session
-n’est pas enregistrée, sans serveur MCP ni hook. Ne pas ajouter
-`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` : Claude Code répondrait alors depuis
-son cache local au lieu de relire l’usage. Les deux interfaces sont marquées
-expérimentales en amont ; `UsageLimits.js` valide chaque champ et transforme une
-forme inattendue en erreur, jamais en valeur inventée.
-
-Les CLI ne démarrent qu’à l’ouverture du panneau, au plus une fois par minute
-hors `r`, puis toutes les cinq minutes ou après une réinitialisation affichée
-tant qu’il reste ouvert ; aucun polling permanent. Une conversation répond en
-une à deux secondes (environ 200 Mo de mémoire pendant ce temps). Après la
-réponse, stdin est fermé et le CLI se termine seul ; sans réponse, il est arrêté
-après 30 secondes par SIGTERM puis SIGKILL.
-
-Tests : `node tests/usage-limits_test.mjs` vérifie les deux protocoles, la
-validation, le repli sur les fenêtres nommées de Claude et les textes français.
-`tst_UsageController.qml` avec `qs` offscreen pilote le contrôleur avec les faux
-CLI de `tests/fixtures/`, y compris timeout, CLI absent ou muet, refus et limite
-atteinte. `tst_UsagePanel.qml` avec `qmltestrunner` vérifie la vue, ses couleurs,
-sa hauteur et ses touches. Aucun test ne contacte Anthropic ou OpenAI.
-
-## 21. Règle finale pour une future IA
-
-Avant toute modification visuelle, identifier clairement :
-
-1. la géométrie qui doit bouger ;
-2. le contenu qui doit suivre cette géométrie ;
-3. le moniteur qui reçoit le rendu et le clavier ;
-4. les autres écrans qui doivent conserver leurs workspaces sans reproduire l’animation ;
-5. les limites physiques imposées par les modules latéraux ;
-6. la restauration de l’état Hyprland après fermeture.
-
-Tester l’ouverture, le milieu du mouvement, l’arrivée monotone et la fermeture. Vérifier image par image que la géométrie ne franchit jamais sa cible ; une capture finale seule ne suffit pas pour valider une animation.
+# Guide de maintenance du shell Quickshell
+
+Ce guide conserve les raisons des choix et les contraintes difficiles à déduire
+d'un seul composant. Le [README](../README.md) centralise installation, commandes
+de test et diagnostic. Les valeurs exactes, raccourcis et protocoles détaillés
+restent dans le code, l'aide intégrée et les README des outils concernés.
+
+## Architecture et durée de vie
+
+`shell.qml` crée les contrôleurs une fois par session. Son registre `services`
+contient uniquement leurs références : pas d'alias de champs, de fonctions
+relais ou d'état métier. Les vues parlent à leur contrôleur et demandent les
+changements de présentation par signaux.
+
+`ShellCoordinator` décide du mode central, du moniteur cible, des priorités et
+de la restauration après authentification. Il ne possède ni modèle de
+périphérique, ni mot de passe, ni parseur de protocole, ni processus métier.
+`ShellIntegration` expose l'IPC et restaure l'indication de bordure Hyprland.
+Les sources QML restent dans `desktop/`, les helpers dans `tools/` et
+l'installation dans Home Manager ; séparer les dossiers ne multiplie pas les
+services ou les processus par écran.
+
+Chaque écran possède ses vues, mais partage les données et opérations. Un clic
+cible son écran ; un raccourci sans cible utilise le moniteur focalisé. Déplacer
+un panneau vers un autre écran ne doit ni dupliquer une opération ni effacer un
+brouillon. Les écrans non concernés gardent leurs workspaces et n'animent pas
+une copie cachée du panneau.
+
+La durée de vie d'une opération n'est pas celle de sa vue. Fermer le Wi-Fi
+nettoie scanner, connexion interactive, secret et speed test. Fermer Bluetooth
+arrête la découverte, mais une opération native déjà lancée garde son état.
+Masquer les updates ne termine pas leur processus. Polkit est un service
+générique : une demande externe interrompt puis restaure le panneau et son
+moniteur, si celui-ci existe encore.
+
+## Surfaces, géométrie et transitions
+
+### Une surface Wayland stable
+
+Le `PanelWindow` garde la hauteur du moniteur et une zone exclusive fixe.
+Animer sa hauteur provoquait des déplacements des modules latéraux lors des
+recalculs layer-shell. Seuls les éléments internes changent de taille.
+Le masque d'entrée suit les capsules et le panneau réellement présenté ;
+l'espace transparent entre eux reste traversable aux clics. Le rebond visuel
+ne déplace jamais les zones de clic.
+
+Le plafond des widgets centraux vient de
+`WorkspaceSwitcher.expandedImplicitWidth`, calculé avec un slot spécial même
+s'il n'est pas ouvert. Une constante recopiée dans chaque widget divergerait
+avec la géométrie des workspaces. Mesurer le contenu à sa largeur cible, pas à
+sa largeur animée : sinon les retours à la ligne font gonfler puis rétrécir les
+notifications et panneaux pendant leur ouverture.
+
+En plein écran, toute la barre du moniteur concerné monte en couche Overlay.
+Elle redescend après la fin de la fermeture, sans changer sa géométrie ni sa
+réserve. Il n'existe pas d'OSD indépendant à instancier pour ce cas.
+
+### Animation commune
+
+La transformation centrale est monotone, avec décélération à l'arrivée :
+pas de ressort, de dépassement de la cible ou de trajet aller-retour.
+Une interruption reprend les valeurs effectivement affichées. Source et
+destination restent brièvement rendues ensemble, pilotées par une seule
+progression ; les composants ne relancent pas chacun leur propre entrée.
+Lors d'une séquence rapide de modes, capturer les opacités et translations
+courantes au lieu de faire disparaître brutalement les couches intermédiaires.
+Un passage entre deux panneaux ne doit pas afficher les workspaces entre eux.
+
+Le rebond de sélection est une exception limitée aux capsules latérales
+survolées ou temporairement actives. Une opération de fond ne force pas ce
+rebond. Les listes et workspaces ne rebondissent pas ; masquer ou désactiver
+une vue termine ses animations.
+
+### Passage entre capsule et messagerie
+
+`BeeperBubble` part du rectangle de la capsule. L'ouverture fige ce rectangle
+avant de changer de mode ; la fermeture rejoint la destination actuelle.
+Pour passer du chat à un panneau, établir d'abord le panneau cible, puis
+fermer le chat. Une seule surface peint le verre jusqu'au relais au même
+rectangle final. Deux fonds ou une seconde animation de hauteur produiraient
+un dernier mouvement parasite.
+
+Pendant la fermeture, désactiver le contenu, pas son conteneur visuel :
+le collecteur de `GlassShape` ignore les éléments désactivés, même par un
+parent, ce qui ferait disparaître le verre avant la fin du trajet.
+Les workspaces restent masqués jusqu'au retour réel à la capsule, y compris
+lorsqu'un OSD apparaît puis expire pendant que le chat est ouvert.
+
+Le chat est centré dans la zone de travail. Les marges externes de
+`BeeperBubble` correspondent aux `general.gaps_out` de Hyprland ; les maintenir
+cohérentes. Son contenu garde sa mise en page finale pendant la transformation.
+
+## Couleurs et verre
+
+[Theme.js](../ui/Theme.js) est la source des couleurs. Les widgets latéraux et
+leurs panneaux centraux partagent leur accent ; ne pas recopier leurs codes
+hexadécimaux dans les vues ou dans une seconde table documentaire.
+Les couleurs de plateforme Beeper et les repères du clavier sont indépendants
+de ces accents, afin qu'un changement de couleur de la barre ne les recolore pas.
+
+Le rose d'action et le jaune d'état ont des rôles distincts dans les workspaces
+et contrôles génériques. Les panneaux ayant leur propre accent l'utilisent
+pour leurs sélections. Un compteur élevé ne constitue pas à lui seul une erreur ;
+distinguer une valeur indisponible de zéro. Les images et icônes fournies par
+les applications gardent leurs couleurs. Le thème des bordures Hyprland est
+indépendant de celui de Quickshell.
+
+`GlassState.enabled` dépend de la disponibilité du plugin. Le repli opaque
+doit rester lisible : ne pas rendre `Theme.background` transparent globalement,
+car il sert aussi au texte inversé. `GlassShape` appartient au rectangle qui
+porte les transformations et suit son rayon. Après une modification du module
+C++, redémarrer le runtime déployé ; un rechargement QML ne recharge pas ce module.
+
+Les sélections internes réutilisent `SelectionSurface` et le verre existant.
+Elles ne sont pas une deuxième vitre : pas de `GlassShape`, de flou ou de shader
+par ligne. Les sélections pleines inversent le texte pour le contraste ; les
+teintes translucides gardent leurs libellés clairs. Le liseré tournant et les
+reflets synthétiques de bord ont été retirés volontairement.
+
+## Messagerie
+
+### État, envoi et API
+
+Un `BeeperData` et un backend Go servent toute la session. Les vues par écran
+n'activent que le panneau ciblé. La connexion reste vivante quand le chat est
+masqué, notamment pour recevoir les notifications. L'interface est en anglais ;
+les contenus et noms des conversations ne sont pas traduits.
+
+Ouvrir une conversation, défiler ou écrire ne la marque pas lue. Seuls une
+action explicite ou un envoi accepté le font. Un envoi marque jusqu'au dernier
+message connu au départ, pour laisser non lus ceux arrivés entre-temps.
+Un échec ou un résultat incertain ne change pas la lecture.
+
+Au départ d'un envoi, texte, pièces jointes et réponse sont transférés dans un
+instantané persistant distinct du prochain brouillon. Un succès tardif ne doit
+jamais effacer ce nouveau brouillon, même s'il est identique. En cas d'échec,
+restaurer l'ancien seulement si la saisie est vide ; sinon proposer sa
+récupération séparément, sans écraser ni renvoyer automatiquement.
+Les pièces jointes des envois incertains restent protégées après redémarrage.
+Vérifier la conversation avant de retenter un envoi non confirmé.
+Un lot utilise les envois unitaires de l'API dans l'ordre de sélection ; seul le
+premier porte le texte et la réponse. Persister la progression avant le fichier
+suivant et ne conserver en récupération que les fichiers non encore acceptés.
+Une erreur arrête le lot. Les anciens brouillons `attachment` restent lisibles
+avec les nouveaux brouillons `attachments`.
+
+Brouillons, sélection et réponses asynchrones sont associés au `chatID`.
+Une réponse tardive ne déplace ni le défilement ni la sélection d'un autre chat.
+Après succès, seule la conversation concernée retourne en bas ; un geste
+manuel libère cette ancre.
+
+`isLowPriority` vient de Beeper. Attendre le succès d'une modification, rejeter
+les lectures antérieures puis accepter les modifications d'autres clients.
+Ne pas réintroduire de classement local persistant ou de migration distante
+des anciens choix d'archives. Les non-lus comptent les conversations, y compris
+les marquages manuels, dans tout le catalogue et non dans les seules pages
+chargées. Une erreur ou un catalogue incomplet donne un état indisponible,
+jamais un zéro ou un total partiel présenté comme exact.
+
+Les réactions sont ordonnées par message et préservent celles des autres
+participants. Comparer sans VS15/VS16, puis envoyer la variante exacte admise
+par la plateforme ; conserver tons de peau et jointures ZWJ. Identifier notre
+participant par les données API, pas par son nom affiché.
+Les reçus de lecture doivent être confirmés : la livraison seule ne suffit
+pas. Dans Telegram privé, le dernier marqueur confirmé couvre les anciens
+messages envoyés ; ne pas étendre cette inférence aux groupes, aux messages
+plus récents ou aux envois en attente.
+
+Pour les auteurs, membres et réactions, ne pas inventer une personne à partir
+de la photo du groupe. Un total de participants ne se déduit d'une liste
+partielle que lorsque l'API garantit sa complétude. Les identités et couleurs
+des auteurs restent stables pendant navigation, pagination et transfert d'écran.
+Les détails de protocole et de persistance appartiennent au
+[backend](../../tools/quickshell/beeper/README.md).
+
+### Pagination, modèles et défilement
+
+`KeyedListModel` réconcilie les snapshots par identité. Remplacer tout le modèle
+détruit les delegates, relance les décodeurs et casse les ancres de lecture.
+Cela concerne aussi les pièces jointes et les réactions.
+
+La sélection de conversation est un identifiant, pas le `currentIndex` natif
+d'une ListView : une activité de fond peut réordonner le catalogue sans ramener
+le viewport sur une sélection hors champ. Une navigation explicite révèle la
+ligne après avoir arrêté le mouvement précédent ; un geste utilisateur
+interrompt le suivi d'une ligne qui grandit. Aucun `forceLayout()` ou parcours
+du catalogue à chaque image.
+
+La sélection et son brouillon changent immédiatement, mais le chargement de
+l'historique attend une courte pause de navigation. Cela évite de construire
+les conversations traversées pendant une répétition de touche. Une cible
+explicite, telle qu'une notification, contourne ce délai. Chaque requête porte
+sa génération pour rejeter les réponses périmées.
+
+Les curseurs API restent opaques : ne pas en fabriquer depuis un identifiant
+ou `sortKey`. Une seule pagination à la fois ; un curseur inchangé termine les
+pages et une erreur suspend les tentatives jusqu'à une reprise explicite.
+Précharger pendant le défilement avec un throttle, sans attendre sa fin.
+La recherche dispose de sa propre génération et pagination ; changer de chat,
+de requête, fermer ou naviguer manuellement interrompt la localisation d'un
+ancien résultat, sans limite arbitraire de pages.
+
+`BeeperHistory` conserve les hauteurs exactes des messages dans un Flickable :
+l'estimation des delegates variables d'une ListView faisait varier le curseur
+de défilement pendant un simple scroll. L'Instantiator asynchrone répartit les
+créations entre images ; révéler les nouvelles bulles et activer leurs médias
+après restauration du viewport. Les panneaux invisibles ne reconstruisent pas
+d'historique ; un panneau en cours de fermeture conserve son contenu.
+
+Les positions de layout restent présentes, mais seuls les avatars, médias et
+citations proches du viewport chargent leurs ressources. Conserver les dimensions
+décodées après déchargement : sinon une pièce jointe change de hauteur à chaque
+retour à l'écran. Une recherche binaire limite les mises à jour de visibilité
+aux lignes concernées. Seuls les nouveaux messages arrivant en bas d'une
+conversation déjà ouverte jouent une entrée, jamais les anciennes pages ou
+un rafraîchissement.
+
+`AcceleratedScroll` conserve le nom historique, sans multiplicateur de cadence.
+La molette accumule une distance avec durée bornée ; le pavé tactile garde ses
+deltas natifs. Ne pas ajouter de `Behavior on contentY` en concurrence avec
+Flickable, ni restaurer une ancre au milieu d'un geste.
+Voir l'[avertissement Qt sur les hauteurs variables](https://doc.qt.io/qt-6/qml-qtquick-controls-scrollbar.html#varying-delegate-sizes).
+
+### Texte, focus et saisie
+
+Le texte des messages reste brut. Recherche et sélection peignent une couche
+échappée avec la même police et le même interligne ; le texte original détermine
+seul la géométrie. Ne pas basculer un même Text entre formats brut et riche :
+l'ordre des bindings pourrait interpréter brièvement du contenu utilisateur
+comme du HTML. Préserver les indices UTF-16 en ignorant casse et accents.
+Les liens ouvrables sont limités à HTTP(S) et mailto.
+
+La sélection de texte ne vole pas le focus aux raccourcis de navigation.
+Les touches de navigation restent du texte dans les champs ; respecter les
+compositions, AltGr et touches mortes. `Ctrl+H/L` passe entre les panneaux en
+conservant brouillon, réponse et pièce jointe. Le sélecteur Yazi/Ghostty ouvert
+par `Ctrl+F` garde la conversation d'origine, même si la sélection change ;
+annulation ou fermeture restaure la saisie sans envoyer. La classe de fenêtre
+`dev.me.file` conserve les règles flottantes de Yazi. Pendant son ouverture,
+le chat se replie avec son animation habituelle avant de lancer Yazi. Attendre
+la fin réelle de cette transition, pas un délai fixe. Il libère alors son grab
+et son masque d'entrée ; la barre garde
+sa couche normale. À la fermeture de Yazi, le même panneau et le brouillon sont
+réaffichés. Ne pas forcer la réouverture si l'utilisateur a fermé le chat ou
+choisi un autre panneau entre-temps.
+
+L'ordre des annulations compte : mode Vim, sélection de texte, lecture audio,
+modale et aperçus de réponse/pièce jointe ont leurs traitements contextuels
+avant la fermeture du chat. L'aide `?` et les handlers sont la référence des
+touches exactes ; ne pas maintenir une deuxième liste ici.
+
+En mode normal Vim, le champ doit réellement être en lecture seule, y compris
+pour les entrées IME, collages et dépôts. Les commandes utilisent le caractère
+produit, pas seulement le code de touche ; une touche morte seule ne doit pas
+perdre la commande en attente. Une commande ou session d'insertion forme une
+seule étape d'annulation, car l'undo natif Qt peut scinder un remplacement.
+La prise de focus interne démarre la saisie ; un simple retour dans la fenêtre
+ne doit pas réinitialiser arbitrairement son mode.
+
+La saisie d'emojis restaure le curseur et la sélection, sans envoyer. Le catalogue
+et sa licence sont inclus dans `BeeperEmojiData.js` ; `generate-emojis.mjs`
+produit son patch de régénération. Un vocal reste un brouillon après arrêt.
+Annuler sa préparation à la fermeture ou au changement de chat : un retour
+tardif ne doit pas ouvrir le micro. Une connexion perdue n'empêche jamais
+d'arrêter un enregistrement déjà lancé.
+
+### Médias et rendu
+
+L'audio possède un lecteur partagé indépendant des delegates, du moniteur et
+du chat sélectionné. Scroll, rafraîchissement, changement de conversation ou
+fermeture du panneau ne l'interrompent pas. Les contrôles recréés se rattachent
+à la même position ; une pause explicite permet de passer à un autre vocal.
+Les formes d'onde réelles viennent du backend ; seule la démo peut en inventer.
+La molette au-dessus du lecteur continue de faire défiler les messages.
+
+Le plein écran multimédia utilise une surface séparée sans redimensionner la
+barre. Une vidéo démarre à l'ouverture, met les lecteurs inline en pause et
+s'arrête à la fermeture, même si son téléchargement finit plus tard.
+Une vidéo en pause reste en pause après un seek. Les durées API sont en
+secondes, celles de Qt Multimedia en millisecondes.
+
+Sur cette machine NVIDIA/Wayland, le chemin VAAPI d'export des textures peut
+bloquer le shell. Le runtime choisit donc le décodage logiciel FFmpeg
+(`QT_FFMPEG_DECODING_HW_DEVICE_TYPES=,`), tout en gardant le rendu Qt Quick et
+Liquid Glass sur GPU. Vérifier des pixels réellement décodés et l'arrêt des
+lecteurs avec le harnais `--video` ; `PlayingState` seul ne prouve rien.
+
+Les photos attendent d'être prêtes avant le trajet depuis leur vignette.
+Animer transform/opacité, sans redimensionner l'image décodée. Si la vignette
+est masquée, rognée ou réaffectée, utiliser un fondu plutôt qu'un trajet vers
+une autre image. La règle Hyprland `no_anim` de la surface photo évite un second
+fondu de couche ; le fond est seulement assombri, pas flouté.
+
+Garder chat et photo dans le même périmètre de focus. À la fermeture, retirer
+l'ancien grab avant de masquer la fenêtre puis créer celui du chat au tour
+suivant : réactiver le grab existant laisse un événement `cleared` tardif
+annuler le clavier. Tester avec le pointeur hors du chat et une autre fenêtre
+ouverte. Un clic extérieur libère le focus sans fermer le chat ; ne pas lier
+le grab à la seule visibilité ni reprendre le clavier à l'autre application.
+
+Les bulles utilisent un chemin rempli unique pour éviter un joint transparent
+entre pointe et corps. Les médias ne peignent pas une seconde carte dessous.
+Conserver texte, avatars et résolution de décodage stables pendant les
+animations de sélection ; les transforms évitent les recalculs coûteux de
+texte à chaque image. `ClippingRectangle` réalise le masque circulaire :
+un rectangle arrondi ordinaire ne découpe pas ses enfants.
+
+## Notifications et coexistence des panneaux
+
+Quickshell possède un seul serveur de notifications et une seule carte,
+présentée sur l'écran ciblé à réception. Une nouvelle carte remplace l'ancienne ;
+pas d'historique, de file ni de rejeu. Garder l'objet retenu pendant le fade de
+fermeture pour que son image reste disponible.
+
+Les notifications recouvrent temporairement les autres modes, dont les états
+et opérations continuent. Le guard protège leurs champs sans désactiver puis
+réactiver les vues, ce qui perdrait leurs sélections. Une notification seule
+ne réclame pas de clavier exclusif. À sa fin, restaurer le mode encore actif,
+pas un OSD déjà expiré.
+
+Volume, luminosité et notifications ordinaires coexistent avec le chat dans
+la barre. Les autres panneaux centraux le remplacent ; ouvrir le chat les
+ferme. Les arrivées MPRIS passives n'ouvrent pas un panneau : les applications
+publient aussi leurs vocaux et vidéos comme lecteurs.
+
+Quand le chat est ouvert, supprimer les bannières de messagerie sur tous les
+écrans, même sans focus, tout en conservant les sons autorisés. Ouvrir le chat
+retire une carte de messagerie déjà affichée sans interrompre son son. Ne pas
+mettre ces arrivées en attente pour la fermeture. Supprimer les doublons natifs
+Beeper tant que notre client est connecté.
+Les conversations Low Priority ne notifient que pour mentions structurées ou
+réponses admissibles, avec respect du mute/snooze.
+
+Ne pas déranger expire toutes les arrivées, même critiques, et arrête seulement
+les lecteurs de notification appartenant au shell. Musique, appels et micro
+ne changent pas. Son état survit au rechargement QML, pas au redémarrage du
+processus. Le feedback de la cloche est temporaire : un mode muet persistant
+ne maintient ni survol ni rebond.
+
+Chaque arrivée autorisée possède son lecteur de son, sans délai minimal ni file.
+Respecter `suppress-sound` ; une mise à jour du même ID ne rejoue pas le son.
+Suivre et libérer les lecteurs, y compris après un échec, permet de couper
+ceux déjà actifs lors du passage en Ne pas déranger.
+
+Le raccourci Échap du compositeur n'est consommé que si une carte est présente.
+Son bail expire après un crash du shell. Dans le sous-mode Voxtype, fermer une
+notification ne doit pas annuler la dictée ni quitter ce sous-mode.
+Le clic droit de la cloche bascule uniquement le clavier intégré ; son état
+vit dans Hyprland, indépendamment de la cloche et de l'état Ne pas déranger.
+
+## Intégrations système
+
+### Workspaces
+
+La sélection est locale à chaque moniteur, l'occupation est globale.
+Quickshell 0.3.1 peut traiter `workspacev2` sur l'ancien écran si l'événement
+précède `focusedmon` : utiliser l'instantané `lastIpcObject.activeWorkspace.id`
+rafraîchi par `WorkspaceMonitorSync`, pas le focus global ni directement
+`monitor.activeWorkspace`. Regrouper les événements avec l'API native,
+sans polling `hyprctl`. Un écran absent ne reprend pas le workspace d'un autre.
+
+La référence de moniteur vient de Bar ; la rechercher dans chaque sélecteur
+avait créé une boucle de binding. Largeur et rendu suivent le même identifiant
+local, y compris pour les special workspaces. Les tests IPC utilisent des
+sockets privés, sans déplacer les workspaces réels.
+
+L'indication de bordure de la fenêtre Hyprland doit être restaurée au démarrage,
+à la fermeture du dernier overlay et à la destruction de `ShellIntegration`,
+afin qu'un redémarrage ne laisse pas la bordure inactive.
+
+### Réseau, audio et luminosité
+
+Wi-Fi et Bluetooth utilisent les modèles natifs Quickshell. Garder le scanner
+Wi-Fi actif tant que le sélecteur est ouvert : le couper masque les réseaux
+inconnus. La fin du spinner ne termine pas le scanner. Une roue de navigation
+ne s'anime qu'après une action utilisateur, pas à chaque résultat de scan.
+
+Le speed test est explicite ; fermeture et timeout arrêtent son groupe de
+processus. Les générations rejettent toute sortie tardive. Transmettre un
+secret Wi-Fi directement à l'API native, jamais dans des arguments shell.
+
+Les coches audio suivent les périphériques effectifs, même lorsqu'une
+préférence vient d'être écrite. PipeWire possède volume et mute ; WirePlumber
+libère la préférence de la direction concernée lors d'un hotplug ou changement
+de route. Désactiver la restauration des anciens défauts ne suffit pas à
+libérer une préférence actuelle. Volume, mute et nouveaux flux ne constituent
+pas un hotplug.
+
+MPRIS préfère `playerctld`, qui suit le dernier lecteur actif. La pause/reprise
+pendant la dictée appartient à Voxtype ; le contrôleur QML ne doit pas ajouter
+une deuxième politique concurrente.
+
+Chaque écran affiche sa propre luminosité. Une valeur externe inconnue ne
+reprend jamais celle de la dalle interne. Les lectures initiales/topologiques
+ne font ni écriture ni OSD. Les commandes DDC sont regroupées en préservant les
+inversions et la saturation à chaque pas ; invalider les réponses et le bus
+mémorisé quand les moniteurs changent. Les mesures internes ne remplacent pas
+une consigne en attente. Voir le [helper luminosité](../../tools/quickshell/brightness/README.md).
+
+### Batterie et télémétrie
+
+Le branchement prime sur l'alerte de niveau : icône et pourcentage sont verts
+branchés, rouges débranchés sous 20 %, sinon dans l'accent normal. Chaque
+appareil est indépendant, sans éclair ajouté. Un pourcentage inconnu n'est
+pas une batterie vide.
+
+`!UPower.onBattery` couvre une batterie pleine ou à charge limitée ; une
+décharge explicite doit néanmoins retirer le vert si l'état global est en
+retard. Le clavier Agar ne fournit pas son branchement par Bluetooth : son
+identité USB précise et une télémétrie fraîche servent d'indice. Cela fonctionne
+via un hub, mais pas sur un chargeur mural sans liaison USB au PC. Un niveau de
+100 % ne prouve jamais un branchement.
+
+Les collecteurs système/GPU sont partagés ; les tops de processus sont abonnés
+seulement quand le panneau est réellement visible. Les générations évitent
+de présenter un ancien top après réouverture. Un collecteur expiré, une carte
+en veille et une vraie mesure à zéro sont trois états distincts.
+Ne pas initialiser NVML avant d'avoir vérifié la veille PCI, car cela réveillerait
+la NVIDIA. Les limites et unités appartiennent aux README
+[système](../../tools/quickshell/system-stats/README.md) et
+[GPU](../../tools/quickshell/gpu-monitor/README.md).
+
+### Lanceurs
+
+Le catalogue applications utilise `DesktopEntries`, sans scruter périodiquement
+les fichiers desktop. Une activation d'instance existante doit aussi fonctionner
+depuis un autre workspace normal ou spécial. Une recherche ne réserve pas
+les lettres ordinaires aux commandes de navigation.
+
+TabCtl fournit les onglets et le helper normalise ses erreurs en JSON.
+Les favicons viennent de la base SQLite locale, sans téléchargement.
+Activer un onglet ne suffit pas : focaliser aussi sa fenêtre Hyprland.
+L'extension Chrome est installée manuellement ; Home Manager possède le
+manifeste Native Messaging. Ne pas lancer `tabctl install` sur ce manifeste.
+Diagnostic et protocole : [helper Chrome](../../tools/quickshell/chrome-tabs/README.md).
+
+## Stockage
+
+Cmd+Y et le clic sur la capsule stockage ouvrent le même mode `storage` sur
+l'écran concerné. Il reprend la largeur maximale, le morphing et la politique
+clavier de la capsule centrale ; ne pas ajouter une fenêtre ni une animation
+d'entrée autonome. Accent principal `Theme.sideDisk`, couleurs de parts issues
+de la palette existante, six libellés et tailles lisibles sans dépendre des couleurs.
+
+L'espace occupé/libre réel reste séparé du camembert des tailles mesurées.
+Sur Btrfs, les blocs de fichiers partagés peuvent apparaître plusieurs fois :
+le graphique indique « Répartition estimée » et utilise la somme des catégories,
+jamais un redimensionnement silencieux pour correspondre au total du disque.
+Une valeur absente affiche `—`, un zéro mesuré reste `0 Gio`, et une mesure
+partielle indique une borne inférieure. Les six lignes restent présentes, même
+quand VM vaut zéro. Applications et caches conservent deux sous-totaux.
+
+Le contrôleur partagé conserve les mesures 30 minutes. R/le bouton actualise,
+Q/Échap ferme. Aucun nettoyage n'est disponible. Le service système ne lit que
+des métadonnées et publie un rapport atomique ; aucun scan récurrent par écran
+ni travail lourd dans le collecteur CPU/RAM. Une erreur conserve la dernière
+mesure et sa date. Les fixtures QML désactivent les vrais services.
+
+Le service fixe laisse le shell non privilégié : la règle Polkit n'autorise
+que la session locale active de l'utilisateur prévu à demander son démarrage.
+Fermer le panneau laisse finir l'analyse. Rapport, cache et contrat de mesures :
+[collecteur stockage](../../tools/quickshell/system-stats/README.md#on-demand-storage-breakdown).
+
+## Updates et authentification
+
+Le build et l'installation sont deux décisions distinctes. Un résumé de
+processus actualise l'affichage, mais ne confirme jamais l'installation.
+Seul `installUpdate()`, déclenché explicitement, transmet `install\n`.
+Ne pas injecter Enter dans la session réelle pour vérifier une présentation.
+
+L'installation réutilise le résultat construit et prépare la génération de
+démarrage avec `boot`, sans redémarrer les services de la session courante.
+L'état de redémarrage requis persiste jusqu'à ce que `/run/current-system`
+corresponde à la génération attendue. Le checker et les opérations partagent
+un verrou ; build, installation et nettoyage ne se chevauchent pas.
+Les empreintes du flake conditionnent la réutilisation d'un lock candidat.
+Le [README des helpers](../../tools/quickshell/update/README.md) possède les
+détails de cache, rollback et activation privilégiée.
+
+Une fin sans état terminal est un échec, même avec code zéro. Les générations
+isolent les sorties des tentatives précédentes. Les logs volumineux du
+nettoyage restent dans `quickshell/top-bar/clean.log`, pas dans un flux de
+lignes QML ; l'espace récupéré vient d'une mesure avant/après.
+
+Le formulaire Polkit ne stocke jamais une réponse dans les arguments,
+l'environnement, les fichiers ou les logs. L'effacer avant soumission et à
+chaque changement de défi/demande. Échap masque et nettoie le formulaire sans
+confirmer l'opération ni annuler implicitement la demande native.
+Les tests utilisent des transports fictifs et aucun agent système réel.
+
+## Calendrier et météo
+
+Le calendrier manipule des dates civiles locales : ne pas les convertir
+implicitement en UTC. Sa hauteur découle des semaines et des données, pas
+d'une passe de layout à la largeur animée. Un code inconnu, des températures
+incomplètes ou un jour hors couverture ne doivent pas inventer de météo.
+Les données passées sont des modèles archivés, pas des observations mesurées.
+
+La ville manuelle est temporaire. Une nouvelle ouverture redétecte la
+localisation IP ; restauration après notification/Polkit ou déplacement du
+panneau conserve la consultation. Séparer les caches automatique et manuel,
+vider l'ancienne ville à la sélection et rejeter les réponses périmées.
+Minuit suit le nouveau jour seulement tant que l'utilisateur n'a pas choisi
+une autre date.
+
+Un seul `WeatherData` sert tous les écrans ; pas de requête par case ou moniteur.
+Un cache périmé devient indisponible même sans nouvelle réponse. La localisation
+IP est une estimation, notamment avec VPN ou selon IPv4/IPv6, jamais une
+position physique certifiée. Fournisseurs, couverture et protocole de cache :
+[helper météo](../../tools/quickshell/weather/README.md).
+
+## Limites d'utilisation
+
+Seules les CLI officielles déjà authentifiées accèdent aux comptes. Ne pas
+réutiliser leurs fichiers de credentials ni des endpoints privés : les CLI
+possèdent le renouvellement et la compatibilité de leur authentification.
+Les protocoles restent expérimentaux et chaque champ doit être validé.
+Une absence de valeur n'est pas zéro ; conserver une dernière lecture avec
+son erreur plutôt que présenter un résultat frais inventé.
+
+Claude reçoit des requêtes de contrôle sans prompt, sans sauvegarder de session,
+et sans lancer de hooks ou de serveurs MCP. Ne pas ajouter `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` :
+cela ferait relire le cache local plutôt que l'usage courant.
+Codex utilise `account/rateLimits/read` via app-server ; seuls ses quotas
+principaux sont affichés, pas les réserves expérimentales.
+Les crédits de réinitialisation ne sont jamais consommés ; pour Claude,
+un statut de grants absent reste inconnu et renvoie à la page d'usage.
+
+Les pourcentages sont arrondis à l'inférieur : 100 % doit signifier réellement
+atteint. Les processus vivent le temps d'une lecture à la demande, avec timeout
+et arrêt forcé si nécessaire, sans polling permanent panneau fermé.
+`desktop.nix` épingle les mêmes versions de CLI que le profil utilisateur.
+Les fixtures simulent les deux protocoles sans contacter les fournisseurs.
+
+## Clavier et saisie
+
+L'overlay HHKB est tenu par des événements Hyprland ordonnés et n'acquiert ni
+focus clavier ni entrée souris. Les relâchements de touche/modificateur, reloads
+et changements de sous-mode doivent le fermer. Tab doit être consommé pendant
+l'overlay sans déclencher la dictée ; en dehors, il conserve son rôle normal.
+Les labels suivent bindings et XKB, sans supposer les combinaisons Fn du firmware.
+
+Lafayette utilise une touche morte à verrouillage ponctuel, distincte de
+Compose sur Caps Lock et d'AltGr. Tester l'appui puis le relâchement réel, pas
+seulement un symbole isolé. Le keymap est compilé depuis les sources épinglées
+dans `home_manager/hyprland/lafayette.nix`, sans modifier firmware, XKB système
+ou table Compose globale.
+Pour revenir à l'ancien agencement, retirer `kb_file`, remettre
+`kb_layout = "fr"`, `kb_variant = "us"`, conserver `compose:caps` et aligner
+le diagramme. Les commandes de validation sont dans le README.
+
+## Validation ciblée
+
+Utiliser les commandes et environnements du [README](../README.md#build-preview-and-test).
+Pour une animation, contrôler ouverture, interruption, arrivée et fermeture ;
+une capture finale ne valide ni le trajet ni le relais de surface.
+Vérifier aussi le deuxième écran, la stabilité de la réserve Hyprland et le
+retour du focus/de la bordure.
+
+Les suites Wayland couvrent le vrai rendu et les cycles multimédia, les fixtures
+offscreen les états et interactions. Les tests de contrôleurs ne doivent ni
+envoyer de messages, ni modifier les réseaux, ni installer/nettoyer le système.
+Les détails déjà couverts par le code et ses assertions ne nécessitent pas
+une nouvelle copie documentaire ; ajouter ici le motif d'un choix ou le piège
+que cette vérification protège.

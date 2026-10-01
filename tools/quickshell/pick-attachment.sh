@@ -9,22 +9,21 @@ cleanup() {
 trap cleanup EXIT
 
 # A separate Ghostty process waits for Yazi even if another terminal is open.
+# Reuse the usual file-manager class: Hyprland centers it at 1000 x 600, floating.
 # Paths are passed as arguments, never interpolated into a shell command.
-if ! ghostty --gtk-single-instance=false --title="Attach a file" -e \
+if ! ghostty --gtk-single-instance=false --class=dev.me.file --title="Attach a file" -e \
   yazi --chooser-file="$picker_dir/selection" "${HOME:-/}" >/dev/null 2>&1; then
   printf '%s\n' 'Could not open Yazi in Ghostty.' >&2
   exit 1
 fi
 
 if [[ ! -s "$picker_dir/selection" ]]; then
-  printf '%s\n' '{"path":""}'
+  printf '%s\n' '{"paths":[]}'
   exit 0
 fi
 
-# The messenger currently supports one attachment per message. Reject a
-# multi-selection explicitly instead of silently dropping selected files.
+# Preserve Yazi's selection order and encode names without shell evaluation.
 jq -Rs '
   split("\n") | if .[-1] == "" then .[:-1] else . end
-  | if length == 1 then {path: .[0]}
-    else error("Choose one file per message.") end
+  | {paths: .}
 ' "$picker_dir/selection"

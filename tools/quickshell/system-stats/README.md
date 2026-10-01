@@ -118,3 +118,5 @@ space. The UI must use the category sum for the breakdown and display actual
 free/used capacity separately. The intended system service supplies read access
 to Docker/VM directories, resource limits and timeout; an ordinary user scan
 reports denied paths as partial, never silently as zero.
+The service also freezes mount propagation during a scan. Standalone diagnostic
+runs use a mount-table snapshot, so mounts should not be changed while running.

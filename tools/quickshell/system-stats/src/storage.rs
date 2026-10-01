@@ -447,7 +447,11 @@ pub fn collect(options: &Options) -> Result<Value> {
 pub fn write_report(output: &Path, report: &Value) -> Result<()> {
     validate_output(output)?;
     let parent = output.parent().context("Missing output parent")?;
-    let temporary = parent.join(format!(".quickshell-storage-{}.tmp", std::process::id()));
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let temporary = parent.join(format!(
+        ".quickshell-storage-{}-{nonce}.tmp",
+        std::process::id()
+    ));
     let mut file = OpenOptions::new()
         .create_new(true)
         .write(true)

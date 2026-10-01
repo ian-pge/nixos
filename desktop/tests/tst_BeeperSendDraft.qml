@@ -65,16 +65,71 @@ ShellRoot {
     }
     function test_attachment_and_reply_move_with_the_sent_message_not_the_next_draft() {
       const oldAttachment = {path: "/fixture/first.txt", fileName: "first.txt", type: "unknown"};
-      beeperData.draftAttachment = oldAttachment; beeperData.replyToMessageID = "incoming";
+      beeperData.draftAttachments = [oldAttachment]; beeperData.replyToMessageID = "incoming";
       type("With a picture"); keyClick(Qt.Key_Return);
       const sent = pending("send")[0].params;
       compare(sent.attachment.path, oldAttachment.path); compare(sent.replyToMessageID, "incoming");
       compare(beeperData.draftAttachment, null); compare(beeperData.replyToMessageID, "");
-      type("Next"); beeperData.draftAttachment = {path: "/fixture/next.txt", fileName: "next.txt", type: "unknown"};
+      type("Next"); beeperData.draftAttachments = [{path: "/fixture/next.txt", fileName: "next.txt", type: "unknown"}];
       beeperData.replyToMessageID = "another-message";
       beeperData.respond("send", {});
       compare(panel.composer.text, "Next"); compare(beeperData.draftAttachment.path, "/fixture/next.txt");
       compare(beeperData.replyToMessageID, "another-message");
+    }
+    function files() { return ["one", "two", "three"].map(name => ({path: "/fixture/" + name + ".txt", fileName: name + ".txt", type: "file"})); }
+    function flushSavedProgress() {
+      while (pending("saveDraft").length) beeperData.respond("saveDraft", {});
+    }
+    function test_multiple_files_send_in_order_with_text_only_once() {
+      beeperData.draftAttachments = files(); beeperData.replyToMessageID = "incoming";
+      type("The documents"); keyClick(Qt.Key_Return);
+      compare(beeperData.draftAttachments, []); verify(beeperData.sending);
+      for (let i = 0; i < 3; ++i) {
+        compare(pending("send").length, 1);
+        const payload = pending("send")[0].params;
+        compare(payload.attachment.path, files()[i].path);
+        compare(payload.text, i === 0 ? "The documents" : "");
+        compare(payload.replyToMessageID, i === 0 ? "incoming" : "");
+        beeperData.respond("send", {pendingMessageID: "accepted-" + i});
+        if (i < 2) {
+          verify(beeperData.sending); compare(pending("send").length, 0);
+          compare(beeperData.recoverableDrafts[0].attachments.length, 2 - i);
+          flushSavedProgress();
+        }
+      }
+      verify(!beeperData.sending); compare(beeperData.recoverableDrafts, []);
+      compare(pending("send").length, 0);
+    }
+    function test_partial_failure_recovers_only_unsent_files_data() {
+      return [{tag: "empty_draft", next: false}, {tag: "new_draft", next: true}];
+    }
+    function test_partial_failure_recovers_only_unsent_files(data) {
+      beeperData.draftAttachments = files(); type("Sent caption"); keyClick(Qt.Key_Return);
+      beeperData.respond("send", {}); flushSavedProgress();
+      if (data.next) type("My next message");
+      beeperData.respond("send", null, {code: "send_uncertain", message: "Check whether the second file was sent"});
+      verify(!beeperData.sending); compare(pending("send").length, 0);
+      const remaining = data.next ? beeperData.recoverableDrafts[0] : beeperData.draftSnapshot();
+      compare(remaining.attachments.map(file => file.path), files().slice(1).map(file => file.path));
+      compare(remaining.text, "");
+      if (data.next) { compare(panel.composer.text, "My next message"); compare(beeperData.draftAttachments, []); }
+    }
+    function test_failed_progress_save_stops_before_next_file() {
+      beeperData.draftAttachments = files(); keyClick(Qt.Key_Return);
+      flushSavedProgress(); beeperData.respond("send", {});
+      beeperData.respond("saveDraft", null, {message: "Disk unavailable"});
+      verify(!beeperData.sending); compare(pending("send").length, 0);
+      compare(beeperData.draftAttachments.map(file => file.path), files().slice(1).map(file => file.path));
+    }
+    function test_multiple_files_survive_switching_chats_and_old_drafts_still_load() {
+      beeperData.draftAttachments = files(); type("Keep all files");
+      panel.chooseChat(1); beeperData.respond("getDraft", {attachment: {path: "/fixture/legacy.txt", type: "file"}});
+      compare(beeperData.draftAttachments.length, 1); compare(beeperData.draftAttachment.path, "/fixture/legacy.txt");
+      panel.chooseChat(0);
+      compare(beeperData.draftAttachments.map(file => file.path), files().map(file => file.path));
+      beeperData.respond("getDraft", {text: "Keep all files", attachments: files()});
+      compare(beeperData.draftAttachments.length, 3);
+      compare(beeperData.draftText, "Keep all files");
     }
     function test_failed_send_restores_the_original_only_if_no_new_draft_exists() {
       type("Keep this on failure"); beeperData.replyToMessageID = "incoming";

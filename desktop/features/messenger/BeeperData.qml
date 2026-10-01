@@ -73,7 +73,9 @@ Scope {
   property var deletedChatIDs: ({})
   property var deletedMessageIDs: ({})
   property string draftText: ""
-  property var draftAttachment: null
+  property var draftAttachments: []
+  readonly property var draftAttachment: draftAttachments[0] || null
+  property int stagingAttachments: 0
   property string replyToMessageID: ""
   property bool viewFocused: false
   property var viewOwner: null
@@ -338,7 +340,7 @@ Scope {
     currentChatID = chatID; messages = []; loadingMessages = false; trailingMessagesRefresh = false; hasOlderMessages = false; oldestCursor = ""; messagesPaginationBlocked = false;
     restoringDraft = true;
     const saved = localDrafts[chatID] || {};
-    draftText = saved.text || ""; draftAttachment = saved.attachment || null; replyToMessageID = saved.replyToMessageID || "";
+    draftText = saved.text || ""; draftAttachments = attachmentsOf(saved); replyToMessageID = saved.replyToMessageID || "";
     restoringDraft = false;
     const generation = chatGeneration, revision = draftRevision;
     request("getDraft", {chatID: chatID}, (result, error) => {
@@ -349,7 +351,7 @@ Scope {
         return;
       }
       restoringDraft = true;
-      draftText = result.text || ""; draftAttachment = result.attachment || null; replyToMessageID = result.replyToMessageID || "";
+      draftText = result.text || ""; draftAttachments = attachmentsOf(result); replyToMessageID = result.replyToMessageID || "";
       restoringDraft = false;
     });
     // Selection/drafts change immediately. During rapid sidebar navigation,
@@ -366,7 +368,7 @@ Scope {
     currentChatID = ""; targetMessageID = ""; messages = [];
     loadingMessages = false; trailingMessagesRefresh = false; hasOlderMessages = false; oldestCursor = ""; messagesPaginationBlocked = false;
     restoringDraft = true;
-    draftText = ""; draftAttachment = null; replyToMessageID = "";
+    draftText = ""; draftAttachments = []; replyToMessageID = "";
     restoringDraft = false;
     viewFocused = false; updateView(); messagesLoaded(false);
   }
@@ -497,7 +499,7 @@ Scope {
   function draftChanged() {
     if (restoringDraft || !currentChatID) return;
     ++draftRevision;
-    localDrafts[currentChatID] = {text: draftText, attachment: draftAttachment, replyToMessageID: replyToMessageID};
+    localDrafts[currentChatID] = draftSnapshot();
     draftTimer.restart();
   }
   function flushDraft(callback) {
@@ -505,7 +507,7 @@ Scope {
     if (currentChatID) persistChatDraft(currentChatID, callback);
   }
   function draftSnapshot() {
-    return {text: draftText, attachment: draftAttachment, replyToMessageID: replyToMessageID};
+    return {text: draftText, attachments: draftAttachments.slice(), replyToMessageID: replyToMessageID};
   }
   function persistChatDraft(chatID, callback) {
     if (currentChatID === chatID) { draftTimer.stop(); localDrafts[chatID] = draftSnapshot(); }
@@ -513,14 +515,18 @@ Scope {
       {savedDrafts: savedSendDrafts[chatID] || []}), callback);
   }
   function hasDraftContent(draft) {
-    return !!draft && (!!draft.text || !!draft.attachment || !!draft.replyToMessageID);
+    return !!draft && (!!draft.text || attachmentsOf(draft).length > 0 || !!draft.replyToMessageID);
+  }
+  function attachmentsOf(draft) {
+    // Read pre-multiselect drafts and send backups without a disk migration.
+    return Array.isArray(draft?.attachments) ? draft.attachments : draft?.attachment ? [draft.attachment] : [];
   }
   function replaceDraft(chatID, draft) {
-    const value = {text: draft.text || "", attachment: draft.attachment || null, replyToMessageID: draft.replyToMessageID || ""};
+    const value = {text: draft.text || "", attachments: attachmentsOf(draft), replyToMessageID: draft.replyToMessageID || ""};
     localDrafts[chatID] = value;
     if (currentChatID !== chatID) return;
     restoringDraft = true;
-    draftText = value.text; draftAttachment = value.attachment; replyToMessageID = value.replyToMessageID;
+    draftText = value.text; draftAttachments = value.attachments; replyToMessageID = value.replyToMessageID;
     restoringDraft = false; draftChanged();
   }
   function saveSendDraft(chatID, draft) {
@@ -590,7 +596,7 @@ Scope {
     });
   }
   function sendMessage() {
-    if (!currentChatID || sending || !connected || (!draftText.trim() && !draftAttachment)) return;
+    if (!currentChatID || sending || stagingAttachments || !connected || (!draftText.trim() && !draftAttachments.length)) return;
     const chatID = currentChatID, snapshot = draftSnapshot();
     // Snapshot the boundary before sending so a message arriving during the
     // request stays unread, even if the user switches conversations meanwhile.
@@ -600,12 +606,13 @@ Scope {
     // Start a fresh composer synchronously. Preserve the submitted payload on
     // disk before dispatch, independently of the next draft and any late reply.
     replaceDraft(chatID, {}); persistChatDraft(chatID);
-    request("send", Object.assign({chatID: chatID}, snapshot), (result, error) => {
+    let remaining = snapshot;
+    function finish(error) {
       sending = false;
       if (error) {
         if (!deletedChatIDs[chatID]) {
           const current = currentChatID === chatID ? draftSnapshot() : localDrafts[chatID];
-          if (!hasDraftContent(current)) { retireSendDraft(chatID, savedID); replaceDraft(chatID, snapshot); }
+          if (!hasDraftContent(current)) { retireSendDraft(chatID, savedID); replaceDraft(chatID, remaining); }
           persistChatDraft(chatID);
         }
         return;
@@ -617,33 +624,64 @@ Scope {
       messageSent(chatID);
       if (currentChatID === chatID) loadMessages(false);
       refreshChats(false);
-    });
+    }
+    function sendNext() {
+      if (deletedChatIDs[chatID]) { finish({message: "Conversation removed"}); return; }
+      const files = attachmentsOf(remaining);
+      // The public API accepts one attachment per message. Send in selection
+      // order, with the user's text/reply only on the first message.
+      request("send", {chatID: chatID, text: remaining.text, attachment: files[0] || null,
+        replyToMessageID: remaining.replyToMessageID}, (result, error) => {
+        if (error) { finish(error); return; }
+        if (files.length <= 1) { finish(null); return; }
+        remaining = {text: "", attachments: files.slice(1), replyToMessageID: ""};
+        savedSendDrafts = Object.assign({}, savedSendDrafts, {[chatID]: (savedSendDrafts[chatID] || []).map(draft =>
+          draft.id === savedID ? Object.assign({id: savedID}, remaining) : draft)});
+        // Record progress before sending the next file: recovery must never
+        // include a file already accepted by Beeper. Stop on any failure.
+        persistChatDraft(chatID, (saved, saveError) => { if (saveError) finish(saveError); else sendNext(); });
+      });
+    }
+    sendNext();
   }
   function stageAttachment(path, chatID = currentChatID) {
+    ++stagingAttachments;
     request("stageAttachment", {path: path}, (result, error) => {
-      if (error || !result) return;
-      if (deletedChatIDs[chatID]) { request("discardAttachment", {path: result.path}); return; }
-      if (currentChatID === chatID) draftAttachment = result;
-      else {
-        const saved = Object.assign({}, localDrafts[chatID] || {}, {chatID: chatID, attachment: result});
-        localDrafts[chatID] = saved; request("saveDraft", saved);
-      }
+      --stagingAttachments;
+      if (!error && result?.path) appendAttachments(chatID, [result]);
     });
+  }
+  function stageAttachments(paths, chatID = currentChatID) {
+    if (!paths.length) return;
+    if (paths.length === 1) { stageAttachment(paths[0], chatID); return; }
+    ++stagingAttachments;
+    request("stageAttachments", {paths: paths}, (result, error) => {
+      --stagingAttachments;
+      if (!error && Array.isArray(result)) appendAttachments(chatID, result);
+    });
+  }
+  function appendAttachments(chatID, files) {
+    if (deletedChatIDs[chatID]) { files.forEach(file => request("discardAttachment", {path: file.path})); return; }
+    const draft = currentChatID === chatID ? draftSnapshot() : localDrafts[chatID] || {};
+    replaceDraft(chatID, Object.assign({}, draft, {attachments: attachmentsOf(draft).concat(files)}));
+    persistChatDraft(chatID);
   }
   function pasteAttachment() {
     const chatID = currentChatID;
-    request("clipboardAttachment", {}, (result, error) => { if (!error && result && result.path && chatID === currentChatID) draftAttachment = result; });
+    request("clipboardAttachment", {}, (result, error) => { if (!error && result?.path) appendAttachments(chatID, [result]); });
   }
-  function clearAttachment() {
-    const attachment = draftAttachment;
-    draftAttachment = null;
-    if (attachment) flushDraft((result, error) => { if (!error) request("discardAttachment", {path: attachment.path}); });
+  function clearAttachment(index = -1) {
+    const removed = index < 0 ? draftAttachments : draftAttachments.slice(index, index + 1);
+    draftAttachments = index < 0 ? [] : draftAttachments.filter((_, i) => i !== index);
+    if (removed.length) flushDraft((result, error) => {
+      if (!error) removed.forEach(file => request("discardAttachment", {path: file.path}));
+    });
   }
   function updateView() { request("setView", {chatID: currentChatID, focused: viewFocused, atLatest: viewAtLatest}); }
   onViewFocusedChanged: updateView()
   onViewAtLatestChanged: updateView()
   onDraftTextChanged: draftChanged()
-  onDraftAttachmentChanged: draftChanged()
+  onDraftAttachmentsChanged: draftChanged()
   onReplyToMessageIDChanged: draftChanged()
   Component.onCompleted: { if (demo) initializeDemo(); }
   Component.onDestruction: flushDraft()
@@ -745,6 +783,7 @@ Scope {
       chats = chats.map(chat => chat.id === params.chatID ? Object.assign({}, chat, params.changes) : chat);
       result = chats.find(chat => chat.id === params.chatID) || {};
     } else if (method === "stageAttachment") result = {path: params.path, srcURL: params.path, type: "file", fileName: params.path.split("/").pop()};
+    else if (method === "stageAttachments") result = params.paths.map(path => ({path: path, srcURL: path, type: "file", fileName: path.split("/").pop()}));
     else if (method === "search") {
       const words = String(params.query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
       const rows = Object.values(demoMessages).reduce((all, page) => all.concat(page), []);

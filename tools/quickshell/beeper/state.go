@@ -26,16 +26,18 @@ type attachment struct {
 	MimeType string `json:"mimeType,omitempty"`
 }
 type draft struct {
-	Text             string       `json:"text"`
-	Attachment       *attachment  `json:"attachment,omitempty"`
-	ReplyToMessageID string       `json:"replyToMessageID,omitempty"`
-	SavedDrafts      []savedDraft `json:"savedDrafts,omitempty"`
+	Text             string        `json:"text"`
+	Attachment       *attachment   `json:"attachment,omitempty"`
+	Attachments      []*attachment `json:"attachments,omitempty"`
+	ReplyToMessageID string        `json:"replyToMessageID,omitempty"`
+	SavedDrafts      []savedDraft  `json:"savedDrafts,omitempty"`
 }
 type savedDraft struct {
-	ID               string      `json:"id"`
-	Text             string      `json:"text"`
-	Attachment       *attachment `json:"attachment,omitempty"`
-	ReplyToMessageID string      `json:"replyToMessageID,omitempty"`
+	ID               string        `json:"id"`
+	Text             string        `json:"text"`
+	Attachment       *attachment   `json:"attachment,omitempty"`
+	Attachments      []*attachment `json:"attachments,omitempty"`
+	ReplyToMessageID string        `json:"replyToMessageID,omitempty"`
 }
 type diskState struct {
 	Version  int               `json:"version"`
@@ -207,6 +209,34 @@ func (b *backend) stage(path, t string) (*attachment, error) {
 	ok = true
 	return &attachment{Path: name, SrcURL: fileURL(name), Type: t, FileName: info.Name(), MimeType: m}, nil
 }
+
+// Prepare the entire selection before exposing it to the draft. A failed file
+// must not leave an invisible partial selection or orphaned private copies.
+func (b *backend) stageMany(paths []string) ([]*attachment, error) {
+	staged := make([]*attachment, 0, len(paths))
+	for _, path := range paths {
+		a, err := b.stage(path, "")
+		if err != nil {
+			for _, previous := range staged {
+				_ = b.discard(previous.Path)
+			}
+			return nil, err
+		}
+		staged = append(staged, a)
+	}
+	return staged, nil
+}
+func attachmentReferenced(path string, single *attachment, many []*attachment) bool {
+	if single != nil && single.Path == path {
+		return true
+	}
+	for _, a := range many {
+		if a != nil && a.Path == path {
+			return true
+		}
+	}
+	return false
+}
 func (b *backend) prepareRecording() (*attachment, error) {
 	if b.demo {
 		return nil, fail("demo", "Recording is disabled in the demo.")
@@ -242,11 +272,11 @@ func (b *backend) discard(path string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for _, d := range b.state.Drafts {
-		if d.Attachment != nil && d.Attachment.Path == path {
+		if attachmentReferenced(path, d.Attachment, d.Attachments) {
 			return fail("attachment_in_use", "The attachment is still used by a draft.")
 		}
 		for _, saved := range d.SavedDrafts {
-			if saved.Attachment != nil && saved.Attachment.Path == path {
+			if attachmentReferenced(path, saved.Attachment, saved.Attachments) {
 				return fail("attachment_in_use", "The attachment is still used by a saved draft.")
 			}
 		}

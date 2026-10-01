@@ -40,7 +40,7 @@ ShellRoot {
       panel.closeModal(); panel.editMessageID = "";
       panel.pinLatest = false;
       beeperData.setChatTextSize(20);
-      beeperData.selectChat("studio"); beeperData.draftText = ""; beeperData.draftAttachment = null; beeperData.replyToMessageID = "";
+      beeperData.selectChat("studio"); beeperData.draftText = ""; beeperData.draftAttachments = []; beeperData.replyToMessageID = "";
       // Earlier tests may assign text directly and replace its QML binding.
       panel.composer.text = Qt.binding(() => panel.editMessageID ? panel.editText : beeperData.draftText);
       panel.width = 1280; panel.messageIndex = -1; panel.chatIndex = 0;

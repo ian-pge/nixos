@@ -51,9 +51,11 @@ type parameters struct {
 	ReactionKey      string        `json:"reactionKey"`
 	Remove           bool          `json:"remove"`
 	Attachment       *attachment   `json:"attachment"`
+	Attachments      []*attachment `json:"attachments"`
 	SavedDrafts      *[]savedDraft `json:"savedDrafts"`
 	Changes          object        `json:"changes"`
 	Path             string        `json:"path"`
+	Paths            []string      `json:"paths"`
 	Type             string        `json:"type"`
 	URL              string        `json:"url"`
 	FileName         string        `json:"fileName"`
@@ -331,7 +333,7 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		}
 		b.mu.Lock()
 		defer b.mu.Unlock()
-		d := draft{Text: p.Text, Attachment: p.Attachment, ReplyToMessageID: p.ReplyToMessageID, SavedDrafts: b.state.Drafts[p.ChatID].SavedDrafts}
+		d := draft{Text: p.Text, Attachment: p.Attachment, Attachments: p.Attachments, ReplyToMessageID: p.ReplyToMessageID, SavedDrafts: b.state.Drafts[p.ChatID].SavedDrafts}
 		if p.SavedDrafts != nil {
 			d.SavedDrafts = *p.SavedDrafts
 		}
@@ -339,6 +341,8 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return d, b.persistLocked()
 	case "stageAttachment":
 		return b.stage(p.Path, p.Type)
+	case "stageAttachments":
+		return b.stageMany(p.Paths)
 	case "clipboardAttachment":
 		return b.clipboard(ctx)
 	case "prepareRecording":

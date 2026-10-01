@@ -16,7 +16,7 @@ ShellRoot {
   Component {
     id: fakePicker
     QtObject {
-      signal finished(string path, string error)
+      signal finished(var paths, string error)
       function open() { ++fixture.pickerOpens; }
     }
   }
@@ -123,7 +123,7 @@ ShellRoot {
       panel.vimEditing = data.mode !== "plain";
       beeperData.draftText = "Keep my draft";
       beeperData.replyToMessageID = "message-0";
-      beeperData.draftAttachment = {path: "/tmp/keep.txt", type: "file"};
+      beeperData.draftAttachments = [{path: "/tmp/keep.txt", type: "file"}];
       keyClick(Qt.Key_L); compare(panel.navigation, "chats"); verify(!panel.composer.activeFocus);
       keyClick(Qt.Key_L, Qt.ControlModifier); verify(panel.composer.activeFocus);
       if (["vim-normal", "vim-visual"].includes(data.mode)) keyClick(Qt.Key_Escape);
@@ -157,7 +157,7 @@ ShellRoot {
       panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
       compare(fixture.pickerOpens, 1); compare(pickerOpenedSpy.count, 1);
       keyClick(Qt.Key_F, Qt.ControlModifier); compare(fixture.pickerOpens, 1);
-      panel.attachmentPicker.finished("/tmp/a file.txt", "");
+      panel.attachmentPicker.finished(["/tmp/a file.txt"], "");
       compare(pickerClosedSpy.count, 1); compare(panel.attachmentPicker, null);
       compare(pending("stageAttachment")[0].params.path, "/tmp/a file.txt");
       beeperData.respond("stageAttachment", {path: "/tmp/staged.txt", type: "file"});
@@ -168,11 +168,40 @@ ShellRoot {
     function test_picker_cancel_or_failure_keeps_existing_attachment_data() {
       return [{tag: "cancel", error: ""}, {tag: "failure", error: "Yazi failed"}];
     }
+    function test_picker_multiple_files_append_and_can_be_removed_individually() {
+      beeperData.deferAttachments = true;
+      beeperData.draftText = "Keep";
+      beeperData.draftAttachments = [{path: "/tmp/existing.txt", type: "file", fileName: "existing.txt"}];
+      panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
+      panel.attachmentPicker.finished(["/tmp/one.txt", "/tmp/two.txt"], "");
+      compare(pending("stageAttachments")[0].params.paths, ["/tmp/one.txt", "/tmp/two.txt"]);
+      compare(beeperData.stagingAttachments, 1);
+      keyClick(Qt.Key_Return); compare(pending("send").length, 0);
+      beeperData.respond("stageAttachments", [{path: "/tmp/one-staged.txt", fileName: "one.txt", type: "file"},
+        {path: "/tmp/two-staged.txt", fileName: "two.txt", type: "file"}]);
+      compare(beeperData.stagingAttachments, 0);
+      compare(beeperData.draftAttachments.length, 3);
+      const preview = findChild(panel, "beeperDraftAttachments");
+      tryCompare(preview, "count", 3); wait(20);
+      const remove = findChild(panel, "beeperRemoveAttachment1"); verify(remove !== null);
+      mouseClick(remove);
+      compare(beeperData.draftAttachments.map(file => file.path), ["/tmp/existing.txt", "/tmp/two-staged.txt"]);
+      compare(beeperData.draftText, "Keep"); compare(pending("send").length, 0);
+    }
+    function test_picker_failed_staging_preserves_existing_draft() {
+      beeperData.deferAttachments = true;
+      beeperData.draftAttachments = [{path: "/tmp/keep.txt", type: "file"}];
+      panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
+      panel.attachmentPicker.finished(["/tmp/one.txt", "/tmp/missing.txt"], "");
+      beeperData.respond("stageAttachments", null, {message: "Missing file"});
+      compare(beeperData.stagingAttachments, 0); compare(beeperData.draftAttachments.length, 1);
+      compare(beeperData.draftAttachment.path, "/tmp/keep.txt");
+    }
     function test_picker_cancel_or_failure_keeps_existing_attachment(data) {
       beeperData.deferAttachments = true;
-      beeperData.draftText = "Keep"; beeperData.draftAttachment = {path: "/tmp/keep.txt", type: "file"};
+      beeperData.draftText = "Keep"; beeperData.draftAttachments = [{path: "/tmp/keep.txt", type: "file"}];
       panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
-      panel.attachmentPicker.finished("", data.error);
+      panel.attachmentPicker.finished([], data.error);
       compare(pickerClosedSpy.count, 1); compare(pending("stageAttachment").length, 0);
       compare(beeperData.draftText, "Keep"); compare(beeperData.draftAttachment.path, "/tmp/keep.txt");
       verify(panel.composer.activeFocus); compare(beeperData.lastError, data.error);
@@ -181,9 +210,9 @@ ShellRoot {
       beeperData.deferAttachments = true; beeperData.draftText = "Original";
       panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
       panel.chooseChat(1); panel.focusNavigation();
-      panel.attachmentPicker.finished("/tmp/original.txt", "");
+      panel.attachmentPicker.finished(["/tmp/original.txt"], "");
       beeperData.respond("stageAttachment", {path: "/tmp/staged.txt", type: "file"});
-      compare(beeperData.localDrafts["chat-a"].attachment.path, "/tmp/staged.txt");
+      compare(beeperData.localDrafts["chat-a"].attachments[0].path, "/tmp/staged.txt");
       compare(beeperData.localDrafts["chat-a"].text, "Original");
       compare(beeperData.draftAttachment, null); verify(!panel.composer.activeFocus);
     }
@@ -274,10 +303,10 @@ ShellRoot {
     }
     function test_recording_shortcut_keeps_existing_attachment_and_edit_draft() {
       beeperData.deferRecording = true; beeperData.draftText = "Keep text"; panel.compose(); panel.composer.cursorPosition = 0;
-      beeperData.draftAttachment = {type: "file", fileName: "Keep.pdf"};
+      beeperData.draftAttachments = [{type: "file", fileName: "Keep.pdf"}];
       keyClick(Qt.Key_D, Qt.ControlModifier); compare(pending("prepareRecording").length, 0);
       compare(beeperData.draftAttachment.fileName, "Keep.pdf"); compare(beeperData.draftText, "Keep text");
-      beeperData.draftAttachment = null; panel.editMessageID = "edit"; panel.editText = "Keep edit";
+      beeperData.draftAttachments = []; panel.editMessageID = "edit"; panel.editText = "Keep edit";
       keyClick(Qt.Key_D, Qt.ControlModifier); compare(pending("prepareRecording").length, 0);
       compare(panel.editText, "Keep edit");
     }
@@ -287,7 +316,7 @@ ShellRoot {
       tryCompare(panel, "recording", true); panel.openModal("help"); wait(20);
       keyClick(Qt.Key_D, Qt.ControlModifier); tryCompare(panel, "recording", false);
       compare(panel.modal, "help"); compare(pending("send").length, 0);
-      panel.closeModal(); beeperData.draftAttachment = null;
+      panel.closeModal(); beeperData.draftAttachments = [];
       keyClick(Qt.Key_D, Qt.ControlModifier); beeperData.respond("prepareRecording", preparedVoice());
       beeperData.state = "offline";
       keyClick(Qt.Key_D, Qt.ControlModifier); tryCompare(panel, "recording", false);
@@ -611,7 +640,7 @@ ShellRoot {
       beeperData.messages = [{id: "original", chatID: "chat-a", isSender: true, text: "Message original"}];
       waitForHistory();
       beeperData.draftText = "Brouillon conservé";
-      beeperData.draftAttachment = {type: "file", fileName: "notes.txt"};
+      beeperData.draftAttachments = [{type: "file", fileName: "notes.txt"}];
       keyClick(Qt.Key_K, Qt.ControlModifier);
       keyClick(data.edit ? Qt.Key_E : Qt.Key_R);
       if (data.edit) {
@@ -643,14 +672,14 @@ ShellRoot {
     }
     function test_escape_removes_attachment_before_leaving_composer(data) {
       beeperData.draftText = data.text;
-      beeperData.draftAttachment = {type: "file", fileName: "notes.txt", path: "/fixture/attachments/notes.txt"};
+      beeperData.draftAttachments = [{type: "file", fileName: "notes.txt", path: "/fixture/attachments/notes.txt"}];
       keyClick(Qt.Key_Return);
       const surface = findChild(panel, "beeperComposerSurface");
       verify(panel.composer.activeFocus); verify(surface.sendMode);
 
       keyClick(Qt.Key_Escape);
       compare(beeperData.draftAttachment, null);
-      compare(beeperData.localDrafts["chat-a"].attachment, null);
+      compare(beeperData.localDrafts["chat-a"].attachments, []);
       compare(beeperData.localDrafts["chat-a"].text, data.text);
       compare(beeperData.draftText, data.text); compare(panel.composer.text, data.text);
       verify(panel.composer.activeFocus); compare(panel.navigation, "compose");

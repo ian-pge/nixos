@@ -26,6 +26,8 @@
       ProtectHome = "read-only";
       ReadWritePaths = ["/run/quickshell-storage"];
       PrivateDevices = true;
+      # Freeze the mount view used by the scanner's mountinfo snapshot.
+      MountFlags = "private";
       PrivateNetwork = true;
       ProtectKernelTunables = true;
       ProtectKernelModules = true;

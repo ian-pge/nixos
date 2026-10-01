@@ -22,7 +22,7 @@ assert.doesNotMatch(host, /NotificationPopup|notificationData/,
 assert.doesNotMatch(shell + capsule, /inlineMonitor|inlinePresentation/);
 for (const type of ["NetworkController", "BluetoothController", "UpdateController", "PolkitController",
   "BrightnessController", "DictationController", "CalendarController", "SystemController", "MediaController",
-  "PowerController", "UsageController", "ShellCoordinator", "BeeperData", "MessengerController"]) {
+  "PowerController", "UsageController", "StorageController", "ShellCoordinator", "BeeperData", "MessengerController"]) {
   assert.equal((shell.match(new RegExp("\\b" + type + "\\s*\\{", "g")) || []).length, 1, type + " must be unique per session");
 }
 const ipc = read("shell/ShellIntegration.qml");
@@ -36,7 +36,7 @@ for (const name of ["toggleBeeper", "dismissNotification", "toggleDoNotDisturb",
   "mediaPlayPause", "mediaNext", "mediaPrevious", "volumeUp", "volumeDown", "toggleAudioMute",
   "toggleAudio", "toggleCalendar", "toggleMicrophoneMute", "showVolume", "showBrightness",
   "brightnessUp", "brightnessDown", "toggleWifi", "toggleBluetooth", "toggleUpdates",
-  "toggleLauncher", "toggleChromeTabs", "toggleUsage"])
+  "toggleLauncher", "toggleChromeTabs", "toggleUsage", "toggleStorage"])
   assert.ok(ipc.includes("function " + name + "("), "Stable IPC command " + name);
 assert.match(ipc, /target: "topbar"/);
 console.log("PASS: controller ownership, narrow central capsule, independent messenger and stable IPC contracts");

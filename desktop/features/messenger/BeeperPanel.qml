@@ -59,11 +59,15 @@ FocusScope {
   property Component recorderFactory: recorderComponent
   property var attachmentPicker: null
   property Component attachmentPickerFactory: attachmentPickerComponent
+  // A host may hold the picker until its closing animation has finished.
+  property bool attachmentPickerReady: true
+  property bool attachmentPickerStarted: false
+  onAttachmentPickerReadyChanged: if (attachmentPickerReady) Qt.callLater(startAttachmentPicker)
   readonly property bool canNavigatePanes: active && windowFocused && !modal && !connectionSurface.visible
     && !attachmentPicker && !composer.inputMethodComposing
   readonly property bool canPickAttachment: canUseComposerShortcuts && composer.activeFocus
     && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !editMessageID
-    && !recording && !preparingRecording && !attachmentPicker && !emojiPickerOpen
+    && !recording && !preparingRecording && !attachmentPicker && !emojiPickerOpen && !beeperData.stagingAttachments
   property bool gPending: false
   property string pendingOpenMessageID: ""
   property string displayedChatID: ""
@@ -108,7 +112,7 @@ FocusScope {
     && !!beeperData.currentChatID && !searchOpen && !messageSearch.opened
     && !composer.inputMethodComposing && !tokenField.activeFocus
   readonly property bool canStartRecording: active && beeperData.connected && !!beeperData.currentChatID
-    && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !beeperData.draftAttachment
+    && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !beeperData.draftAttachment && !beeperData.stagingAttachments
     && !editMessageID && !dictating && !recorder && !preparingRecording && !composer.inputMethodComposing
   signal closeRequested()
   signal nativeDialogOpened()
@@ -246,17 +250,24 @@ FocusScope {
     const chatID = beeperData.currentChatID;
     const picker = attachmentPickerFactory.createObject(root);
     if (!picker) { beeperData.lastError = "Could not open the file picker."; return; }
+    attachmentPickerStarted = false;
     attachmentPicker = picker;
-    picker.finished.connect((path, error) => {
+    picker.finished.connect((paths, error) => {
       attachmentPicker = null;
+      attachmentPickerStarted = false;
       if (error) beeperData.lastError = error;
-      else if (path) beeperData.stageAttachment(path, chatID);
+      else if (paths.length) beeperData.stageAttachments(paths, chatID);
       nativeDialogClosed();
       if (active && beeperData.currentChatID === chatID) compose();
       picker.destroy();
     });
     nativeDialogOpened();
-    picker.open();
+    startAttachmentPicker();
+  }
+  function startAttachmentPicker() {
+    if (!attachmentPicker || attachmentPickerStarted || !attachmentPickerReady) return;
+    attachmentPickerStarted = true;
+    attachmentPicker.open();
   }
   function openModal(name) {
     if (name !== "help" && name !== "media" && name !== "links") return;
@@ -639,7 +650,7 @@ FocusScope {
     target: root.recorder
     function onFinished(path) {
       const finishedRecorder = root.recorder;
-      if (root.recordingChatID === root.beeperData.currentChatID) root.beeperData.draftAttachment = root.recordingAttachment;
+      if (root.recordingChatID === root.beeperData.currentChatID) root.beeperData.draftAttachments = [root.recordingAttachment];
       else root.beeperData.request("saveDraft", {chatID: root.recordingChatID, text: root.beeperData.localDrafts[root.recordingChatID]?.text || "", attachment: root.recordingAttachment});
       root.recorder = null; root.recordingAttachment = null;
       finishedRecorder.destroy();
@@ -946,7 +957,7 @@ FocusScope {
         onSubmitRequested: root.submitMessage()
         onPasteAttachmentRequested: root.beeperData.pasteAttachment()
         onRecordingToggleRequested: root.toggleRecording()
-        onAttachmentDropped: url => root.beeperData.stageAttachment(url)
+        onAttachmentsDropped: urls => root.beeperData.stageAttachments(urls)
       }
     }
   }

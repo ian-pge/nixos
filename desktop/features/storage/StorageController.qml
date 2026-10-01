@@ -21,6 +21,10 @@ Scope {
   property bool cancelled: false
   property bool readStarted: false
   property bool scanStarted: false
+  property bool readInFlight: false
+  property bool scanInFlight: false
+  property bool pendingRefresh: false
+  property bool pendingForce: false
   property int generation: 0
   property real lastAttempt: 0
   property real scanStartedAt: 0
@@ -30,15 +34,18 @@ Scope {
   readonly property bool loading: phase !== "idle"
 
   function refresh(force = false) {
-    if (!enabled || loading || (lastAttempt > 0 && Date.now() - lastAttempt < minimumInterval)) return;
+    if (!enabled || loading) return;
+    if (readInFlight || scanInFlight) {
+      pendingRefresh = true; pendingForce = force; return;
+    }
+    if (!force && lastAttempt > 0 && Date.now() - lastAttempt < minimumInterval) return;
     if (!force && updatedAt > 0 && Date.now() - updatedAt < cacheLifetime) return;
     forceRequested = force;
     ++generation;
     cancelled = false;
     error = "";
     phase = "cached";
-    readStarted = false;
-    readProcess.running = true;
+    startRead();
     deadline.restart();
   }
   function startScan() {
@@ -48,7 +55,22 @@ Scope {
     scanStartedAt = lastAttempt;
     ++scanCount;
     scanStarted = false;
+    scanInFlight = true;
+    scanProcess.token = generation;
     scanProcess.running = true;
+  }
+  function startRead() {
+    readStarted = false;
+    readInFlight = true;
+    readProcess.token = generation;
+    readProcess.running = true;
+  }
+  function settled() {
+    if (!readInFlight && !scanInFlight && pendingRefresh) {
+      const force = pendingForce;
+      pendingRefresh = false;
+      Qt.callLater(() => { if (root.enabled) root.refresh(force); });
+    }
   }
   function finish() {
     deadline.stop();
@@ -77,6 +99,7 @@ Scope {
   }
   function cancel() {
     cancelled = true;
+    pendingRefresh = false;
     ++generation;
     readProcess.running = false;
     scanProcess.running = false;
@@ -97,38 +120,49 @@ Scope {
   }
   Process {
     id: readProcess
+    property int token: 0
     command: root.readCommand
     stdout: StdioCollector { id: reportText }
     stderr: StdioCollector {}
     onStarted: root.readStarted = true
     onExited: code => {
-      const token = root.generation;
+      const token = readProcess.token;
       Qt.callLater(() => {
+        root.readInFlight = false;
         if (token === root.generation) root.readFinished(code, reportText.text);
+        root.settled();
       });
     }
-    onRunningChanged: if (!running && !root.readStarted && root.loading)
-      root.readFinished(1, "")
+    onRunningChanged: if (!running && !root.readStarted && root.readInFlight) {
+      root.readInFlight = false;
+      if (token === root.generation) root.readFinished(1, "");
+      root.settled();
+    }
   }
   Process {
     id: scanProcess
+    property int token: 0
     command: root.scanCommand
     stdout: StdioCollector {}
     stderr: StdioCollector {}
     onStarted: root.scanStarted = true
     onExited: code => {
-      if (root.cancelled || !root.enabled || root.phase !== "scan") return;
+      root.scanInFlight = false;
+      root.settled();
+      if (token !== root.generation || root.cancelled || !root.enabled || root.phase !== "scan") return;
       if (code !== 0) {
         root.error = "Service de stockage indisponible · R pour réessayer";
         root.finish();
       } else {
         root.phase = "result";
-        root.readStarted = false;
-        readProcess.running = true;
+        root.startRead();
       }
     }
     onRunningChanged: {
-      if (running || root.scanStarted || root.cancelled || !root.enabled || root.phase !== "scan") return;
+      if (running || root.scanStarted || !root.scanInFlight) return;
+      root.scanInFlight = false;
+      root.settled();
+      if (token !== root.generation || root.cancelled || !root.enabled || root.phase !== "scan") return;
       root.error = "Service de stockage indisponible · R pour réessayer";
       root.finish();
     }

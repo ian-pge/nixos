@@ -44,7 +44,7 @@ Rectangle {
     "Shift + Enter     New line",
     "Ctrl + s     Open / close emoji picker",
     "Ctrl + d     Start / finish a voice recording",
-    "Ctrl + f     Attach a file with Yazi (one file per message)",
+    "Ctrl + f     Attach files with Yazi (sent in selection order)",
     "A finished recording is attached to the draft, not sent",
     "Ctrl + v     Paste text, or an image when no text is available",
     "Ctrl + Shift + v     Paste an image attachment"

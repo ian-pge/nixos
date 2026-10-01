@@ -12,8 +12,8 @@ FocusScope {
   readonly property real measuredBytes: Storage.sum(rows)
   readonly property bool partial: snapshot !== null && Storage.incomplete(rows)
   readonly property var colors: ({docker: Theme.sideApplications, nix: Theme.sideSystem,
-    applications: Theme.sideDisk, personal: Theme.sideNotifications,
-    vm: Theme.sideWeather, other: Theme.inactive})
+    applications: Theme.sideDisk, personal: Theme.teal,
+    vm: Theme.pink, other: Theme.inactive})
   implicitHeight: footer.y + footer.height + 12
 
   function focusWhenEnabled() {

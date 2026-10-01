@@ -15,7 +15,7 @@ Item {
   property bool connectionProblem: false
   readonly property string avatarSource: Format.chatAvatarSource(chat)
   readonly property var network: Format.networkBadge(chat?.network)
-  property color accent: [Theme.sideApplications, Theme.sideSystem, Theme.sideWeather, Theme.sideDate][Format.stableHash(chat?.id || Format.chatTitle(chat)) % 4]
+  property color accent: [Theme.sideApplications, Theme.sideSystem, Theme.pink, Theme.sideDate][Format.stableHash(chat?.id || Format.chatTitle(chat)) % 4]
   readonly property color effectiveAccent: connectionProblem ? Theme.error : accent
   readonly property bool imageReady: photo.status === Image.Ready
   implicitWidth: diameter

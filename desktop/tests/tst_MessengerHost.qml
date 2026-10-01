@@ -18,6 +18,18 @@ ShellRoot {
   property bool selectorOpen: false
   property bool competingWindowVisible: false
   property string focusStage: ""
+  property int pickerOpens: 0
+  property real pickerStartProgress: -1
+  Component {
+    id: fakePicker
+    QtObject {
+      signal finished(var paths, string error)
+      function open() {
+        ++fixture.pickerOpens; fixture.pickerStartProgress = fixture.host.morphProgress;
+        fixture.competingWindowVisible = true;
+      }
+    }
+  }
   property bool surfaceFocused: window.contentItem.Window.active
   readonly property bool privateSession: Quickshell.env("QS_MESSENGER_PRIVATE_DBUS") === "1"
     && Quickshell.env("QT_QPA_PLATFORM") === "wayland"
@@ -371,18 +383,70 @@ ShellRoot {
       fixture.selectorOpen = false; wait(30);
       verify(!panel.windowFocused); verify(!model.viewFocused); verify(!grab.active);
     }
-    function test_native_dialog_and_modal_keep_focus_contract() {
-      panel.openModal("help"); wait(0);
-      verify(findChild(host, "beeperModalSurface").activeFocus);
+    function test_native_dialog_hides_chat_then_restores_composer() {
+      panel.compose(); panel.composer.text = "Keep the draft";
       panel.nativeDialogOpened();
       verify(host.nativeDialogOpen); verify(!host.wantsKeyboard);
+      verify(!host.active); verify(!host.presented); verify(!panel.visible);
       verify(!grab.active); verify(!panel.windowFocused); verify(!model.viewFocused);
+      compare(model.draftText, "Keep the draft");
       panel.nativeDialogClosed();
-      tryCompare(findChild(host, "beeperModalSurface"), "activeFocus", true);
+      panel.compose();
+      tryCompare(panel.composer, "activeFocus", true);
       tryCompare(grab, "active", true);
       verify(host.wantsKeyboard);
-      keyClick(Qt.Key_Escape); compare(panel.modal, "");
-      verify(host.active);
+      verify(host.active); verify(host.presented); compare(model.draftText, "Keep the draft");
+    }
+    function test_picker_waits_for_close_and_reopens_with_animation_data() {
+      return [{tag: "animated", animated: true}, {tag: "instant", animated: false}];
+    }
+    function test_picker_waits_for_close_and_reopens_with_animation(data) {
+      const bubble = findChild(host, "beeperBubble"), animation = findChild(bubble, "beeperBubbleReveal");
+      const factory = panel.attachmentPickerFactory;
+      try {
+        fixture.pickerOpens = 0; fixture.pickerStartProgress = -1;
+        panel.attachmentPickerFactory = fakePicker; bubble.animate = data.animated;
+        panel.compose(); panel.composer.clear(); panel.composer.insert(0, "Keep this draft");
+        fixture.focusStage = data.tag + " request picker";
+        panel.pickAttachment();
+        verify(host.nativeDialogOpen); verify(!host.active);
+        if (data.animated) {
+          fixture.focusStage = "closing animation";
+          verify(host.presented, "The closing chat must stay visible");
+          compare(fixture.pickerOpens, 0); verify(animation.running);
+          animation.pause(); bubble.progress = 0.5;
+          wait(40); verify(host.presented); compare(fixture.pickerOpens, 0);
+          animation.resume();
+        }
+        fixture.focusStage = "wait for picker";
+        tryCompare(fixture, "pickerOpens", 1, 1000);
+        compare(fixture.pickerStartProgress, 0); verify(!host.presented);
+        tryCompare(otherWindow.contentItem.Window, "active", true);
+        wait(30); compare(fixture.pickerOpens, 1, "Only launch one picker");
+        fixture.focusStage = "reopen chat";
+        fixture.competingWindowVisible = false;
+        panel.attachmentPicker.finished([], "");
+        fixture.focusStage = data.tag + " restore active";
+        tryCompare(host, "active", true);
+        fixture.focusStage = data.tag + " restore visible";
+        tryCompare(host, "presented", true);
+        fixture.focusStage = data.tag + " finish opening";
+        tryCompare(bubble, "progress", 1, 1000);
+        fixture.focusStage = data.tag + " restore typing";
+        tryCompare(panel.composer, "activeFocus", true);
+        fixture.focusStage = data.tag + " preserve draft";
+        compare(model.draftText, "Keep this draft");
+      } finally {
+        animation.stop();
+        fixture.competingWindowVisible = false;
+        if (panel.attachmentPicker) panel.attachmentPicker.finished([], "");
+        bubble.animate = false; panel.attachmentPickerFactory = factory;
+      }
+    }
+    function test_closing_chat_during_picker_does_not_reopen_it() {
+      panel.compose(); panel.nativeDialogOpened();
+      controller.hide(); panel.nativeDialogClosed(); wait(30);
+      verify(!host.active); verify(!host.wantsKeyboard); verify(!grab.active);
     }
   }
 }

@@ -42,6 +42,69 @@ func jsonResponse(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+func TestMultipleAttachmentsPersistAndProtectCurrentAndSavedDrafts(t *testing.T) {
+	b, _ := testBackend(t, nil)
+	dir := t.TempDir()
+	paths := []string{filepath.Join(dir, "one.txt"), filepath.Join(dir, "two.txt")}
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte(path), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := b.handle(b.ctx, "stageAttachments", parameters{Paths: paths})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := result.([]*attachment)
+	if len(files) != 2 || files[0].FileName != "one.txt" || files[1].FileName != "two.txt" {
+		t.Fatalf("selection changed: %#v", files)
+	}
+	if _, err = b.handle(b.ctx, "saveDraft", parameters{ChatID: "chat", Text: "caption", Attachments: files}); err != nil {
+		t.Fatal(err)
+	}
+	state, err := loadState(b.stateDir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Drafts["chat"].Attachments) != 2 || state.Drafts["chat"].Text != "caption" {
+		t.Fatalf("draft lost files: %#v", state.Drafts["chat"])
+	}
+	for _, file := range files {
+		if b.discard(file.Path) == nil {
+			t.Fatal("deleted a file referenced by a draft")
+		}
+	}
+	backups := []savedDraft{{ID: "partial-send", Attachments: files[1:]}}
+	if _, err = b.handle(b.ctx, "saveDraft", parameters{ChatID: "chat", SavedDrafts: &backups}); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.discard(files[0].Path); err != nil {
+		t.Fatal(err)
+	}
+	if b.discard(files[1].Path) == nil {
+		t.Fatal("deleted an unsent file in a backup")
+	}
+}
+
+func TestMultipleAttachmentStagingRollsBackOnFailure(t *testing.T) {
+	b, _ := testBackend(t, nil)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "keep.txt")
+	if err := os.WriteFile(path, []byte("original"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.stageMany([]string{path, filepath.Join(dir, "missing.txt")}); err == nil {
+		t.Fatal("missing file accepted")
+	}
+	files, err := os.ReadDir(filepath.Join(b.stateDir, "attachments"))
+	if err != nil || len(files) != 0 {
+		t.Fatalf("partial copies leaked: %v %v", files, err)
+	}
+	if data, err := os.ReadFile(path); err != nil || string(data) != "original" {
+		t.Fatal("source changed")
+	}
+}
+
 func TestJSONLFramingAndDemoIsolation(t *testing.T) {
 	t.Setenv("BEEPER_API_URL", "")
 	dir := filepath.Join(t.TempDir(), "must-not-exist")

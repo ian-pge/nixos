@@ -12,7 +12,10 @@ ShellRoot {
     property var currentChat: ({id: "chat", isReadOnly: false})
     property string draftText: ""
     property string replyToMessageID: ""
-    property var draftAttachment: null
+    property var draftAttachments: []
+    readonly property var draftAttachment: draftAttachments[0] || null
+    property int stagingAttachments: 0
+    function clearAttachment(index) { draftAttachments = draftAttachments.filter((_, i) => i !== index); }
     property bool sending: false
     property bool connected: true
     property bool demo: true
@@ -27,7 +30,7 @@ ShellRoot {
     when: window.visible
     function init() {
       model.currentChatID = "chat"; model.currentChat = {id: "chat", isReadOnly: false};
-      model.draftText = ""; model.draftAttachment = null; model.replyToMessageID = "";
+      model.draftText = ""; model.draftAttachments = []; model.replyToMessageID = "";
       model.connected = true; model.sending = false;
       const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../features/messenger/BeeperComposer.qml");
       compare(component.status, Component.Ready, component.errorString());
@@ -79,7 +82,7 @@ ShellRoot {
       fixture.composer.editMessageID = "edit"; fixture.composer.editText = "Edited text";
       verify(fixture.composer.sendMode); mouseClick(child("beeperComposerAction")); compare(sendSpy.count, 1);
       fixture.composer.editMessageID = "";
-      model.draftAttachment = {type: "file", fileName: "Fictional.txt"};
+      model.draftAttachments = [{type: "file", fileName: "Fictional.txt"}];
       verify(fixture.composer.sendMode); mouseClick(child("beeperComposerAction")); compare(sendSpy.count, 2);
       model.sending = true; verify(!child("beeperComposerAction").enabled);
     }

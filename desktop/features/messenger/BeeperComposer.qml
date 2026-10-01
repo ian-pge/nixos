@@ -28,7 +28,7 @@ Rectangle {
     && !beeperData.currentChat?.isReadOnly && !recording && !preparingRecording && !composer.inputMethodComposing
   property var emojiSelection: null
   readonly property bool sendMode: !!composer.text.trim() || !!beeperData.draftAttachment || !!editMessageID
-  readonly property bool busy: preparingRecording || beeperData.sending
+  readonly property bool busy: preparingRecording || beeperData.sending || beeperData.stagingAttachments > 0
   property real sendReveal: sendMode ? 1 : 0
   Behavior on sendReveal { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
   signal editTextEdited(string text)
@@ -37,7 +37,7 @@ Rectangle {
   signal copyRequested(string text)
   signal pasteAttachmentRequested()
   signal recordingToggleRequested()
-  signal attachmentDropped(string url)
+  signal attachmentsDropped(var urls)
   implicitHeight: composerColumn.implicitHeight + 8
   color: Theme.surface
   radius: 24
@@ -97,11 +97,49 @@ Rectangle {
         textScale: root.textSize / Theme.beeperFont.body
       }
     }
-    RowLayout {
-      visible: !!root.beeperData.draftAttachment; Layout.fillWidth: true
+    ColumnLayout {
+      visible: root.beeperData.draftAttachments.length > 0; Layout.fillWidth: true
       Layout.leftMargin: 8; Layout.rightMargin: 8
       Layout.topMargin: root.beeperData.replyToMessageID || root.editMessageID ? 0 : 8
-      BeeperMedia { Layout.fillWidth: true; Layout.preferredHeight: Math.min(88, implicitHeight); attachment: root.beeperData.draftAttachment || {}; beeperData: root.beeperData; playbackEnabled: root.active }
+      Text {
+        visible: root.beeperData.draftAttachments.length > 1
+        text: root.beeperData.draftAttachments.length + " files · sent in order"
+        color: Theme.inactive; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
+      }
+      ListView {
+        id: attachmentList
+        objectName: "beeperDraftAttachments"
+        Layout.fillWidth: true; Layout.preferredHeight: count ? 88 : 0
+        orientation: ListView.Horizontal; spacing: 8; clip: true
+        model: root.beeperData.draftAttachments
+        boundsBehavior: Flickable.StopAtBounds
+        ScrollBar.horizontal: ScrollBar {}
+        delegate: Item {
+          required property var modelData
+          required property int index
+          width: attachmentList.count === 1 ? attachmentList.width : Math.min(220, attachmentList.width)
+          height: 88
+          BeeperMedia {
+            anchors.fill: parent; anchors.rightMargin: 28
+            attachment: modelData; beeperData: root.beeperData; playbackEnabled: root.active
+          }
+          Button {
+            id: removeAttachment
+            objectName: "beeperRemoveAttachment" + index
+            anchors { top: parent.top; right: parent.right }
+            width: 24; height: 24; padding: 0
+            hoverEnabled: true
+            background: null
+            contentItem: Item {
+              opacity: removeAttachment.hovered || removeAttachment.activeFocus ? 1 : 0.65
+              Rectangle { anchors.centerIn: parent; width: 10; height: 1; rotation: 45; color: "white"; antialiasing: true }
+              Rectangle { anchors.centerIn: parent; width: 10; height: 1; rotation: -45; color: "white"; antialiasing: true }
+            }
+            Accessible.name: "Remove " + (modelData.fileName || "attachment")
+            onClicked: root.beeperData.clearAttachment(index)
+          }
+        }
+      }
     }
     // Vim's / search line, aligned with the text: emoji button, spacing, padding.
     VimSearchPrompt {
@@ -247,7 +285,7 @@ Rectangle {
   }
   DropArea {
     anchors.fill: parent
-    onDropped: drop => { if (drop.hasUrls && drop.urls.length) { root.attachmentDropped(drop.urls[0].toString()); drop.acceptProposedAction(); } }
+    onDropped: drop => { if (drop.hasUrls && drop.urls.length) { root.attachmentsDropped(Array.from(drop.urls, url => url.toString())); drop.acceptProposedAction(); } }
   }
   AcceleratedScroll { flickable: composerScroll.contentItem }
   VimEditing {
