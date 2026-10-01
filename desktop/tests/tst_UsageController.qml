@@ -48,7 +48,7 @@ ShellRoot {
     function test_opening_reads_both_plans_once() {
       const runs = usage.claude.run;
       usage.active = true;
-      verify(usage.loading);
+      tryVerify(() => usage.loading);
       tryCompare(usage, "loading", false, 10000);
       compare(usage.claude.run, runs + 1); compare(usage.codex.run, runs + 1);
       compare(usage.claude.error, ""); compare(usage.codex.error, "");
@@ -60,6 +60,8 @@ ShellRoot {
       compare(usage.codex.snapshot.plan, "ChatGPT Pro Lite");
       compare(labels(usage.codex), ["5 heures 12", "Semaine 94"]);
       compare(usage.codex.snapshot.notes[0].text, "1 crédit de réinitialisation");
+      compare(usage.codex.snapshot.resetCredits, 1);
+      compare(usage.claude.snapshot.resetCredits, null);
       verify(usage.updatedAt > 0);
       // Reopening within a minute reuses the answer; R still forces a read.
       usage.active = false; usage.active = true;
@@ -75,6 +77,22 @@ ShellRoot {
       verify(!usage.loading);
       compare(usage.claude.run, runs); compare(usage.codex.run, runs);
       compare(usage.claude.snapshot, null);
+    }
+    function test_visible_bar_refreshes_periodically_and_stops_when_inactive() {
+      const interval = usage.refreshInterval, minimum = usage.minimumInterval;
+      try {
+        usage.refreshInterval = 100; usage.minimumInterval = 0;
+        const claudeRuns = usage.claude.run, codexRuns = usage.codex.run;
+        usage.active = true;
+        tryVerify(() => usage.claude.run >= claudeRuns + 2 && usage.codex.run >= codexRuns + 2, 5000);
+        usage.active = false;
+        tryCompare(usage, "loading", false, 5000);
+        const stopped = usage.claude.run;
+        wait(250); compare(usage.claude.run, stopped);
+      } finally {
+        usage.active = false;
+        usage.refreshInterval = interval; usage.minimumInterval = minimum;
+      }
     }
     function test_snapshot_answer_uses_named_windows() {
       modes("snapshot", "ok");

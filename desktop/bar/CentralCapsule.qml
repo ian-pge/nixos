@@ -12,7 +12,6 @@ import "../features/notifications"
 import "../features/system"
 import "../features/storage"
 import "../features/updates"
-import "../features/usage"
 import "../features/workspaces"
 
 // Geometry and content crossfades only; panel lifetime belongs to ShellCoordinator.
@@ -25,6 +24,8 @@ Rectangle {
   property var monitor: null
   property bool entered: false
   property real barTopInset: 10
+  // Panel readability is independent of the number of workspace buttons.
+  readonly property real panelWidth: 434
   readonly property bool notificationActive: services.notifications.visible
     && monitorName === services.notifications.targetMonitor
   readonly property bool dictationOverlayActive: services.dictation.active
@@ -33,7 +34,6 @@ Rectangle {
   readonly property bool audioSelectorActive: coordinator.isOpen("audio", monitorName)
   readonly property bool calendarActive: coordinator.isOpen("calendar", monitorName)
   readonly property bool systemPanelActive: coordinator.isOpen("system", monitorName)
-  readonly property bool usagePanelActive: coordinator.isOpen("usage", monitorName)
   readonly property bool storagePanelActive: coordinator.isOpen("storage", monitorName)
   readonly property bool brightnessOverlayActive: coordinator.isOpen("brightness", monitorName)
   readonly property bool mediaOverlayActive: coordinator.isOpen("media", monitorName)
@@ -45,7 +45,6 @@ Rectangle {
   readonly property bool audioSelectorKeyboardActive: audioSelectorActive && !services.dictation.active
   readonly property bool calendarKeyboardActive: calendarActive && !services.dictation.active
   readonly property bool systemPanelKeyboardActive: systemPanelActive && !services.dictation.active
-  readonly property bool usagePanelKeyboardActive: usagePanelActive && !services.dictation.active
   readonly property bool storagePanelKeyboardActive: storagePanelActive && !services.dictation.active
   readonly property bool wifiSelectorKeyboardActive: wifiSelectorActive
   readonly property bool bluetoothSelectorKeyboardActive: bluetoothSelectorActive
@@ -53,13 +52,13 @@ Rectangle {
   readonly property bool appLauncherKeyboardActive: appLauncherActive
   readonly property bool chromeTabsKeyboardActive: chromeTabsActive && !services.chromeTabs.actionPending
   readonly property bool keyboardSelectorActive: audioSelectorKeyboardActive || calendarKeyboardActive
-    || systemPanelKeyboardActive || usagePanelKeyboardActive || storagePanelKeyboardActive
+    || systemPanelKeyboardActive || storagePanelKeyboardActive
     || wifiSelectorKeyboardActive || bluetoothSelectorKeyboardActive
     || updateSelectorKeyboardActive || appLauncherKeyboardActive || chromeTabsKeyboardActive
   function restoreFocus() {
     if (!keyboardSelectorActive || notificationActive) return;
     const widget = ({audio: audioSelector, calendar: calendarPanel, system: systemPanel,
-      usage: usagePanel, storage: storagePanel, wifi: wifiSelector, bluetooth: bluetoothSelector, updates: updateSelector,
+      storage: storagePanel, wifi: wifiSelector, bluetooth: bluetoothSelector, updates: updateSelector,
       launcher: appLauncher, tabs: chromeTabsLauncher})[coordinator.mode];
     if (widget) widget.forceActiveFocus();
   }
@@ -68,7 +67,7 @@ Rectangle {
   z: 2
   GlassShape { objectName: "capsuleGlassShape"; anchors.fill: parent; radius: root.radius; enabled: GlassState.enabled && root.drawBackground }
   readonly property bool overlayVisible: root.notificationActive || root.volumeOverlayActive
-    || root.audioSelectorActive || root.calendarActive || root.systemPanelActive || root.usagePanelActive || root.storagePanelActive
+    || root.audioSelectorActive || root.calendarActive || root.systemPanelActive || root.storagePanelActive
     || root.brightnessOverlayActive || root.mediaOverlayActive
     || root.appLauncherActive || root.chromeTabsActive
     || root.wifiSelectorActive || root.bluetoothSelectorActive
@@ -85,7 +84,6 @@ Rectangle {
   readonly property string targetMode: root.notificationActive ? "notification"
     : root.dictationOverlayActive
     ? "dictation" : root.systemPanelActive ? "system"
-    : root.usagePanelActive ? "usage"
     : root.storagePanelActive ? "storage"
     : root.calendarActive ? "calendar"
     : root.audioSelectorActive ? "audio"
@@ -100,10 +98,9 @@ Rectangle {
   readonly property real preferredWidth: root.notificationActive
     ? notificationPopup.implicitWidth : root.dictationOverlayActive
     ? voiceDictationIndicator.implicitWidth
-    : root.systemPanelActive ? workspaceSwitcher.expandedImplicitWidth
-    : root.usagePanelActive ? workspaceSwitcher.expandedImplicitWidth
-    : root.storagePanelActive ? workspaceSwitcher.expandedImplicitWidth
-    : root.calendarActive ? workspaceSwitcher.expandedImplicitWidth
+    : root.systemPanelActive ? maximumWidth
+    : root.storagePanelActive ? maximumWidth
+    : root.calendarActive ? maximumWidth
     : root.audioSelectorActive ? audioSelector.implicitWidth
     : root.appLauncherActive ? appLauncher.implicitWidth
     : root.chromeTabsActive ? chromeTabsLauncher.implicitWidth
@@ -112,23 +109,23 @@ Rectangle {
     : root.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
     : root.mediaOverlayActive ? nowPlayingIndicator.implicitWidth
     : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
-  readonly property real maximumWidth: workspaceSwitcher.expandedImplicitWidth
+  readonly property real maximumWidth: Math.min(panelWidth, parent ? parent.width : panelWidth)
   readonly property real targetWidth: Math.min(preferredWidth, maximumWidth)
   readonly property real targetHeight: root.notificationActive
     ? notificationPopup.implicitHeight : root.dictationOverlayActive
     ? voiceDictationIndicator.implicitHeight
     : root.systemPanelActive ? systemPanel.implicitHeight
-    : root.usagePanelActive ? usagePanel.implicitHeight
     : root.storagePanelActive ? storagePanel.implicitHeight
     : root.calendarActive ? calendarPanel.implicitHeight
     : root.audioSelectorActive ? audioSelector.implicitHeight
     : root.appLauncherActive ? appLauncher.implicitHeight
     : root.chromeTabsActive ? chromeTabsLauncher.implicitHeight
     : root.updateSelectorActive ? updateSelector.implicitHeight
-    : root.wifiSelectorActive ? wifiSelector.implicitHeight : 36
+    : root.wifiSelectorActive ? wifiSelector.implicitHeight
+    : root.overlayVisible ? 36 : workspaceSwitcher.implicitHeight
   readonly property var contentModes: ["workspaces", "volume", "audio",
     "brightness", "dictation", "media", "wifi", "bluetooth",
-    "launcher", "tabs", "updates", "notification", "calendar", "system", "usage", "storage"]
+    "launcher", "tabs", "updates", "notification", "calendar", "system", "storage"]
   property string visualSourceMode: "workspaces"
   property string visualTargetMode: "workspaces"
   property real transitionProgress: 1
@@ -138,7 +135,6 @@ Rectangle {
 
   function modeHeight(mode) {
     if (mode === "system") return systemPanel.implicitHeight;
-    if (mode === "usage") return usagePanel.implicitHeight;
     if (mode === "storage") return storagePanel.implicitHeight;
     if (mode === "notification") return notificationPopup.implicitHeight;
     if (mode === "calendar") return calendarPanel.implicitHeight;
@@ -242,7 +238,7 @@ Rectangle {
   y: root.barTopInset
   width: followingChatOpening ? root.messengerHost.capsuleWidth : targetWidth
   height: followingChatOpening ? root.messengerHost.capsuleHeight : targetHeight
-  radius: 18
+  radius: Math.min(height / 2, Theme.barSize(18))
   color: !drawBackground ? "transparent" : GlassState.enabled ? Qt.alpha(Theme.background, 0.12) : Theme.background
   clip: true
   opacity: root.entered ? (returningFromChat ? root.messengerHost.originContentOpacity
@@ -472,28 +468,12 @@ Rectangle {
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
-    implicitWidth: workspaceSwitcher.expandedImplicitWidth
+    implicitWidth: root.maximumWidth
     height: implicitHeight
     transform: Translate { y: root.contentOffset("system") }
     opacity: root.contentOpacity("system")
     visible: opacity > 0
     enabled: root.systemPanelKeyboardActive
-  }
-
-  UsagePanel {
-    id: usagePanel
-    objectName: "usagePanel"
-    controller: root.services.usage
-    onCloseRequested: root.coordinator.close("usage")
-    anchors.top: parent.top
-    anchors.left: parent.left
-    anchors.right: parent.right
-    implicitWidth: workspaceSwitcher.expandedImplicitWidth
-    height: implicitHeight
-    transform: Translate { y: root.contentOffset("usage") }
-    opacity: root.contentOpacity("usage")
-    visible: opacity > 0
-    enabled: root.usagePanelKeyboardActive
   }
 
   StoragePanel {
@@ -504,7 +484,7 @@ Rectangle {
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
-    implicitWidth: workspaceSwitcher.expandedImplicitWidth
+    implicitWidth: root.maximumWidth
     height: implicitHeight
     transform: Translate { y: root.contentOffset("storage") }
     opacity: root.contentOpacity("storage")
@@ -519,7 +499,7 @@ Rectangle {
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
-    implicitWidth: workspaceSwitcher.expandedImplicitWidth
+    implicitWidth: root.maximumWidth
     height: implicitHeight
     transform: Translate { y: root.contentOffset("calendar") }
     opacity: root.contentOpacity("calendar")
@@ -539,7 +519,7 @@ Rectangle {
     id: notificationPopup
     objectName: "barNotification"
     visible: root.services.notifications.presented !== null
-    maximumWidth: workspaceSwitcher.expandedImplicitWidth
+    maximumWidth: root.maximumWidth
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right

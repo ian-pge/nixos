@@ -48,7 +48,7 @@ Rectangle {
         font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption }
       }
       BeeperButton {
-        text: "×"; accent: root.accent
+        iconName: "x"; accent: root.accent
         implicitWidth: 32; implicitHeight: 32
         Accessible.name: "Close conversation search"
         onClicked: root.closeRequested()

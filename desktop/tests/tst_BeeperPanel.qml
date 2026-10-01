@@ -324,13 +324,13 @@ ShellRoot {
         ]);
         compare(panel.networkFilter, "all");
         compare(panel.currentNetwork.name, "All");
-        compare(child("beeperNetworkFilter").text, "\uf086");
+        compare(child("beeperNetworkFilter").iconName, "messages-square");
         verify(!child("beeperSearch").visible);
         const networks = [
           {key: "telegram", chat: "design", count: 1, glyph: "\ue217"},
           {key: "whatsapp", chat: "lea", count: 2, glyph: "\uf232"},
           {key: "instagram", chat: "instagram-test", count: 1, glyph: "\uf16d"},
-          {key: "sms", chat: "sms-test", count: 1, glyph: "\uf27a"}
+          {key: "sms", chat: "sms-test", count: 1, glyph: "", iconName: "message-circle"}
         ];
         for (const network of networks) {
           keyClick(Qt.Key_Tab);
@@ -338,6 +338,7 @@ ShellRoot {
           compare(beeperData.currentChatID, network.chat);
           compare(panel.filteredChats.length, network.count);
           compare(child("beeperNetworkFilter").text, network.glyph);
+          compare(child("beeperNetworkFilter").iconName, network.iconName || "");
           compare(child("beeperComposerMicrophone").color, child("beeperNetworkFilter").accent);
           compare(child("beeperComposerSendIcon").color, child("beeperNetworkFilter").accent);
         }

@@ -105,11 +105,11 @@ Item {
       verify(cells.every(cell => cell.day === 0 ? cell.date === "" : cell.date.length === 10));
     }
     function test_weather_codes_data() {
-      return [{tag: "sun", code: 0, icon: "\ue30d"}, {tag: "clear", code: 1, icon: "\ue302"},
-        {tag: "cloud", code: 3, icon: "\ue312"}, {tag: "fog", code: 48, icon: "\ue313"},
-        {tag: "drizzle", code: 51, icon: "\ue318"}, {tag: "rain", code: 65, icon: "\ue318"},
-        {tag: "snow", code: 75, icon: "\ue31a"}, {tag: "showers", code: 82, icon: "\ue319"},
-        {tag: "storm", code: 99, icon: "\ue31d"}, {tag: "null", code: null, icon: ""},
+      return [{tag: "sun", code: 0, icon: "sun"}, {tag: "clear", code: 1, icon: "cloud-sun"},
+        {tag: "cloud", code: 3, icon: "cloud"}, {tag: "fog", code: 48, icon: "cloud-fog"},
+        {tag: "drizzle", code: 51, icon: "cloud-rain"}, {tag: "rain", code: 65, icon: "cloud-rain"},
+        {tag: "snow", code: 75, icon: "cloud-snow"}, {tag: "showers", code: 82, icon: "cloud-rain-wind"},
+        {tag: "storm", code: 99, icon: "cloud-lightning"}, {tag: "null", code: null, icon: ""},
         {tag: "unknown", code: 1000, icon: ""}, {tag: "missing", code: undefined, icon: ""}];
     }
     function test_weather_codes(row) { compare(Calendar.weatherIcon(row.code), row.icon); }
@@ -130,9 +130,9 @@ Item {
     function test_day_contents_and_stable_geometry() {
       compare(panel.monthTitle, "Septembre 2026");
       const today = findChild(panel, "2026-09-10");
-      verify(today.isToday); compare(today.weatherIcon, "\ue30d");
+      verify(today.isToday); compare(today.weatherIcon, "sun");
       compare(today.temperatureText, "0°/13°");
-      compare(findChild(panel, "2026-09-11").weatherIcon, "\ue31d");
+      compare(findChild(panel, "2026-09-11").weatherIcon, "cloud-lightning");
       compare(findChild(panel, "2026-09-12").weatherIcon, "");
       compare(findChild(panel, "2026-09-30").weatherIcon, "");
       compare(findChild(panel, "2026-09-30").temperatureText, "");
@@ -141,7 +141,7 @@ Item {
         // Today's solid Pink cell draws its content in Crust.
         const icon = findChild(day, "weatherIcon");
         compare(icon.color, day === today ? Theme.background : Theme.weatherRain);
-        compare(icon.font.family, "Ubuntu Nerd Font");
+        compare(icon.name, day.weatherIcon); verify(icon.valid);
         const temperature = findChild(day, "temperature");
         compare(temperature.color, day === today ? Theme.background : Theme.sideWeather);
         verify(temperature.y + temperature.height <= day.height);

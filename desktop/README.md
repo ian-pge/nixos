@@ -74,9 +74,26 @@ its QML fixture on the session bus. Sidebar/performance timings are diagnostics,
 not portable pass/fail thresholds. `BEEPER_SIDEBAR_SOURCE` and
 `BEEPER_PERFORMANCE_SOURCE` can point to older packaged components for comparison.
 Other render modes are documented at the top of the Wayland harness.
+`QS_TEST_GLASS_PLUGIN=/path/to/libliquid-glass.so` loads Liquid Glass in the
+private compositor. With `--desktop`, also set `QS_TEST_GRIM=/path/to/grim` and
+`QS_TOOLTIP_DIAGNOSTIC=/tmp/tooltip.png` to capture the percentage tooltip using
+native pointer motion. This exercises the compositor's geometry clipping.
 Backend build/test commands live in each [tool's README](../tools/README.md).
 
 ## Activation and diagnostics
+
+Workspace digits adapt to the connected displays: Cmd+1…5 on a lone display;
+with the laptop and an external screen, Cmd+1…5 targets the external display
+and Cmd+6…0 targets the laptop. Disconnecting merges windows from 6…10 into
+the corresponding 1…5 slots without closing applications. Cmd+Alt+H/L cycles
+within the current screen's five slots. See the
+[workspace policy](../home_manager/hyprland/workspace-policy.lua).
+
+Validate the generated Lua with
+`lua home_manager/hyprland/tests/workspace-navigation_test.lua GENERATED_HYPRLAND_LUA`.
+`node home_manager/hyprland/tests/workspace-hotplug_test.mjs` exercises real
+window migration on private virtual outputs; it never disconnects a real screen.
+`node desktop/tests/workspaces_test.mjs` verifies the bar through isolated IPC.
 
 Building does not activate NixOS or restart Quickshell. To apply the current
 Home Manager configuration deliberately (including its other pending changes):
@@ -104,6 +121,36 @@ window border must return after closing an overlay. IPC methods live in
 [shell/ShellIntegration.qml](shell/ShellIntegration.qml), for example
 `qs --config top-bar ipc call topbar toggleWifi`. Some methods perform real
 actions: use the fixtures for update/cleanup tests.
+
+## Shared icons
+
+UI icons use the complete, bundled Lucide SVG catalogue. Any feature can import
+`ui/` and use the same component; names follow the Lucide catalogue:
+
+```qml
+import "../../ui"
+import "../../ui/Theme.js" as Theme
+
+Icon {
+  name: "wifi"
+  size: 18
+  color: Theme.sideNetwork
+  strokeWidth: 2
+}
+```
+
+Use `spinning: true` with `name: "loader-circle"` for loading indicators.
+`BarCell`, `BarDial`, `Pill` and `BeeperButton` accept `iconName` separately from
+their text. Put accessible labels on the owning control. Workspace Pac-Man,
+ghosts and empty dots intentionally keep their Nerd Font glyphs. Keep application logos,
+avatars, user emojis and keyboard notation as their original content.
+
+Assets are local and shared by all views, including chat. The SVG renderer
+handles color/opacity and HiDPI sizing without icon fonts or per-icon effects.
+The pinned version, integrity check and generator are in
+[update-lucide.mjs](ui/icons/update-lucide.mjs); regeneration requires Node and
+`tar`, but normal builds and runtime require no downloads. The upstream license
+is bundled with the catalogue.
 
 ## Storage
 
@@ -141,10 +188,16 @@ real recording or account.
 
 ## Plan limits
 
-The usage panel uses the official Claude and Codex CLIs already signed in to
-the user's accounts. It neither reads credential files nor submits prompts or
-consumes reset credits. The experimental protocol handling and failure policy
-are documented under [usage limits](docs/DESIGN_GUIDE.md#limites-dutilisation).
+The bar shows three logo dials: GPT/Codex's main quota, Claude's five-hour quota
+and its all-model weekly quota. Rings show remaining allowance; hover for the exact
+percentage. The dials are hover-only and keep the normal pointer. Reset times
+and freshness remain in the accessible label. Top-right badges show available
+reset credits once per provider, only when greater than zero; unknown counts stay hidden.
+Press Cmd+R to refresh. One shared
+controller reads the signed-in official CLIs at startup and every five minutes;
+it neither reads credential files nor submits prompts or consumes reset credits.
+The experimental protocol handling and failure policy are documented under
+[usage limits](docs/DESIGN_GUIDE.md#limites-dutilisation).
 
 ## HHKB shortcut sheet
 

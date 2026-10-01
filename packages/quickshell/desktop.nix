@@ -32,6 +32,7 @@
       else
         name
         == "qmldir"
+        || name == "LICENSE"
         || lib.any (extension: lib.hasSuffix extension name) [
           ".qml"
           ".js"

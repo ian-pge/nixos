@@ -52,6 +52,7 @@ ShellRoot {
       if (results.failed) console.error("FAILED", qtest_results.functionName);
     }
     function background() { return findChild(pill, "pill-background"); }
+    function selection() { return findChild(pill, "pill-selection"); }
     function label() { return findChild(pill, "pill-label"); }
     function trailing() { return findChild(pill, "pill-trailing-label"); }
     function test_active_data() {
@@ -62,8 +63,14 @@ ShellRoot {
       pill.forceHovered = true;
       wait(250);
       verify(pill.hovered);
-      const tint = Qt.alpha(pill.accent, 0.16);
-      compare(background().color, data.glass ? tint : Qt.tint(Theme.background, tint));
+      const tint = Qt.alpha(pill.accent, Theme.barSelectionOpacity);
+      compare(background().color, data.glass ? Qt.alpha(Theme.background, 0.12) : Theme.background);
+      compare(selection().color, tint);
+      compare(selection().x, Theme.barSelectionInset());
+      compare(selection().y, Theme.barSelectionInset());
+      compare(selection().width, pill.width - 2 * Theme.barSelectionInset());
+      compare(selection().height, pill.height - 2 * Theme.barSelectionInset());
+      compare(background().transform.length, 0);
       compare(label().color, pill.accent);
       compare(trailing().color, pill.accent);
       if (data.glass) verify(background().color.a < 0.2);
@@ -76,7 +83,10 @@ ShellRoot {
       mouseMove(pill, 100, 18);
       tryCompare(pill, "hovered", true);
       wait(250);
-      compare(background().color, Qt.alpha(pill.accent, 0.16));
+      compare(selection().color, Qt.alpha(pill.accent, Theme.barSelectionOpacity));
+      compare(background().color, Qt.alpha(Theme.background, 0.12));
+      compare(background().mapToItem(pill, 0, 0).y, 0);
+      compare(background().transform.length, 0);
       compare(label().color, pill.accent);
       mouseClick(pill, 100, 18);
       compare(clicks.count, 1);
@@ -84,6 +94,7 @@ ShellRoot {
       tryCompare(pill, "hovered", false);
       wait(250);
       compare(background().color, Qt.alpha(Theme.background, 0.12));
+      compare(selection().color.a, 0);
     }
     function test_inactive_trailing_label_stays_muted() {
       GlassState.enabled = true;

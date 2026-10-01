@@ -128,6 +128,7 @@ Rectangle {
         Layout.alignment: Qt.AlignVCenter
         Layout.minimumWidth: 54; Layout.maximumWidth: 54; Layout.preferredHeight: 54
         text: root.currentNetwork.glyph
+        iconName: root.currentNetwork.iconName || ""
         font.pixelSize: 30
         prominent: true
         accent: root.networkAccent
@@ -144,15 +145,20 @@ Rectangle {
           radius: width / 2
           color: Qt.alpha(networkSelector.accent, networkSelector.hovered || networkSelector.activeFocus ? 0.24 : 0.14)
         }
-        contentItem: BeeperRollingText {
-          objectName: "beeperNetworkGlyph"
-          // Nerd Font glyphs overhang their advance width. The button has room
-          // for this ink; only numeric counters need the rolling text's clip.
-          clip: false
-          text: networkSelector.text; font: networkSelector.font
-          color: networkSelector.accent
-          animateChanges: root.animateSelection
-          travel: 8
+        contentItem: Item {
+          Icon {
+            anchors.centerIn: parent; size: 30
+            name: root.currentNetwork.iconName || ""; visible: name !== ""
+            color: networkSelector.accent
+          }
+          BeeperRollingText {
+            objectName: "beeperNetworkGlyph"
+            anchors.fill: parent; visible: !root.currentNetwork.iconName
+            clip: false
+            text: networkSelector.text; font: networkSelector.font
+            color: networkSelector.accent
+            animateChanges: root.animateSelection; travel: 8
+          }
         }
         Rectangle {
           objectName: "beeperNetworkConnectionWarning"
@@ -160,10 +166,7 @@ Rectangle {
           width: 18; height: 18; radius: width / 2
           x: parent.width - width + 1; y: -1; z: 2
           color: Theme.error; antialiasing: true
-          Text {
-            anchors.centerIn: parent; text: "!"; color: Theme.background
-            font { family: "Ubuntu Nerd Font"; pixelSize: 15; bold: true }
-          }
+          Icon { anchors.centerIn: parent; name: "circle-alert"; color: Theme.background; size: 15 }
         }
         Rectangle {
           objectName: "beeperLowPriorityViewIndicator"
@@ -171,7 +174,7 @@ Rectangle {
           width: 20; height: 20; radius: width / 2
           x: parent.width - width + 1; y: parent.height - height + 1; z: 2
           color: root.networkAccent
-          Text { anchors.centerIn: parent; text: "\uf103"; color: Theme.background; font { family: "Ubuntu Nerd Font"; pixelSize: 12 } }
+          Icon { anchors.centerIn: parent; name: "chevrons-down"; color: Theme.background; size: 12 }
           Accessible.name: "Low priority conversations only"
         }
         onClicked: root.networkCycleRequested()
@@ -198,10 +201,7 @@ Rectangle {
         implicitWidth: counterContents.width; implicitHeight: counterContents.height
         Row {
           id: counterContents
-          Text {
-            text: root.unreadFirst ? "↑ " : ""; color: unreadCounter.color
-            font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control; weight: Font.DemiBold }
-          }
+          Icon { name: "arrow-up"; visible: root.unreadFirst; color: unreadCounter.color; size: Theme.beeperFont.control }
           BeeperRollingText {
             objectName: "beeperUnreadConversationDigits"
             text: root.unreadReady ? String(root.unreadCount) : root.unreadLoading ? "…" : "—"
@@ -365,16 +365,17 @@ Rectangle {
           anchors { right: parent.right; rightMargin: chatRow.rightInset }
           y: title.y + (title.implicitHeight * title.scale - height) / 2
           spacing: 4
-          Text {
-            text: chatRow.row.isMuted ? "󰂛" : chatRow.row.isPinned ? "󰐃" : ""
+          Icon {
+            size: Theme.beeperFont.caption
+            name: chatRow.row.isMuted ? "bell-off" : chatRow.row.isPinned ? "pin" : ""
+            visible: name !== ""
             color: chatRow.titleColor
-            font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption }
+
           }
-          Text {
+          Icon {
             objectName: "beeperChatPriorityIcon-" + chatRow.row.id
             visible: chatRow.row.isLowPriority === true
-            text: "\uf103"; color: chatRow.titleColor
-            font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption }
+            name: "chevrons-down"; color: chatRow.titleColor; size: Theme.beeperFont.caption
             Accessible.name: "Low priority conversation. Shift+A to move to inbox."
           }
         }

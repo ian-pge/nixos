@@ -22,16 +22,16 @@ Rectangle {
     }
   }
 
-  Text {
+  Icon {
+
+    size: 17
     id: volumeIcon
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: controller.icon()
+    name: controller.icon()
     color: Theme.sideVolume
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 17
-    font.bold: true
+
   }
 
   Rectangle {

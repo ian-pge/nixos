@@ -106,7 +106,7 @@ ShellRoot {
   UsageController {
     id: usageFeature
     enabled: desktop.servicesEnabled
-    active: panels.mode === "usage"
+    active: desktop.servicesEnabled
   }
   SystemController {
     id: systemFeature

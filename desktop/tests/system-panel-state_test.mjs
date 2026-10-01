@@ -11,7 +11,9 @@ assert.match(bar, /item: messengerSurface\.presented \? messengerSurface\.surfac
 assert.match(bar, /sourceWidth: centerMorph\.width/);
 assert.match(bar, /sourceHeight: centerMorph\.height/);
 assert.match(capsule, /targetWidth: Math\.min\(preferredWidth, maximumWidth\)/);
-assert.match(capsule, /maximumWidth: workspaceSwitcher\.expandedImplicitWidth/);
+assert.match(capsule, /maximumWidth: Math\.min\(panelWidth,/);
+assert.doesNotMatch(capsule, /maximumWidth: workspaceSwitcher\./,
+  "Five workspace slots must not shrink calendar, storage or system panels");
 assert.match(capsule, /y: root\.barTopInset/);
 assert.match(capsule, /Math\.max\(root\.messengerHost\.originContentOpacity, overlayReveal\)/);
 assert.match(capsule, /drawBackground: !root\.messengerHost\.presented \|\| \(root\.messengerHost\.active && overlayReveal > 0\)/);

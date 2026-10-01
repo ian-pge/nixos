@@ -73,13 +73,13 @@ FocusScope {
     event.accepted = true;
   }
 
-  Text {
+  Icon {
+
+    size: 18
     x: 16; y: 12; width: 22; height: 24
-    text: root.detailsOpen || root.locationSearchOpen ? "‹" : ""
+    name: root.detailsOpen || root.locationSearchOpen ? "chevron-left" : "calendar-days"
     color: Theme.sideWeather
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 18
-    verticalAlignment: Text.AlignVCenter
+
     MouseArea {
       objectName: "backToCalendar"
       anchors.fill: parent
@@ -188,17 +188,14 @@ FocusScope {
               font.pixelSize: 13
               font.bold: cell.isSelected || cell.isToday
             }
-            Text {
+            Icon {
               objectName: "weatherIcon"
               anchors.horizontalCenter: parent.horizontalCenter
               y: 20; height: 22
-              text: cell.modelData.day === 0 ? "" : cell.weatherIcon
-              visible: text !== ""
+              name: cell.modelData.day === 0 ? "" : cell.weatherIcon
+              visible: name !== ""
               color: cell.filled ? Theme.background : Calendar.weatherIconColor(cell.forecast?.code)
-              font.family: "Ubuntu Nerd Font"
-              font.pixelSize: 20
-              verticalAlignment: Text.AlignVCenter
-              textFormat: Text.PlainText
+              size: 20
             }
             MouseArea {
               anchors.fill: parent

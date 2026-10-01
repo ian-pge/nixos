@@ -1,4 +1,5 @@
 import QtQuick
+import "../../ui"
 import "../../ui/Layout.js" as Layout
 import "../../ui/Theme.js" as Theme
 
@@ -6,7 +7,7 @@ FocusScope {
   id: root
 
   required property var controller
-  property string spinnerFrame: "⠋"
+  property string spinnerFrame: "loader-circle"
   signal closeRequested()
   readonly property var selectedNetwork: controller.entries.length > 0
     ? controller.entries[Math.min(controller.selectedIndex,
@@ -26,51 +27,38 @@ FocusScope {
   property bool componentReady: false
   property bool wheelNavigationPending: false
   readonly property string wifiIconText: {
-    if (controller.loading) return root.spinnerFrame;
+    if (controller.loading) return "loader-circle";
     if (selectedNetwork !== null && selectedNetwork.type === "ethernet")
-      return "󰈀";
+      return "ethernet-port";
     if (selectedNetwork !== null)
       return signalIcon(selectedNetwork.strength);
-    return "󰤭";
+    return "wifi-off";
   }
   readonly property string securityIconText:
     !controller.passwordMode && selectedNetwork !== null
       && selectedNetwork.type === "wifi"
-      && controller.isSecured(selectedNetwork) ? "󰌾" : ""
-  readonly property string counterText: controller.passwordMode ? "󰌾"
+      && controller.isSecured(selectedNetwork) ? "lock-keyhole" : ""
+  readonly property string counterText: controller.passwordMode ? ""
     : controller.entries.length > 0
       ? (controller.selectedIndex + 1) + "/"
         + controller.entries.length
       : "0/0"
   readonly property real collapsedContentWidth: 15
-    + wifiIconMetrics.advanceWidth(wifiIconText) + 13 + 7 + 8
+    + 17 + 13 + 7 + 8
     + Layout.widestText(labelMetrics,
       [desiredLabelText, displayedLabelText, previousLabelText])
-    + 12 + securityMetrics.advanceWidth(securityIconText) + 8
-    + counterMetrics.advanceWidth(counterText) + 15
+    + 12 + (securityIconText ? 13 : 0) + 8
+    + (controller.passwordMode ? 13 : counterMetrics.advanceWidth(counterText)) + 15
 
   implicitWidth: controller.speedTestExpanded ? 400
     : Layout.boundedWidth(collapsedContentWidth, 0, 400)
   implicitHeight: controller.speedTestExpanded ? 94 : 36
 
   FontMetrics {
-    id: wifiIconMetrics
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 17
-    font.bold: true
-  }
-
-  FontMetrics {
     id: labelMetrics
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 14
     font.bold: true
-  }
-
-  FontMetrics {
-    id: securityMetrics
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 13
   }
 
   FontMetrics {
@@ -81,10 +69,10 @@ FocusScope {
   }
 
   function signalIcon(strength) {
-    if (strength < 26) return "󰤟";
-    if (strength < 51) return "󰤢";
-    if (strength < 76) return "󰤥";
-    return "󰤨";
+    if (strength < 26) return "wifi-zero";
+    if (strength < 51) return "wifi-low";
+    if (strength < 76) return "wifi-high";
+    return "wifi";
   }
 
   function syncLabel() {
@@ -191,16 +179,16 @@ FocusScope {
     anchors.right: parent.right
     height: 36
 
-  Text {
+  Icon {
+
+    size: 17
     id: wifiIcon
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: root.wifiIconText
+    name: root.wifiIconText
+    spinning: controller.loading
     color: Theme.sideNetwork
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 17
-    font.bold: true
 
   }
 
@@ -287,17 +275,20 @@ FocusScope {
     anchors.verticalCenter: parent.verticalCenter
     spacing: 8
 
-    Text {
-      text: root.securityIconText
+    Icon {
+
+      size: 13
+      name: root.securityIconText
+      visible: name !== ""
       height: 18
-      verticalAlignment: Text.AlignVCenter
+
       color: Theme.secondary
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 13
+
     }
 
     Text {
       text: root.counterText
+      visible: !controller.passwordMode
       height: 18
       verticalAlignment: Text.AlignVCenter
       color: Theme.secondary
@@ -305,6 +296,7 @@ FocusScope {
       font.pixelSize: 12
       font.bold: true
     }
+    Icon { name: "lock-keyhole"; size: 13; color: Theme.secondary; visible: controller.passwordMode }
   }
   }
 
@@ -333,16 +325,14 @@ FocusScope {
       visible: controller.speedTestRunning
       anchors.fill: parent
 
-      Text {
+      Icon {
         id: speedTestSpinner
         anchors.left: parent.left
         anchors.leftMargin: 15
         y: 8
-        text: root.spinnerFrame
+        name: root.spinnerFrame; spinning: true
         color: Theme.sideNetwork
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 15
-        font.bold: true
+        size: 15
 
       }
 

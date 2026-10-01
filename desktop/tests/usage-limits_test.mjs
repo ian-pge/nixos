@@ -9,6 +9,33 @@ vm.runInContext(readFileSync(new URL("../features/usage/UsageLimits.js", import.
 const plain = value => JSON.parse(JSON.stringify(value));
 const hour = 3600000, day = 24 * hour;
 
+// The quota bar shows remaining allowance; an expired reading is
+// unknown until confirmed by a fresh response, never an assumed full reset.
+const quotaNow = Date.parse("2026-10-01T12:00:00Z");
+const quotaSnapshot = {limits: [
+  {window: "five_hour", percent: 20, resetsAt: quotaNow + hour},
+  {window: "seven_day", percent: 34, resetsAt: quotaNow + day},
+  {label: "Semaine · modèle", percent: 99, resetsAt: quotaNow + day}
+]};
+assert.equal(limits.barWindow(quotaSnapshot, "five_hour").percent, 20);
+assert.equal(limits.barWindow(quotaSnapshot, "seven_day").percent, 34);
+assert.equal(limits.remainingPercent(limits.barWindow(quotaSnapshot, "five_hour"), quotaNow), 80);
+assert.equal(limits.remainingPercent({percent: 100}, quotaNow), 0);
+assert.equal(limits.remainingPercent({percent: 140}, quotaNow), 0);
+assert.equal(limits.remainingPercent({percent: null}, quotaNow), null);
+assert.equal(limits.remainingPercent({percent: 20, resetsAt: quotaNow}, quotaNow), null);
+assert.equal(limits.barWindow(null, "five_hour"), null);
+assert.equal(limits.barWindow({limits: [quotaSnapshot.limits[2]]}, "seven_day"), null);
+const codexWindows = {limits: [{minutes: 300, percent: 12}, {minutes: 10080, percent: 46}]};
+assert.equal(limits.barWindow(codexWindows, "codex").percent, 46);
+assert.equal(limits.barWindow({limits: [codexWindows.limits[0]]}, "codex").percent, 12);
+const quotaHint = limits.quotaTooltip("Claude · 5 h", {error: "Lecture refusée", updatedAt: quotaNow},
+  quotaSnapshot.limits[0], quotaNow);
+assert.match(quotaHint, /80 % restants/);
+assert.match(quotaHint, /20 % utilisés/);
+assert.match(quotaHint, /Réinitialisation dans 1 h/);
+assert.match(quotaHint, /Lecture refusée/);
+
 // Claude Code: initialize, then one get_usage request that skips the transcript scan.
 const claudeContext = {};
 const [initialize] = plain(limits.claude.opening());
@@ -61,9 +88,16 @@ assert.deepEqual(claude.snapshot.notes, [unknownClaudeResets],
 const resetNow = Date.parse("2026-09-30T00:00:00Z");
 for (const status of [null, undefined, {}, {eligible: false}])
   assert.deepEqual(plain(limits.claudeResetCredits(status, resetNow)), unknownClaudeResets);
+for (const status of [null, undefined, {}, {eligible: false}])
+  assert.equal(limits.claudeResetCount(status, resetNow), null);
+assert.equal(claude.snapshot.resetCredits, null);
 const resetGrants = {eligible: true, grants: [
   {resets_left: 1, ends_at: "2026-10-15T00:00:00Z"},
   {resets_left: 2, ends_at: "2026-09-29T00:00:00Z"}]};
+assert.equal(limits.claudeResetCount(resetGrants, resetNow), 1);
+assert.equal(limits.claudeResetCount({grants: []}, resetNow), 0);
+assert.equal(limits.claudeResetCount({grants: [{resets_left: 2}, {resets_left: 1}]}, resetNow), 3);
+assert.equal(limits.claudeResetCount({grants: [{resets_left: null}]}, resetNow), null);
 assert.deepEqual(plain(limits.claudeResetCredits(resetGrants, resetNow)),
   {text: "1 crédit de réinitialisation", alert: false}, "Expired grants are excluded");
 assert.deepEqual(plain(limits.claudeResetCredits({grants: [{resets_left: 1}, {resets_left: 2}]}, resetNow)),
@@ -133,6 +167,12 @@ assert.deepEqual(codex.snapshot.limits.map(row => [row.label, row.percent, row.r
   ["5 heures", 12, 1790620000000], ["Semaine", 94, 1791047867000]], "Shortest window first");
 assert.deepEqual(codex.snapshot.notes, [{ text: "1 crédit de réinitialisation", alert: false }]);
 assert.equal(codex.snapshot.blocked, false);
+assert.equal(codex.snapshot.resetCredits, 1);
+assert.equal(limits.codexResetCount({availableCount: 0}), 0);
+assert.equal(limits.codexResetCount({availableCount: "2"}), 2);
+for (const count of [undefined, null, "", "invalid", true, -1, 0.5, NaN, Infinity])
+  assert.equal(limits.codexResetCount({availableCount: count}), null);
+assert.equal(limits.codexResetCount(null), null);
 
 const reached = plain(limits.codexSnapshot({ ordinaryUsageAllowed: false, rateLimitResetCredits: { availableCount: 2 },
   rateLimits: { planType: "self_serve_business_prolite", rateLimitReachedType: "rate_limit_reached",
@@ -147,6 +187,7 @@ const blocked = plain(limits.codexSnapshot({ ordinaryUsageAllowed: false, rateLi
 assert.deepEqual(blocked.snapshot.notes, [{ text: "Usage bloqué", alert: true }]);
 assert.equal(blocked.snapshot.limits[0].label, "2 jours");
 assert.equal(blocked.snapshot.plan, "", "An unknown plan is left blank");
+assert.equal(blocked.snapshot.resetCredits, null, "An absent reset counter must not become zero");
 assert.equal(limits.codexSnapshot({ rateLimits: { primary: null, secondary: { windowDurationMins: 300 } } }).error,
   "Limites Codex indisponibles");
 assert.equal(limits.codexSnapshot(null).error, "Réponse inattendue de Codex");

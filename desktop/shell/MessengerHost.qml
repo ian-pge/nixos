@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Hyprland
 import "../features/messenger"
+import "../ui"
 import "../ui/Theme.js" as Theme
 
 // Per-monitor shell adapter: shared layer-surface focus, placement, animation
@@ -139,11 +140,15 @@ Item {
     width: 250; height: 32; radius: 16; color: Theme.surfaceRaised
     visible: root.active && root.dictating
     z: 3
-    Text {
+    Row {
       anchors.centerIn: parent
-      text: root.transcribing ? "Dictation · transcribing…" : "●  Dictation in progress"
-      color: Theme.state
-      font.family: "Ubuntu Nerd Font"; font.pixelSize: Theme.beeperFont.secondary
+      spacing: 6
+      Icon { name: root.transcribing ? "loader-circle" : "mic"; spinning: root.transcribing; color: Theme.state; size: 16; anchors.verticalCenter: parent.verticalCenter }
+      Text {
+        text: root.transcribing ? "Dictation · transcribing…" : "Dictation in progress"
+        color: Theme.state
+        font.family: "Ubuntu Nerd Font"; font.pixelSize: Theme.beeperFont.secondary
+      }
     }
   }
 }

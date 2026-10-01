@@ -130,10 +130,9 @@ Rectangle {
             width: 24; height: 24; padding: 0
             hoverEnabled: true
             background: null
-            contentItem: Item {
+            contentItem: Icon {
               opacity: removeAttachment.hovered || removeAttachment.activeFocus ? 1 : 0.65
-              Rectangle { anchors.centerIn: parent; width: 10; height: 1; rotation: 45; color: "white"; antialiasing: true }
-              Rectangle { anchors.centerIn: parent; width: 10; height: 1; rotation: -45; color: "white"; antialiasing: true }
+              name: "x"; size: 12; color: "white"; strokeWidth: 1.5
             }
             Accessible.name: "Remove " + (modelData.fileName || "attachment")
             onClicked: root.beeperData.clearAttachment(index)
@@ -163,10 +162,8 @@ Rectangle {
           color: Qt.alpha(root.networkAccent, emojiButton.down ? 0.28
             : root.emojiPickerOpen || emojiButton.hovered || emojiButton.activeFocus ? 0.2 : 0.1)
         }
-        contentItem: Text {
-          text: "\uf118"; color: root.networkAccent
-          horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-          font { family: "Ubuntu Nerd Font"; pixelSize: 23 }
+        contentItem: Icon {
+          name: "face-slightly-smiling"; color: root.networkAccent; size: 23
         }
       }
       ScrollView {
@@ -245,32 +242,33 @@ Rectangle {
           radius: width / 2
           color: Qt.alpha(root.recording ? Theme.error : root.networkAccent,
             actionButton.down ? 0.28 : actionButton.hovered || actionButton.activeFocus ? 0.2 : 0.1)
-          Rectangle {
+          Icon {
             objectName: "beeperComposerStopIcon"
             anchors.centerIn: parent
-            width: 16; height: 16
+            name: "square"; size: 16
             color: Theme.error
             visible: root.recording && !root.busy
           }
         }
         contentItem: Item {
-          Text {
+          Icon {
+            size: 23
             objectName: "beeperComposerMicrophone"
-            anchors.centerIn: parent; text: "󰍬"
+            anchors.centerIn: parent; name: "mic"
             color: root.networkAccent
             opacity: root.busy || root.recording ? 0 : 1 - root.sendReveal
             scale: 0.8 + 0.2 * opacity
-            font { family: "Ubuntu Nerd Font"; pixelSize: 23 }
+
           }
-          Text {
+          Icon {
             objectName: "beeperComposerSendIcon"
-            anchors.centerIn: parent; text: root.editMessageID ? "✓" : "\uf1d8"
+            anchors.centerIn: parent; name: root.editMessageID ? "check" : "send"
             color: root.networkAccent
             opacity: root.busy || root.recording ? 0 : root.sendReveal
             scale: 0.8 + 0.2 * opacity
-            font { family: "Ubuntu Nerd Font"; pixelSize: 21 }
+            size: 21
           }
-          Text { anchors.centerIn: parent; visible: root.busy; text: "…"; color: root.networkAccent; font.pixelSize: 23 }
+          Icon { anchors.centerIn: parent; visible: root.busy; name: "loader-circle"; spinning: true; color: root.networkAccent; size: 23 }
         }
       }
     }

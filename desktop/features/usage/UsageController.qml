@@ -2,8 +2,8 @@ import Quickshell
 import QtQuick
 import "UsageLimits.js" as Limits
 
-// Owns both CLI conversations. They run only while the panel is open, at
-// most once a minute unless the user explicitly asks for a refresh.
+// One shared pair of brief CLI reads for every bar, refreshed every five
+// minutes while active. No per-screen collector or long-running CLI.
 Scope {
   id: root
   property bool enabled: true
@@ -36,9 +36,12 @@ Scope {
     return Limits.expired(claudeSource.snapshot, Date.now())
       || Limits.expired(codexSource.snapshot, Date.now());
   }
+  function refreshWhenActive() { if (active) refresh(); }
 
-  onActiveChanged: if (active) refresh()
-  // A window that resets while the panel is open is read again.
+  onActiveChanged: if (active) Qt.callLater(root.refreshWhenActive)
+  onEnabledChanged: if (enabled && active) Qt.callLater(root.refreshWhenActive)
+  Component.onCompleted: if (enabled && active) Qt.callLater(root.refreshWhenActive)
+  // Re-read a window at its reset time instead of assuming a fresh allowance.
   onNowChanged: if (active && expired()) refresh()
 
   SystemClock { id: clock; precision: SystemClock.Minutes }

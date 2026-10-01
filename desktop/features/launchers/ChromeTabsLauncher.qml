@@ -63,20 +63,19 @@ FocusScope {
   Item {
     anchors.fill: parent
 
-    Text {
+    Icon {
+
+      size: 17
       id: searchIcon
       anchors.left: parent.left
       anchors.leftMargin: 16
       y: 9
       width: 22
       height: 24
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: "󰍉"
+
+      name: "search"
       color: Theme.sideApplications
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 17
-      font.bold: true
+
     }
 
     TextInput {
@@ -300,13 +299,13 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
 
-            Text {
+            Icon {
+
+              size: 12
               visible: tabRow.tab.pinned
-              text: "󰐃"
+              name: "pin"
               color: Theme.sideApplications
-              font.family: "Ubuntu Nerd Font"
-              font.pixelSize: 12
-              font.bold: true
+
             }
 
             Rectangle {

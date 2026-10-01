@@ -54,20 +54,19 @@ FocusScope {
   Item {
     anchors.fill: parent
 
-    Text {
+    Icon {
+
+      size: 17
       id: searchIcon
       anchors.left: parent.left
       anchors.leftMargin: 16
       y: 9
       width: 22
       height: 24
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: "󰍉"
+
+      name: "search"
       color: Theme.sideApplications
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 17
-      font.bold: true
+
     }
 
     TextInput {
@@ -239,14 +238,14 @@ FocusScope {
               cache: true
             }
 
-            Text {
+            Icon {
+
+              size: 15
               visible: appIcon.status === Image.Error
               anchors.centerIn: parent
-              text: "󰀻"
+              name: "app-window"
               color: appRow.selected ? Theme.background : Theme.inactive
-              font.family: "Ubuntu Nerd Font"
-              font.pixelSize: 15
-              font.bold: true
+
             }
           }
 

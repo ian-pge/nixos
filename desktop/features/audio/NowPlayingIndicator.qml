@@ -1,4 +1,5 @@
 import QtQuick
+import "../../ui"
 import "../../ui/Layout.js" as Layout
 import "../../ui/Theme.js" as Theme
 
@@ -13,18 +14,11 @@ Item {
 
   implicitWidth: Layout.boundedWidth(15 + 18 + 10
     + labelMetrics.advanceWidth(labelText) + 12
-    + playbackMetrics.advanceWidth(playbackIconText) + 14, 160, 480)
+    + 16 + 14, 160, 480)
   implicitHeight: 36
 
   FontMetrics {
     id: labelMetrics
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 16
-    font.bold: true
-  }
-
-  FontMetrics {
-    id: playbackMetrics
     font.family: "Ubuntu Nerd Font"
     font.pixelSize: 16
     font.bold: true
@@ -95,16 +89,16 @@ Item {
     }
   }
 
-  Text {
+  Icon {
+
+    size: 16
     id: playbackIcon
     anchors.right: parent.right
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
-    text: root.playbackIconText
+    name: root.playbackIconText
     color: Theme.action
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 16
-    font.bold: true
+
   }
 
   Text {

@@ -1,4 +1,5 @@
 import QtQuick
+import "../../ui"
 import "../../ui/Layout.js" as Layout
 import "../../ui/Theme.js" as Theme
 
@@ -7,7 +8,7 @@ FocusScope {
 
   required property var updates
   required property var auth
-  property string spinnerFrame: "⠋"
+  property string spinnerFrame: "loader-circle"
   signal closeRequested()
   readonly property var availableUpdates: updates.updates
   readonly property int rowCount: Math.max(1, availableUpdates.length)
@@ -169,7 +170,7 @@ FocusScope {
     if (kind === "added") return Theme.sideGpu;
     if (kind === "removed") return Theme.error;
     if (kind === "downgraded") return Theme.sideDisk;
-    if (kind === "changed") return Theme.sideBrightness;
+    if (kind === "changed") return Theme.yellow;
     return Theme.sideUpdates;
   }
 
@@ -265,31 +266,26 @@ FocusScope {
       width: 20
       height: 20
 
-      Text {
+      Icon {
         id: checkingIcon
         anchors.fill: parent
         visible: updates.checking
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        text: root.spinnerFrame
+        name: root.spinnerFrame; spinning: true
         color: Theme.sideUpdates
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 17
-        font.bold: true
+        size: 17
       }
 
-      Text {
+      Icon {
+
+        size: 17
         anchors.fill: parent
         visible: !updates.checking
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        text: updates.checkFailed ? ""
-          : updates.rebootRequired ? "󰜉"
-          : availableUpdates.length > 0 ? "" : ""
+
+        name: updates.checkFailed ? "triangle-alert"
+          : updates.rebootRequired ? "refresh-cw"
+          : availableUpdates.length > 0 ? "download" : "package"
         color: updates.checkFailed ? Theme.error : Theme.sideUpdates
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 17
-        font.bold: true
+
       }
     }
 
@@ -402,23 +398,22 @@ FocusScope {
     anchors.fill: parent
     visible: root.progressMode
 
-    Text {
+    Icon {
+
+      size: 17
       id: progressIcon
+      spinning: root.updateProcessing
       anchors.left: parent.left
       anchors.leftMargin: 16
       y: 9
       width: 20
       height: 20
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: root.updateProcessing ? root.spinnerFrame
-        : updates.phase === "error" ? ""
-        : updates.phase === "success" ? "" : "󰆍"
+
+      name: root.updateProcessing ? root.spinnerFrame
+        : updates.phase === "error" ? "triangle-alert"
+        : updates.phase === "success" ? "circle-check" : "terminal"
       color: updates.phase === "error"
         ? Theme.error : Theme.sideUpdates
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 17
-      font.bold: true
 
     }
 
@@ -459,25 +454,24 @@ FocusScope {
     anchors.fill: parent
     visible: root.changesMode
 
-    Text {
+    Icon {
+
+      size: 17
       id: changesIcon
+      spinning: updates.phase === "installing"
       anchors.left: parent.left
       anchors.leftMargin: 16
       y: 9
       width: 20
       height: 20
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: updates.phase === "installing"
+
+      name: updates.phase === "installing"
         ? root.spinnerFrame
-        : updates.phase === "success" ? ""
-        : updates.phase === "error" ? ""
-        : ""
+        : updates.phase === "success" ? "circle-check"
+        : updates.phase === "error" ? "triangle-alert"
+        : "download"
       color: updates.phase === "error"
         ? Theme.error : Theme.sideUpdates
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 17
-      font.bold: true
 
     }
 
@@ -626,20 +620,19 @@ FocusScope {
     anchors.fill: parent
     visible: root.successMode || root.cleaningMode
 
-    Text {
+    Icon {
+
+      size: 17
       id: completionIcon
+      spinning: root.cleaningMode
       anchors.left: parent.left
       anchors.leftMargin: 16
       anchors.verticalCenter: parent.verticalCenter
       width: 20
       height: 20
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: root.cleaningMode ? root.spinnerFrame : ""
+
+      name: root.cleaningMode ? root.spinnerFrame : "circle-check"
       color: Theme.sideUpdates
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 17
-      font.bold: true
 
     }
 
@@ -679,20 +672,19 @@ FocusScope {
     anchors.fill: parent
     visible: root.authMode
 
-    Text {
+    Icon {
+
+      size: 18
       id: authIcon
       anchors.left: parent.left
       anchors.leftMargin: 16
       anchors.verticalCenter: parent.verticalCenter
       width: 20
       height: 20
-      horizontalAlignment: Text.AlignHCenter
-      verticalAlignment: Text.AlignVCenter
-      text: "󰌾"
+
+      name: "lock-keyhole"
       color: Theme.sideUpdates
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 18
-      font.bold: true
+
     }
 
     Text {

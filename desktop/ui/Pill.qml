@@ -7,10 +7,12 @@ Item {
   id: root
 
   property string text: ""
+  property string iconName: ""
   property int textFormat: Text.AutoText
   property string trailingText: ""
   property bool trailingInactive: false
   property color accent: Theme.foreground
+  property bool outlined: false
   property string leftCommand: ""
   property string rightCommand: ""
   property string wheelUpCommand: ""
@@ -26,9 +28,8 @@ Item {
   signal wheelUp()
   signal wheelDown()
 
-  implicitWidth: iconOnly ? 36 : Math.max(36, label.implicitWidth + 20
-    + (trailingText !== "" ? trailingLabel.implicitWidth + 8 : 0))
-  implicitHeight: 36
+  implicitWidth: iconOnly ? Theme.barSize(36) : Math.max(Theme.barSize(36), content.implicitWidth + Theme.barSize(20))
+  implicitHeight: Theme.barSize(36)
 
   function run(command) {
     if (command !== "")
@@ -39,31 +40,43 @@ Item {
     objectName: "pill-background"
     id: glassBackground
     anchors.fill: parent
-    radius: 18
+    radius: height / 2
     GlassShape { anchors.fill: parent; radius: glassBackground.radius; enabled: GlassState.enabled }
     color: GlassState.enabled
-      ? Qt.alpha(root.hovered ? root.accent : Theme.background, root.hovered ? 0.16 : 0.12)
-      : root.hovered ? Qt.tint(Theme.background, Qt.alpha(root.accent, 0.16)) : Theme.background
-    transform: SelectionBounce {
-      active: root.hovered && root.visible && root.enabled
-    }
+      ? Qt.alpha(Theme.background, 0.12) : Theme.background
 
     Behavior on color {
       ColorAnimation { duration: 220 }
     }
+    Rectangle {
+      objectName: "pill-selection"
+      anchors.fill: parent
+      anchors.margins: Theme.barSelectionInset()
+      radius: height / 2
+      color: root.hovered ? Qt.alpha(root.accent, Theme.barSelectionOpacity) : "transparent"
+      Behavior on color { ColorAnimation { duration: 160 } }
+    }
 
     Row {
+      id: content
       anchors.centerIn: parent
-      spacing: 8
+      spacing: Theme.barSize(8)
+      Icon {
+        objectName: "pill-icon"
+        visible: root.iconName !== ""; name: root.iconName; size: Theme.barIconSize
+        anchors.verticalCenter: parent.verticalCenter
+        color: root.accent
+      }
 
       Text {
         id: label
         objectName: "pill-label"
+        visible: root.text !== ""
         text: root.text
         textFormat: root.textFormat
         color: root.accent
         font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 16
+        font.pixelSize: Theme.barSize(16)
         font.bold: true
 
         Behavior on color { ColorAnimation { duration: 220 } }
@@ -82,7 +95,18 @@ Item {
     }
   }
 
-  // Keep the hit area still so the bounce cannot toggle hover at its edges.
+  Rectangle {
+    objectName: "pill-outline"
+    anchors.fill: parent
+    anchors.margins: Theme.barOutlineInset()
+    visible: root.outlined
+    radius: height / 2
+    color: "transparent"
+    border.width: Theme.barOutlineWidth
+    border.color: root.accent
+  }
+
+  // The full capsule remains clickable, including the selection's outer margin.
   MouseArea {
     id: pointer
     anchors.fill: parent

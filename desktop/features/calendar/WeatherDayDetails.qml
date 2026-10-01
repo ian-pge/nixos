@@ -17,13 +17,13 @@ Item {
   }
   onForecastChanged: hourlyList.positionViewAtBeginning()
 
-  Text {
+  Icon {
+
+    size: 24
     width: 30; height: 30
-    text: Calendar.weatherIcon(root.forecast?.code)
+    name: Calendar.weatherIcon(root.forecast?.code)
     color: Calendar.weatherIconColor(root.forecast?.code)
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 24
-    verticalAlignment: Text.AlignVCenter
+
   }
   Text {
     x: 36; height: 30; width: Math.max(0, parent.width - 132)
@@ -92,13 +92,12 @@ Item {
         font.pixelSize: 11
         verticalAlignment: Text.AlignVCenter
       }
-      Text {
+      Icon {
+        size: 20
         x: parent.width * 0.14; width: parent.width * 0.10; height: parent.height
-        text: Calendar.weatherIcon(hour.modelData.code)
+        name: Calendar.weatherIcon(hour.modelData.code)
         color: Calendar.weatherIconColor(hour.modelData.code)
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 20
-        verticalAlignment: Text.AlignVCenter
+
       }
       Row {
         x: parent.width * 0.24

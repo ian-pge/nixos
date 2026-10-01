@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import Quickshell.Widgets
+import "../../ui"
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
 
@@ -68,10 +69,17 @@ Item {
     Accessible.name: root.network.name + (root.connectionProblem ? ": connection problem" : "")
     Text {
       anchors.centerIn: parent
+      visible: !root.network.iconName
       text: root.network.glyph
       textFormat: Text.PlainText
       color: root.connectionProblem || Theme.beeperNetworkColors[root.network.key] ? Theme.background : Theme.selectedForeground
       font { family: "Ubuntu Nerd Font"; pixelSize: Math.round(badge.width * 0.60); bold: !root.network.logo }
+    }
+    Icon {
+      anchors.centerIn: parent
+      name: root.network.iconName || ""; visible: name !== ""
+      size: Math.round(badge.width * 0.60)
+      color: root.connectionProblem || Theme.beeperNetworkColors[root.network.key] ? Theme.background : Theme.selectedForeground
     }
     HoverHandler { id: badgeHover }
     ToolTip {

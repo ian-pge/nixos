@@ -10,6 +10,16 @@ Item {
   property var monitor: null
   readonly property string monitorName: monitor?.name ?? ""
   property var workspaces: Hyprland.workspaces.values
+  property var monitors: Hyprland.monitors.values
+  readonly property int workspaceCount: 5
+  // Match the compositor policy: a lone display always shows slots 1–5.
+  readonly property bool internalMonitor: /^(eDP|LVDS|DSI)-/.test(monitorName)
+  readonly property bool externalMonitorAvailable: monitors.some(output =>
+    !/^(eDP|LVDS|DSI)-/.test(output.name)
+    && (!output.lastIpcObject?.mirrorOf || output.lastIpcObject.mirrorOf === "none"))
+  readonly property int firstWorkspaceId: internalMonitor && externalMonitorAvailable ? 6 : 1
+  readonly property var workspaceIds: Array.from({length: workspaceCount},
+    (_, index) => firstWorkspaceId + index)
   // workspacev2 can reach Quickshell before focusedmon and corrupt the old
   // monitor's activeWorkspace. Use the compositor snapshot, refreshed by
   // WorkspaceMonitorSync, rather than that focus-derived property.
@@ -24,11 +34,11 @@ Item {
   readonly property bool specialSlotRendered: presentedSpecialWorkspace !== ""
   readonly property string specialSlotName: presentedSpecialWorkspace.startsWith("special:")
     ? presentedSpecialWorkspace.slice(8) : presentedSpecialWorkspace
-  readonly property real specialSlotWidth: Math.max(70, specialLabel.implicitWidth + 24)
+  readonly property real specialSlotWidth: Math.max(Theme.barSize(70), specialLabel.implicitWidth + Theme.barSize(24))
   readonly property real naturalContentWidth: {
     let total = 0;
-    for (let workspaceId = 1; workspaceId <= 8; workspaceId++) {
-      total += workspaceId === activeWorkspaceId ? 60 : 40;
+    for (const workspaceId of workspaceIds) {
+      total += Theme.barSize(workspaceId === activeWorkspaceId ? 60 : 40);
     }
     return total;
   }
@@ -109,11 +119,11 @@ Item {
       ? special.name : "", animate);
   }
 
-  readonly property real baseImplicitWidth: naturalContentWidth + 12
-  // Shared central-widget width limit, including a special slot even when closed.
-  readonly property real expandedImplicitWidth: baseImplicitWidth + specialSlotWidth + 12
+  readonly property real baseImplicitWidth: naturalContentWidth + Theme.barSize(12)
+  // Workspace capsule geometry only; expanded panels choose their own width.
+  readonly property real expandedImplicitWidth: baseImplicitWidth + specialSlotWidth + Theme.barSize(12)
   implicitWidth: specialWorkspaceVisible ? expandedImplicitWidth : baseImplicitWidth
-  implicitHeight: 36
+  implicitHeight: Theme.barSize(36)
 
   Component.onCompleted: Qt.callLater(() => syncSpecialWorkspace(false))
 
@@ -152,7 +162,7 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    radius: 18
+    radius: Theme.barSize(18)
     color: root.backgroundColor
 
     Item {
@@ -165,15 +175,16 @@ Item {
       Row {
         id: workspaceRow
         anchors.centerIn: parent
-        spacing: (workspaceArea.width - root.naturalContentWidth - 12) / 7
+        spacing: (workspaceArea.width - root.naturalContentWidth - Theme.barSize(12))
+          / Math.max(1, root.workspaceCount - 1)
 
       Repeater {
-        model: 8
+        model: root.workspaceIds
 
         Item {
           id: workspaceButton
 
-          readonly property int workspaceId: index + 1
+          readonly property int workspaceId: modelData
           objectName: "workspace-" + workspaceId
           readonly property var workspace: root.workspaceForId(workspaceId)
           readonly property bool active: workspaceId === root.activeWorkspaceId
@@ -181,8 +192,8 @@ Item {
             && workspace.toplevels.values.length > 0
           readonly property bool hovered: pointer.containsMouse
 
-          width: active ? 60 : 40
-          height: 24
+          width: Theme.barSize(active ? 60 : 40)
+          height: Theme.barSize(24)
 
           Behavior on width {
             NumberAnimation {
@@ -193,7 +204,7 @@ Item {
 
           Rectangle {
             anchors.fill: parent
-            radius: 16
+            radius: Theme.barSize(16)
             color: workspaceButton.active ? Theme.action
               : workspaceButton.hovered ? Theme.surfaceRaised : "transparent"
 
@@ -201,6 +212,7 @@ Item {
               ColorAnimation { duration: 220 }
             }
 
+            // Keep the workspace characters, independently of the UI icon set.
             Text {
               anchors.centerIn: parent
               text: workspaceButton.active
@@ -212,8 +224,9 @@ Item {
                   ? Theme.action
                   : workspaceButton.occupied ? Theme.state : Theme.inactive
               font.family: "Ubuntu Nerd Font"
-              font.pixelSize: 16
+              font.pixelSize: Theme.barSize(16)
               font.bold: true
+
               scale: workspaceButton.hovered && !workspaceButton.active ? 1.14 : 1
 
               Behavior on color {
@@ -246,11 +259,11 @@ Item {
       visible: root.specialSlotRendered
       opacity: root.specialSlotOpacity()
       anchors.right: parent.right
-      anchors.rightMargin: 6
+      anchors.rightMargin: Theme.barSize(6)
       anchors.verticalCenter: parent.verticalCenter
       width: root.specialSlotWidth
-      height: 24
-      radius: 12
+      height: Theme.barSize(24)
+      radius: Theme.barSize(12)
       color: Theme.action
 
       Text {
@@ -259,7 +272,7 @@ Item {
         text: root.specialSlotName
         color: Theme.background
         font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 13
+        font.pixelSize: Theme.barSize(13)
         font.bold: true
         font.weight: Font.Black
       }

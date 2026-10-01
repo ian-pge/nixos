@@ -127,6 +127,10 @@ try {
     } catch { return false; }
   }, "nested compositor readiness");
   assert.equal((await exec("hyprctl", ["configerrors"], {env, timeout: 2000})).stdout.trim(), "", "Nested compositor configuration must be valid");
+  if (env.QS_TEST_GLASS_PLUGIN) {
+    const loaded = await exec("hyprctl", ["plugin", "load", env.QS_TEST_GLASS_PLUGIN], {env, timeout: 5000});
+    assert.match(loaded.stdout, /ok/i, "Load Liquid Glass only into this private compositor");
+  }
   const testFile = renderAvatar ? "./tst_BeeperAvatar.qml" : renderBubble ? "./tst_BeeperBubble.qml" : renderMedia ? "./tst_BeeperMedia.qml"
     : testVideo ? "./tst_BeeperVideo.qml"
     : renderPeople ? "./tst_BeeperPeople.qml"
@@ -164,6 +168,7 @@ try {
   if (testSidebar) console.log(shellLog.split('\n').filter(line => /Sidebar animation:/.test(line)).join('\n'));
   if (testSidebar && Number.isFinite(sidebarCpuTicks)) console.log("Sidebar animation CPU ticks:", sidebarCpuTicks);
   if (testPerformance) console.log(shellLog.split('\n').filter(line => /Conversation performance:/.test(line)).join('\n'));
+  if (env.QS_TOOLTIP_DIAGNOSTIC) console.log(shellLog.split('\n').filter(line => /Tooltip diagnostic|Tooltip pointer:/.test(line)).join('\n'));
   console.log(renderAvatar
     ? "PASS: avatar photo is circular, network badge remains visible, contact fallback updates correctly"
     : renderBubble ? "PASS: independent bubble geometry, reversible animation and concurrent chat/audio focus"

@@ -17,17 +17,17 @@ ShellRoot {
     property bool volumeVisible: Quickshell.env("BEEPER_PREVIEW_VOLUME") === "1"
     property bool brightnessVisible: Quickshell.env("BEEPER_PREVIEW_BRIGHTNESS") === "1"
     property int brightness: 70
-    function icon() { return "󰕾"; }
+    function icon() { return "volume-2"; }
     function setVolume(delta) { volume = Math.max(0, Math.min(100, Math.round(volume + delta * 100))); }
     function showVolumeOverlay() { brightnessVisible = false; volumeVisible = true; }
-    function brightnessIcon() { return "󰃠"; }
+    function brightnessIcon() { return "sun"; }
     function changeBrightness(delta) { brightness = Math.max(0, Math.min(100, brightness + delta)); }
     function showBrightnessOverlay() { volumeVisible = false; brightnessVisible = true; }
   }
   QtObject {
     id: previewBrightness
     function value(monitor) { return previewAudio.brightness; }
-    function icon(monitor) { return "󰃠"; }
+    function icon(monitor) { return "sun"; }
   }
   FloatingWindow {
     id: window
@@ -108,9 +108,9 @@ ShellRoot {
       Row {
         anchors.right: parent.right; anchors.rightMargin: 16
         y: 10; spacing: 6; z: 2
-        BeeperButton { text: "−"; height: 36; onClicked: { previewAudio.setVolume(-0.05); previewAudio.showVolumeOverlay(); } }
-        BeeperButton { text: "󰕾  " + previewAudio.volume + "%"; height: 36; onClicked: previewAudio.volumeVisible = !previewAudio.volumeVisible }
-        BeeperButton { text: "+"; height: 36; onClicked: { previewAudio.setVolume(0.05); previewAudio.showVolumeOverlay(); } }
+        BeeperButton { iconName: "minus"; Accessible.name: "Lower volume"; height: 36; onClicked: { previewAudio.setVolume(-0.05); previewAudio.showVolumeOverlay(); } }
+        BeeperButton { iconName: "volume-2"; text: previewAudio.volume + "%"; height: 36; onClicked: previewAudio.volumeVisible = !previewAudio.volumeVisible }
+        BeeperButton { iconName: "plus"; Accessible.name: "Raise volume"; height: 36; onClicked: { previewAudio.setVolume(0.05); previewAudio.showVolumeOverlay(); } }
       }
     }
     Timer {

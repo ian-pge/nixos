@@ -903,7 +903,8 @@ FocusScope {
         Column {
           visible: !connectionSurface.visible && (!root.beeperData.currentChatID || (root.beeperData.messages.length === 0 && !root.beeperData.loadingMessages && !root.beeperData.historyLoadPending))
           anchors.centerIn: parent; width: Math.min(parent.width - 40, 340); spacing: 15
-          Text { anchors.horizontalCenter: parent.horizontalCenter; text: "󰍡"; color: Qt.alpha(Theme.sideApplications, 0.6); font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.illustration } }
+          Icon {
+            size: Theme.beeperFont.illustration; anchors.horizontalCenter: parent.horizontalCenter; name: "messages-square"; color: Qt.alpha(Theme.sideApplications, 0.6);  }
           Text { width: parent.width; text: root.beeperData.currentChatID ? "The conversation starts here." : "Everyone,\nin one place."; horizontalAlignment: Text.AlignHCenter; color: Theme.foreground; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.subheading; weight: Font.Medium } wrapMode: Text.Wrap }
           Text { width: parent.width; text: root.beeperData.currentChatID ? "Write the first message." : "Choose a conversation, or check in with someone."; horizontalAlignment: Text.AlignHCenter; color: Theme.secondary; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control } wrapMode: Text.Wrap }
         }
@@ -914,7 +915,7 @@ FocusScope {
         visible: !!root.beeperData.lastError && !connectionSurface.visible
         color: Qt.alpha(Theme.error, 0.09); radius: 10
         Text { id: errorText; anchors { left: parent.left; right: dismissError.left; verticalCenter: parent.verticalCenter; margins: 10 } text: root.beeperData.lastError; color: Theme.error; wrapMode: Text.Wrap; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary } }
-        BeeperButton { id: dismissError; anchors { right: parent.right; verticalCenter: parent.verticalCenter } text: "×"; onClicked: root.beeperData.lastError = "" }
+        BeeperButton { id: dismissError; anchors { right: parent.right; verticalCenter: parent.verticalCenter } iconName: "x"; Accessible.name: "Dismiss error"; onClicked: root.beeperData.lastError = "" }
       }
       RowLayout {
         objectName: "beeperSavedSendDraft"

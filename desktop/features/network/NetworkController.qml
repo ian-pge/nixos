@@ -95,16 +95,16 @@ Scope {
 
   function icon() {
     if (type === "ethernet")
-      return "󰈀";
+      return "ethernet-port";
     if (type !== "wifi")
-      return "󰤭";
+      return "wifi-off";
     if (strength < 26)
-      return "󰤟";
+      return "wifi-zero";
     if (strength < 51)
-      return "󰤢";
+      return "wifi-low";
     if (strength < 76)
-      return "󰤥";
-    return "󰤨";
+      return "wifi-high";
+    return "wifi";
   }
 
   onActiveChanged: {
@@ -426,7 +426,6 @@ Scope {
     }
     connectionUsedPassword = false;
   }
-
 
   Connections {
     enabled: root.active

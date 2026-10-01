@@ -57,8 +57,8 @@ Scope {
   }
   function icon(monitor = "") {
     const level = value(monitor);
-    if (level === null) return "󰃠";
-    return level < 34 ? "󰃞" : level < 67 ? "󰃟" : "󰃠";
+    if (level === null) return "sun";
+    return level < 34 ? "sun-dim" : level < 67 ? "sun-medium" : "sun";
   }
   function change(delta, monitor) {
     if (!Number.isFinite(delta) || delta === 0 || !monitor) return;

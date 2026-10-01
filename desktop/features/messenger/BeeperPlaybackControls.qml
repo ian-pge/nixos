@@ -1,4 +1,5 @@
 import QtQuick
+import "../../ui"
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtMultimedia
@@ -38,11 +39,11 @@ RowLayout {
       radius: width / 2
       color: Qt.alpha(root.accent, play.down ? 0.3 : play.hovered || play.activeFocus ? 0.23 : 0.15)
     }
-    contentItem: Text {
-      text: root.playing ? "󰏤" : "󰐊"
+    contentItem: Icon {
+      size: 23
+      name: root.playing ? "pause" : "play"
       color: root.enabled ? root.accent : Theme.inactive
-      horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-      font { family: "Ubuntu Nerd Font"; pixelSize: 23 }
+
     }
   }
   Slider {

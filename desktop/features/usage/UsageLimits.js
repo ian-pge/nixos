@@ -41,8 +41,10 @@ function failure(error, reason) {
   return { done: true, snapshot: null, error: error, detail: detail(reason) };
 }
 
-function limit(label, percent, resetsAt) {
-  return { label: label, percent: percent, resetsAt: resetsAt, reached: percent >= 100 };
+function limit(label, percent, resetsAt, window) {
+  var row = { label: label, percent: percent, resetsAt: resetsAt, reached: percent >= 100 };
+  if (window) row.window = window;
+  return row;
 }
 
 // Alerts explain a block; other notes are neutral facts.
@@ -82,7 +84,8 @@ function claudeRows(rows) {
   for (var index = 0; index < rows.length; ++index) {
     var row = rows[index];
     if (!isObject(row) || finite(row.percent) === null) continue;
-    result.push(limit(claudeLabel(row), row.percent, isoTime(row.resets_at)));
+    result.push(limit(claudeLabel(row), row.percent, isoTime(row.resets_at),
+      row.kind === "session" ? "five_hour" : row.kind === "weekly_all" ? "seven_day" : ""));
   }
   return result;
 }
@@ -90,12 +93,12 @@ function claudeRows(rows) {
 // Older and snapshot answers only carry the named windows.
 function claudeWindows(limits) {
   var result = [];
-  function add(label, window) {
+  function add(label, window, key) {
     if (isObject(window) && finite(window.utilization) !== null)
-      result.push(limit(label, window.utilization, isoTime(window.resets_at)));
+      result.push(limit(label, window.utilization, isoTime(window.resets_at), key));
   }
-  add("Session en cours", limits.five_hour);
-  add("Semaine · tous les modèles", limits.seven_day);
+  add("Session en cours", limits.five_hour, "five_hour");
+  add("Semaine · tous les modèles", limits.seven_day, "seven_day");
   if (Array.isArray(limits.model_scoped)) {
     for (var index = 0; index < limits.model_scoped.length; ++index) {
       var window = limits.model_scoped[index];
@@ -117,21 +120,28 @@ function claudePlan(type) {
 // Claude Code 2.1.285 calls the reset-grant status `cedar_ember`. Its
 // get_usage answer can leave it null even when the web account has a grant.
 // A missing status is unknown, never a zero balance.
-function claudeResetCredits(status, now) {
-  var unavailable = note("Réinitialisations : voir Claude", false);
-  unavailable.url = "https://claude.ai/settings/usage";
-  if (!isObject(status) || !Array.isArray(status.grants)) return unavailable;
+function claudeResetCount(status, now) {
+  if (!isObject(status) || !Array.isArray(status.grants)) return null;
   var count = 0;
   for (var index = 0; index < status.grants.length; ++index) {
     var grant = status.grants[index];
     var remaining = isObject(grant) ? finite(grant.resets_left) : null;
     if (remaining === null || remaining < 0 || Math.floor(remaining) !== remaining)
-      return unavailable;
+      return null;
     var expiresAt = isoTime(grant.ends_at);
     if (expiresAt !== null && expiresAt <= now) continue;
     count += remaining;
   }
-  return note(plural(count, "crédit de réinitialisation", "crédits de réinitialisation"), false);
+  return count;
+}
+
+function claudeResetCredits(status, now) {
+  var count = claudeResetCount(status, now);
+  if (count !== null)
+    return note(plural(count, "crédit de réinitialisation", "crédits de réinitialisation"), false);
+  var unavailable = note("Réinitialisations : voir Claude", false);
+  unavailable.url = "https://claude.ai/settings/usage";
+  return unavailable;
 }
 
 function claudeSnapshot(usage, plan) {
@@ -143,10 +153,12 @@ function claudeSnapshot(usage, plan) {
   var rows = Array.isArray(limits.limits) ? claudeRows(limits.limits) : [];
   if (rows.length === 0) rows = claudeWindows(limits);
   if (rows.length === 0) return failure("Limites Claude indisponibles");
+  var now = Date.now();
   return success({
     plan: text(plan) || claudePlan(usage.subscription_type),
     limits: rows,
-    notes: [claudeResetCredits(limits.cedar_ember, Date.now())],
+    resetCredits: claudeResetCount(limits.cedar_ember, now),
+    notes: [claudeResetCredits(limits.cedar_ember, now)],
     blocked: rows.some(function(row) { return row.reached; })
   });
 }
@@ -218,6 +230,13 @@ var codexReachedNotes = {
 
 // Only the historical `codex` bucket is shown; experimental reserve buckets
 // in rateLimitsByLimitId are not presented as ordinary limits.
+function codexResetCount(status) {
+  if (!isObject(status)) return null;
+  var count = status.availableCount;
+  if (typeof count === "string" && /^[0-9]+$/.test(count)) count = Number(count);
+  return finite(count) !== null && count >= 0 && Math.floor(count) === count ? count : null;
+}
+
 function codexSnapshot(result) {
   if (!isObject(result) || !isObject(result.rateLimits))
     return failure("Réponse inattendue de Codex");
@@ -233,13 +252,13 @@ function codexSnapshot(result) {
   var reachedType = text(limits.rateLimitReachedType);
   if (reachedType !== "") notes.push(note(codexReachedNotes[reachedType] || "Limite atteinte", true));
   else if (result.ordinaryUsageAllowed === false) notes.push(note("Usage bloqué", true));
-  var credits = isObject(result.rateLimitResetCredits)
-    ? Number(result.rateLimitResetCredits.availableCount) : 0;
-  if (isFinite(credits) && credits >= 1)
+  var credits = codexResetCount(result.rateLimitResetCredits);
+  if (credits !== null && credits >= 1)
     notes.push(note(plural(credits, "crédit de réinitialisation", "crédits de réinitialisation"), false));
   return success({
     plan: codexPlan(limits.planType),
     limits: rows,
+    resetCredits: credits,
     notes: notes,
     blocked: reachedType !== "" || result.ordinaryUsageAllowed === false
       || rows.some(function(row) { return row.reached; })
@@ -307,4 +326,36 @@ function expired(snapshot, now) {
   return snapshot.limits.some(function(row) {
     return finite(row.resetsAt) !== null && row.resetsAt <= now;
   });
+}
+
+// The bar shows one ordinary Codex window (weekly on the current plan), and
+// exactly Claude's all-model weekly / five-hour windows, never a model subset.
+function barWindow(snapshot, key) {
+  var rows = isObject(snapshot) && Array.isArray(snapshot.limits) ? snapshot.limits : [];
+  if (key === "codex") return rows.find(function(row) { return row.minutes === 10080; }) || rows[0] || null;
+  return rows.find(function(row) { return row.window === key; }) || null;
+}
+
+function remainingPercent(row, now) {
+  if (!isObject(row) || finite(row.percent) === null) return null;
+  if (finite(row.resetsAt) !== null && row.resetsAt <= now) return null;
+  return Math.max(0, Math.min(100, 100 - row.percent));
+}
+
+function quotaTooltip(label, source, row, now) {
+  var remaining = remainingPercent(row, now);
+  var lines = [label + (row ? " · " + row.label : "")];
+  if (remaining !== null)
+    lines.push(percentText(remaining) + " restants · " + percentText(row.percent) + " utilisés");
+  else if (row && finite(row.resetsAt) !== null && row.resetsAt <= now)
+    lines.push("Réinitialisation en attente de confirmation");
+  else lines.push(source.loading ? "Actualisation…" : "Limite indisponible");
+  if (row && remaining !== null && resetText(row.resetsAt, now)) lines.push(resetText(row.resetsAt, now));
+  if (source.error) lines.push("Actualisation échouée : " + source.error);
+  var resets = isObject(source.snapshot) ? source.snapshot.resetCredits : null;
+  lines.push(finite(resets) === null ? "Nombre de resets indisponible"
+    : plural(resets, "reset disponible", "resets disponibles"));
+  if (source.updatedAt > 0) lines.push(updateText(source.updatedAt, now));
+  lines.push("Cliquer pour actualiser");
+  return lines.join("\n");
 }

@@ -156,7 +156,7 @@ ShellRoot {
       operationRunner.emitEvent({phase: "awaitingInstall", changes: [{name: "app", kind: "added", oldVersions: [], newVersions: ["1"]}], counts: {added: 1}});
       verify(!updates.busy); verify(updates.summaryReady);
       compare(updates.changes.length, 1);
-      compare(updates.displayedIcon, "󰌾");
+      compare(updates.displayedIcon, "lock-keyhole");
       compare(operationRunner.writes.length, 0);
       updates.handleEnter();
       compare(operationRunner.writes.join(""), "install\n");
@@ -232,7 +232,7 @@ ShellRoot {
       verify(updates.refreshStatus()); verify(updates.checking);
       verify(!updates.forceStatus()); verify(!updates.startClean());
       statusRunner.finish(0, statusResult("reboot-required", []));
-      verify(updates.rebootRequired); compare(updates.icon, "󰜉");
+      verify(updates.rebootRequired); compare(updates.icon, "refresh-cw");
       verify(updates.refreshStatus()); verify(!updates.checking);
       statusRunner.finish(0, "malformed");
       verify(updates.checkFailed); verify(updates.rebootRequired);

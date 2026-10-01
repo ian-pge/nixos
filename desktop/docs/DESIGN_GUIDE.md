@@ -41,13 +41,53 @@ Le `PanelWindow` garde la hauteur du moniteur et une zone exclusive fixe.
 Animer sa hauteur provoquait des déplacements des modules latéraux lors des
 recalculs layer-shell. Seuls les éléments internes changent de taille.
 Le masque d'entrée suit les capsules et le panneau réellement présenté ;
-l'espace transparent entre eux reste traversable aux clics. Le rebond visuel
-ne déplace jamais les zones de clic.
+l'espace transparent entre eux reste traversable aux clics. Le survol ne
+déplace pas les widgets ni leurs zones de clic.
 
-Le plafond des widgets centraux vient de
-`WorkspaceSwitcher.expandedImplicitWidth`, calculé avec un slot spécial même
-s'il n'est pas ouvert. Une constante recopiée dans chaque widget divergerait
-avec la géométrie des workspaces. Mesurer le contenu à sa largeur cible, pas à
+Les indicateurs latéraux sont regroupés dans des blocs sur une seule ligne ; stockage
+et mises à jour restent des capsules autonomes. Un seul `GlassShape` appartient
+à chaque bloc, les cellules internes gardant leurs propres zones de clic et de
+molette. Le bloc heure/date/météo est une seule cible de survol et de clic ;
+ses cellules sont uniquement visuelles. Bluetooth, Wi-Fi, micro et notifications
+gardent chacun leur sélection circulaire, sans teinter tout le bloc réseau.
+Heure/date/météo et mises à jour ont un liseré permanent de leur
+couleur autour de la capsule entière, en retrait du fond avec la même marge et
+la même épaisseur que les cadrans. Il réutilise la région de verre du fond,
+sans contour autour de chaque icône. Les icônes et logos des blocs partagent
+la taille `barIconSize` de `Theme.js`.
+Le texte heure/date/météo est en 17 px gras. La connectivité garde son fond
+commun sans liseré global : chaque icône a un cercle complet, de même diamètre
+et épaisseur que les cadrans, sans région de verre supplémentaire.
+Les sélections du calendrier et des capsules autonomes sont en retrait du bord,
+avec la même marge que les cadrans. Toutes utilisent le même voile d'accent,
+défini dans `Theme.js`, par-dessus le fond existant ; le survol ne remplace pas
+le matériau du bloc. Les accents propres à chaque catégorie sont conservés.
+Le centre et les capsules autonomes sont centrés verticalement dans
+la hauteur des blocs. `Bar.capsuleTopInset` fournit la même origine au centre
+et à la messagerie, tandis que la zone réservée couvre toute la barre.
+
+CPU, charge GPU, VRAM, RAM, stockage, batteries, son et luminosité affichent leur niveau dans
+un cadran complet autour de l'icône. La piste couvre toujours le tour entier ;
+la partie remplie part de midi et grandit dans le sens horaire avec la valeur.
+La VRAM est le rapport mémoire graphique utilisée / totale, distinct de la
+charge du GPU. Les compteurs CPU/GPU/VRAM/RAM utilisent les mesures numériques fraîches ; un GPU
+éteint ou une mesure périmée reste inconnu, sans afficher un faux zéro. Les
+blocs de cadrans ont les mêmes marges horizontales et verticales : leurs
+extrémités sont concentriques aux cadrans, et un cadran seul a un fond rond.
+Une mesure absente reste distincte
+de zéro (piste pointillée et icône atténuée), et chaque batterie conserve sa
+propre couleur d'état. Le survol affiche seulement le pourcentage (`42%`), ou
+un tiret pour une mesure inconnue. Les noms et états détaillés restent accessibles
+aux technologies d'assistance, sans changer la largeur des blocs.
+Le fond de l'infobulle déclare son propre `GlassShape` : il sort des capsules
+de la barre. Sans cette géométrie, le compositeur Liquid Glass élimine ses pixels,
+même si Qt indique `visible` et `opened`. Vérifier aussi le rendu avec le plugin
+chargé dans le compositeur de test, pas seulement l'état QML.
+
+Le plafond des widgets centraux vient de `CentralCapsule.panelWidth`, borné par
+la largeur de la fenêtre. Il reste indépendant du nombre de workspaces : les
+cinq boutons d'un écran ne doivent pas rétrécir les panneaux détaillés.
+Mesurer le contenu à sa largeur cible, pas à
 sa largeur animée : sinon les retours à la ligne font gonfler puis rétrécir les
 notifications et panneaux pendant leur ouverture.
 
@@ -66,10 +106,10 @@ Lors d'une séquence rapide de modes, capturer les opacités et translations
 courantes au lieu de faire disparaître brutalement les couches intermédiaires.
 Un passage entre deux panneaux ne doit pas afficher les workspaces entre eux.
 
-Le rebond de sélection est une exception limitée aux capsules latérales
-survolées ou temporairement actives. Une opération de fond ne force pas ce
-rebond. Les listes et workspaces ne rebondissent pas ; masquer ou désactiver
-une vue termine ses animations.
+Les widgets ne rebondissent pas, y compris la capsule de mises à jour.
+Le survol et les états actifs changent seulement la teinte de sélection.
+Les animations d'ouverture, de fermeture et de progression restent fluides ;
+masquer ou désactiver une vue termine ses animations.
 
 ### Passage entre capsule et messagerie
 
@@ -91,6 +131,16 @@ Le chat est centré dans la zone de travail. Les marges externes de
 cohérentes. Son contenu garde sa mise en page finale pendant la transformation.
 
 ## Couleurs et verre
+
+Les pictogrammes d'interface passent par `ui/Icon.qml` et le catalogue Lucide
+local. Les contrôleurs retournent des noms sémantiques (`wifi`, `volume-x`,
+etc.), pas des caractères de police. La taille, l'épaisseur et la couleur sont
+des propriétés du composant ; conserver les boîtes de mise en page lors des
+changements d'état. Les libellés restent séparés de l'icône (`iconName` dans
+les boutons et cellules partagés). Les workspaces gardent volontairement
+Pac-Man, les fantômes et les points vides en Nerd Font. Les logos d'applications, avatars, emojis
+utilisateur et notations clavier gardent leur rendu propre. Ne pas ajouter de
+shader par icône : Qt met en cache les SVG générés pour la couleur et la taille.
 
 [Theme.js](../ui/Theme.js) est la source des couleurs. Les widgets latéraux et
 leurs panneaux centraux partagent leur accent ; ne pas recopier leurs codes
@@ -335,7 +385,7 @@ Ne pas déranger expire toutes les arrivées, même critiques, et arrête seulem
 les lecteurs de notification appartenant au shell. Musique, appels et micro
 ne changent pas. Son état survit au rechargement QML, pas au redémarrage du
 processus. Le feedback de la cloche est temporaire : un mode muet persistant
-ne maintient ni survol ni rebond.
+ne maintient pas le survol.
 
 Chaque arrivée autorisée possède son lecteur de son, sans délai minimal ni file.
 Respecter `suppress-sound` ; une mise à jour du même ID ne rejoue pas le son.
@@ -352,7 +402,23 @@ vit dans Hyprland, indépendamment de la cloche et de l'état Ne pas déranger.
 
 ### Workspaces
 
-La sélection est locale à chaque moniteur, l'occupation est globale.
+Chaque barre présente les cinq workspaces affectés à son moniteur par les
+règles Hyprland, avec sa sélection locale et l'occupation de ces workspaces.
+`workspace-policy.lua` adapte les règles aux sorties actives : seul, l'écran
+utilise 1–5 ; avec une sortie externe et l'écran intégré, l'externe utilise
+1–5 et l'intégré 6–10. DP-2 est préféré s'il existe, sinon une autre sortie
+externe est acceptée ; les noms eDP/LVDS/DSI identifient l'écran intégré.
+Les événements de moniteur sont regroupés avant l'application des règles,
+sans changer les modes vidéo ni lancer de processus de polling.
+
+Au débranchement, les fenêtres de 6–10 rejoignent 1–5 par paire, sans toucher
+aux workspaces spéciaux. À la reconnexion, les bureaux 1–5 passent sur l'externe
+et l'intégré retrouve 6–10 ; les fenêtres fusionnées restent dans 1–5. Les
+raccourcis 6–0 et leurs variantes Shift sont inactifs avec un seul écran afin
+de ne pas créer de bureaux invisibles. La navigation précédente/suivante et
+les cinq boutons suivent la même répartition ; une relecture de configuration
+inchangée ne déplace pas les fenêtres ni le focus.
+
 Quickshell 0.3.1 peut traiter `workspacev2` sur l'ancien écran si l'événement
 précède `focusedmon` : utiliser l'instantané `lastIpcObject.activeWorkspace.id`
 rafraîchi par `WorkspaceMonitorSync`, pas le focus global ni directement
@@ -410,6 +476,12 @@ retard. Le clavier Agar ne fournit pas son branchement par Bluetooth : son
 identité USB précise et une télémétrie fraîche servent d'indice. Cela fonctionne
 via un hub, mais pas sur un chargeur mural sans liaison USB au PC. Un niveau de
 100 % ne prouve jamais un branchement.
+
+Les Pixel Buds connectés rejoignent le bloc des batteries. Le cadran utilise
+uniquement le pourcentage du périphérique fourni par BlueZ, sans le présenter
+comme une mesure séparée de l'écouteur gauche, droit ou du boîtier. Un premier
+rapport encore absent reste inconnu ; une déconnexion retire le cadran. Le
+vert exige un état de charge explicite d'UPower, pas un niveau à 100 %.
 
 Les collecteurs système/GPU sont partagés ; les tops de processus sont abonnés
 seulement quand le panneau est réellement visible. Les générations évitent
@@ -525,10 +597,29 @@ Codex utilise `account/rateLimits/read` via app-server ; seuls ses quotas
 principaux sont affichés, pas les réserves expérimentales.
 Les crédits de réinitialisation ne sont jamais consommés ; pour Claude,
 un statut de grants absent reste inconnu et renvoie à la page d'usage.
+Le compteur de resets est conservé séparément dans `snapshot.resetCredits` :
+un entier positif ou nul, et `null` si la source ne le fournit pas. Les grants
+Claude expirés sont exclus. Un badge sur Codex et un à droite du duo Claude
+apparaissent uniquement pour un nombre strictement positif ; zéro et inconnu
+restent distincts dans les données mais n'affichent rien. Ces badges opaques
+restent dans les bornes de rendu du bloc, sans région de verre superposée.
+Ils sont informatifs et ne déclenchent aucune réinitialisation.
+
+Les quotas sont trois cadrans permanents : un quota principal Codex (la semaine
+si elle existe), puis les fenêtres Claude de cinq heures et hebdomadaire tous
+modèles, identifiées par les données du protocole et non leur libellé traduit.
+Les cadrans montrent le pourcentage restant. Les deux logos Claude sont centrés,
+sans sous-titre : cinq heures à gauche, semaine à droite. Le survol affiche
+uniquement le pourcentage restant. Le prochain reset et les erreurs de lecture
+restent dans le libellé d'accessibilité. Une fenêtre
+expirée reste inconnue jusqu'à confirmation du serveur. Aucun panneau central
+`usage` n'est instancié ; Cmd+R actualise les trois cadrans. Ces jauges sont
+consultables au survol uniquement : aucune action au clic et curseur normal.
 
 Les pourcentages sont arrondis à l'inférieur : 100 % doit signifier réellement
-atteint. Les processus vivent le temps d'une lecture à la demande, avec timeout
-et arrêt forcé si nécessaire, sans polling permanent panneau fermé.
+atteint. Un contrôleur partagé lit au démarrage puis toutes les cinq minutes,
+indépendamment du nombre d'écrans. Les processus vivent uniquement le temps
+d'une lecture, avec timeout et arrêt forcé si nécessaire.
 `desktop.nix` épingle les mêmes versions de CLI que le profil utilisateur.
 Les fixtures simulent les deux protocoles sans contacter les fournisseurs.
 

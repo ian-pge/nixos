@@ -71,15 +71,15 @@ function monthCells(year, month) {
 // Monochrome Nerd Font glyphs allow condition-specific icon colors.
 function weatherIcon(code) {
   switch (code) {
-    case 0: return "\ue30d";
-    case 1: case 2: return "\ue302";
-    case 3: return "\ue312";
-    case 45: case 48: return "\ue313";
+    case 0: return "sun";
+    case 1: case 2: return "cloud-sun";
+    case 3: return "cloud";
+    case 45: case 48: return "cloud-fog";
     case 51: case 53: case 55: case 56: case 57:
-    case 61: case 63: case 65: case 66: case 67: return "\ue318";
-    case 71: case 73: case 75: case 77: case 85: case 86: return "\ue31a";
-    case 80: case 81: case 82: return "\ue319";
-    case 95: case 96: case 99: return "\ue31d";
+    case 61: case 63: case 65: case 66: case 67: return "cloud-rain";
+    case 71: case 73: case 75: case 77: case 85: case 86: return "cloud-snow";
+    case 80: case 81: case 82: return "cloud-rain-wind";
+    case 95: case 96: case 99: return "cloud-lightning";
     default: return "";
   }
 }

@@ -14,35 +14,49 @@
     toLua
     ;
 
-  workspaceCount = 8;
+  workspaceCount = 10;
+  workspacesPerMonitor = 5;
 
-  # Cycle globally through the bar's numbered slots, including empty workspaces.
-  # Absolute targets follow their assigned monitor instead of creating workspace 9.
+  # Cycle through the focused monitor's five slots, including empty workspaces.
   cycleWorkspace = step: ''
     function()
       local workspace = hl.get_active_workspace()
-      if workspace == nil then
+      local monitor = hl.get_active_monitor()
+      if workspace == nil or monitor == nil then
         return
       end
 
+      local first = quickshell_workspace_first(monitor)
+      local last = first + ${toString workspacesPerMonitor} - 1
       local target
-      if workspace.id < 1 or workspace.id > ${toString workspaceCount} then
-        target = ${toString step} > 0 and 1 or ${toString workspaceCount}
+      if workspace.id < first or workspace.id > last then
+        target = ${toString step} > 0 and first or last
       else
-        target = ((workspace.id - 1 + (${toString step})) % ${toString workspaceCount}) + 1
+        target = ((workspace.id - first + (${toString step})) % ${toString workspacesPerMonitor}) + first
       end
       hl.dispatch(hl.dsp.focus({ workspace = target }))
     end
   '';
 
-  workspaceBinds = lib.concatMap (workspace: [
+  workspaceBinds = lib.concatMap (workspace: let
+    key =
+      if workspace == 10
+      then "0"
+      else toString workspace;
+  in [
     (mkBind
-      (mainKey (toString workspace))
-      "hl.dsp.focus({ workspace = ${toString workspace} })"
+      (mainKey key)
+      ''        function()
+                local target = quickshell_workspace_target(${toString workspace})
+                if target then hl.dispatch(hl.dsp.focus({ workspace = target })) end
+              end''
       {})
     (mkBind
-      (mainKey "SHIFT + ${toString workspace}")
-      "hl.dsp.window.move({ workspace = ${toString workspace} })"
+      (mainKey "SHIFT + ${key}")
+      ''        function()
+                local target = quickshell_workspace_target(${toString workspace})
+                if target then hl.dispatch(hl.dsp.window.move({ workspace = target })) end
+              end''
       {})
   ]) (lib.range 1 workspaceCount);
 
@@ -50,9 +64,11 @@
     lib.concatMap (binding: [
       (mkBind
         (mainKey binding.key)
-        (if binding.workspace == "Chat"
-         then mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleBeeper"
-         else "hl.dsp.workspace.toggle_special(${toLua binding.workspace})")
+        (
+          if binding.workspace == "Chat"
+          then mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleBeeper"
+          else "hl.dsp.workspace.toggle_special(${toLua binding.workspace})"
+        )
         {})
       (mkBind
         (mainKey "SHIFT + ${binding.key}")

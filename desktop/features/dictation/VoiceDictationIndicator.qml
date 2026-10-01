@@ -32,13 +32,11 @@ Rectangle {
     spacing: 10
     visible: !root.recording
 
-    Text {
+    Icon {
       anchors.verticalCenter: parent.verticalCenter
-      text: root.controller.brailleFrame
+      name: "loader-circle"; spinning: true
       color: root.accent
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 17
-      font.bold: true
+      size: 17
     }
 
     Text {

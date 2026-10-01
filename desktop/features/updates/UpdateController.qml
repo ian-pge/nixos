@@ -17,9 +17,9 @@ Scope {
   property bool checking: false
   property bool checkFailed: false
   property bool rebootRequired: false
-  property string icon: ""
-  readonly property string displayedIcon: phase === "awaitingInstall" ? "󰌾"
-    : phase === "error" ? "" : icon
+  property string icon: "package"
+  readonly property string displayedIcon: phase === "awaitingInstall" ? "lock-keyhole"
+    : phase === "error" ? "triangle-alert" : icon
   property string phase: "idle"
   property string message: ""
   property string operation: "update"
@@ -175,12 +175,12 @@ Scope {
       checkFailed = status.state === "error";
       rebootRequired = status.state === "reboot-required";
       updates = status.updates;
-      icon = checkFailed ? "" : rebootRequired ? "󰜉"
-        : status.hasUpdates ? "" : "";
+      icon = checkFailed ? "triangle-alert" : rebootRequired ? "refresh-cw"
+        : status.hasUpdates ? "download" : "package";
     } catch (error) {
       checkFailed = true;
       // A failed checker cannot disprove a successfully installed generation.
-      icon = "";
+      icon = "triangle-alert";
       updates = [];
     }
     checking = false;

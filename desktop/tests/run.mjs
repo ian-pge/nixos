@@ -35,7 +35,7 @@ async function run(command, args, env = baseEnv, expected = null) {
     const code = await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', resolve); });
     assert.equal(code, 0, 'Failed: ' + label);
     if (expected) assert.match(output, expected, 'No successful test result: ' + label);
-    assert.doesNotMatch(output, /TypeError:|ReferenceError:|Binding loop detected|Cannot assign to non-existent property/);
+    assert.doesNotMatch(output, /TypeError:|ReferenceError:|Binding loop detected|Cannot assign to non-existent property|Unknown Lucide icon:/);
     ++passed;
   } finally { clearTimeout(timer); }
 }
@@ -48,7 +48,7 @@ try {
     if (existsSync(path.join(here, file))) await run(process.execPath, [path.join(here, file)]);
   }
   for (const file of ['tst_AcceleratedScroll.qml', 'tst_KeyedListModel.qml', 'tst_BeeperData.qml', 'tst_BeeperNavigation.qml', 'tst_BeeperConnections.qml', 'tst_BeeperComposer.qml', 'tst_BeeperPanel.qml', 'tst_BeeperSidebar.qml', 'tst_BeeperArrivals.qml', 'tst_BeeperReactions.qml', 'tst_BeeperSendDraft.qml', 'tst_BeeperKeyboard.qml', 'tst_BeeperVim.qml', 'tst_BeeperLowPriority.qml', 'tst_BeeperUnreadOrder.qml', 'tst_BeeperSearch.qml', 'tst_BeeperPagination.qml', 'tst_BeeperQuotes.qml', 'tst_BeeperMedia.qml', 'tst_BeeperPeople.qml', 'tst_BeeperVideo.qml', 'tst_BeeperBubble.qml',
-    'tst_BeeperAttachmentPicker.qml', 'tst_MessengerController.qml', 'tst_LauncherControllers.qml', 'tst_NetworkControllers.qml',
+    'tst_Icon.qml', 'tst_BeeperAttachmentPicker.qml', 'tst_MessengerController.qml', 'tst_LauncherControllers.qml', 'tst_NetworkControllers.qml',
     'tst_UpdateControllers.qml', 'tst_FeatureControllers.qml', 'tst_CollectorLifecycle.qml',
     'tst_ShellCoordinator.qml', 'tst_SystemData.qml', 'tst_UsageController.qml', 'tst_StorageController.qml',
     'tst_WeatherData.qml', 'tst_NotificationData.qml', 'tst_NotificationPopup.qml', 'tst_WorkspaceSwitcher.qml',

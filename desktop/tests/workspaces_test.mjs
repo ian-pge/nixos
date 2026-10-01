@@ -16,13 +16,14 @@ await mkdir(socketDirectory, { recursive: true });
 
 const monitors = [
   { id: 0, name: "DP-2", description: "Dell", activeWorkspace: { id: 3, name: "3" }, focused: true },
-  { id: 1, name: "eDP-1", description: "Laptop", activeWorkspace: { id: 5, name: "5" }, focused: false },
+  { id: 1, name: "eDP-1", description: "Laptop", activeWorkspace: { id: 6, name: "6" }, focused: false },
 ].map(monitor => ({ ...monitor, x: 0, y: 0, width: 1920, height: 1080, scale: 1,
   specialWorkspace: { id: 0, name: "" } }));
-const workspaces = Array.from({ length: 8 }, (_, index) => ({
-  id: index + 1, name: String(index + 1), monitor: index < 4 ? "DP-2" : "eDP-1",
-  monitorID: index < 4 ? 0 : 1, windows: 0, hasfullscreen: false,
+const workspaces = Array.from({ length: 10 }, (_, index) => ({
+  id: index + 1, name: String(index + 1), monitor: index < 5 ? "DP-2" : "eDP-1",
+  monitorID: index < 5 ? 0 : 1, windows: 0, hasfullscreen: false,
 }));
+const externalMonitor = monitors[0];
 const eventClients = new Set();
 const requestedWorkspaces = [];
 let monitorRequests = 0;
@@ -43,11 +44,31 @@ const requests = net.createServer(socket => {
       }
       if (request === "j/workspaces") return socket.end(JSON.stringify(workspaces));
       if (request === "j/clients") return socket.end("[]");
-      assert.match(request, /^dispatch hl\.dsp\.focus\(\{ workspace = [1-8] \}\)$/);
+      if (request === "dispatch test-monitor-undock") {
+        monitors.splice(monitors.indexOf(externalMonitor), 1);
+        const laptop = monitors[0];
+        laptop.focused = true; laptop.activeWorkspace = {id: 5, name: "5"};
+        workspaces.splice(5);
+        for (const workspace of workspaces) { workspace.monitor = laptop.name; workspace.monitorID = laptop.id; }
+        for (const client of eventClients) client.write("monitorremoved>>DP-2\nworkspacev2>>5,5\nfocusedmon>>eDP-1,5\n");
+        return socket.end("ok");
+      }
+      if (request === "dispatch test-monitor-dock") {
+        externalMonitor.focused = false; externalMonitor.activeWorkspace = {id: 1, name: "1"};
+        const laptop = monitors[0];
+        laptop.activeWorkspace = {id: 6, name: "6"};
+        monitors.unshift(externalMonitor);
+        for (const workspace of workspaces) { workspace.monitor = "DP-2"; workspace.monitorID = 0; }
+        for (let id = 6; id <= 10; id++) workspaces.push({id, name: String(id),
+          monitor: "eDP-1", monitorID: 1, windows: 0, hasfullscreen: false});
+        for (const client of eventClients) client.write("monitoraddedv2>>0,DP-2,Dell\nworkspacev2>>6,6\nfocusedmon>>eDP-1,6\n");
+        return socket.end("ok");
+      }
+      assert.match(request, /^dispatch hl\.dsp\.focus\(\{ workspace = (?:[1-9]|10) \}\)$/);
       const id = Number(request.match(/workspace = (\d+)/)[1]);
       requestedWorkspaces.push(id);
       const source = monitors.find(monitor => monitor.focused);
-      const destination = monitors[id <= 4 ? 0 : 1];
+      const destination = monitors.find(monitor => monitor.name === (id <= 5 ? "DP-2" : "eDP-1")) || monitors[0];
       const workspaceChanged = destination.activeWorkspace.id !== id;
       destination.activeWorkspace = { id, name: String(id) };
       for (const monitor of monitors) monitor.focused = monitor === destination;
@@ -95,9 +116,9 @@ try {
   assert.equal(exitCode, 0, "Quickshell integration tests must complete successfully");
   assert.match(output, /WorkspaceIpc: \d+ passed, 0 failed/);
   assert.doesNotMatch(output, /Binding loop|TypeError|ReferenceError/);
-  assert.deepEqual(requestedWorkspaces, [6, 7, 3, 2, 5, 4]);
+  assert.deepEqual(requestedWorkspaces, [7, 8, 3, 2, 10, 5, 4]);
   assert.ok(monitorRequests >= 7, "Every switch must refresh the authoritative monitor snapshots");
-  console.log("PASS: isolated native IPC, both switch directions, focus-only and same-monitor changes");
+  console.log("PASS: isolated native IPC, per-monitor focus, unplug/replug and five-slot bar updates");
 } finally {
   for (const client of eventClients) client.destroy();
   await Promise.all([events, requests].map(server => new Promise(resolve => server.close(resolve))));

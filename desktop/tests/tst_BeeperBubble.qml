@@ -47,7 +47,7 @@ ShellRoot {
   QtObject {
     id: brightnessViewState
     function value(monitor) { return audioState.brightness; }
-    function icon(monitor) { return "󰃠"; }
+    function icon(monitor) { return "sun"; }
   }
   QtObject {
     id: audioState
@@ -62,8 +62,8 @@ ShellRoot {
     property var inputs: [{name: "mic", description: "Microphone", isSink: false, ready: true}]
     property var sink: outputs[0]
     property var microphoneSource: inputs[0]
-    function audioIcon() { return "󰕾"; }
-    function brightnessIcon() { return "󰃠"; }
+    function audioIcon() { return "volume-2"; }
+    function brightnessIcon() { return "sun"; }
     function icon() { return audioIcon(); }
     function deviceLabel(node) { return node.description; }
     function setVolume(delta) { audioVolume = Math.round(audioVolume + delta * 100); }

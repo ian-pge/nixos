@@ -94,20 +94,19 @@ FocusScope {
     event.accepted = true;
   }
 
-  Text {
+  Icon {
+
+    size: 17
     id: titleIcon
     anchors.left: parent.left
     anchors.leftMargin: 16
     y: 9
     width: 22
     height: 24
-    horizontalAlignment: Text.AlignHCenter
-    verticalAlignment: Text.AlignVCenter
-    text: "󰕾"
+
+    name: "volume-2"
     color: Theme.sideVolume
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 17
-    font.bold: true
+
   }
 
   Text {
@@ -189,18 +188,19 @@ FocusScope {
         font.bold: true
       }
 
-      Text {
+      Icon {
+
+        size: 18
         id: deviceIcon
         anchors.left: parent.left
         anchors.leftMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         width: 24
-        horizontalAlignment: Text.AlignHCenter
+
         visible: row.node !== null
-        text: row.modelData.section === "OUTPUTS" ? "󰓃" : "󰍬"
+        name: row.modelData.section === "OUTPUTS" ? "speaker" : "mic"
         color: row.active ? Theme.sideVolume : Theme.inactive
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 18
+
       }
 
       Text {
@@ -222,16 +222,17 @@ FocusScope {
         font.bold: true
       }
 
-      Text {
+      Icon {
+
+        size: 14
         id: activeMark
         anchors.right: parent.right
         anchors.rightMargin: 18
         anchors.verticalCenter: parent.verticalCenter
         width: 18
-        text: row.active ? "" : ""
+        name: row.active ? "check" : ""
         color: Theme.sideVolume
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 14
+
       }
 
       MouseArea {

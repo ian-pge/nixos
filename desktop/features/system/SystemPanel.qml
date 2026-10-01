@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import "../../ui"
 import "../../ui/Theme.js" as Theme
 
 FocusScope {
@@ -41,10 +42,12 @@ FocusScope {
   component Heading: Item {
     property string title
     property string value
+    property string iconName
     height: 22
+    Icon { id: headingIcon; anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; name: parent.iconName; size: 16; color: Theme.sideSystem }
     Label {
-      anchors.left: parent.left
-      width: Math.max(0, parent.width - reading.width - 8)
+      anchors.left: headingIcon.right; anchors.leftMargin: 6
+      width: Math.max(0, parent.width - reading.width - 30)
       height: parent.height
       text: parent.title
       font.pixelSize: 13; font.bold: true
@@ -64,9 +67,9 @@ FocusScope {
     color: Theme.surfaceRaised
   }
 
-  Label {
+  Icon {
     x: 16; y: 12; width: 22; height: 24
-    text: ""; font.pixelSize: 18
+    name: "cpu"; size: 18
     color: Theme.sideSystem
   }
   Label {
@@ -84,7 +87,7 @@ FocusScope {
     Heading {
       objectName: "cpuHeading"
       width: parent.width
-      title: "  CPU"; value: root.value(root.system?.cpu, 0, " %")
+      iconName: "cpu"; title: "CPU"; value: root.value(root.system?.cpu, 0, " %")
     }
     Label {
       objectName: "cpuModel"
@@ -117,7 +120,7 @@ FocusScope {
     Heading {
       objectName: "memoryHeading"
       width: parent.width
-      title: "   RAM"; value: root.value(root.system?.memory, 0, " %")
+      iconName: "memory-stick"; title: "RAM"; value: root.value(root.system?.memory, 0, " %")
     }
     Label {
       objectName: "memoryDetails"
@@ -150,7 +153,7 @@ FocusScope {
     Heading {
       objectName: "gpuHeading"
       width: parent.width
-      title: "  GPU"
+      iconName: "gpu"; title: "GPU"
       value: root.gpu?.poweredOn === false ? "Veille" : root.value(root.gpu?.usage, 0, " %")
     }
     Label {

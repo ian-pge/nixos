@@ -20,7 +20,7 @@ Scope {
       ? player.trackArtist : player !== null ? player.identity : "";
     return artist !== "" ? title + "  •  " + artist : title;
   }
-  readonly property string playbackIconText: playing ? "󰏤" : "󰐊"
+  readonly property string playbackIconText: playing ? "pause" : "play"
   signal feedbackRequested(string monitor)
 
   // Metadata/track changes never request an OSD: voice messages also use MPRIS.

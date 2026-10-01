@@ -40,12 +40,12 @@ function networkBadge(network) {
   const name = String(network || "").trim();
   const key = name.toLowerCase().replace(/[\s_-]/g, "");
   // Brand glyphs from the installed Nerd Font; no remote icon downloads.
-  if (key === "all") return {key: "all", name: "All", glyph: "\uf086", logo: true};
+  if (key === "all") return {key: "all", name: "All", glyph: "", iconName: "messages-square", logo: true};
   if (key.startsWith("whatsapp")) return {key: "whatsapp", name: "WhatsApp", glyph: "\uf232", logo: true};
   if (key.startsWith("telegram")) return {key: "telegram", name: "Telegram", glyph: "\ue217", logo: true};
   if (key.startsWith("instagram")) return {key: "instagram", name: "Instagram", glyph: "\uf16d", logo: true};
   if (key === "sms" || key === "sms/rcs" || key === "rcs" || key === "androidsms" || key.startsWith("googlemessages"))
-    return {key: "sms", name: "SMS", glyph: "\uf27a", logo: true};
+    return {key: "sms", name: "SMS", glyph: "", iconName: "message-circle", logo: true};
   if (key === "signal") return {key: "signal", name: "Signal", glyph: "S", logo: false};
   return {key: "other", name: name, glyph: Array.from(name)[0]?.toUpperCase() || "", logo: false};
 }

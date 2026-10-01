@@ -55,7 +55,7 @@ ShellRoot {
       y: 10
       Component.onCompleted: setSource("file://" + Quickshell.shellDir + "/../ui/Pill.qml", {
         iconOnly: true,
-        text: Qt.binding(() => root.notifications?.doNotDisturb ? "󰂛" : "󰂚"),
+        iconName: Qt.binding(() => root.notifications?.doNotDisturb ? "bell-off" : "bell"),
         accent: root.theme.sideNotifications,
         forceHovered: Qt.binding(() => (root.notifications?.dndFeedbackActive ?? false)
           && root.notifications?.dndFeedbackTargetMonitor === "TEST"),
@@ -247,31 +247,32 @@ ShellRoot {
       tryVerify(() => notifications.soundProcesses.length === 0);
     }
     function test_toggle_feedback_stops_but_muted_icon_remains() {
-      compare(pill.width, 36);
-      compare(pill.height, 36);
+      compare(pill.width, root.theme.barSize(36));
+      compare(pill.height, root.theme.barSize(36));
       compare(pill.accent, root.theme.sideNotifications);
       pill.leftClicked();
       verify(notifications.doNotDisturb);
       verify(pill.hovered);
       const visual = pill.children[0];
-      const mutedIcon = pill.text;
-      compare(mutedIcon, "󰂛");
-      // Pill's opaque hover uses the existing 16% accent tint.
-      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha(root.theme.sideNotifications, 0.16)));
+      const selection = findChild(pill, "pill-selection");
+      const mutedIcon = pill.iconName;
+      compare(mutedIcon, "bell-off");
+      tryCompare(selection, "color", Qt.alpha(root.theme.sideNotifications, root.theme.barSelectionOpacity));
+      compare(visual.color, root.theme.background);
       tryCompare(notifications, "dndFeedbackActive", false, 2500);
       verify(notifications.doNotDisturb, "Ending feedback must not disable DND");
-      verify(!pill.hovered, "Active DND must not keep its highlight or bounce");
-      tryCompare(visual.transform[0], "y", 0);
-      tryCompare(visual, "color", "#181926");
-      compare(pill.text, mutedIcon);
+      verify(!pill.hovered, "Active DND must not keep its highlight");
+      compare(visual.transform.length, 0);
+      tryCompare(selection, "color", "#00000000");
+      compare(pill.iconName, mutedIcon);
       pill.leftClicked();
       verify(!notifications.doNotDisturb);
-      verify(pill.hovered, "Unmuting must briefly bounce too");
-      compare(pill.text, "󰂚");
-      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha(root.theme.sideNotifications, 0.16)));
+      verify(pill.hovered, "Unmuting must briefly highlight too");
+      compare(pill.iconName, "bell");
+      tryCompare(selection, "color", Qt.alpha(root.theme.sideNotifications, root.theme.barSelectionOpacity));
       tryCompare(notifications, "dndFeedbackActive", false, 2500);
-      tryCompare(visual.transform[0], "y", 0);
-      tryCompare(visual, "color", "#181926");
+      compare(visual.transform.length, 0);
+      tryCompare(selection, "color", "#00000000");
     }
     function test_toggle_feedback_only_highlights_its_target_monitor() {
       notifications.toggleDoNotDisturb("OTHER");

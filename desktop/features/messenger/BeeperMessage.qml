@@ -23,7 +23,7 @@ Item {
   property color networkAccent: Theme.secondary
   property string searchQuery: ""
   readonly property string plainBody: Format.text(message)
-  readonly property string highlightedBody: renderMedia ? Format.highlightText(plainBody, searchQuery, Theme.sideBrightness, Theme.background) : ""
+  readonly property string highlightedBody: renderMedia ? Format.highlightText(plainBody, searchQuery, Theme.yellow, Theme.background) : ""
   readonly property bool outgoing: !!message.isSender
   readonly property var sender: Format.senderProfile(message, beeperData?.currentChat, beeperData?.accounts)
   readonly property var readers: beeperData?.readReceiptReaders?.[message.id]
@@ -235,7 +235,8 @@ Item {
             required property var modelData
             objectName: "beeperMessageLink"
             width: bubble.width
-            text: "↗  " + (modelData.title || modelData.url)
+            iconName: "external-link"
+            text: modelData.title || modelData.url
             font.pixelSize: Theme.beeperFont.control * root.textScale
             prominent: true
             accent: root.outgoing ? root.contentAccent : Theme.sideApplications

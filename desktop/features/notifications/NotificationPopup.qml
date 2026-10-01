@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import Quickshell
 import QtQuick
+import "../../ui"
 import QtQuick.Effects
 import "../../ui/Layout.js" as Layout
 import "../../ui/Theme.js" as Theme
@@ -99,12 +100,13 @@ Item {
       asynchronous: true
     }
 
-    Text {
+    Icon {
+
+      size: 23
       anchors.centerIn: parent
       visible: avatar.status !== Image.Ready && fallbackIcon.status !== Image.Ready
-      text: "󰂚"
-      font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 23
+      name: "bell"
+
       color: Theme.state
     }
   }

@@ -30,15 +30,14 @@ Scope {
     ? Math.round(audio.volume * 100)
     : 0
 
-
   function icon() {
     if (muted)
-      return "󰖁";
+      return "volume-x";
     if (volume < 34)
-      return "󰕿";
+      return "volume";
     if (volume < 67)
-      return "󰖀";
-    return "󰕾";
+      return "volume-1";
+    return "volume-2";
   }
 
   function setVolume(delta) {
@@ -75,7 +74,6 @@ Scope {
     audio.muted = !audio.muted;
     return true;
   }
-
 
   Loader {
     active: root.enabled

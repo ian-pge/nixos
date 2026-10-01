@@ -25,6 +25,11 @@
     };
   };
 
+  # Live previews can temporarily point this generated config straight into
+  # the store. Let activation reclaim this one path instead of treating the
+  # preview symlink as an unmanaged file collision.
+  xdg.configFile."quickshell/top-bar".force = true;
+
   # Qt otherwise selects the single-threaded basic render loop on this
   # NVIDIA/Wayland setup, making high-refresh QML animations visibly uneven.
   systemd.user.services.quickshell = {

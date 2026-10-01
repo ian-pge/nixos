@@ -1,4 +1,5 @@
 import QtQuick
+import "../../ui"
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtMultimedia
@@ -246,7 +247,8 @@ Item {
     id: fileRow
     visible: root.kind === "file" && !root.downloading && !root.errorText
     anchors.fill: parent
-    Text { text: "󰈙"; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.icon } color: root.accentBackground ? Theme.background : Theme.sideApplications }
+    Icon {
+      size: Theme.beeperFont.icon; name: "file";  color: root.accentBackground ? Theme.background : Theme.sideApplications }
     ColumnLayout {
       Layout.fillWidth: true
       Text { Layout.fillWidth: true; text: root.attachment.fileName || "Attachment"; elide: Text.ElideMiddle; color: root.accentBackground ? Theme.background : Theme.foreground; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control } }

@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import "../../ui"
 import "../../ui/Theme.js" as Theme
 import "UsageLimits.js" as Limits
 
@@ -40,9 +41,9 @@ FocusScope {
     color: Theme.surfaceRaised
   }
 
-  Label {
+  Icon {
     x: 16; y: 12; width: 22; height: 24
-    text: "󰊚"; font.pixelSize: 18
+    name: "chart-no-axes-combined"; size: 18
     color: Theme.usageAccent
   }
   Label {

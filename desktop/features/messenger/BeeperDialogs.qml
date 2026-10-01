@@ -188,7 +188,7 @@ Rectangle {
       RowLayout {
         Layout.fillWidth: true
         Text { Layout.fillWidth: true; text: root.mode === "help" ? "Keyboard shortcuts" : root.mode === "links" ? "Open a link" : "Attachment"; color: Theme.foreground; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.title; weight: Font.Medium } }
-        BeeperButton { text: "×"; onClicked: root.closeRequested() }
+        BeeperButton { iconName: "x"; Accessible.name: "Close"; onClicked: root.closeRequested() }
       }
       ListView {
         id: linksList

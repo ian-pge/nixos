@@ -43,7 +43,7 @@ Scope {
   }
   function open(kind, monitor = "", restore = false) {
     if (!["workspaces", "volume", "brightness", "media", "audio", "calendar", "system",
-          "usage", "storage", "wifi", "bluetooth", "updates", "launcher", "tabs"].includes(kind)) return;
+          "storage", "wifi", "bluetooth", "updates", "launcher", "tabs"].includes(kind)) return;
     if (kind === "workspaces") { close(mode); return; }
     const target = resolveMonitor(monitor), previous = mode;
     if (notificationCovers(target)) services.notifications.close();

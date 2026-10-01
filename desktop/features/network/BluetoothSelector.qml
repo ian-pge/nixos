@@ -1,4 +1,5 @@
 import QtQuick
+import "../../ui"
 import "../../ui/Layout.js" as Layout
 import "../../ui/Theme.js" as Theme
 
@@ -6,7 +7,7 @@ FocusScope {
   id: root
 
   required property var controller
-  property string spinnerFrame: "⠋"
+  property string spinnerFrame: "loader-circle"
   signal closeRequested()
   readonly property var devices: controller.currentDevices
   readonly property var selectedDevice: devices.length > 0
@@ -27,14 +28,14 @@ FocusScope {
   property bool componentReady: false
   property bool wheelNavigationPending: false
   readonly property string bluetoothIconText:
-    controller.scanning ? root.spinnerFrame
-      : selectedDeviceConnected ? "󰂯" : "󰂲"
+    controller.scanning ? "loader-circle"
+      : selectedDeviceConnected ? "bluetooth-connected" : "bluetooth-off"
   readonly property string tabText: controller.tab === 0
     ? "PAIRED" : "NEARBY"
   readonly property string counterText: devices.length > 0
     ? (controller.selectedIndex + 1) + "/" + devices.length : "0/0"
   readonly property real contentWidth: 15
-    + bluetoothIconMetrics.advanceWidth(bluetoothIconText) + 13 + 7 + 8
+    + 17 + 13 + 7 + 8
     + Layout.widestText(labelMetrics,
       [desiredLabelText, displayedLabelText, previousLabelText])
     + 12 + tabMetrics.advanceWidth(tabText) + 8
@@ -42,13 +43,6 @@ FocusScope {
 
   implicitWidth: Layout.boundedWidth(contentWidth, 0, 400)
   implicitHeight: 36
-
-  FontMetrics {
-    id: bluetoothIconMetrics
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 17
-    font.bold: true
-  }
 
   FontMetrics {
     id: labelMetrics
@@ -139,16 +133,16 @@ FocusScope {
     }
   }
 
-  Text {
+  Icon {
+
+    size: 17
     id: bluetoothIcon
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: root.bluetoothIconText
+    name: root.bluetoothIconText
+    spinning: controller.scanning
     color: Theme.sideBluetooth
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 17
-    font.bold: true
 
   }
 

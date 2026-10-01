@@ -23,16 +23,16 @@ Rectangle {
     }
   }
 
-  Text {
+  Icon {
+
+    size: 17
     id: brightnessIcon
     anchors.left: parent.left
     anchors.leftMargin: 15
     anchors.verticalCenter: parent.verticalCenter
-    text: controller.icon(targetMonitor)
+    name: controller.icon(targetMonitor)
     color: Theme.sideBrightness
-    font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 17
-    font.bold: true
+
   }
 
   Rectangle {

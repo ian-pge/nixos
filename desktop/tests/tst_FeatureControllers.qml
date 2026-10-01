@@ -284,5 +284,37 @@ ShellRoot {
       verify(power.keyboardPluggedIn(keyboard)); compare(power.keyboardBatteries.length, 1);
       telemetry.systemFresh = false; verify(!power.keyboardPluggedIn(keyboard)); compare(power.keyboardBatteries.length, 0);
     }
+    function test_pixel_buds_battery_tracks_connection_and_missing_reports() {
+      const buds = {name: "Ian's Pixel Buds Pro 2", deviceName: "Pixel Buds Pro 2",
+        address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: true, battery: 0.73};
+      const keyboard = {icon: "input-keyboard", address: "KEYBOARD", dbusPath: "/keyboard",
+        connected: true, batteryAvailable: true, battery: 0.45};
+      power.bluetoothDevices = [keyboard, buds];
+      compare(power.keyboardBatteries.length, 1);
+      compare(power.earbudBatteries.length, 1); compare(power.accessoryBatteries.length, 2);
+      compare(power.earbudBatteries[0].name, buds.name);
+      compare(power.earbudBatteries[0].percent, 73); verify(!power.earbudBatteries[0].pluggedIn);
+      power.bluetoothDevices = [Object.assign({}, buds, {battery: 0})];
+      compare(power.earbudBatteries[0].percent, 0);
+      for (const report of [{batteryAvailable: false}, {battery: NaN}, {battery: null}]) {
+        power.bluetoothDevices = [Object.assign({}, buds, report)];
+        compare(power.earbudBatteries.length, 1); compare(power.earbudBatteries[0].percent, null);
+      }
+      power.bluetoothDevices = [Object.assign({}, buds, {connected: false})];
+      compare(power.earbudBatteries.length, 0); compare(power.accessoryBatteries.length, 0);
+      power.bluetoothDevices = [Object.assign({}, buds, {name: "My earbuds"})];
+      compare(power.earbudBatteries.length, 1, "The original name survives an alias change");
+      power.bluetoothDevices = [Object.assign({}, buds, {name: "Another headset", deviceName: "Other headset"})];
+      compare(power.earbudBatteries.length, 0);
+    }
+    function test_pixel_buds_full_battery_is_not_assumed_to_be_charging() {
+      power.bluetoothDevices = [{name: "Pixel Buds Pro", address: "BUDS", dbusPath: "/buds",
+        connected: true, batteryAvailable: true, battery: 1}];
+      compare(power.earbudBatteries[0].percent, 100); verify(!power.earbudBatteries[0].pluggedIn);
+      power.powerDevices = [{ready: true, isPresent: true, nativePath: "/buds", state: UPowerDeviceState.Charging}];
+      verify(power.earbudBatteries[0].pluggedIn);
+      power.powerDevices = [];
+      verify(!power.earbudBatteries[0].pluggedIn);
+    }
   }
 }

@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import "../../ui"
 import "../../ui/Theme.js" as Theme
 import "Storage.js" as Storage
 
@@ -39,9 +40,9 @@ FocusScope {
     elide: Text.ElideRight
     verticalAlignment: Text.AlignVCenter
   }
-  Label {
+  Icon {
     x: 16; y: 12; width: 22; height: 24
-    text: ""; font.pixelSize: 18; color: Theme.sideDisk
+    name: "hard-drive"; size: 18; color: Theme.sideDisk
   }
   Label {
     objectName: "storageTitle"
