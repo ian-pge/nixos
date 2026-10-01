@@ -96,6 +96,7 @@
 
   # Let rendered Markdown previews use the full width of their pane.
   markdown_preview = {
+    open_markdown_files_in_preview = true;
     limit_content_width = false;
   };
   markdown_preview_theme = (import ./markdown-theme.nix).name;

@@ -34,8 +34,15 @@ Item {
   QtObject {
     id: state
     property int closed: 0
+    property var openedLinks: []
   }
-  UsagePanel { id: panel; width: 434; controller: controller; onCloseRequested: state.closed += 1 }
+  UsagePanel {
+    id: panel
+    width: 434
+    controller: controller
+    linkOpener: url => { state.openedLinks = state.openedLinks.concat([url]); }
+    onCloseRequested: state.closed += 1
+  }
 
   TestCase {
     name: "UsagePanel"
@@ -55,7 +62,7 @@ Item {
         limits: [row("Semaine", 94, new Date(2026, 9, 3, 19, 17).getTime())]};
       for (const source of [claudeSource, codexSource]) { source.error = ""; source.loading = false; }
       controller.loading = false; controller.updatedAt = new Date(2026, 8, 28, 15, 41).getTime();
-      controller.refreshes = []; state.closed = 0;
+      controller.refreshes = []; state.closed = 0; state.openedLinks = [];
       panel.width = 434; panel.visible = true; panel.enabled = true;
       panel.forceActiveFocus();
       wait(0);
@@ -98,6 +105,35 @@ Item {
       const notes = child("sectionNotes", section("codex")).text;
       verify(notes.includes('<font color="' + Theme.error + '">Limite atteinte</font>'));
       verify(notes.endsWith(" · 1 crédit de réinitialisation"));
+    }
+    function test_provider_logos_load_without_overlapping_the_plan() {
+      for (const provider of ["claude", "codex"]) {
+        const area = section(provider), logo = child("providerLogo", area);
+        verify(logo.visible);
+        verify(logo.source.toString().includes("/features/usage/icons/"), logo.source.toString());
+        tryCompare(logo, "status", Image.Ready);
+        compare(logo.width, 18); compare(logo.height, 18);
+        verify(logo.source.toString().endsWith("/icons/" + provider + ".svg"));
+        const title = child("sectionTitle", area), plan = child("sectionPlan", area);
+        verify(title.x >= logo.x + logo.width + 8);
+        verify(title.x + title.width <= plan.x - 12);
+      }
+    }
+    function test_claude_reset_credits_or_unknown_link_are_visible() {
+      const full = panel.implicitHeight;
+      claudeSource.snapshot = Object.assign({}, claudeSource.snapshot,
+        {notes: [{text: "1 crédit de réinitialisation", alert: false}]});
+      const notes = child("sectionNotes", section("claude"));
+      verify(notes.visible);
+      compare(notes.text, "1 crédit de réinitialisation");
+      verify(panel.implicitHeight > full);
+      claudeSource.snapshot = Object.assign({}, claudeSource.snapshot,
+        {notes: [{text: "Réinitialisations : voir Claude", alert: false,
+          url: "https://claude.ai/settings/usage"}]});
+      verify(notes.text.includes('href="https://claude.ai/settings/usage"'));
+      verify(!notes.text.includes("0 crédits"));
+      notes.linkActivated("https://claude.ai/settings/usage");
+      compare(state.openedLinks, ["https://claude.ai/settings/usage"]);
     }
     function test_loading_and_errors_before_any_reading() {
       claudeSource.snapshot = null; claudeSource.loading = true; controller.loading = true;

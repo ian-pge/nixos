@@ -52,6 +52,30 @@ assert.deepEqual(claude.snapshot.limits.map(row => [row.label, row.percent, row.
   ["Session en cours", 3, false], ["Semaine · tous les modèles", 10, false], ["Semaine · Fable", 15, false]]);
 assert.equal(claude.snapshot.limits[0].resetsAt, Date.parse("2026-09-28T18:30:00.153503+00:00"));
 assert.equal(claude.snapshot.blocked, false);
+const unknownClaudeResets = {text: "Réinitialisations : voir Claude", alert: false,
+  url: "https://claude.ai/settings/usage"};
+assert.deepEqual(claude.snapshot.notes, [unknownClaudeResets],
+  "Missing reset data must not imply there are no credits");
+
+// Claude's reset-grant status can be null in a real get_usage response.
+const resetNow = Date.parse("2026-09-30T00:00:00Z");
+for (const status of [null, undefined, {}, {eligible: false}])
+  assert.deepEqual(plain(limits.claudeResetCredits(status, resetNow)), unknownClaudeResets);
+const resetGrants = {eligible: true, grants: [
+  {resets_left: 1, ends_at: "2026-10-15T00:00:00Z"},
+  {resets_left: 2, ends_at: "2026-09-29T00:00:00Z"}]};
+assert.deepEqual(plain(limits.claudeResetCredits(resetGrants, resetNow)),
+  {text: "1 crédit de réinitialisation", alert: false}, "Expired grants are excluded");
+assert.deepEqual(plain(limits.claudeResetCredits({grants: [{resets_left: 1}, {resets_left: 2}]}, resetNow)),
+  {text: "3 crédits de réinitialisation", alert: false});
+assert.deepEqual(plain(limits.claudeResetCredits({grants: []}, resetNow)),
+  {text: "0 crédits de réinitialisation", alert: false}, "An explicit empty grant list is a known zero");
+for (const remaining of [null, "1", -1, 0.5, Infinity])
+  assert.deepEqual(plain(limits.claudeResetCredits({grants: [{resets_left: remaining}]}, resetNow)),
+    unknownClaudeResets, "A malformed count stays unknown");
+assert.deepEqual(plain(limits.claudeSnapshot({...usage, rate_limits: {...usage.rate_limits,
+  cedar_ember: {eligible: true, grants: [{resets_left: 1}]}}}, "").snapshot.notes),
+  [{text: "1 crédit de réinitialisation", alert: false}]);
 
 // Snapshot answers can omit server rows; the named windows remain usable.
 const snapshot = plain(limits.claudeSnapshot({ subscription_type: "pro", rate_limits: {

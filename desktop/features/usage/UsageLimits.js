@@ -114,6 +114,26 @@ function claudePlan(type) {
   return names[type] || "";
 }
 
+// Claude Code 2.1.285 calls the reset-grant status `cedar_ember`. Its
+// get_usage answer can leave it null even when the web account has a grant.
+// A missing status is unknown, never a zero balance.
+function claudeResetCredits(status, now) {
+  var unavailable = note("Réinitialisations : voir Claude", false);
+  unavailable.url = "https://claude.ai/settings/usage";
+  if (!isObject(status) || !Array.isArray(status.grants)) return unavailable;
+  var count = 0;
+  for (var index = 0; index < status.grants.length; ++index) {
+    var grant = status.grants[index];
+    var remaining = isObject(grant) ? finite(grant.resets_left) : null;
+    if (remaining === null || remaining < 0 || Math.floor(remaining) !== remaining)
+      return unavailable;
+    var expiresAt = isoTime(grant.ends_at);
+    if (expiresAt !== null && expiresAt <= now) continue;
+    count += remaining;
+  }
+  return note(plural(count, "crédit de réinitialisation", "crédits de réinitialisation"), false);
+}
+
 function claudeSnapshot(usage, plan) {
   if (!isObject(usage)) return failure("Réponse inattendue de Claude Code");
   if (usage.rate_limits_available === false)
@@ -126,7 +146,7 @@ function claudeSnapshot(usage, plan) {
   return success({
     plan: text(plan) || claudePlan(usage.subscription_type),
     limits: rows,
-    notes: [],
+    notes: [claudeResetCredits(limits.cedar_ember, Date.now())],
     blocked: rows.some(function(row) { return row.reached; })
   });
 }

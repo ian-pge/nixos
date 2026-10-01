@@ -6,6 +6,8 @@ import QtTest
 ShellRoot {
   id: root
   property var notifications: null
+  readonly property var theme: Qt.createQmlObject('import QtQml; import "file://' + Quickshell.shellDir
+    + '/../ui/Theme.js" as Theme; QtObject { property var library: Theme }', root).library
 
   QtObject {
     id: workspace
@@ -54,7 +56,7 @@ ShellRoot {
       Component.onCompleted: setSource("file://" + Quickshell.shellDir + "/../ui/Pill.qml", {
         iconOnly: true,
         text: Qt.binding(() => root.notifications?.doNotDisturb ? "󰂛" : "󰂚"),
-        accent: "#a6da95",
+        accent: root.theme.sideNotifications,
         forceHovered: Qt.binding(() => (root.notifications?.dndFeedbackActive ?? false)
           && root.notifications?.dndFeedbackTargetMonitor === "TEST"),
         interactive: true
@@ -247,7 +249,7 @@ ShellRoot {
     function test_toggle_feedback_stops_but_muted_icon_remains() {
       compare(pill.width, 36);
       compare(pill.height, 36);
-      compare(pill.accent, "#a6da95");
+      compare(pill.accent, root.theme.sideNotifications);
       pill.leftClicked();
       verify(notifications.doNotDisturb);
       verify(pill.hovered);
@@ -255,7 +257,7 @@ ShellRoot {
       const mutedIcon = pill.text;
       compare(mutedIcon, "󰂛");
       // Pill's opaque hover uses the existing 16% accent tint.
-      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha("#a6da95", 0.16)));
+      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha(root.theme.sideNotifications, 0.16)));
       tryCompare(notifications, "dndFeedbackActive", false, 2500);
       verify(notifications.doNotDisturb, "Ending feedback must not disable DND");
       verify(!pill.hovered, "Active DND must not keep its highlight or bounce");
@@ -266,7 +268,7 @@ ShellRoot {
       verify(!notifications.doNotDisturb);
       verify(pill.hovered, "Unmuting must briefly bounce too");
       compare(pill.text, "󰂚");
-      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha("#a6da95", 0.16)));
+      tryCompare(visual, "color", Qt.tint("#181926", Qt.alpha(root.theme.sideNotifications, 0.16)));
       tryCompare(notifications, "dndFeedbackActive", false, 2500);
       tryCompare(visual.transform[0], "y", 0);
       tryCompare(visual, "color", "#181926");

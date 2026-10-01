@@ -65,3 +65,56 @@ cargo clippy --manifest-path tools/quickshell/system-stats/Cargo.toml --all-targ
 Tests cover counter resets, guest accounting, rounding, disk caching, missing
 or malformed files, backlight removal/reappearance and the JSON stream lifetime.
 The stream test only reads real telemetry; fixture tests never write procfs/sysfs.
+
+## On-demand storage breakdown
+
+The same package also installs `quickshell-storage`. This is an independent,
+one-shot metadata scan, never part of the one-second telemetry loop:
+
+```sh
+quickshell-storage --home /home/ian --output /run/quickshell-storage/report.json
+```
+
+The output parent must already exist. A temporary file in that directory is
+atomically renamed to the requested report, with mode 0644. The old report
+survives a failed or interrupted scan. `--root /absolute/fixture` restricts
+traversal to a fixture directory for diagnostics; capacity still describes the
+filesystem containing that directory. Invalid, relative and symlink output
+destinations are rejected. The collector has no cleanup or deletion operation;
+it only removes its own temporary report if publication fails.
+
+The schema is `schemaVersion: 1`, a completion-time `measuredAt` in epoch
+milliseconds, `durationMs`, `estimated: true`, `filesystem`, and `disk` containing
+`totalBytes`, `usedBytes` and `availableBytes` from statvfs. `categories` always
+contains `docker`, `nix`, `applications`, `personal`, `vm` and `other`, each with
+`bytes` and `partial`. Applications additionally contains `cacheBytes` and
+`dataBytes`. `errors` contains an aggregate `count` and a generic `message`;
+private file names never enter the report. A wholly inaccessible category has
+null bytes, while a partially measured category is explicitly a lower bound.
+
+Sizes use allocated blocks (`st_blocks * 512`), including sparse-file handling.
+Directory descriptors opened with `O_NOFOLLOW` prevent symlink traversal even
+if a directory is replaced during the scan. Regular-file contents, Docker
+sockets, device nodes and VM disk contents are never opened. The mount table
+restricts traversal to the root backing filesystem, including its Btrfs
+subvolumes, excluding external and pseudo filesystems. Inode/device pairs are
+globally deduplicated for files and directories. `/home`, `/var` and `/nix` are
+visited before `/persist`; persistence aliases are classified using their
+canonical home/system location.
+
+Docker includes `/var/lib/docker`, `/var/lib/containerd` and per-user
+`.local/share/docker`. Nix includes `/nix/store`. Applications includes hidden
+home directories and `/var/lib/flatpak`, with `.cache` broken out separately.
+The NixOS checkout and chezmoi source directories remain personal projects.
+VMs includes libvirt image directories and `VirtualBox VMs`. Other files go
+to `other`. Only a complete scan whose category sum is below actual filesystem
+usage adds the remaining allocation to `other` (metadata, inaccessible-to-the-
+namespace snapshots and similar filesystem overhead). No category is scaled
+down if estimates exceed actual usage.
+
+These remain estimates on Btrfs: separate inodes can share extents and a running
+filesystem changes during traversal. The report is not a promise of reclaimable
+space. The UI must use the category sum for the breakdown and display actual
+free/used capacity separately. The intended system service supplies read access
+to Docker/VM directories, resource limits and timeout; an ordinary user scan
+reports denied paths as partial, never silently as zero.

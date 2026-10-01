@@ -8,6 +8,7 @@ import "UsageLimits.js" as Limits
 FocusScope {
   id: root
   required property var controller
+  property var linkOpener: url => Qt.openUrlExternally(url)
   signal closeRequested()
   implicitHeight: updateLabel.y + updateLabel.height + 12
 
@@ -57,7 +58,9 @@ FocusScope {
     objectName: "claudeSection"
     x: 16; y: 58; width: parent.width - 32; height: implicitHeight
     source: root.controller.claude
+    logoSource: Qt.resolvedUrl("icons/claude.svg")
     now: root.controller.now
+    onExternalLinkRequested: url => root.linkOpener(url)
   }
   Divider { y: claudeSection.y + claudeSection.height + 12 }
   UsageSection {
@@ -66,7 +69,9 @@ FocusScope {
     x: 16; y: claudeSection.y + claudeSection.height + 24
     width: parent.width - 32; height: implicitHeight
     source: root.controller.codex
+    logoSource: Qt.resolvedUrl("icons/codex.svg")
     now: root.controller.now
+    onExternalLinkRequested: url => root.linkOpener(url)
   }
 
   Label {

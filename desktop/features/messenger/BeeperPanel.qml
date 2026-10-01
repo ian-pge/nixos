@@ -57,6 +57,13 @@ FocusScope {
   property int recordingGeneration: 0
   property var recorder: null
   property Component recorderFactory: recorderComponent
+  property var attachmentPicker: null
+  property Component attachmentPickerFactory: attachmentPickerComponent
+  readonly property bool canNavigatePanes: active && windowFocused && !modal && !connectionSurface.visible
+    && !attachmentPicker && !composer.inputMethodComposing
+  readonly property bool canPickAttachment: canUseComposerShortcuts && composer.activeFocus
+    && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !editMessageID
+    && !recording && !preparingRecording && !attachmentPicker && !emojiPickerOpen
   property bool gPending: false
   property string pendingOpenMessageID: ""
   property string displayedChatID: ""
@@ -227,6 +234,30 @@ FocusScope {
     }
   }
   function compose() { if (composerSurface.enabled && beeperData.currentChatID) { navigation = "compose"; composer.forceActiveFocus(); } }
+  function navigatePane(right) {
+    composerSurface.closeEmojiPicker();
+    closeChatSearch(); closeConversationSearch(false); gPending = false;
+    if (!right) focusNavigation();
+    else if (composerSurface.enabled) compose();
+    else if (beeperData.currentChatID) { navigation = "messages"; navigationFocus.forceActiveFocus(); }
+  }
+  function pickAttachment() {
+    if (!canPickAttachment) return;
+    const chatID = beeperData.currentChatID;
+    const picker = attachmentPickerFactory.createObject(root);
+    if (!picker) { beeperData.lastError = "Could not open the file picker."; return; }
+    attachmentPicker = picker;
+    picker.finished.connect((path, error) => {
+      attachmentPicker = null;
+      if (error) beeperData.lastError = error;
+      else if (path) beeperData.stageAttachment(path, chatID);
+      nativeDialogClosed();
+      if (active && beeperData.currentChatID === chatID) compose();
+      picker.destroy();
+    });
+    nativeDialogOpened();
+    picker.open();
+  }
   function openModal(name) {
     if (name !== "help" && name !== "media" && name !== "links") return;
     modal = name;
@@ -600,6 +631,10 @@ FocusScope {
     id: recorderComponent
     BeeperRecorder {}
   }
+  Component {
+    id: attachmentPickerComponent
+    BeeperAttachmentPicker {}
+  }
   Connections {
     target: root.recorder
     function onFinished(path) {
@@ -622,6 +657,21 @@ FocusScope {
     sequence: "Escape"; context: Qt.ApplicationShortcut; autoRepeat: false
     enabled: root.active && !!root.beeperData.audioPlayback?.active
     onActivated: root.beeperData.audioPlayback.pause()
+  }
+  Shortcut {
+    sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; autoRepeat: false
+    enabled: root.canNavigatePanes
+    onActivated: root.navigatePane(false)
+  }
+  Shortcut {
+    sequence: "Ctrl+L"; context: Qt.ApplicationShortcut; autoRepeat: false
+    enabled: root.canNavigatePanes
+    onActivated: root.navigatePane(true)
+  }
+  Shortcut {
+    sequence: "Ctrl+F"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.canPickAttachment
+    onActivated: root.pickAttachment()
   }
   Shortcut {
     sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; autoRepeat: false
@@ -719,7 +769,7 @@ FocusScope {
       event.accepted = true;
     }
     else if (key === "j" || key === "k") { chooseChat(chatIndex + (key === "j" ? 1 : -1)); focusNavigation(); event.accepted = true; }
-    else if (key === "h" || key === "l") { key === "h" ? focusNavigation() : compose(); event.accepted = true; }
+    else if (key === "h") { focusNavigation(); event.accepted = true; }
     else if (key === "g") { if (gPending) { goEdge(false); gPending = false; } else { gPending = true; gTimer.restart(); } event.accepted = true; }
     else if (key === "G") { goEdge(true); event.accepted = true; }
     else if (key === "/") { openChatSearch(); event.accepted = true; }

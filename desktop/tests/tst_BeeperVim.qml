@@ -174,7 +174,7 @@ ShellRoot {
     function test_returning_to_the_composer_restarts_insert_mode() {
       type("abc"); keyClick(Qt.Key_Escape); compare(vim().mode, "normal");
       keyClick(Qt.Key_K, Qt.ControlModifier); verify(!composer().activeFocus);
-      keyClick("l"); verify(composer().activeFocus); compare(vim().mode, "insert");
+      keyClick(Qt.Key_L, Qt.ControlModifier); verify(composer().activeFocus); compare(vim().mode, "insert");
       type("d"); compare(composer().text, "abcd");
     }
     function test_help_documents_vim_only_when_enabled() {

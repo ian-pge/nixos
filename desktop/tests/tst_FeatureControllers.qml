@@ -259,6 +259,21 @@ ShellRoot {
       compare(power.keyboardBatteries.length, 1); compare(power.keyboardBatteries[0].percent, 45);
       verify(power.keyboardBatteries[0].pluggedIn);
     }
+    function test_power_unplugging_clears_charging_before_global_state_catches_up() {
+      power.onBattery = false;
+      power.battery = {ready: true, isPresent: true, percentage: 0.73, state: UPowerDeviceState.Charging};
+      verify(power.batteryPluggedIn);
+      for (const state of [UPowerDeviceState.Discharging, UPowerDeviceState.PendingDischarge]) {
+        power.battery = {ready: true, isPresent: true, percentage: 0.73, state: state};
+        verify(!power.batteryPluggedIn);
+      }
+      for (const state of [UPowerDeviceState.FullyCharged, UPowerDeviceState.PendingCharge]) {
+        power.battery = {ready: true, isPresent: true, percentage: 0.8, state: state};
+        verify(power.batteryPluggedIn, "A full or charge-limited battery can still be plugged in");
+      }
+      power.onBattery = true;
+      verify(!power.batteryPluggedIn);
+    }
     function test_power_agar_usb_match_requires_identity_and_freshness() {
       const keyboard = {icon: "input-keyboard", address: "E6:9D:03:3D:7C:3C", dbusPath: "/agar",
         connected: false, batteryAvailable: false};

@@ -23,16 +23,16 @@ var searchCurrentMatch = "#4ded8796";
 
 // Fixed Catppuccin accents shared by side capsules and paired central controls.
 var sideApplications = "#7dc4e4";
-var sideUpdates = "#f0c6c6";
-var sideNetwork = "#ee99a0";
+var sideUpdates = "#91d7e3"; // Sky
+var sideNetwork = "#f0c6c6"; // Flamingo
 var sideBluetooth = "#8aadf4";
-var sideNotifications = "#a6da95";
+var sideNotifications = "#8bd5ca"; // Teal
 var sideSystem = "#c6a0f6";
 var sideDisk = "#f5a97f";
 var sideCpu = "#91d7e3";
 var sideMemory = "#c6a0f6";
 var sideGpu = "#a6da95";
-var sideBattery = "#f4dbd6";
+var sideBattery = "#f4dbd6"; // Rosewater
 var batteryPluggedIn = "#a6da95";
 var sideVolume = "#b7bdf8";
 var sideBrightness = "#eed49f";
@@ -44,6 +44,7 @@ var sideDate = "#8bd5ca";
 var sideTime = "#ed8796";
 // Central plan-limit panel (Cmd+R), without a side capsule: Catppuccin Teal.
 var usageAccent = "#8bd5ca";
+var keyboardSystem = "#a6da95";
 
 // Messenger typography is independent from the compact top-bar widgets.
 var beeperUnread = "#eed49f";
@@ -52,12 +53,12 @@ var beeperFont = {
   title: 24, subheading: 28, heading: 30, hero: 38, icon: 28, illustration: 52
 };
 var beeperSenderColors = [
-  sideApplications, sideSystem, sideDisk, sideNotifications,
+  sideApplications, sideSystem, sideDisk, "#a6da95",
   sideWeather, sideBrightness, error, sideBluetooth,
-  sideCpu, sideVolume, sideNetwork, sideUpdates
+  sideCpu, sideVolume, "#ee99a0", "#f0c6c6"
 ];
 var beeperNetworkColors = {
   // Catppuccin Macchiato: Mauve, Green, Sapphire, Blue, Pink and Teal.
-  all: sideSystem, whatsapp: sideNotifications, telegram: sideApplications,
+  all: sideSystem, whatsapp: "#a6da95", telegram: sideApplications,
   signal: sideBluetooth, instagram: sideWeather, sms: sideDate
 };

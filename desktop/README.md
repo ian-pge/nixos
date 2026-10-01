@@ -56,8 +56,8 @@ The boundaries are intentional:
   the messenger backend remains in `tools/quickshell/beeper/`; it is not copied
   into `desktop/`.
 - [`../packages/quickshell/`](../packages/quickshell/) contains Nix recipes.
-  `runtime.nix` wraps Quickshell with Liquid Glass, Qt Multimedia and Qt image
-  formats (WebP stickers and photos, static or animated);
+  `runtime.nix` wraps Quickshell with Liquid Glass, Qt Multimedia, SVG icons and
+  Qt image formats (WebP stickers and photos, static or animated);
   `desktop.nix` filters the application sources and pins helper paths to the Nix
   store. Tests and documentation are not part of the installed application.
 - [`../home_manager/quickshell.nix`](../home_manager/quickshell.nix) only installs,
@@ -207,8 +207,13 @@ selects conversations on the left. `Ctrl+J/K` enters message selection at the
 newest message, then selects and reveals the next/previous message. Returning to
 conversations, focusing the composer, sending a reply, or leaving the chat clears
 that selection, so the next entry starts at the newest message again. Draft text
-is preserved. `l` focuses the composer in the selected conversation, like Enter;
-`h` returns to conversations.
+is preserved. Enter focuses the composer in the selected conversation;
+`h` returns to conversations. `Ctrl+H/L` focuses the conversation list/composer
+even while typing or searching, preserving the draft, reply and attachment.
+Bare `l` no longer opens the composer. While composing, `Ctrl+F` opens Yazi in
+Ghostty to choose one attachment per message; cancellation preserves the draft.
+The file remains attached to the original conversation if selection changes
+while the picker is open. Closing the picker restores typing focus.
 The `i` shortcut and action palette are removed.
 With a message selected, `1` reacts with 👍, `2` with 😂, `3` with 💜, `4` with 🔥,
 `5` with 💯 and `6` with 🤡. Telegram uses its standard equivalents 🤣 and ❤️ for `2` and `3`,
@@ -629,7 +634,9 @@ Each window shows its label, used percentage, a gauge and its reset time:
 a delay under 24 hours, otherwise the local day and time. Claude lists the
 current session, the week across all models and each per-model weekly window;
 Codex lists its rolling windows, shortest first, the ChatGPT plan and any
-available reset credits. Percentages are rounded down, so `100 %` and the
+available reset credits. Each provider heading includes its logo. Claude reset
+credits are shown when its CLI supplies a reset-grant status; otherwise a link
+to Claude's usage page is shown, without implying a zero balance. Percentages are rounded down, so `100 %` and the
 Catppuccin Red gauge mean the limit is actually reached. A failed refresh
 keeps the last reading with an explicit note; without one, the section shows
 the error. The panel uses its own accent, `Theme.usageAccent` (Teal), and has

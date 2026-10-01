@@ -15,6 +15,7 @@ import "./features/network"
 import "./features/notifications"
 import "./features/power"
 import "./features/system"
+import "./features/storage"
 import "./features/updates"
 import "./features/usage"
 import "./features/workspaces"
@@ -55,6 +56,7 @@ ShellRoot {
     readonly property var notifications: notificationsFeature
     readonly property var power: powerFeature
     readonly property var system: systemFeature
+    readonly property var storage: storageFeature
     readonly property var updates: updatesFeature
     readonly property var usage: usageFeature
     readonly property var spinner: spinnerFeature
@@ -111,6 +113,11 @@ ShellRoot {
     enabled: desktop.servicesEnabled
     topRequested: panels.systemProcessListsWanted
     onBrightnessSample: value => brightnessFeature.sample = value
+  }
+  StorageController {
+    id: storageFeature
+    enabled: desktop.servicesEnabled
+    active: panels.mode === "storage"
   }
   PowerController { id: powerFeature; enabled: desktop.servicesEnabled; telemetry: systemFeature.telemetry }
   NotificationData {

@@ -148,13 +148,14 @@ ShellRoot {
       keyClick(Qt.Key_K); compare(beeperData.currentChatID, "studio");
       keyClick(Qt.Key_I); verify(!child("beeperComposer").activeFocus);
       const draft = beeperData.draftText;
-      keyClick(Qt.Key_L); compare(panel.navigation, "compose");
+      keyClick(Qt.Key_L); compare(panel.navigation, "chats"); verify(!child("beeperComposer").activeFocus);
+      keyClick(Qt.Key_Return); compare(panel.navigation, "compose");
       verify(child("beeperComposer").activeFocus); compare(beeperData.currentChatID, "studio");
       compare(child("beeperComposer").text, draft); compare(panel.modal, "");
       keyClick(Qt.Key_Escape); verify(!child("beeperComposer").activeFocus); compare(closeSpy.count, 0);
       compare(panel.navigation, "chats");
       keyClick(Qt.Key_J); compare(beeperData.currentChatID, "lea");
-      keyClick(Qt.Key_L); verify(child("beeperComposer").activeFocus);
+      keyClick(Qt.Key_L, Qt.ControlModifier); verify(child("beeperComposer").activeFocus);
       compare(beeperData.currentChatID, "lea");
       keyClick(Qt.Key_Escape); compare(panel.navigation, "chats");
       keyClick(Qt.Key_K); compare(beeperData.currentChatID, "studio"); wait(20);

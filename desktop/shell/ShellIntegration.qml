@@ -36,6 +36,7 @@ Scope {
     function toggleAudio() { root.coordinator.toggle("audio"); }
     function toggleCalendar() { root.coordinator.toggle("calendar"); }
     function toggleUsage() { root.coordinator.toggle("usage"); }
+    function toggleStorage() { root.coordinator.toggle("storage"); }
     function toggleMicrophoneMute() {
       if (root.services.audio.toggleMicrophoneMute()) root.coordinator.showMicrophoneFeedback();
     }

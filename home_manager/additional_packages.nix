@@ -32,13 +32,13 @@
             NIX_BUILD_CORES = "12";
           };
       }))
-    herdr
+    # herdr
     kalker
     blender
     # davinci-resolve
     nvd
     nix-output-monitor
-    zotero
+    # zotero
     fastfetch
     obsidian
     # freecad-wayland

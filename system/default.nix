@@ -13,6 +13,7 @@
     ./persistance.nix
     ./nixos_config.nix
     ./docker.nix
+    ./storage.nix
     ./qmk_keyboard.nix
     # ./steam.nix
     ./nh.nix

@@ -33,7 +33,8 @@ Rectangle {
     "Tab / Shift+Tab     Next / previous network",
     "j / k     Next / previous conversation",
     "h     Return to conversations",
-    "l / Enter     Write in the selected conversation",
+    "Enter     Write in the selected conversation",
+    "Ctrl + h / l     Focus conversations / composer (also while typing)",
     "Ctrl + j / k     Next / previous message (also while typing)",
     "gg / G     First / last conversation or message",
     "Ctrl + u     Scroll up half a page",
@@ -43,6 +44,7 @@ Rectangle {
     "Shift + Enter     New line",
     "Ctrl + s     Open / close emoji picker",
     "Ctrl + d     Start / finish a voice recording",
+    "Ctrl + f     Attach a file with Yazi (one file per message)",
     "A finished recording is attached to the draft, not sent",
     "Ctrl + v     Paste text, or an image when no text is available",
     "Ctrl + Shift + v     Paste an image attachment"

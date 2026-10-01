@@ -12,6 +12,14 @@ ShellRoot {
   property var copiedTexts: []
   property int recordStarts: 0
   property int recordStops: 0
+  property int pickerOpens: 0
+  Component {
+    id: fakePicker
+    QtObject {
+      signal finished(string path, string error)
+      function open() { ++fixture.pickerOpens; }
+    }
+  }
   // Never instantiate the native CaptureSession or open the microphone.
   Component {
     id: fakeRecorder
@@ -27,6 +35,8 @@ ShellRoot {
   }
   Window { id: window; width: 1280; height: 900; visible: true }
   SignalSpy { id: closeSpy; target: fixture.panel; signalName: "closeRequested" }
+  SignalSpy { id: pickerOpenedSpy; target: fixture.panel; signalName: "nativeDialogOpened" }
+  SignalSpy { id: pickerClosedSpy; target: fixture.panel; signalName: "nativeDialogClosed" }
   TestResult { id: results }
   TestCase {
     name: "BeeperKeyboard"
@@ -71,9 +81,10 @@ ShellRoot {
     function init() {
       fixture.openedUrls = []; fixture.copiedTexts = [];
       fixture.recordStarts = 0; fixture.recordStops = 0;
+      fixture.pickerOpens = 0;
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
-        {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true, recorderFactory: fakeRecorder,
+        {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true, recorderFactory: fakeRecorder, attachmentPickerFactory: fakePicker,
           linkOpener: url => { fixture.openedUrls = fixture.openedUrls.concat([url]); return true; },
           clipboardWriter: text => { fixture.copiedTexts = fixture.copiedTexts.concat([text]); }});
       beeperData.chats = [
@@ -89,6 +100,7 @@ ShellRoot {
       beeperData.respond("messages", {items: messages, hasMore: false});
       tryCompare(panel, "restoringView", false);
       panel.focusNavigation(); closeSpy.clear(); wait(20);
+      pickerOpenedSpy.clear(); pickerClosedSpy.clear();
     }
     function cleanup() {
       if (results.failed) console.error("FAILED", qtest_results.functionName);
@@ -103,6 +115,94 @@ ShellRoot {
         {tag: "default", network: "WhatsApp", emoji: ["👍", "😂", "💜", "🔥", "💯", "🤡"]},
         {tag: "telegram_in_all", network: "Telegram", emoji: ["👍", "🤣", "❤️", "🔥", "💯", "🤡"]}
       ];
+    }
+    function test_ctrl_h_l_preserve_draft_reply_and_attachment_data() {
+      return ["plain", "vim-insert", "vim-normal", "vim-visual"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_ctrl_h_l_preserve_draft_reply_and_attachment(data) {
+      panel.vimEditing = data.mode !== "plain";
+      beeperData.draftText = "Keep my draft";
+      beeperData.replyToMessageID = "message-0";
+      beeperData.draftAttachment = {path: "/tmp/keep.txt", type: "file"};
+      keyClick(Qt.Key_L); compare(panel.navigation, "chats"); verify(!panel.composer.activeFocus);
+      keyClick(Qt.Key_L, Qt.ControlModifier); verify(panel.composer.activeFocus);
+      if (["vim-normal", "vim-visual"].includes(data.mode)) keyClick(Qt.Key_Escape);
+      if (data.mode === "vim-visual") keyClick(Qt.Key_V);
+      keyClick(Qt.Key_H, Qt.ControlModifier);
+      compare(panel.navigation, "chats"); verify(!panel.composer.activeFocus);
+      compare(beeperData.draftText, "Keep my draft"); compare(beeperData.replyToMessageID, "message-0");
+      compare(beeperData.draftAttachment.path, "/tmp/keep.txt");
+      keyClick(Qt.Key_L, Qt.ControlModifier); verify(panel.composer.activeFocus);
+      panel.composer.deselect(); panel.composer.cursorPosition = panel.composer.length;
+      keyClick(Qt.Key_L); compare(beeperData.draftText, "Keep my draftl");
+      compare(pending("send").length, 0); compare(closeSpy.count, 0);
+    }
+    function test_ctrl_h_l_leave_search_and_emoji_inputs_data() {
+      return ["chats", "messages", "emoji"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_ctrl_h_l_leave_search_and_emoji_inputs(data) {
+      beeperData.draftText = "Keep";
+      if (data.mode === "chats") panel.openChatSearch();
+      else if (data.mode === "messages") panel.openConversationSearch();
+      else { panel.compose(); keyClick(Qt.Key_S, Qt.ControlModifier); keyClick(Qt.Key_Slash); }
+      wait(20);
+      keyClick(Qt.Key_H, Qt.ControlModifier); compare(panel.navigation, "chats");
+      verify(!panel.searchField.activeFocus); verify(!panel.emojiPickerOpen);
+      keyClick(Qt.Key_L, Qt.ControlModifier); verify(panel.composer.activeFocus);
+      compare(beeperData.draftText, "Keep");
+    }
+    function test_ctrl_f_stages_selection_and_restores_composer() {
+      beeperData.deferAttachments = true;
+      beeperData.draftText = "A file for you"; beeperData.replyToMessageID = "message-0";
+      panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
+      compare(fixture.pickerOpens, 1); compare(pickerOpenedSpy.count, 1);
+      keyClick(Qt.Key_F, Qt.ControlModifier); compare(fixture.pickerOpens, 1);
+      panel.attachmentPicker.finished("/tmp/a file.txt", "");
+      compare(pickerClosedSpy.count, 1); compare(panel.attachmentPicker, null);
+      compare(pending("stageAttachment")[0].params.path, "/tmp/a file.txt");
+      beeperData.respond("stageAttachment", {path: "/tmp/staged.txt", type: "file"});
+      compare(beeperData.draftAttachment.path, "/tmp/staged.txt");
+      compare(beeperData.draftText, "A file for you"); compare(beeperData.replyToMessageID, "message-0");
+      verify(panel.composer.activeFocus); compare(pending("send").length, 0);
+    }
+    function test_picker_cancel_or_failure_keeps_existing_attachment_data() {
+      return [{tag: "cancel", error: ""}, {tag: "failure", error: "Yazi failed"}];
+    }
+    function test_picker_cancel_or_failure_keeps_existing_attachment(data) {
+      beeperData.deferAttachments = true;
+      beeperData.draftText = "Keep"; beeperData.draftAttachment = {path: "/tmp/keep.txt", type: "file"};
+      panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
+      panel.attachmentPicker.finished("", data.error);
+      compare(pickerClosedSpy.count, 1); compare(pending("stageAttachment").length, 0);
+      compare(beeperData.draftText, "Keep"); compare(beeperData.draftAttachment.path, "/tmp/keep.txt");
+      verify(panel.composer.activeFocus); compare(beeperData.lastError, data.error);
+    }
+    function test_picker_stages_to_original_chat_after_switch() {
+      beeperData.deferAttachments = true; beeperData.draftText = "Original";
+      panel.compose(); keyClick(Qt.Key_F, Qt.ControlModifier);
+      panel.chooseChat(1); panel.focusNavigation();
+      panel.attachmentPicker.finished("/tmp/original.txt", "");
+      beeperData.respond("stageAttachment", {path: "/tmp/staged.txt", type: "file"});
+      compare(beeperData.localDrafts["chat-a"].attachment.path, "/tmp/staged.txt");
+      compare(beeperData.localDrafts["chat-a"].text, "Original");
+      compare(beeperData.draftAttachment, null); verify(!panel.composer.activeFocus);
+    }
+    function test_ctrl_f_only_opens_from_writable_composer_data() {
+      return ["navigation", "inactive", "unfocused", "readonly", "editing", "sending", "recording", "help", "vim-normal"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_ctrl_f_only_opens_from_writable_composer(data) {
+      panel.compose();
+      if (data.mode === "navigation") panel.focusNavigation();
+      else if (data.mode === "inactive") panel.active = false;
+      else if (data.mode === "unfocused") panel.windowFocused = false;
+      else if (data.mode === "readonly") beeperData.chats = [Object.assign({}, beeperData.currentChat, {isReadOnly: true})];
+      else if (data.mode === "editing") panel.editMessageID = "message-0";
+      else if (data.mode === "sending") beeperData.sending = true;
+      else if (data.mode === "recording") panel.preparingRecording = true;
+      else if (data.mode === "help") panel.openModal("help");
+      else if (data.mode === "vim-normal") { panel.vimEditing = true; keyClick(Qt.Key_Escape); }
+      wait(20); keyClick(Qt.Key_F, Qt.ControlModifier);
+      compare(fixture.pickerOpens, data.mode === "vim-normal" ? 1 : 0);
     }
     function test_ctrl_s_opens_the_emoji_grid_from_navigation_and_composer_data() {
       return [{tag: "navigation", compose: false}, {tag: "composer", compose: true}];

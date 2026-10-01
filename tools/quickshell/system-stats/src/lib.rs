@@ -1,6 +1,7 @@
 //! Local telemetry; no subprocesses and no writes to procfs or sysfs.
 mod details;
 pub mod processes;
+pub mod storage;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::{

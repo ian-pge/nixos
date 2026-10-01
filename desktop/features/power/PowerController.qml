@@ -13,6 +13,8 @@ Scope {
   property var bluetoothDevices: enabled ? Bluetooth.devices.values : []
   readonly property bool batteryAvailable: battery !== null && battery.ready && battery.isPresent
   readonly property bool batteryPluggedIn: batteryAvailable && !onBattery
+    && battery.state !== UPowerDeviceState.Discharging
+    && battery.state !== UPowerDeviceState.PendingDischarge
   readonly property int batteryPercent: batteryAvailable ? Math.round(battery.percentage * 100) : 0
   readonly property var keyboardBatteries: bluetoothDevices
     .filter(device => device.icon === "input-keyboard")

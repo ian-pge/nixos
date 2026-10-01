@@ -619,10 +619,10 @@ Scope {
       refreshChats(false);
     });
   }
-  function stageAttachment(path) {
-    const chatID = currentChatID;
+  function stageAttachment(path, chatID = currentChatID) {
     request("stageAttachment", {path: path}, (result, error) => {
       if (error || !result) return;
+      if (deletedChatIDs[chatID]) { request("discardAttachment", {path: result.path}); return; }
       if (currentChatID === chatID) draftAttachment = result;
       else {
         const saved = Object.assign({}, localDrafts[chatID] || {}, {chatID: chatID, attachment: result});

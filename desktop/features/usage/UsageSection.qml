@@ -8,7 +8,9 @@ import "UsageLimits.js" as Limits
 Item {
   id: root
   required property var source
+  property url logoSource: ""
   property real now: Date.now()
+  signal externalLinkRequested(string url)
   readonly property var snapshot: source.snapshot
   readonly property var limits: snapshot?.limits ?? []
   readonly property var notes: (snapshot?.notes ?? []).concat(source.error !== "" && snapshot !== null
@@ -29,9 +31,19 @@ Item {
     verticalAlignment: Text.AlignVCenter
   }
 
+  Image {
+    id: logo
+    objectName: "providerLogo"
+    y: 2; width: 18; height: 18
+    source: root.logoSource
+    sourceSize.width: 18; sourceSize.height: 18
+    fillMode: Image.PreserveAspectFit
+    visible: root.logoSource.toString() !== ""
+  }
   Label {
     objectName: "sectionTitle"
-    width: Math.max(0, parent.width - plan.implicitWidth - 12)
+    x: logo.visible ? logo.width + 8 : 0
+    width: Math.max(0, parent.width - x - plan.implicitWidth - 12)
     height: 22
     text: root.source.name
     font.pixelSize: 13; font.bold: true
@@ -49,9 +61,12 @@ Item {
     y: 24; width: parent.width
     visible: root.notes.length > 0
     textFormat: Text.StyledText
+    linkColor: Theme.secondary
+    onLinkActivated: url => root.externalLinkRequested(url)
     // Notes are fixed local strings; alerts use the explicit failure color.
-    text: root.notes.map(note => note.alert
-      ? '<font color="' + Theme.error + '">' + note.text + "</font>" : note.text).join(" · ")
+    text: root.notes.map(note => note.url
+      ? '<a href="' + note.url + '">' + note.text + "</a>"
+      : note.alert ? '<font color="' + Theme.error + '">' + note.text + "</font>" : note.text).join(" · ")
   }
   Label {
     objectName: "sectionMessage"

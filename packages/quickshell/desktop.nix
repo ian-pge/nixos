@@ -1,6 +1,10 @@
 {
   lib,
   runCommand,
+  writeShellApplication,
+  ghostty,
+  yazi,
+  jq,
   pipewire,
   sound-theme-freedesktop,
   quickshellSystemStats,
@@ -8,7 +12,14 @@
   quickshellBeeper,
   claude-code,
   codex,
+  coreutils,
+  systemd,
 }: let
+  attachmentPicker = writeShellApplication {
+    name = "quickshell-beeper-pick-file";
+    runtimeInputs = [coreutils ghostty yazi jq];
+    text = builtins.readFile ../../tools/quickshell/pick-attachment.sh;
+  };
   source = lib.cleanSourceWith {
     src = ../../desktop;
     filter = path: type: let
@@ -40,10 +51,16 @@ in
     chmod -R u+w "$out"
     substituteInPlace "$out/features/system/SystemController.qml" \
       --replace-fail '"quickshell-system-stats"' '"${quickshellSystemStats}/bin/quickshell-system-stats"'
+    substituteInPlace "$out/features/storage/StorageController.qml" \
+      --replace-fail '["systemctl",' '["${systemd}/bin/systemctl",' \
+      --replace-fail '["cat",' '["${coreutils}/bin/cat",'
     substituteInPlace "$out/features/calendar/WeatherData.qml" \
       --replace-fail '"quickshell-weather"' '"${quickshellWeather}/bin/quickshell-weather"'
     substituteInPlace "$out/features/messenger/BeeperData.qml" \
       --replace-fail '"quickshell-beeper"' '"${quickshellBeeper}/bin/quickshell-beeper"'
+    substituteInPlace "$out/features/messenger/BeeperAttachmentPicker.qml" \
+      --replace-fail 'property var command: ["bash", Qt.resolvedUrl("../../../tools/quickshell/pick-attachment.sh").toString().replace(/^file:\/\//, "")]' \
+        'property var command: ["${attachmentPicker}/bin/quickshell-beeper-pick-file"]'
     # The same CLI builds as the user's profile, so they share its sign-in state.
     substituteInPlace "$out/features/usage/UsageController.qml" \
       --replace-fail 'claudeCommand: ["claude",' 'claudeCommand: ["${claude-code}/bin/claude",' \

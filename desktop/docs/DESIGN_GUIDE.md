@@ -909,18 +909,18 @@ y compris pendant sa sortie animée. Une notification conserve la priorité jaun
 
 Les compteurs ne changent pas de couleur selon leur quantité. Les icônes d’applications et favicons conservent naturellement leurs couleurs d’origine, car ce sont des contenus externes et non des accents d’interface.
 
-Les capsules latérales conservent les accents fixes d’origine déclarés dans `Theme.js`, à l’exception des icônes de batterie branchée ou faible décrites ci-dessous. Les accents sont partagés avec leur widget central correspondant lorsqu’une capsule latérale existe ; `Theme.sideApplications` reste réservé aux deux lanceurs centraux. `Pill.forceHovered` maintient la légère teinte du survol pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
+Les capsules latérales conservent les accents fixes d’origine déclarés dans `Theme.js`, à l’exception des libellés de batterie décrits ci-dessous. Les accents sont partagés avec leur widget central correspondant lorsqu’une capsule latérale existe ; `Theme.sideApplications` reste réservé aux deux lanceurs centraux. `Pill.forceHovered` maintient la légère teinte du survol pendant que le widget central associé est ouvert. La top bar n’affiche aucune infobulle :
 
 | Capsule | Token | Couleur |
 |---|---|---|
 | Lanceurs centraux applications / onglets | `Theme.sideApplications` | `#7dc4e4` |
-| Updates | `Theme.sideUpdates` | `#f0c6c6` |
-| Réseau | `Theme.sideNetwork` | `#ee99a0` |
+| Updates | `Theme.sideUpdates` | Sky `#91d7e3` |
+| Réseau | `Theme.sideNetwork` | Flamingo `#f0c6c6` |
 | Bluetooth | `Theme.sideBluetooth` | `#8aadf4` |
-| Ne pas déranger | `Theme.sideNotifications` | `#a6da95` |
+| Ne pas déranger | `Theme.sideNotifications` | Teal `#8bd5ca` |
 | Système (CPU, RAM, GPU) | `Theme.sideSystem` | `#c6a0f6` |
 | Stockage | `Theme.sideDisk` | `#f5a97f` |
-| Batterie | `Theme.sideBattery` | `#f4dbd6` |
+| Batterie | `Theme.sideBattery` / `Theme.batteryPluggedIn` / `Theme.error` | Rosewater `#f4dbd6` / vert / rouge selon l’état |
 | Volume | `Theme.sideVolume` | `#b7bdf8` |
 | Luminosité | `Theme.sideBrightness` | `#eed49f` |
 | Température météo, date, heure | `Theme.sideWeather` | `#f5bde6` |
@@ -1164,14 +1164,19 @@ Le Bluetooth utilise exclusivement `Quickshell.Bluetooth` : découverte BlueZ, a
 
 La capsule batterie regroupe le PC (`󰌢`, pourcentage UPower) et les claviers
 Bluetooth (`󰌌`, pourcentage natif `BluetoothDevice.battery`), séparés par trois
-espaces, avec l’accent `Theme.sideBattery`. Les icônes seules deviennent vertes
-(`Theme.batteryPluggedIn`), y compris au survol, lorsque l’appareil est branché.
-Sinon, une batterie connue strictement inférieure à `20 %` rend uniquement son
-icône rouge (`Theme.error`), y compris au survol. Le vert est prioritaire sur le
-rouge ; à `20 %` ou avec un niveau inconnu, conserver la couleur normale.
-Chaque appareil est évalué indépendamment et les pourcentages gardent leur couleur.
+espaces. Chaque icône et son pourcentage partagent la même couleur : vert
+(`Theme.batteryPluggedIn`) lorsque l’appareil est branché, quel que soit son
+niveau ; sinon, rouge (`Theme.error`) pour un niveau connu strictement inférieur
+à `20 %`, Rosewater (`Theme.sideBattery`, `#f4dbd6`) à partir de `20 %` ou avec un
+niveau inconnu. Le vert est donc prioritaire sur l’alerte de batterie faible pour
+un même appareil. Aucun éclair n’est ajouté.
+Chaque appareil est évalué indépendamment, y compris au survol. La teinte au
+survol de la capsule est rouge si au moins un appareil débranché est faible,
+verte sinon si au moins un appareil est branché, Rosewater sinon.
 Pour le PC, utiliser `!UPower.onBattery` afin de couvrir aussi une batterie pleine
-ou dont la charge est limitée. Pour « Agar BLE », le Bluetooth ne fournit aucun
+ou dont la charge est limitée, mais les états `Discharging` et `PendingDischarge`
+retirent immédiatement le vert même si l’état global n’est pas encore à jour.
+Pour « Agar BLE », le Bluetooth ne fournit aucun
 état de charge : son adresse est associée à son identité USB (vendor/product et
 numéro de série), détectée via le flux système existant, sans processus ajouté.
 Cela fonctionne aussi via un hub, mais pas avec un chargeur mural sans connexion
@@ -1566,14 +1571,14 @@ l’écran ciblé. Passer en plein écran conserve la carte courante ; la dispar
 du moniteur la ferme. Le mode Ne pas déranger reste prioritaire en plein écran.
 
 Une capsule `36×36px` de contrôle Ne pas déranger se place tout à droite,
-immédiatement après Bluetooth. Accent vert Catppuccin
+immédiatement après Bluetooth. Accent Teal Catppuccin Macchiato
 `Theme.sideNotifications` : cloche normale si le mode est désactivé, cloche barrée
 s’il est actif. Le clic gauche et l’IPC `topbar.toggleDoNotDisturb` basculent le même
 état global sur tous les écrans. `forceHovered` donne une légère teinte du fond
 et un rebond pendant `2000ms` à chaque activation/désactivation. Ensuite, le fond
 redevient sombre et le rebond s’arrête, sauf en cas de vrai survol ; seule la
 cloche barrée indique que le mode est encore actif. L’état actif n’entretient
-ni le fond vert ni l’animation.
+ni le fond teinté ni l’animation.
 Aucune infobulle ni notification de confirmation n’est émise.
 
 Le clic droit bascule uniquement le clavier intégré
@@ -1794,12 +1799,18 @@ uniquement pour une limite atteinte, un blocage signalé ou un échec explicite.
 Les compteurs ne changent pas de couleur avant `100 %` : les pourcentages sont
 arrondis à l’inférieur, donc `100 %` signifie réellement atteint.
 
-Chaque section (Claude, puis Codex) affiche le forfait à droite, puis une ligne
+Chaque section (Claude, puis Codex) affiche son logo de 18 px à gauche du nom,
+le forfait à droite, puis une ligne
 par fenêtre : libellé, pourcentage, jauge sans curseur et réinitialisation
 (délai sous 24 h, sinon jour et heure locaux). Claude présente la session en
 cours, la semaine tous modèles et chaque fenêtre hebdomadaire par modèle ;
 Codex présente ses fenêtres de la plus courte à la plus longue, le forfait
 ChatGPT et les crédits de réinitialisation disponibles, jamais consommés. Un
+compteur Claude est lu dans les grants du statut `cedar_ember` lorsqu'il est
+fourni. Un statut absent ou `null` reste inconnu, même si un crédit est visible
+sur le web : afficher alors `Réinitialisations : voir Claude`, lien vers
+`https://claude.ai/settings/usage`, plutôt qu'un faux zéro. Aucun crédit n'est
+consommé et aucun endpoint privé n'est appelé. Un
 échec d’actualisation conserve la dernière lecture avec la note
 `Échec de l’actualisation` ; sans lecture, la section affiche l’erreur.
 

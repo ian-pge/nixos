@@ -130,6 +130,9 @@ PanelWindow {
       objectName: "storagePill"
       text: " " + services.system.diskUsage + "%"
       accent: Theme.sideDisk
+      forceHovered: coordinator.isOpen("storage", window.monitorName)
+      interactive: true
+      onLeftClicked: coordinator.toggle("storage", window.monitorName)
     }
   }
 
@@ -185,6 +188,13 @@ PanelWindow {
     Behavior on opacity { NumberAnimation { duration: 240 } }
 
     Pill {
+      objectName: "batteryPill"
+      readonly property bool warning: (services.power.batteryAvailable
+        && !services.power.batteryPluggedIn && services.power.batteryPercent < 20)
+        || services.power.keyboardBatteries.some(device =>
+          !device.pluggedIn && device.percent !== null && device.percent < 20)
+      readonly property bool pluggedIn: services.power.batteryPluggedIn
+        || services.power.keyboardBatteries.some(device => device.pluggedIn)
       visible: services.power.batteryAvailable || services.power.keyboardBatteries.length > 0
       textFormat: Text.StyledText
       text: (services.power.batteryAvailable
@@ -192,13 +202,13 @@ PanelWindow {
         .concat(services.power.keyboardBatteries.map(device =>
           batteryLabel("󰌌", device.percent, device.pluggedIn)))
         .join("&nbsp;&nbsp;&nbsp;")
-      accent: Theme.sideBattery
+      accent: warning ? Theme.error : pluggedIn ? Theme.batteryPluggedIn : Theme.sideBattery
 
       function batteryLabel(icon, percent, pluggedIn) {
-        const iconColor = pluggedIn ? Theme.batteryPluggedIn
-          : percent !== null && percent < 20 ? Theme.error : "";
-        return (iconColor !== "" ? '<font color="' + iconColor + '">' + icon + '</font>' : icon)
-          + "&nbsp;" + (percent === null ? "--" : percent) + "%";
+        const color = pluggedIn ? Theme.batteryPluggedIn
+          : percent !== null && percent < 20 ? Theme.error : Theme.sideBattery;
+        return '<font color="' + color + '">' + icon
+          + "&nbsp;" + (percent === null ? "--" : percent) + "%</font>";
       }
     }
 

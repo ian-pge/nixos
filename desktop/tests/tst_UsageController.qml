@@ -53,6 +53,8 @@ ShellRoot {
       compare(usage.claude.run, runs + 1); compare(usage.codex.run, runs + 1);
       compare(usage.claude.error, ""); compare(usage.codex.error, "");
       compare(usage.claude.snapshot.plan, "Claude Max");
+      compare(usage.claude.snapshot.notes[0].text, "Réinitialisations : voir Claude");
+      compare(usage.claude.snapshot.notes[0].url, "https://claude.ai/settings/usage");
       compare(labels(usage.claude), ["Session en cours 3", "Semaine · tous les modèles 10", "Semaine · Fable 15"]);
       verify(usage.claude.snapshot.limits[0].resetsAt > Date.now());
       compare(usage.codex.snapshot.plan, "ChatGPT Pro Lite");

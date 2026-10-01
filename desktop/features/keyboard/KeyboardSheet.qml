@@ -25,7 +25,7 @@ Rectangle {
     case "app": return Theme.sideBluetooth;
     case "workspace": return Theme.sideSystem;
     case "window": return Theme.sideDisk;
-    case "system": return Theme.sideNotifications;
+    case "system": return Theme.keyboardSystem;
     case "help": return Theme.sideWeather;
     case "level3": return Theme.sideDate;
     case "navigation": return Theme.sideApplications;
