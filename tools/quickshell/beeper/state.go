@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	beeper "github.com/beeper/desktop-api-go/v5"
+	beeper "github.com/beeper/desktop-api-go/v6"
 )
 
 type attachment struct {

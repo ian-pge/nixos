@@ -27,6 +27,8 @@ Item {
   property bool downloading: false
   property int resolutionGeneration: 0
   property bool inlinePlayWhenReady: false
+  property bool openWhenReady: false
+  property var fileOpener: url => Qt.openUrlExternally(url)
   readonly property bool playWhenReady: sharedAudio ? currentAudio && sharedAudio.playWhenReady : inlinePlayWhenReady
   property string errorText: ""
   readonly property bool sourceReady: /^(file:|https?:|data:)/.test(sourceUrl)
@@ -103,6 +105,17 @@ Item {
     if (!playbackEnabled || !renderEnabled || !visible || !player?.seekable || player.duration <= 0) return;
     player.setPosition(Math.max(0, Math.min(player.duration, player.position + delta)));
   }
+  function openFile() {
+    if (kind !== "file" || !playbackEnabled || !renderEnabled || !visible) return;
+    errorText = "";
+    if (sourceUrl.startsWith("file:")) {
+      openWhenReady = false;
+      if (fileOpener(sourceUrl) === false) errorText = "Could not open this attachment.";
+    } else {
+      openWhenReady = true;
+      resolve();
+    }
+  }
   function resolve() {
     if (!beeperData || downloading || !visible || !playbackEnabled || !renderEnabled) return;
     const url = attachment.srcURL || attachment.url || attachment.id || "";
@@ -112,13 +125,18 @@ Item {
     beeperData.request("download", {url: url}, (result, error) => {
       if (generation !== resolutionGeneration) return;
       downloading = false;
-      if (error || !result || result.error) { inlinePlayWhenReady = false; errorText = error ? error.message : result?.error || "Preview unavailable"; return; }
+      if (error || !result || result.error) { openWhenReady = false; inlinePlayWhenReady = false; errorText = error ? error.message : result?.error || "Preview unavailable"; return; }
       sourceUrl = result.srcURL || "";
+      if (openWhenReady) {
+        openWhenReady = false;
+        if (sourceUrl.startsWith("file:")) openFile();
+        else errorText = "Could not open this attachment.";
+      }
       Qt.callLater(playPendingMedia);
     });
   }
   onPlaybackEnabledChanged: {
-    if (!playbackEnabled) pauseInline();
+    if (!playbackEnabled) { openWhenReady = false; pauseInline(); }
     else { resolveIfNeeded(); requestWaveform(); }
   }
   function requestWaveform() {
@@ -129,10 +147,10 @@ Item {
     target: root.beeperData
     function onConnectedChanged() { Qt.callLater(root.requestWaveform); }
   }
-  onRenderEnabledChanged: if (renderEnabled) { resolveIfNeeded(); requestWaveform(); } else pauseInline()
+  onRenderEnabledChanged: if (renderEnabled) { resolveIfNeeded(); requestWaveform(); } else { openWhenReady = false; pauseInline(); }
   function resolveIfNeeded() { if (!sharedAudio && visible && playbackEnabled && renderEnabled && sourceUrl && !sourceReady) resolve(); }
-  onVisibleChanged: { if (!visible) pauseInline(); else { resolveIfNeeded(); requestWaveform(); } }
-  onAttachmentChanged: { ++resolutionGeneration; downloading = false; pauseInline(); sourceUrl = Format.attachmentSource(attachment); errorText = ""; resolveIfNeeded(); }
+  onVisibleChanged: { if (!visible) { openWhenReady = false; pauseInline(); } else { resolveIfNeeded(); requestWaveform(); } }
+  onAttachmentChanged: { ++resolutionGeneration; downloading = false; openWhenReady = false; pauseInline(); sourceUrl = Format.attachmentSource(attachment); errorText = ""; resolveIfNeeded(); }
   Component.onCompleted: { resolveIfNeeded(); requestWaveform(); }
 
   Loader {
@@ -254,10 +272,7 @@ Item {
       Text { Layout.fillWidth: true; text: root.attachment.fileName || "Attachment"; elide: Text.ElideMiddle; color: root.accentBackground ? Theme.background : Theme.foreground; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control } }
       Text { text: Format.bytes(root.attachment.fileSize || root.attachment.size); color: root.accentBackground ? Theme.background : Theme.secondary; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary } }
     }
-    BeeperButton { text: "Open"; prominent: root.accentBackground; accent: root.accent; onClicked: {
-      if (root.sourceUrl.startsWith("file:")) Qt.openUrlExternally(root.sourceUrl);
-      else root.resolve();
-    } }
+    BeeperButton { text: "Open"; prominent: root.accentBackground; accent: root.accent; onClicked: root.openFile() }
   }
   Rectangle {
     anchors.fill: parent; visible: root.mediaDownloading || !!root.mediaError

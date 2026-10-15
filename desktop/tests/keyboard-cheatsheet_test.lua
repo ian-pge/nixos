@@ -9,6 +9,7 @@ local function dispatcher(path)
 end
 hl = setmetatable({
   dsp = dispatcher("hl.dsp"),
+  plugin = { load = function() end },
   bind = function(key, action, options)
     assert(action ~= nil, "binding registered before its callback exists: " .. key)
     bindings[#bindings + 1] = { key = key, action = action, options = options or {} }
@@ -29,7 +30,7 @@ hl = setmetatable({
 
 assert(loadfile(assert(arg[1], "provide the generated Hyprland config")))()
 local show, next_page, previous_page, stop_voice
-local chromeTabs, usage, audio, releases = 0, 0, 0, {}
+local chromeTabs, storage, audio, releases = 0, 0, 0, {}
 for _, binding in ipairs(bindings) do
   local action, options = binding.action, binding.options
   if binding.key == "SUPER + apostrophe" and not options.release then
@@ -53,9 +54,9 @@ for _, binding in ipairs(bindings) do
       assert(binding.key == "SUPER + P", "Chrome tabs must move to Cmd+P")
       assert(not options.release and not options.repeating)
     end
-    if action.path == "hl.dsp.exec_cmd" and action.args[1]:find("topbar toggleUsage", 1, true) then
-      usage = usage + 1
-      assert(binding.key == "SUPER + R", "Plan limits must open with Cmd+R")
+    if action.path == "hl.dsp.exec_cmd" and action.args[1]:find("topbar toggleStorage", 1, true) then
+      storage = storage + 1
+      assert(binding.key == "SUPER + R", "Storage must open with Cmd+R")
       assert(not options.release and not options.repeating)
     end
     if action.path == "hl.dsp.exec_cmd" and action.args[1]:match("topbar toggleAudio$") then
@@ -71,7 +72,7 @@ for _, binding in ipairs(bindings) do
 end
 assert(show and next_page and previous_page and stop_voice)
 assert(chromeTabs == 1, "exactly one Chrome tabs binding is required")
-assert(usage == 1, "exactly one plan-limits binding is required")
+assert(storage == 1, "exactly one storage binding is required")
 assert(audio == 1, "exactly one audio panel binding is required")
 assert(not releases.P, "releasing P must no longer hide the sheet")
 assert(not releases.ISO_Level5_Latch, "the Lafayette latch must not control the sheet")

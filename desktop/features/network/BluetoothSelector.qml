@@ -5,6 +5,7 @@ import "../../ui/Theme.js" as Theme
 
 FocusScope {
   id: root
+  objectName: "bluetoothSelector"
 
   required property var controller
   property string spinnerFrame: "loader-circle"
@@ -34,34 +35,34 @@ FocusScope {
     ? "PAIRED" : "NEARBY"
   readonly property string counterText: devices.length > 0
     ? (controller.selectedIndex + 1) + "/" + devices.length : "0/0"
-  readonly property real contentWidth: 15
-    + 17 + 13 + 7 + 8
+  readonly property real contentWidth: Theme.barSize(15)
+    + Theme.barSize(17) + Theme.barSize(13) + Theme.barSize(7) + Theme.barSize(8)
     + Layout.widestText(labelMetrics,
       [desiredLabelText, displayedLabelText, previousLabelText])
-    + 12 + tabMetrics.advanceWidth(tabText) + 8
-    + counterMetrics.advanceWidth(counterText) + 15
+    + Theme.barSize(12) + tabMetrics.advanceWidth(tabText) + Theme.barSize(8)
+    + counterMetrics.advanceWidth(counterText) + Theme.barSize(15)
 
-  implicitWidth: Layout.boundedWidth(contentWidth, 0, 400)
-  implicitHeight: 36
+  implicitWidth: Layout.boundedWidth(contentWidth, 0, Theme.barSize(400))
+  implicitHeight: Theme.barSize(36)
 
   FontMetrics {
     id: labelMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 14
+    font.pixelSize: Theme.barSize(14)
     font.bold: true
   }
 
   FontMetrics {
     id: tabMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 11
+    font.pixelSize: Theme.barSize(11)
     font.bold: true
   }
 
   FontMetrics {
     id: counterMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 12
+    font.pixelSize: Theme.barSize(12)
     font.bold: true
   }
 
@@ -78,7 +79,7 @@ FocusScope {
       return;
     selectionWheel.stop();
     outgoingSlide.y = 0;
-    incomingSlide.y = controller.selectionDirection > 0 ? 40 : -40;
+    incomingSlide.y = controller.selectionDirection > 0 ? Theme.barSize(40) : -Theme.barSize(40);
     previousLabelText = displayedLabelText;
     outgoingLabel.visible = true;
     displayedLabelText = desiredLabelText;
@@ -135,10 +136,11 @@ FocusScope {
 
   Icon {
 
-    size: 17
+    size: Theme.barSize(17)
     id: bluetoothIcon
+    objectName: "bluetoothSelectorIcon"
     anchors.left: parent.left
-    anchors.leftMargin: 15
+    anchors.leftMargin: Theme.barSize(15)
     anchors.verticalCenter: parent.verticalCenter
     name: root.bluetoothIconText
     spinning: controller.scanning
@@ -149,20 +151,20 @@ FocusScope {
   Rectangle {
     id: activeDot
     anchors.left: bluetoothIcon.right
-    anchors.leftMargin: 13
+    anchors.leftMargin: Theme.barSize(13)
     anchors.verticalCenter: parent.verticalCenter
-    width: 7
-    height: 7
-    radius: 3.5
+    width: Theme.barSize(7)
+    height: Theme.barSize(7)
+    radius: Theme.barSize(3.5)
     color: root.selectedDeviceConnected ? Theme.sideBluetooth : Theme.inactive
   }
 
   Item {
     id: labelViewport
     anchors.left: activeDot.right
-    anchors.leftMargin: 8
+    anchors.leftMargin: Theme.barSize(8)
     anchors.right: bluetoothStatus.left
-    anchors.rightMargin: 12
+    anchors.rightMargin: Theme.barSize(12)
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     clip: true
@@ -177,12 +179,13 @@ FocusScope {
       color: Theme.foreground
       elide: Text.ElideNone
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: Theme.barSize(14)
       font.bold: true
     }
 
     Text {
       id: incomingLabel
+      objectName: "bluetoothSelectorLabel"
       text: root.displayedLabelText
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
@@ -190,7 +193,7 @@ FocusScope {
       color: Theme.foreground
       elide: Text.ElideNone
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: Theme.barSize(14)
       font.bold: true
     }
   }
@@ -206,7 +209,7 @@ FocusScope {
       target: outgoingSlide
       property: "y"
       from: 0
-      to: controller.selectionDirection > 0 ? -40 : 40
+      to: controller.selectionDirection > 0 ? -Theme.barSize(40) : Theme.barSize(40)
       duration: 150
       easing.type: Easing.InOutCubic
     }
@@ -214,7 +217,7 @@ FocusScope {
     NumberAnimation {
       target: incomingSlide
       property: "y"
-      from: controller.selectionDirection > 0 ? 40 : -40
+      from: controller.selectionDirection > 0 ? Theme.barSize(40) : -Theme.barSize(40)
       to: 0
       duration: 150
       easing.type: Easing.InOutCubic
@@ -224,27 +227,27 @@ FocusScope {
   Row {
     id: bluetoothStatus
     anchors.right: parent.right
-    anchors.rightMargin: 15
+    anchors.rightMargin: Theme.barSize(15)
     anchors.verticalCenter: parent.verticalCenter
-    spacing: 8
+    spacing: Theme.barSize(8)
 
     Text {
       text: root.tabText
-      height: 18
+      height: Theme.barSize(18)
       verticalAlignment: Text.AlignVCenter
       color: Theme.sideBluetooth
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 11
+      font.pixelSize: Theme.barSize(11)
       font.bold: true
     }
 
     Text {
       text: root.counterText
-      height: 18
+      height: Theme.barSize(18)
       verticalAlignment: Text.AlignVCenter
       color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 12
+      font.pixelSize: Theme.barSize(12)
       font.bold: true
     }
   }

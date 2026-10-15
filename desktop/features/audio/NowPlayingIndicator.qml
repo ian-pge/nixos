@@ -5,6 +5,7 @@ import "../../ui/Theme.js" as Theme
 
 Item {
   id: root
+  objectName: "nowPlayingIndicator"
 
   required property var controller
   readonly property var player: controller.player
@@ -12,25 +13,26 @@ Item {
   readonly property string labelText: controller.labelText
   readonly property string playbackIconText: controller.playbackIconText
 
-  implicitWidth: Layout.boundedWidth(15 + 18 + 10
-    + labelMetrics.advanceWidth(labelText) + 12
-    + 16 + 14, 160, 480)
-  implicitHeight: 36
+  implicitWidth: Layout.boundedWidth(Theme.barSize(15) + Theme.barSize(18) + Theme.barSize(10)
+    + labelMetrics.advanceWidth(labelText) + Theme.barSize(12)
+    + Theme.barSize(16) + Theme.barSize(14), Theme.barSize(160), Theme.barSize(480))
+  implicitHeight: Theme.barSize(36)
 
   FontMetrics {
     id: labelMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 16
+    font.pixelSize: Theme.barSize(16)
     font.bold: true
   }
 
   Item {
     id: equalizer
+    objectName: "mediaEqualizer"
     anchors.left: parent.left
-    anchors.leftMargin: 15
+    anchors.leftMargin: Theme.barSize(15)
     anchors.verticalCenter: parent.verticalCenter
-    width: 18
-    height: 20
+    width: Theme.barSize(18)
+    height: Theme.barSize(20)
 
     Repeater {
       model: 4
@@ -40,11 +42,11 @@ Item {
         required property int index
         property real level: 4 + (index % 2) * 2
 
-        x: index * 5
+        x: index * 5 * Theme.barScale
         anchors.bottom: parent.bottom
-        width: 3
-        height: level
-        radius: 1.5
+        width: 3 * Theme.barScale
+        height: level * Theme.barScale
+        radius: 1.5 * Theme.barScale
         color: root.playing ? Theme.state : Theme.inactive
 
         SequentialAnimation {
@@ -91,10 +93,10 @@ Item {
 
   Icon {
 
-    size: 16
+    size: Theme.barSize(16)
     id: playbackIcon
     anchors.right: parent.right
-    anchors.rightMargin: 14
+    anchors.rightMargin: Theme.barSize(14)
     anchors.verticalCenter: parent.verticalCenter
     name: root.playbackIconText
     color: Theme.action
@@ -102,10 +104,11 @@ Item {
   }
 
   Text {
+    objectName: "mediaLabel"
     anchors.left: equalizer.right
-    anchors.leftMargin: 10
+    anchors.leftMargin: Theme.barSize(10)
     anchors.right: playbackIcon.left
-    anchors.rightMargin: 12
+    anchors.rightMargin: Theme.barSize(12)
     anchors.verticalCenter: parent.verticalCenter
     horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
@@ -113,7 +116,7 @@ Item {
     color: Theme.foreground
     elide: Text.ElideRight
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 16
+    font.pixelSize: Theme.barSize(16)
     font.bold: true
   }
 }

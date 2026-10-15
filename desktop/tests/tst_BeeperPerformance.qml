@@ -115,5 +115,25 @@ ShellRoot {
         compare(history.itemAtIndex(index).message.chatID, "chat-21");
       if (!referenceSource) compare(history.createdCount, 6);
     }
+    function test_z_large_history_zoom_updates_the_viewport_first_and_finishes_in_batches() {
+      if (referenceSource) return;
+      panel.chooseChat(22); tryVerify(() => pendingMessages().length > 0);
+      beeperData.respond("messages", {items: messages("chat-22", 500), hasMore: false});
+      tryCompare(panel, "restoringView", false, 10000);
+      const history = findChild(panel, "beeperMessages");
+      history.positionViewAtIndex(250, ListView.Beginning); wait(30); panel.rememberPosition();
+      const anchor = beeperData.messages[history.indexAt(1, history.contentY + 12)].id;
+      fixture.lastBeat = Date.now(); fixture.longestPause = 0; fixture.measuring = true;
+      const started = Date.now(); panel.changeTextSize(1);
+      const applyMs = Date.now() - started;
+      const scale = beeperData.chatTextSize / 20;
+      compare(history.itemAtIndex(250).textScale, scale);
+      verify(history.itemAtIndex(0).textScale !== scale, "Offscreen text must not all change synchronously");
+      tryCompare(history, "rescaling", false, 10000); wait(30); fixture.measuring = false;
+      compare(beeperData.messages[history.indexAt(1, history.contentY + 12)].id, anchor);
+      for (let i = 0; i < 500; ++i) compare(history.itemAtIndex(i).textScale, scale);
+      console.log("Conversation performance:", JSON.stringify({scenario: "complete-batched-zoom", messages: 500,
+        applyMs: applyMs, settleMs: Date.now() - started, longestPauseMs: fixture.longestPause}));
+    }
   }
 }

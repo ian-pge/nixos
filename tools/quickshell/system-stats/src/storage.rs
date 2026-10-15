@@ -9,6 +9,7 @@ use nix::{
     sys::stat::{Mode, SFlag, fstat, fstatat},
 };
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 use std::{
     collections::{HashMap, HashSet},
     ffi::{OsStr, OsString},
@@ -30,6 +31,7 @@ const APPS: usize = 2;
 const PERSONAL: usize = 3;
 const VM: usize = 4;
 const OTHER: usize = 5;
+const DOCKER_PARTS: [&str; 5] = ["layers", "volumes", "buildCache", "containers", "other"];
 
 pub struct Options {
     pub home: PathBuf,
@@ -226,20 +228,120 @@ fn classify(path: &Path, home: &Path) -> (usize, bool) {
     }
 }
 
+fn docker_roots(home: &Path) -> [PathBuf; 3] {
+    [
+        PathBuf::from("/var/lib/docker"),
+        home.join(".local/share/docker"),
+        PathBuf::from("/root/.local/share/docker"),
+    ]
+}
+
+// Filesystem allocation, not Docker's logical/reclaimable image sizes. In
+// particular, Btrfs subvolumes include both images and writable container layers.
+fn docker_part(path: &Path, home: &Path) -> Option<usize> {
+    let path = canonical_category_path(path);
+    if path.starts_with("/var/lib/containerd") {
+        return Some(0);
+    }
+    for root in docker_roots(home) {
+        if let Ok(relative) = path.strip_prefix(root) {
+            return Some(
+                match relative
+                    .components()
+                    .next()
+                    .map(|part| part.as_os_str().as_bytes())
+                {
+                    Some(
+                        b"btrfs" | b"overlay2" | b"overlayfs" | b"aufs" | b"devicemapper"
+                        | b"image" | b"containerd",
+                    ) => 0,
+                    Some(b"volumes") => 1,
+                    Some(b"buildkit") => 2,
+                    Some(b"containers") => 3,
+                    _ => 4,
+                },
+            );
+        }
+    }
+    None
+}
+
+// Disjoint first-level home entries, plus the two explicitly classified source
+// checkouts. Never publish names from /root, other users or application data.
+fn personal_entry(path: &Path, home: &Path) -> Option<PathBuf> {
+    let path = canonical_category_path(path);
+    let relative = path.strip_prefix(home).ok()?;
+    for project in [".config/nixos", ".local/share/chezmoi"] {
+        if relative.starts_with(project) {
+            return Some(PathBuf::from(project));
+        }
+    }
+    let first = relative.components().next()?.as_os_str();
+    if first.as_bytes().starts_with(b".") || first == "VirtualBox VMs" {
+        return None;
+    }
+    Some(PathBuf::from(first))
+}
+
+fn display_personal_path(path: &Path) -> String {
+    let mut display = String::from("~/");
+    for chunk in path.as_os_str().as_bytes().utf8_chunks() {
+        for character in chunk.valid().chars() {
+            if character.is_control()
+                || character == '%'
+                || matches!(character, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+            {
+                for byte in character.encode_utf8(&mut [0; 4]).as_bytes() {
+                    let _ = write!(display, "%{byte:02X}");
+                }
+            } else {
+                display.push(character);
+            }
+        }
+        for byte in chunk.invalid() {
+            let _ = write!(display, "%{byte:02X}");
+        }
+    }
+    display
+}
+
+#[derive(Default)]
+struct PersonalEntry {
+    bytes: u64,
+    partial: bool,
+    directory: bool,
+}
+
 #[derive(Default)]
 struct Totals {
     bytes: [u64; 6],
     partial: [bool; 6],
     cache_bytes: u64,
+    docker_bytes: [u64; 5],
+    docker_partial: [bool; 5],
+    personal: HashMap<PathBuf, PersonalEntry>,
     errors: u64,
 }
 
 impl Totals {
-    fn add(&mut self, category: usize, cache: bool, blocks: i64) {
+    fn add(&mut self, path: &Path, home: &Path, directory: bool, blocks: i64) {
+        let (category, cache) = classify(path, home);
         let bytes = u64::try_from(blocks).unwrap_or(0).saturating_mul(512);
         self.bytes[category] = self.bytes[category].saturating_add(bytes);
         if cache {
             self.cache_bytes = self.cache_bytes.saturating_add(bytes);
+        }
+        if category == DOCKER
+            && let Some(index) = docker_part(path, home)
+        {
+            self.docker_bytes[index] = self.docker_bytes[index].saturating_add(bytes);
+        }
+        if category == PERSONAL
+            && let Some(key) = personal_entry(path, home)
+        {
+            let entry = self.personal.entry(key.clone()).or_default();
+            entry.bytes = entry.bytes.saturating_add(bytes);
+            entry.directory |= directory || canonical_category_path(path) != home.join(key);
         }
     }
 
@@ -247,6 +349,27 @@ impl Totals {
         self.errors += 1;
         self.partial[classify(path, home).0] = true;
         let path = canonical_category_path(path);
+        if let Some(index) = docker_part(&path, home) {
+            self.docker_partial[index] = true;
+            // A denied Docker root may hide every subcategory.
+            if docker_roots(home).contains(&path) {
+                self.docker_partial.fill(true);
+            }
+        } else if docker_roots(home)
+            .iter()
+            .chain([PathBuf::from("/var/lib/containerd")].iter())
+            .any(|root| root.starts_with(&path))
+            || path == Path::new("/persist")
+        {
+            self.docker_partial.fill(true);
+        }
+        if let Some(key) = personal_entry(&path, home) {
+            self.personal.entry(key).or_default().partial = true;
+        } else if home.starts_with(&path) || path == Path::new("/persist") {
+            for entry in self.personal.values_mut() {
+                entry.partial = true;
+            }
+        }
         // A denied ancestor can hide more than its own directory's category.
         for (prefix, category) in [
             (PathBuf::from("/var/lib/docker"), DOCKER),
@@ -298,6 +421,22 @@ impl Totals {
                         category["dataBytes"] =
                             json!(self.bytes[APPS].saturating_sub(self.cache_bytes));
                     }
+                    if index == DOCKER {
+                        category["breakdown"] = Value::Array(DOCKER_PARTS.iter().enumerate().map(|(part, id)| {
+                            json!({"id":id, "bytes": if self.docker_partial[part] && self.docker_bytes[part] == 0 {
+                                Value::Null
+                            } else { json!(self.docker_bytes[part]) }, "partial":self.docker_partial[part]})
+                        }).collect());
+                    }
+                    if index == PERSONAL {
+                        let mut entries: Vec<_> = self.personal.iter().filter(|(_, entry)| entry.bytes > 0).collect();
+                        entries.sort_by(|(left_path, left), (right_path, right)|
+                            right.bytes.cmp(&left.bytes).then_with(|| left_path.cmp(right_path)));
+                        category["largestEntries"] = Value::Array(entries.into_iter().take(5).map(|(path, entry)| {
+                            json!({"path":display_personal_path(path), "bytes":entry.bytes,
+                                "kind":if entry.directory {"directory"} else {"file"}, "partial":entry.partial})
+                        }).collect());
+                    }
                     category
                 })
                 .collect(),
@@ -341,8 +480,8 @@ impl Scanner<'_> {
             if !self.seen.insert((stat.st_dev, stat.st_ino)) {
                 return;
             }
-            let (category, cache) = classify(&virtual_path, self.home);
-            self.totals.add(category, cache, stat.st_blocks);
+            self.totals
+                .add(&virtual_path, self.home, false, stat.st_blocks);
             return;
         }
         // Bound descriptors and stack use even on adversarial directory trees.
@@ -373,8 +512,8 @@ impl Scanner<'_> {
         if !self.seen.insert((stat.st_dev, stat.st_ino)) {
             return;
         }
-        let (category, cache) = classify(&virtual_path, self.home);
-        self.totals.add(category, cache, stat.st_blocks);
+        self.totals
+            .add(&virtual_path, self.home, true, stat.st_blocks);
         // /proc/self/fd resolves our O_NOFOLLOW-opened descriptor, never a
         // user-controlled path. Keep it open until enumeration is complete.
         let entries = match fs::read_dir(format!("/proc/self/fd/{}", descriptor.as_raw_fd())) {
@@ -432,7 +571,7 @@ pub fn collect(options: &Options) -> Result<Value> {
     let categories = scanner.totals.categories(used);
     let error_count = scanner.totals.errors;
     Ok(json!({
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "measuredAt": SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
         "durationMs": start.elapsed().as_millis() as u64,
         "estimated": true,
@@ -461,7 +600,9 @@ pub fn write_report(output: &Path, report: &Value) -> Result<()> {
     let result = (|| -> Result<()> {
         serde_json::to_writer(&mut file, report)?;
         file.write_all(b"\n")?;
-        file.set_permissions(fs::Permissions::from_mode(0o644))?;
+        // Names in the personal top five must not become world-readable.
+        // The fixed service grants its desktop user a read-only ACL afterwards.
+        file.set_permissions(fs::Permissions::from_mode(0o600))?;
         file.sync_all()?;
         fs::rename(&temporary, output).context("Cannot publish report")?;
         File::open(parent)?.sync_all()?;
@@ -589,6 +730,108 @@ mod tests {
     }
 
     #[test]
+    fn docker_details_are_disjoint_and_keep_unknown_parts_unknown() {
+        let home = Path::new("/home/test");
+        let mut totals = Totals::default();
+        for (path, part) in [
+            ("/var/lib/docker/btrfs/subvolumes/layer", 0),
+            (
+                "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/file",
+                0,
+            ),
+            ("/home/test/.local/share/docker/volumes/data/file", 1),
+            ("/persist/system/var/lib/docker/buildkit/cache", 2),
+            ("/var/lib/docker/containers/id/log.json", 3),
+            ("/var/lib/docker/network/files/state", 4),
+        ] {
+            assert_eq!(docker_part(Path::new(path), home), Some(part));
+            totals.add(Path::new(path), home, false, 8);
+        }
+        assert_eq!(totals.docker_bytes, [8192, 4096, 4096, 4096, 4096]);
+        assert_eq!(
+            totals.docker_bytes.iter().sum::<u64>(),
+            totals.bytes[DOCKER]
+        );
+        let report = totals.categories(0);
+        assert_eq!(report[DOCKER]["breakdown"].as_array().unwrap().len(), 5);
+        let mut denied = Totals::default();
+        denied.failure(Path::new("/var/lib/docker"), home);
+        for part in denied.categories(0)[DOCKER]["breakdown"]
+            .as_array()
+            .unwrap()
+        {
+            assert!(part["bytes"].is_null());
+            assert_eq!(part["partial"], true);
+        }
+    }
+
+    #[test]
+    fn personal_top_five_groups_disjoint_entries_and_only_names_the_configured_home() {
+        let home = Path::new("/home/test");
+        let mut totals = Totals::default();
+        for (path, blocks) in [
+            ("/home/test/Projects/one/src/data", 100),
+            ("/persist/home/test/Projects/two/data", 80),
+            ("/home/test/Downloads/movie", 90),
+            ("/home/test/archive.tar", 70),
+            ("/home/test/.config/nixos/flake.nix", 60),
+            ("/home/test/.local/share/chezmoi/file", 50),
+            ("/home/test/Documents/notes", 20),
+            ("/home/test/.cache/private-cache-name", 1000),
+            ("/home/test/VirtualBox VMs/private-vm", 1000),
+            ("/root/private-root-name", 1000),
+            ("/home/other/private-user-name", 1000),
+        ] {
+            totals.add(Path::new(path), home, false, blocks);
+        }
+        totals.failure(Path::new("/home/test/Downloads/unreadable"), home);
+        let report = totals.categories(0);
+        let entries = report[PERSONAL]["largestEntries"].as_array().unwrap();
+        let paths: Vec<_> = entries
+            .iter()
+            .map(|entry| entry["path"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "~/Projects",
+                "~/Downloads",
+                "~/archive.tar",
+                "~/.config/nixos",
+                "~/.local/share/chezmoi"
+            ]
+        );
+        assert_eq!(entries[0]["bytes"], 180 * 512);
+        assert_eq!(entries[0]["kind"], "directory");
+        assert_eq!(entries[1]["partial"], true);
+        assert_eq!(entries[2]["kind"], "file");
+        assert!(!report.to_string().contains("private-"));
+        assert!(
+            entries
+                .windows(2)
+                .all(|pair| pair[0]["bytes"].as_u64() >= pair[1]["bytes"].as_u64())
+        );
+    }
+
+    #[test]
+    fn display_names_preserve_unicode_and_escape_ambiguous_or_unsafe_bytes() {
+        assert_eq!(
+            display_personal_path(Path::new("Photos été")),
+            "~/Photos été"
+        );
+        assert_eq!(display_personal_path(Path::new("name\n")), "~/name%0A");
+        assert_eq!(display_personal_path(Path::new("name%0A")), "~/name%250A");
+        assert_eq!(
+            display_personal_path(Path::new(OsStr::from_bytes(b"bad\xff"))),
+            "~/bad%FF"
+        );
+        assert_eq!(
+            display_personal_path(Path::new("name\u{202e}")),
+            "~/name%E2%80%AE"
+        );
+    }
+
+    #[test]
     fn report_write_is_atomic_readable_and_rejects_symlink_destinations() {
         let fixture = tempfile::tempdir().unwrap();
         let output = fixture.path().join("report.json");
@@ -600,7 +843,7 @@ mod tests {
         );
         assert_eq!(
             fs::metadata(&output).unwrap().permissions().mode() & 0o777,
-            0o644
+            0o600
         );
         let alias = fixture.path().join("alias");
         symlink(&output, &alias).unwrap();

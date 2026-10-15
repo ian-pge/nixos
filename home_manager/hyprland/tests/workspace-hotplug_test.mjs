@@ -112,24 +112,36 @@ try {
   assert.equal(await ctl("output", "remove", "DP-2"), "ok");
   await until(async () => {
     const windows = await json("clients");
-    return [first, second].every(saved => windows.some(w => w.address === saved.address && w.workspace.id === 2));
-  }, "7-to-2 merge without closing either window");
-  await until(async () => (await json("workspaces")).filter(w => w.id > 0).every(w => w.id <= 5), "five solo workspaces");
-  assert.equal(await ctl("eval", 'assert(quickshell_workspace_target(6) == nil); assert(quickshell_workspace_target(1) == 1)'), "ok");
+    return windows.some(w => w.address === first.address && w.workspace.id === 2)
+      && windows.some(w => w.address === second.address && w.workspace.id === 7);
+  }, "both windows stay in their original workspaces");
+  await until(async () => {
+    const spaces = await json("workspaces");
+    return Array.from({length: 10}, (_, index) => index + 1).every(id =>
+      spaces.some(w => w.id === id && w.monitor === "eDP-TEST"));
+  }, "ten solo laptop workspaces");
+  assert.equal(await ctl("eval", 'assert(quickshell_workspace_target(10) == 10); hl.dispatch(hl.dsp.focus({workspace=10}))'), "ok");
+  await until(async () => (await json("monitors")).some(m => m.name === "eDP-TEST" && m.activeWorkspace.id === 10),
+    "workspace ten is selectable on the laptop alone");
 
   assert.equal(await ctl("output", "create", "headless", "DP-2"), "ok");
   await until(async () => {
     const spaces = await json("workspaces");
     const outputs = await json("monitors");
     return spaces.some(w => w.id === 2 && w.monitor === "DP-2")
+      && spaces.some(w => w.id === 7 && w.monitor === "eDP-TEST")
       && outputs.some(m => m.name === "eDP-TEST" && m.activeWorkspace.id >= 6 && m.activeWorkspace.id <= 10);
   }, "reconnection restores the per-screen ranges");
   assert.equal((await json("clients")).length, 2);
   assert.equal(await ctl("output", "remove", "eDP-TEST"), "ok");
   await until(async () => (await json("workspaces")).filter(w => w.id > 0).every(w => w.id <= 5), "external-only layout");
+  const externalWindows = await json("clients");
+  assert.ok([first, second].every(saved => externalWindows.some(w => w.address === saved.address && w.workspace.id === 2)),
+    "Only the external-only layout retains the original 7-to-2 merge");
+  assert.equal(await ctl("eval", 'assert(quickshell_workspace_target(6) == nil)'), "ok");
   assert.equal(await ctl("configerrors"), "");
   assert.doesNotMatch(log, /ERROR|error in timer callback|stack traceback/);
-  console.log("PASS: native Hyprland hotplug, window-preserving merge, reconnect, solo output and cleanup");
+  console.log("PASS: native Hyprland hotplug, ten laptop workspaces, reconnect and external-only merge");
 } catch (error) {
   console.error(log);
   if (env.HYPRLAND_INSTANCE_SIGNATURE) {

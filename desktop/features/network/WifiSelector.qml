@@ -5,8 +5,10 @@ import "../../ui/Theme.js" as Theme
 
 FocusScope {
   id: root
+  objectName: "wifiSelector"
 
   required property var controller
+  function uiSize(value) { return controller.speedTestExpanded ? value : Theme.barSize(value); }
   property string spinnerFrame: "loader-circle"
   signal closeRequested()
   readonly property var selectedNetwork: controller.entries.length > 0
@@ -43,28 +45,28 @@ FocusScope {
       ? (controller.selectedIndex + 1) + "/"
         + controller.entries.length
       : "0/0"
-  readonly property real collapsedContentWidth: 15
-    + 17 + 13 + 7 + 8
+  readonly property real collapsedContentWidth: uiSize(15)
+    + uiSize(17) + uiSize(13) + uiSize(7) + uiSize(8)
     + Layout.widestText(labelMetrics,
       [desiredLabelText, displayedLabelText, previousLabelText])
-    + 12 + (securityIconText ? 13 : 0) + 8
-    + (controller.passwordMode ? 13 : counterMetrics.advanceWidth(counterText)) + 15
+    + uiSize(12) + (securityIconText ? uiSize(13) : 0) + uiSize(8)
+    + (controller.passwordMode ? uiSize(13) : counterMetrics.advanceWidth(counterText)) + uiSize(15)
 
   implicitWidth: controller.speedTestExpanded ? 400
-    : Layout.boundedWidth(collapsedContentWidth, 0, 400)
-  implicitHeight: controller.speedTestExpanded ? 94 : 36
+    : Layout.boundedWidth(collapsedContentWidth, 0, uiSize(400))
+  implicitHeight: controller.speedTestExpanded ? 94 : uiSize(36)
 
   FontMetrics {
     id: labelMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 14
+    font.pixelSize: root.uiSize(14)
     font.bold: true
   }
 
   FontMetrics {
     id: counterMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 12
+    font.pixelSize: root.uiSize(12)
     font.bold: true
   }
 
@@ -88,7 +90,7 @@ FocusScope {
       return;
     selectionWheel.stop();
     outgoingSlide.y = 0;
-    incomingSlide.y = controller.selectionDirection > 0 ? 40 : -40;
+    incomingSlide.y = controller.selectionDirection > 0 ? uiSize(40) : -uiSize(40);
     previousLabelText = displayedLabelText;
     outgoingLabel.visible = true;
     displayedLabelText = desiredLabelText;
@@ -174,17 +176,19 @@ FocusScope {
 
   Item {
     id: networkRow
+    objectName: "wifiSelectorRow"
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
-    height: 36
+    height: root.uiSize(36)
 
   Icon {
 
-    size: 17
+    size: root.uiSize(17)
     id: wifiIcon
+    objectName: "wifiSelectorIcon"
     anchors.left: parent.left
-    anchors.leftMargin: 15
+    anchors.leftMargin: root.uiSize(15)
     anchors.verticalCenter: parent.verticalCenter
     name: root.wifiIconText
     spinning: controller.loading
@@ -195,11 +199,11 @@ FocusScope {
   Rectangle {
     id: activeDot
     anchors.left: wifiIcon.right
-    anchors.leftMargin: 13
+    anchors.leftMargin: root.uiSize(13)
     anchors.verticalCenter: parent.verticalCenter
-    width: 7
-    height: 7
-    radius: 3.5
+    width: root.uiSize(7)
+    height: root.uiSize(7)
+    radius: root.uiSize(3.5)
     color: root.selectedNetwork !== null && root.selectedNetwork.active
       ? Theme.sideNetwork : Theme.inactive
   }
@@ -207,9 +211,9 @@ FocusScope {
   Item {
     id: labelViewport
     anchors.left: activeDot.right
-    anchors.leftMargin: 8
+    anchors.leftMargin: root.uiSize(8)
     anchors.right: wifiStatus.left
-    anchors.rightMargin: 12
+    anchors.rightMargin: root.uiSize(12)
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     clip: true
@@ -224,12 +228,13 @@ FocusScope {
       color: Theme.foreground
       elide: Text.ElideNone
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: root.uiSize(14)
       font.bold: true
     }
 
     Text {
       id: incomingLabel
+      objectName: "wifiSelectorLabel"
       text: root.displayedLabelText
       width: parent.width
       anchors.verticalCenter: parent.verticalCenter
@@ -237,7 +242,7 @@ FocusScope {
       color: Theme.foreground
       elide: Text.ElideNone
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: root.uiSize(14)
       font.bold: true
     }
   }
@@ -253,7 +258,7 @@ FocusScope {
       target: outgoingSlide
       property: "y"
       from: 0
-      to: controller.selectionDirection > 0 ? -40 : 40
+      to: controller.selectionDirection > 0 ? -root.uiSize(40) : root.uiSize(40)
       duration: 150
       easing.type: Easing.InOutCubic
     }
@@ -261,7 +266,7 @@ FocusScope {
     NumberAnimation {
       target: incomingSlide
       property: "y"
-      from: controller.selectionDirection > 0 ? 40 : -40
+      from: controller.selectionDirection > 0 ? root.uiSize(40) : -root.uiSize(40)
       to: 0
       duration: 150
       easing.type: Easing.InOutCubic
@@ -271,16 +276,16 @@ FocusScope {
   Row {
     id: wifiStatus
     anchors.right: parent.right
-    anchors.rightMargin: 15
+    anchors.rightMargin: root.uiSize(15)
     anchors.verticalCenter: parent.verticalCenter
-    spacing: 8
+    spacing: root.uiSize(8)
 
     Icon {
 
-      size: 13
+      size: root.uiSize(13)
       name: root.securityIconText
       visible: name !== ""
-      height: 18
+      height: root.uiSize(18)
 
       color: Theme.secondary
 
@@ -289,14 +294,14 @@ FocusScope {
     Text {
       text: root.counterText
       visible: !controller.passwordMode
-      height: 18
+      height: root.uiSize(18)
       verticalAlignment: Text.AlignVCenter
       color: Theme.secondary
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 12
+      font.pixelSize: root.uiSize(12)
       font.bold: true
     }
-    Icon { name: "lock-keyhole"; size: 13; color: Theme.secondary; visible: controller.passwordMode }
+    Icon { name: "lock-keyhole"; size: root.uiSize(13); color: Theme.secondary; visible: controller.passwordMode }
   }
   }
 
@@ -315,9 +320,9 @@ FocusScope {
       anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.leftMargin: 14
-      anchors.rightMargin: 14
-      height: 1
+      anchors.leftMargin: root.uiSize(14)
+      anchors.rightMargin: root.uiSize(14)
+      height: root.uiSize(1)
       color: Theme.surfaceRaised
     }
 
@@ -328,43 +333,43 @@ FocusScope {
       Icon {
         id: speedTestSpinner
         anchors.left: parent.left
-        anchors.leftMargin: 15
-        y: 8
+        anchors.leftMargin: root.uiSize(15)
+        y: root.uiSize(8)
         name: root.spinnerFrame; spinning: true
         color: Theme.sideNetwork
-        size: 15
+        size: root.uiSize(15)
 
       }
 
       Text {
         anchors.left: speedTestSpinner.right
-        anchors.leftMargin: 8
-        y: 8
+        anchors.leftMargin: root.uiSize(8)
+        y: root.uiSize(8)
         text: controller.speedTestPhase
         color: Theme.secondary
         font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 11
+        font.pixelSize: root.uiSize(11)
         font.bold: true
       }
 
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: 8
+        y: root.uiSize(8)
         text: controller.speedTestLiveValue
         color: Theme.sideNetwork
         font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 11
+        font.pixelSize: root.uiSize(11)
         font.bold: true
       }
 
       Text {
         anchors.right: parent.right
-        anchors.rightMargin: 15
-        y: 8
+        anchors.rightMargin: root.uiSize(15)
+        y: root.uiSize(8)
         text: Math.round(controller.speedTestProgress * 100) + "%"
         color: Theme.secondary
         font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 11
+        font.pixelSize: root.uiSize(11)
         font.bold: true
       }
 
@@ -372,11 +377,11 @@ FocusScope {
         id: speedTestProgressTrack
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 15
-        anchors.rightMargin: 15
-        y: 35
-        height: 5
-        radius: 2.5
+        anchors.leftMargin: root.uiSize(15)
+        anchors.rightMargin: root.uiSize(15)
+        y: root.uiSize(35)
+        height: root.uiSize(5)
+        radius: root.uiSize(2.5)
         color: Theme.surfaceRaised
 
         Rectangle {
@@ -403,8 +408,8 @@ FocusScope {
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.leftMargin: 14
-      anchors.rightMargin: 14
+      anchors.leftMargin: root.uiSize(14)
+      anchors.rightMargin: root.uiSize(14)
 
       Repeater {
         model: [
@@ -423,21 +428,21 @@ FocusScope {
 
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            y: 8
+            y: root.uiSize(8)
             text: modelData.label
             color: Theme.secondary
             font.family: "Ubuntu Nerd Font"
-            font.pixelSize: 10
+            font.pixelSize: root.uiSize(10)
             font.bold: true
           }
 
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            y: 25
+            y: root.uiSize(25)
             text: modelData.value + " " + modelData.unit
             color: Theme.sideNetwork
             font.family: "Ubuntu Nerd Font"
-            font.pixelSize: 12
+            font.pixelSize: root.uiSize(12)
             font.bold: true
           }
         }
@@ -451,7 +456,7 @@ FocusScope {
       text: controller.speedTestMessage
       color: Theme.error
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 12
+      font.pixelSize: root.uiSize(12)
       font.bold: true
     }
   }

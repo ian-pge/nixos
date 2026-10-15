@@ -82,11 +82,13 @@ Backend build/test commands live in each [tool's README](../tools/README.md).
 
 ## Activation and diagnostics
 
-Workspace digits adapt to the connected displays: Cmd+1…5 on a lone display;
-with the laptop and an external screen, Cmd+1…5 targets the external display
-and Cmd+6…0 targets the laptop. Disconnecting merges windows from 6…10 into
-the corresponding 1…5 slots without closing applications. Cmd+Alt+H/L cycles
-within the current screen's five slots. See the
+Workspace digits adapt to the connected displays: Cmd+1…0 selects all ten
+workspaces on the laptop alone. With an external screen, Cmd+1…5 targets that
+display and Cmd+6…0 targets the laptop. Unplugging the external display brings
+all ten workspaces onto the laptop, preserving each window's workspace; plugging
+it back in restores the split. A lone external display retains five slots and
+merges windows from 6…10 into the corresponding 1…5 slots. Cmd+Alt+H/L cycles
+within the current screen's range; Shift moves a window to the selected workspace. See the
 [workspace policy](../home_manager/hyprland/workspace-policy.lua).
 
 Validate the generated Lua with
@@ -154,7 +156,9 @@ is bundled with the catalogue.
 
 ## Storage
 
-Cmd+Y or a click on the storage capsule opens the on-demand disk report.
+Cmd+R or a click on the storage capsule opens the disk report. The shell prepares
+it in the background at startup, even while the panel is closed, reusing a
+recent report if available. Rebooting clears the runtime cache and starts a new scan.
 The fixed system service and shortcut require a NixOS rebuild; the preview
 cannot install them. The panel offers no deletion action. Its chart is an
 estimate, especially on Btrfs; physical free space is reported separately.
@@ -177,6 +181,8 @@ media and persistence details. The
 [messenger constraints](docs/DESIGN_GUIDE.md#messagerie) explain read state,
 asynchronous responses, focus and rendering decisions.
 
+Changing workspace on the panel's screen or focusing another screen folds the
+chat back into the bar, preserving the conversation and draft.
 The in-app `?` help is the shortcut reference. `Ctrl+H/L` moves between panes;
 `Ctrl+F` in the composer folds the chat back into the bar, then opens Yazi in its usual floating
 1000 × 600 Ghostty window. Selecting files, cancelling or closing Yazi restores
@@ -193,8 +199,7 @@ and its all-model weekly quota. Rings show remaining allowance; hover for the ex
 percentage. The dials are hover-only and keep the normal pointer. Reset times
 and freshness remain in the accessible label. Top-right badges show available
 reset credits once per provider, only when greater than zero; unknown counts stay hidden.
-Press Cmd+R to refresh. One shared
-controller reads the signed-in official CLIs at startup and every five minutes;
+One shared controller reads the signed-in official CLIs at startup and every five minutes;
 it neither reads credential files nor submits prompts or consumes reset credits.
 The experimental protocol handling and failure policy are documented under
 [usage limits](docs/DESIGN_GUIDE.md#limites-dutilisation).

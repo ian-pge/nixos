@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	beeper "github.com/beeper/desktop-api-go/v5"
-	"github.com/beeper/desktop-api-go/v5/option"
+	beeper "github.com/beeper/desktop-api-go/v6"
+	"github.com/beeper/desktop-api-go/v6/option"
 	"github.com/gorilla/websocket"
 )
 
@@ -586,9 +586,9 @@ func TestUploadUsesOfficialMultipartEndpoint(t *testing.T) {
 }
 
 type capturedNotification struct {
-	title, body, image string
-	target             object
-	silent             bool
+	title, body, image, network string
+	target                      object
+	silent                      bool
 }
 type fakeNotifications struct {
 	mu       sync.Mutex
@@ -596,9 +596,9 @@ type fakeNotifications struct {
 	received chan struct{}
 }
 
-func (n *fakeNotifications) send(title, body, image string, target object, silent bool) {
+func (n *fakeNotifications) send(title, body, image, network string, target object, silent bool) {
 	n.mu.Lock()
-	n.items = append(n.items, capturedNotification{title, body, image, target, silent})
+	n.items = append(n.items, capturedNotification{title, body, image, network, target, silent})
 	n.mu.Unlock()
 	if n.received != nil {
 		select {
@@ -725,7 +725,7 @@ func TestDirectChatNotificationUsesTheParticipantPhoto(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
-		jsonResponse(w, object{"id": "chat", "title": "Camille", "type": "single", "imgURL": nil,
+		jsonResponse(w, object{"id": "chat", "title": "Camille", "type": "single", "imgURL": nil, "network": "Instagram",
 			"participants": object{"items": []object{{"id": "me", "isSelf": true}, {"id": "camille", "imgURL": fileURL(avatar)}}}})
 	})
 	n := &fakeNotifications{}
@@ -734,6 +734,9 @@ func TestDirectChatNotificationUsesTheParticipantPhoto(t *testing.T) {
 		"type": "TEXT", "timestamp": time.Now().Format(time.RFC3339Nano)}, time.Now().Add(-time.Minute))
 	if n.count() != 1 || n.items[0].image != fileURL(avatar) {
 		t.Fatalf("direct chat notification must carry the contact's photo, got %+v", n.items)
+	}
+	if n.items[0].network != "Instagram" {
+		t.Fatalf("the notification must name the conversation's network for its badge, got %q", n.items[0].network)
 	}
 }
 func TestNotificationCandidatesExcludeHistoricalAndMutatedMessages(t *testing.T) {

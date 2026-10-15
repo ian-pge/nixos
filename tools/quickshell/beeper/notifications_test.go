@@ -102,7 +102,7 @@ func TestDBusNotificationIdentityMarkupAndClick(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.close()
-	n.send("Camille", "L'atelier & <b>texte</b>", "", object{"chatID": "chat", "messageID": "message"}, true)
+	n.send("Camille", "L'atelier & <b>texte</b>", "", "", object{"chatID": "chat", "messageID": "message"}, true)
 	select {
 	case call := <-service.calls:
 		if call.AppName != "Messages" || call.Hints["desktop-entry"].Value() != "quickshell-beeper" {
@@ -117,11 +117,14 @@ func TestDBusNotificationIdentityMarkupAndClick(t *testing.T) {
 		if _, ok := call.Hints["image-path"]; ok || call.Icon != "" {
 			t.Fatal("a notification without a photo must not claim an image or icon")
 		}
+		if _, ok := call.Hints["x-quickshell-beeper-network"]; ok {
+			t.Fatal("a notification without a network must not claim one")
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("no Notify call")
 	}
 	service.markup.Store(true)
-	n.send("Camille", "L'atelier & <b>texte</b>", "file:///avatars/camille.jpg", object{"chatID": "chat", "messageID": "message"}, true)
+	n.send("Camille", "L'atelier & <b>texte</b>", "file:///avatars/camille.jpg", "Telegram", object{"chatID": "chat", "messageID": "message"}, true)
 	select {
 	case call := <-service.calls:
 		if call.Body != "L&#39;atelier &amp; &lt;b&gt;texte&lt;/b&gt;" {
@@ -129,6 +132,9 @@ func TestDBusNotificationIdentityMarkupAndClick(t *testing.T) {
 		}
 		if call.Hints["image-path"].Value() != "file:///avatars/camille.jpg" || call.Icon != "" {
 			t.Fatal("the sender photo belongs in the image-path hint, not the application icon")
+		}
+		if call.Hints["x-quickshell-beeper-network"].Value() != "Telegram" {
+			t.Fatal("the conversation's network belongs in the vendor hint")
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("no markup-aware Notify call")

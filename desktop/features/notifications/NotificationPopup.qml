@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import Quickshell
 import QtQuick
 import "../../ui"
+import "../messenger"
 import QtQuick.Effects
 import "../../ui/Layout.js" as Layout
 import "../../ui/Theme.js" as Theme
@@ -18,6 +19,9 @@ Item {
   readonly property string body: notification !== null ? notification.body : ""
   readonly property string photo: notification !== null ? notification.image : ""
   readonly property string appIcon: notification !== null ? notification.appIcon : ""
+  // Our Beeper helper names the conversation's network, e.g. "Instagram".
+  readonly property string network: notification !== null
+    ? String(notification.hints?.["x-quickshell-beeper-network"] || "") : ""
 
   readonly property real naturalTextWidth: Math.max(
     measureLines(appMetrics, appName),
@@ -108,6 +112,12 @@ Item {
       name: "bell"
 
       color: Theme.state
+    }
+
+    // Same badge as the chat list; the card is too brief for a hover tooltip.
+    BeeperNetworkBadge {
+      network: root.network
+      showsName: false
     }
   }
 

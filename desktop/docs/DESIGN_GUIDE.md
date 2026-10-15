@@ -96,10 +96,19 @@ chargé dans le compositeur de test, pas seulement l'état QML.
 
 Le plafond des widgets centraux vient de `CentralCapsule.panelWidth`, borné par
 la largeur de la fenêtre. Il reste indépendant du nombre de workspaces : les
-cinq boutons d'un écran ne doivent pas rétrécir les panneaux détaillés.
+boutons d'un écran ne doivent pas rétrécir les panneaux détaillés.
 Mesurer le contenu à sa largeur cible, pas à
 sa largeur animée : sinon les retours à la ligne font gonfler puis rétrécir les
 notifications et panneaux pendant leur ouverture.
+
+Les capsules centrales sur une seule ligne suivent `Theme.barSize`, comme la
+barre : hauteur de 42 px à l'échelle actuelle, avec contenu, marges et largeur
+utile agrandis. Volume, luminosité, musique, dictée et Bluetooth suivent cette
+règle ; Wi-Fi et updates ne l'appliquent qu'à leur état compact. Le speed test,
+les listes détaillées, le calendrier, le système, le stockage, les lanceurs et
+les notifications conservent leurs dimensions. Le plafond central reste 434 px.
+Ne pas agrandir ces panneaux ni ajouter un défilement pour aligner une capsule.
+La forme d'onde du chat garde son échelle indépendante de celle de la dictée en barre.
 
 En plein écran, toute la barre du moniteur concerné monte en couche Overlay.
 Elle redescend après la fin de la fermeture, sans changer sa géométrie ni sa
@@ -238,6 +247,30 @@ Les détails de protocole et de persistance appartiennent au
 `KeyedListModel` réconcilie les snapshots par identité. Remplacer tout le modèle
 détruit les delegates, relance les décodeurs et casse les ancres de lecture.
 Cela concerne aussi les pièces jointes et les réactions.
+Retirer les lignes absentes avant de réordonner les survivantes ; déplacer les
+blocs contigus en une opération native, en choisissant le côté le plus court.
+Un archivage ou un reclassement ne doit pas provoquer un déplacement par ligne
+du catalogue. `immutableRows` évite de sérialiser à nouveau les messages inchangés,
+dont `BeeperData` remplace les snapshots modifiés ; les modèles de pièces jointes
+et de réactions continuent de vérifier leur contenu.
+
+La barre latérale conserve uniquement les identifiants dans son modèle natif ;
+ses lignes visibles lisent les snapshots originaux de conversations. Pour un
+filtrage ou un tri massif, `bulkThreshold` autorise la réaffectation des cellules
+existantes en une passe, sans vider le modèle. Conserver l'ancre du viewport,
+la sélection par identifiant et le brouillon ; le retour explicite en haut lors
+du tri reste prioritaire. Ce mode ne doit pas être activé pour les historiques
+ou médias, dont l'identité des delegates assure la continuité des lecteurs.
+
+La liste anime nativement les déplacements et la disparition des conversations.
+Pendant ce mouvement, fixer les hauteurs de layout finales et animer séparément
+la hauteur visuelle, les avatars et le texte avec le même rythme. Le fond de
+sélection suit la ligne entrante, sans ajouter un second déplacement. Animer
+les hauteurs de layout simultanément changerait les destinations calculées par
+ListView et ferait se chevaucher les lignes.
+Une navigation supplémentaire pendant ce mouvement change immédiatement de
+conversation et de sélection, puis redimensionne les lignes une fois leurs
+positions stabilisées ; elle ne modifie pas les destinations en cours.
 
 La sélection de conversation est un identifiant, pas le `currentIndex` natif
 d'une ListView : une activité de fond peut réordonner le catalogue sans ramener
@@ -245,6 +278,14 @@ le viewport sur une sélection hors champ. Une navigation explicite révèle la
 ligne après avoir arrêté le mouvement précédent ; un geste utilisateur
 interrompt le suivi d'une ligne qui grandit. Aucun `forceLayout()` ou parcours
 du catalogue à chaque image.
+
+En mode non-lues d'abord, un marquage manuel comme lu confirmé passe à la
+conversation non lue suivante, ou à la précédente si c'était la dernière de
+cette section. Sans non-lue restante, revenir en haut de la liste. Conserver
+le brouillon ; une réponse tardive ne remplace pas une navigation ultérieure.
+Le reclassement d'une conversation devenue lue ne doit jamais entraîner le
+viewport vers la section des conversations lues, même si l'événement arrive
+avant la réponse au marquage.
 
 La sélection et son brouillon changent immédiatement, mais le chargement de
 l'historique attend une courte pause de navigation. Cela évite de construire
@@ -266,6 +307,14 @@ de défilement pendant un simple scroll. L'Instantiator asynchrone répartit les
 créations entre images ; révéler les nouvelles bulles et activer leurs médias
 après restauration du viewport. Les panneaux invisibles ne reconstruisent pas
 d'historique ; un panneau en cours de fermeture conserve son contenu.
+
+Le modèle indique les lignes modifiées et la première position affectée.
+Mesurer seulement ces bulles, puis repositionner leurs suivantes sans refaire
+leur texte. Une mise à jour identique ne relance pas le layout. Le zoom applique
+la nouvelle taille au viewport en premier, puis aux autres bulles par petits
+lots cadencés par les images. Préserver l'ancre courante ou le bas du chat à
+chaque lot, et décaler aussi la destination d'un scroll en cours. Une nouvelle
+taille ou un changement d'historique remplace les travaux encore en attente.
 
 Les positions de layout restent présentes, mais seuls les avatars, médias et
 citations proches du viewport chargent leurs ressources. Conserver les dimensions
@@ -319,7 +368,12 @@ ne doit pas réinitialiser arbitrairement son mode.
 
 La saisie d'emojis restaure le curseur et la sélection, sans envoyer. Le catalogue
 et sa licence sont inclus dans `BeeperEmojiData.js` ; `generate-emojis.mjs`
-produit son patch de régénération. Un vocal reste un brouillon après arrêt.
+produit son patch de régénération avec les clés de recherche déjà normalisées.
+La grille réutilise un nombre borné de cellules pour la portion visible du
+catalogue ; une recherche ou un scroll change leur contenu sans recréer le
+catalogue. Une seule infobulle est partagée. Une recherche annule le mouvement
+de molette précédent et replace la sélection au premier résultat.
+Un vocal reste un brouillon après arrêt.
 Annuler sa préparation à la fermeture ou au changement de chat : un retour
 tardif ne doit pas ouvrir le micro. Une connexion perdue n'empêche jamais
 d'arrêter un enregistrement déjà lancé.
@@ -370,7 +424,8 @@ un rectangle arrondi ordinaire ne découpe pas ses enfants.
 Quickshell possède un seul serveur de notifications et une seule carte,
 présentée sur l'écran ciblé à réception. Une nouvelle carte remplace l'ancienne ;
 pas d'historique, de file ni de rejeu. Garder l'objet retenu pendant le fade de
-fermeture pour que son image reste disponible.
+fermeture pour que son image reste disponible. Une carte de messagerie porte
+sur la photo le badge réseau du chat (`BeeperNetworkBadge`), sans infobulle.
 
 Les notifications recouvrent temporairement les autres modes, dont les états
 et opérations continuent. Le guard protège leurs champs sans désactiver puis
@@ -412,26 +467,31 @@ vit dans Hyprland, indépendamment de la cloche et de l'état Ne pas déranger.
 
 ### Workspaces
 
-Chaque barre présente les cinq workspaces affectés à son moniteur par les
+Chaque barre présente les workspaces affectés à son moniteur par les
 règles Hyprland, avec sa sélection locale et l'occupation de ces workspaces.
-Les boutons inactifs sont circulaires ; le bouton actif est une capsule de
-largeur `barSize(40)`, pour une hauteur commune de `barSize(24)`. La largeur
+Les boutons inactifs sont circulaires ; le bouton actif est une capsule dont
+la largeur dépasse sa hauteur de `barSize(16)`, pour garder de l'espace autour
+du Pac-Man. La hauteur commune est `barSize(28)`, proche du
+diamètre extérieur des cadrans latéraux, sans agrandir les glyphes. La largeur
 du groupe suit ces dimensions, sans modifier celle des panneaux centraux.
 La capsule spéciale épouse son texte avec une marge de `barSize(6)` de chaque
 côté, sans changer sa typographie ni ajouter d'espace après le dernier bouton.
-`workspace-policy.lua` adapte les règles aux sorties actives : seul, l'écran
-utilise 1–5 ; avec une sortie externe et l'écran intégré, l'externe utilise
-1–5 et l'intégré 6–10. DP-2 est préféré s'il existe, sinon une autre sortie
+`workspace-policy.lua` adapte les règles aux sorties actives : le portable seul
+utilise 1–10 ; avec une sortie externe et l'écran intégré, l'externe utilise
+1–5 et l'intégré 6–10. Un écran externe seul conserve 1–5.
+DP-2 est préféré s'il existe, sinon une autre sortie
 externe est acceptée ; les noms eDP/LVDS/DSI identifient l'écran intégré.
 Les événements de moniteur sont regroupés avant l'application des règles,
 sans changer les modes vidéo ni lancer de processus de polling.
 
-Au débranchement, les fenêtres de 6–10 rejoignent 1–5 par paire, sans toucher
-aux workspaces spéciaux. À la reconnexion, les bureaux 1–5 passent sur l'externe
-et l'intégré retrouve 6–10 ; les fenêtres fusionnées restent dans 1–5. Les
-raccourcis 6–0 et leurs variantes Shift sont inactifs avec un seul écran afin
-de ne pas créer de bureaux invisibles. La navigation précédente/suivante et
-les cinq boutons suivent la même répartition ; une relecture de configuration
+Au débranchement de l'externe, les dix bureaux rejoignent le portable sans
+changer l'appartenance des fenêtres ni toucher aux workspaces spéciaux.
+À la reconnexion, les bureaux 1–5 passent sur l'externe et l'intégré retrouve
+6–10. Si seul l'écran externe reste actif, les fenêtres de 6–10 rejoignent
+1–5 par paire, comme auparavant. Les raccourcis 6–0 et leurs variantes Shift
+sont disponibles sur le portable seul et avec les deux écrans ; ils restent
+inactifs sur un écran externe seul. La navigation précédente/suivante et
+les boutons suivent la même répartition ; une relecture de configuration
 inchangée ne déplace pas les fenêtres ni le focus.
 
 Quickshell 0.3.1 peut traiter `workspacev2` sur l'ancien écran si l'événement
@@ -523,7 +583,7 @@ Diagnostic et protocole : [helper Chrome](../../tools/quickshell/chrome-tabs/REA
 
 ## Stockage
 
-Cmd+Y et le clic sur la capsule stockage ouvrent le même mode `storage` sur
+Cmd+R et le clic sur la capsule stockage ouvrent le même mode `storage` sur
 l'écran concerné. Il reprend la largeur maximale, le morphing et la politique
 clavier de la capsule centrale ; ne pas ajouter une fenêtre ni une animation
 d'entrée autonome. Accent principal `Theme.sideDisk`, couleurs de parts issues
@@ -536,10 +596,22 @@ jamais un redimensionnement silencieux pour correspondre au total du disque.
 Une valeur absente affiche `—`, un zéro mesuré reste `0 Gio`, et une mesure
 partielle indique une borne inférieure. Les six lignes restent présentes, même
 quand VM vaut zéro. Applications et caches conservent deux sous-totaux.
+Docker détaille images/couches (y compris les couches inscriptibles), volumes,
+cache de build, conteneurs/journaux et autres données, sans sommer les tailles
+logiques de Docker avec les blocs du disque. Les cinq plus gros éléments de
+la catégorie personnelle sont les fichiers/dossiers de premier niveau de `~`,
+ainsi que les sources NixOS et chezmoi : un parent et ses enfants ne figurent
+pas séparément. Les chemins d'autres utilisateurs et les données cachées des
+applications ne sont pas publiés. Le classement et les sous-totaux reprennent
+la même mesure, sans scan supplémentaire.
 
-Le contrôleur partagé conserve les mesures 30 minutes. R/le bouton actualise,
+Le contrôleur partagé prépare le rapport dès le démarrage du shell, même si
+le panneau reste fermé, et conserve les mesures 30 minutes. Un rapport récent
+évite de relancer l'analyse lors d'un redémarrage du shell ; le cache dans
+`/run` disparaît au redémarrage du PC. R/le bouton actualise,
 Q/Échap ferme. Aucun nettoyage n'est disponible. Le service système ne lit que
-des métadonnées et publie un rapport atomique ; aucun scan récurrent par écran
+des métadonnées et publie un rapport atomique privé (0600, puis ACL de lecture
+pour l'utilisateur du shell) ; aucun scan récurrent par écran
 ni travail lourd dans le collecteur CPU/RAM. Une erreur conserve la dernière
 mesure et sa date. Les fixtures QML désactivent les vrais services.
 
@@ -628,12 +700,18 @@ sans sous-titre : cinq heures à gauche, semaine à droite. Le survol affiche
 uniquement le pourcentage restant. Le prochain reset et les erreurs de lecture
 restent dans le libellé d'accessibilité. Une fenêtre
 expirée reste inconnue jusqu'à confirmation du serveur. Aucun panneau central
-`usage` n'est instancié ; Cmd+R actualise les trois cadrans. Ces jauges sont
+`usage` n'est instancié. Ces jauges sont
 consultables au survol uniquement : aucune action au clic et curseur normal.
 
 Les pourcentages sont arrondis à l'inférieur : 100 % doit signifier réellement
 atteint. Un contrôleur partagé lit au démarrage puis toutes les cinq minutes,
-indépendamment du nombre d'écrans. Les processus vivent uniquement le temps
+indépendamment du nombre d'écrans. Pendant les cinq premières minutes, une
+source encore sans première réponse valide est retentée toutes les trente
+secondes, sans relire la source déjà disponible. Une lecture en cours n'est
+jamais doublée ; si elle dépasse cet intervalle, la relance attend sa sortie.
+Le délai d'une minute entre rafraîchissements ordinaires ne bloque pas ces
+tentatives initiales. Masquer ou réactiver le contrôleur ne prolonge pas cette
+fenêtre de démarrage. Les processus vivent uniquement le temps
 d'une lecture, avec timeout et arrêt forcé si nécessaire.
 `desktop.nix` épingle les mêmes versions de CLI que le profil utilisateur.
 Les fixtures simulent les deux protocoles sans contacter les fournisseurs.

@@ -136,7 +136,7 @@ for _, output in ipairs({external, internal}) do
   end
 end
 
--- Undocking merges windows 7→2, preserves existing windows on 2 and specials,
+-- Undocking keeps all ten workspace IDs, their windows and specials,
 -- and keeps the focused application selected without ever closing it.
 windows = {{name = "external-app", workspace = workspaces[2]},
   {name = "laptop-app", workspace = workspaces[7]},
@@ -146,22 +146,24 @@ internal.active_workspace = workspaces[7]
 monitors["DP-2"] = nil
 for _, value in pairs(workspaces) do value.monitor = internal end
 emit("monitor.removed"); emit("monitor.layout_changed"); flush()
-assert(#windows == 3 and windows[1].workspace.id == 2 and windows[2].workspace.id == 2)
+assert(#windows == 3 and windows[1].workspace.id == 2 and windows[2].workspace.id == 7)
 assert(windows[3].workspace.id == -98)
-assert(focused_window == windows[2] and internal.active_workspace.id == 2)
+assert(focused_window == windows[2] and internal.active_workspace.id == 7)
 for id = 1, 10 do
   assert(rules[id].monitor == "eDP-1")
-  assert(rules[id].persistent == (id <= 5))
+  assert(rules[id].persistent)
   assert(rules[id].default == (id == 1))
 end
-for id = 1, 5 do press("SUPER + " .. id, id, "eDP-1") end
-for _, key in ipairs({"6", "7", "8", "9", "0"}) do
-  local before = #actions
-  bindings["SUPER + " .. key](); bindings["SUPER + SHIFT + " .. key]()
-  assert(#actions == before, "upper shortcuts must not create hidden slots while alone")
+-- Verify every numeric key and move shortcut, using no real user windows.
+focused_window = nil
+for id = 1, 10 do
+  local key = id == 10 and "0" or tostring(id)
+  press("SUPER + " .. key, id, "eDP-1")
+  press("SUPER + SHIFT + " .. key, id, nil, "hl.dsp.window.move")
 end
-press("SUPER + ALT + L", 1, "eDP-1")
-press("SUPER + ALT + H", 5, "eDP-1")
+for id = 1, 10 do press("SUPER + ALT + L", id, "eDP-1") end
+for id = 9, 0, -1 do press("SUPER + ALT + H", id == 0 and 10 or id, "eDP-1") end
+focused_window = windows[2]
 
 -- Unchanged layout events and reloads never move an already correct window.
 local before, writes = #actions, rule_writes
@@ -175,8 +177,8 @@ external = monitor("HDMI-A-1", 1)
 emit("monitor.added"); emit("monitor.layout_changed"); flush()
 assert(rules[1].monitor == "HDMI-A-1" and rules[6].monitor == "eDP-1")
 assert(windows[1].workspace.monitor.name == "HDMI-A-1")
-assert(windows[2].workspace.id == 2 and windows[2].workspace.monitor.name == "HDMI-A-1")
-assert(internal.active_workspace.id == 6)
+assert(windows[2].workspace.id == 7 and windows[2].workspace.monitor.name == "eDP-1")
+assert(internal.active_workspace.id == 7)
 press("SUPER + 0", 10, "eDP-1")
 press("SUPER + ALT + L", 6, "eDP-1")
 press("SUPER + 1", 1, "HDMI-A-1")
@@ -187,9 +189,27 @@ for _, value in pairs(workspaces) do value.monitor = external end
 focused, focused_window = external, nil
 emit("monitor.removed"); flush()
 assert(rules[1].monitor == "HDMI-A-1" and not rules[6].persistent)
+assert(windows[2].workspace.id == 2, "A lone external display keeps the existing five-slot merge")
+for _, key in ipairs({"6", "7", "8", "9", "0"}) do
+  local before = #actions
+  bindings["SUPER + " .. key](); bindings["SUPER + SHIFT + " .. key]()
+  assert(#actions == before, "A lone external display must not create hidden slots")
+end
 monitors, focused = {}, nil
 before = #actions
 emit("monitor.removed"); flush()
 bindings["SUPER + 1"](); bindings["SUPER + ALT + H"](); bindings["SUPER + ALT + L"]()
 assert(#actions == before)
-print("PASS: dock/undock, direct/shifted/cycle shortcuts, window merging, focus, reload and connector changes")
+
+-- Starting from no displays, a lone laptop materializes all ten empty slots.
+monitors, workspaces, windows = {}, {}, {}
+internal = monitor("eDP-1", 1)
+focused = internal
+emit("monitor.added"); flush()
+for id = 1, 10 do
+  assert(rules[id].persistent and rules[id].monitor == "eDP-1")
+  assert(workspaces[id] and workspaces[id].monitor == internal)
+end
+press("SUPER + ALT + H", 10, "eDP-1")
+press("SUPER + ALT + L", 1, "eDP-1")
+print("PASS: ten laptop workspaces, dock/undock, direct/shifted/cycle shortcuts, focus and external-only merge")

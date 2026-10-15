@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	beeper "github.com/beeper/desktop-api-go/v5"
+	beeper "github.com/beeper/desktop-api-go/v6"
 	"github.com/godbus/dbus/v5"
 	"github.com/gorilla/websocket"
 )
@@ -223,7 +223,7 @@ func (b *backend) resync(ctx context.Context, c *beeper.Client, summary bool, si
 		seenCursors[cursor] = true
 	}
 	if summary && chats > 0 && b.notifications != nil {
-		b.notifications.send("Messages received while disconnected", fmt.Sprintf("%d unread message(s) in %d conversation(s)", messages, chats), "", object{}, true)
+		b.notifications.send("Messages received while disconnected", fmt.Sprintf("%d unread message(s) in %d conversation(s)", messages, chats), "", "", object{}, true)
 	}
 	b.emit("chatsChanged", object{})
 	b.mu.Lock()
@@ -355,7 +355,7 @@ func (b *backend) considerMessage(ctx context.Context, chatID string, m object, 
 		body = string(r[:240]) + "…"
 	}
 	image := b.notificationImage(ctx, notificationAvatar(chat, m))
-	b.notifications.send(title, body, image, object{"chatID": chatID, "messageID": id}, false)
+	b.notifications.send(title, body, image, textField(chat, "network"), object{"chatID": chatID, "messageID": id}, false)
 }
 
 // The person who wrote the message, as in the messenger: their participant
@@ -473,7 +473,7 @@ func (b *backend) resolvePending(ctx context.Context, chat, id string) {
 }
 
 type notificationSink interface {
-	send(title, body, image string, target object, silent bool)
+	send(title, body, image, network string, target object, silent bool)
 	close()
 }
 type notifier struct {
@@ -526,13 +526,18 @@ func newNotifier(ctx context.Context, emit func(string, any)) (*notifier, error)
 	return n, nil
 }
 func (n *notifier) close() { _ = n.conn.Close() }
-func (n *notifier) send(title, body, image string, target object, silent bool) {
+func (n *notifier) send(title, body, image, network string, target object, silent bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	hints := map[string]dbus.Variant{"desktop-entry": dbus.MakeVariant("quickshell-beeper"), "category": dbus.MakeVariant("im.received"), "suppress-sound": dbus.MakeVariant(silent)}
 	// The sender's photo is the notification image, not the application icon.
 	if image != "" {
 		hints["image-path"] = dbus.MakeVariant(image)
+	}
+	// Beeper's network name, e.g. "Instagram", so the shell can badge the photo
+	// as the messenger does. Freedesktop reserves x-vendor- hints for this.
+	if network != "" {
+		hints["x-quickshell-beeper-network"] = dbus.MakeVariant(network)
 	}
 	var id uint32
 	server := n.conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")

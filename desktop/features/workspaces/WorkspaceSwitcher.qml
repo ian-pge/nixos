@@ -11,12 +11,12 @@ Item {
   readonly property string monitorName: monitor?.name ?? ""
   property var workspaces: Hyprland.workspaces.values
   property var monitors: Hyprland.monitors.values
-  readonly property int workspaceCount: 5
-  // Match the compositor policy: a lone display always shows slots 1–5.
+  // Match the compositor policy: the laptop alone keeps all ten workspaces.
   readonly property bool internalMonitor: /^(eDP|LVDS|DSI)-/.test(monitorName)
   readonly property bool externalMonitorAvailable: monitors.some(output =>
     !/^(eDP|LVDS|DSI)-/.test(output.name)
     && (!output.lastIpcObject?.mirrorOf || output.lastIpcObject.mirrorOf === "none"))
+  readonly property int workspaceCount: internalMonitor && !externalMonitorAvailable ? 10 : 5
   readonly property int firstWorkspaceId: internalMonitor && externalMonitorAvailable ? 6 : 1
   readonly property var workspaceIds: Array.from({length: workspaceCount},
     (_, index) => firstWorkspaceId + index)
@@ -36,8 +36,8 @@ Item {
     ? presentedSpecialWorkspace.slice(8) : presentedSpecialWorkspace
   readonly property real specialSlotWidth: Math.max(workspaceButtonHeight,
     specialLabel.implicitWidth + Theme.barSize(12))
-  readonly property real workspaceButtonHeight: Theme.barSize(24)
-  readonly property real activeButtonWidth: Theme.barSize(40)
+  readonly property real workspaceButtonHeight: Theme.barSize(28)
+  readonly property real activeButtonWidth: workspaceButtonHeight + Theme.barSize(16)
   readonly property real naturalContentWidth: {
     let total = 0;
     for (const workspaceId of workspaceIds) {
@@ -177,7 +177,9 @@ Item {
 
       Row {
         id: workspaceRow
-        anchors.centerIn: parent
+        // Keep odd-sized circles centered without anchor rounding offsets.
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
         spacing: (workspaceArea.width - root.naturalContentWidth - Theme.barSize(12))
           / Math.max(1, root.workspaceCount - 1)
 
@@ -217,7 +219,10 @@ Item {
 
             // Keep the workspace characters, independently of the UI icon set.
             Text {
-              anchors.centerIn: parent
+              anchors.verticalCenter: parent.verticalCenter
+              // Avoid rounded center anchors on both the glyph and its parent:
+              // the animated button reaches an odd width on the final frame.
+              x: (parent.width - width) / 2
               text: workspaceButton.active
                 ? "󰮯"
                 : workspaceButton.occupied ? "󰊠" : ""
@@ -265,6 +270,7 @@ Item {
       anchors.right: parent.right
       anchors.rightMargin: Theme.barSize(6)
       anchors.verticalCenter: parent.verticalCenter
+      anchors.alignWhenCentered: false
       width: root.specialSlotWidth
       height: root.workspaceButtonHeight
       radius: height / 2

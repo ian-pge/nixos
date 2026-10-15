@@ -58,7 +58,7 @@ var weatherSun = "#a6da95";
 var weatherRain = "#ed8796";
 var sideDate = "#8bd5ca";
 var sideTime = "#ed8796";
-// Persistent plan-limit dials; Cmd+R refreshes their shared readings.
+// Persistent plan-limit dials share the same accent.
 var usageAccent = "#b7bdf8";
 var keyboardSystem = "#a6da95";
 

@@ -27,11 +27,12 @@ ShellRoot {
     }
     function init() {
       usage.active = false;
+      usage.enabled = false;
       tryCompare(usage, "loading", false, 10000);
-      usage.enabled = true; usage.lastRefresh = 0; usage.timeout = 5000;
-      for (const source of [usage.claude, usage.codex]) {
-        source.snapshot = null; source.error = ""; source.updatedAt = 0; source.killDelay = 3000;
-      }
+      usage.destroy();
+      const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../features/usage/UsageController.qml");
+      usage = component.createObject(root, {timeout: 5000});
+      verify(usage !== null);
       modes("ok", "ok");
     }
     function modes(claude, codex) {
@@ -93,6 +94,109 @@ ShellRoot {
         usage.active = false;
         usage.refreshInterval = interval; usage.minimumInterval = minimum;
       }
+    }
+    function test_startup_retry_defaults() {
+      compare(usage.startupRetryInterval, 30000);
+      compare(usage.startupRetryDuration, 300000);
+      compare(usage.refreshInterval, 300000);
+      compare(usage.minimumInterval, 60000);
+    }
+    function test_startup_retries_only_missing_source_and_stops_on_success() {
+      usage.startupRetryInterval = 150;
+      usage.startupRetryDuration = 2000;
+      modes("exit", "ok");
+      usage.active = true;
+      tryVerify(() => usage.codex.snapshot !== null);
+      tryVerify(() => usage.claude.run >= 2, 1000);
+      compare(usage.codex.run, 1, "A healthy provider must not be polled every 30 seconds");
+      // Startup retries bypass the normal one-minute throttle.
+      compare(usage.minimumInterval, 60000);
+      modes("ok", "ok");
+      tryVerify(() => usage.claude.snapshot !== null, 1500);
+      tryCompare(usage, "loading", false);
+      const runs = usage.claude.run;
+      wait(350);
+      compare(usage.claude.run, runs);
+      compare(usage.codex.run, 1);
+      const startedAt = usage.startupStartedAt;
+      usage.active = false;
+      wait(30);
+      usage.active = true;
+      wait(200);
+      compare(usage.startupStartedAt, startedAt, "Visibility does not restart the five-minute window");
+      compare(usage.claude.run, runs);
+    }
+    function test_startup_retry_window_expires_and_normal_polling_continues() {
+      usage.startupRetryInterval = 120;
+      usage.startupRetryDuration = 650;
+      usage.refreshInterval = 1400;
+      usage.minimumInterval = 0;
+      modes("exit", "error");
+      usage.active = true;
+      tryVerify(() => usage.claude.run >= 2 && usage.codex.run >= 2, 600);
+      tryVerify(() => !usage.startupRetriesAllowed(), 1000);
+      tryCompare(usage, "loading", false);
+      const claudeRuns = usage.claude.run, codexRuns = usage.codex.run;
+      wait(300);
+      compare(usage.claude.run, claudeRuns);
+      compare(usage.codex.run, codexRuns);
+      tryVerify(() => usage.claude.run > claudeRuns && usage.codex.run > codexRuns, 1500);
+    }
+    function test_startup_retries_stop_when_disabled_and_do_not_extend_window() {
+      usage.startupRetryInterval = 100;
+      usage.startupRetryDuration = 450;
+      modes("exit", "error");
+      usage.active = true;
+      tryVerify(() => usage.claude.run >= 1);
+      usage.enabled = false;
+      tryCompare(usage, "loading", false);
+      const runs = usage.claude.run, startedAt = usage.startupStartedAt;
+      wait(550);
+      compare(usage.claude.run, runs);
+      usage.enabled = true;
+      wait(250);
+      compare(usage.startupStartedAt, startedAt);
+      compare(usage.claude.run, runs);
+    }
+    function test_startup_timeout_retries_without_overlapping_processes() {
+      usage.startupRetryInterval = 80;
+      usage.startupRetryDuration = 1500;
+      usage.timeout = 250;
+      modes("hang", "ok");
+      usage.active = true;
+      tryVerify(() => usage.claude.loading);
+      const firstAttempt = usage.claude.lastStartedAt;
+      wait(120);
+      compare(usage.claude.run, 1, "Never start a second process while the first is running");
+      tryVerify(() => usage.claude.run >= 2, 1000);
+      verify(usage.claude.lastStartedAt - firstAttempt >= 250);
+      modes("ok", "ok");
+      tryVerify(() => usage.claude.snapshot !== null, 1500);
+      compare(usage.codex.run, 1);
+    }
+    function test_startup_retry_is_not_blocked_by_other_provider() {
+      usage.startupRetryInterval = 100;
+      usage.startupRetryDuration = 1000;
+      usage.timeout = 600;
+      modes("exit", "hang");
+      usage.active = true;
+      tryVerify(() => usage.claude.run >= 2, 500);
+      verify(usage.codex.loading);
+      compare(usage.codex.run, 1);
+      usage.active = false;
+    }
+    function test_later_failure_does_not_restart_fast_polling() {
+      usage.startupRetryInterval = 100;
+      usage.startupRetryDuration = 1500;
+      usage.active = true;
+      tryVerify(() => usage.claude.snapshot !== null && usage.codex.snapshot !== null);
+      tryCompare(usage, "loading", false);
+      modes("exit", "error");
+      refreshAndWait();
+      const runs = usage.claude.run;
+      wait(300);
+      compare(usage.claude.run, runs);
+      verify(usage.claude.snapshot !== null);
     }
     function test_snapshot_answer_uses_named_windows() {
       modes("snapshot", "ok");

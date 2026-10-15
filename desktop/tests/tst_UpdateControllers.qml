@@ -126,6 +126,40 @@ ShellRoot {
       view.visible = true; view.enabled = true; view.forceActiveFocus();
       wait(10); verify(view.activeFocus);
     }
+    function test_only_compact_update_states_use_bar_scale() {
+      view.height = Qt.binding(() => view.implicitHeight);
+      compare(view.singleLine, false);
+      compare(view.implicitHeight, 92);
+      compare(findChild(view, "updatesTitle").font.pixelSize, 14);
+      updates.updates = [];
+      compare(view.singleLine, true);
+      compare(view.implicitHeight, 42);
+      compare(findChild(view, "updatesTitle").font.pixelSize, 16);
+      compare(view.uiSize(16), 19);
+      view.width = Math.min(434, view.implicitWidth);
+      wait(0);
+      const title = findChild(view, "updatesTitle"), status = findChild(view, "updatesStatus");
+      verify(title.x + title.width <= status.x - 13);
+      for (const phase of ["building", "cleaning", "success"]) {
+        updates.phase = phase;
+        verify(view.singleLine);
+        compare(view.implicitHeight, 42);
+      }
+      updates.phase = "idle";
+      updates.updates = [{name: "nixpkgs", date: "today"}];
+      compare(view.implicitHeight, 92);
+      compare(findChild(view, "updatesTitle").font.pixelSize, 14);
+      updates.phase = "awaitingInstall";
+      updates.summaryReady = true;
+      updates.changes = [{name: "example", kind: "changed", oldVersions: ["1"], newVersions: ["2"]}];
+      verify(!view.singleLine);
+      compare(view.implicitHeight, 84);
+      compare(view.uiSize(14), 14);
+      beginAuth();
+      verify(view.singleLine); compare(view.implicitHeight, 42);
+      fakeAgent.isActive = false; fakeAgent.flow = null;
+      view.width = 480;
+    }
     function test_disabled_startup_is_inert() {
       compare(operationRunner.commands.length, 0);
       compare(statusRunner.commands.length, 0);

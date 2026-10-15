@@ -8,6 +8,13 @@ var definitions = [
   {id: "vm", label: "VM", height: 34},
   {id: "other", label: "Système et autres", height: 34}
 ];
+var dockerDefinitions = [
+  {id: "layers", label: "Images et couches"},
+  {id: "volumes", label: "Volumes"},
+  {id: "buildCache", label: "Cache de build"},
+  {id: "containers", label: "Conteneurs / journaux"},
+  {id: "other", label: "Autres données"}
+];
 
 function known(value) {
   return typeof value === "number" && isFinite(value) && value >= 0;
@@ -23,8 +30,17 @@ function rows(snapshot) {
       partial: reading ? reading.partial === true : true,
       cacheBytes: reading && known(reading.cacheBytes) ? reading.cacheBytes : null,
       dataBytes: reading && known(reading.dataBytes) ? reading.dataBytes : null,
+      details: definition.id === "docker" ? dockerDefinitions.map(part => {
+        const detail = reading?.breakdown?.find(item => item.id === part.id);
+        return {id: part.id, label: part.label, bytes: known(detail?.bytes) ? detail.bytes : null,
+          partial: detail ? detail.partial === true : true};
+      }) : [],
+      largestEntries: definition.id === "personal" && Array.isArray(reading?.largestEntries)
+        ? reading.largestEntries.slice(0, 5) : [],
       y: y
     });
+    if (definition.id === "docker") row.height += row.details.length * 16 + 4;
+    if (definition.id === "personal") row.height += 16 + Math.max(1, row.largestEntries.length) * 18;
     y += row.height;
     return row;
   });
@@ -58,6 +74,14 @@ function formatBytes(bytes) {
   if (gib >= 1024) return (gib / 1024).toFixed(1).replace(".", ",") + " Tio";
   if (gib < 0.1) return "< 0,1 Gio";
   return gib.toFixed(1).replace(".", ",") + " Gio";
+}
+
+function formatEntryBytes(bytes) {
+  if (!known(bytes)) return "—";
+  if (bytes >= 107374182.4) return formatBytes(bytes);
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1).replace(".", ",") + " Mio";
+  if (bytes >= 1024) return (bytes / 1024).toFixed(1).replace(".", ",") + " Kio";
+  return Math.round(bytes) + " o";
 }
 
 function percent(bytes, total) {

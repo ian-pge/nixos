@@ -29,6 +29,7 @@ Scope {
   property var lowPriorityPending: ({})
   property int chatsRevision: 0
   property var reactionOperations: ({})
+  property var attachmentSaveOperations: ({})
   property var chats: []
   property var unreadCounts: ({})
   property var lowPriorityUnreadCounts: ({})
@@ -99,6 +100,7 @@ Scope {
   signal quotesUpdated()
   signal tokenStored()
   signal chatPriorityChanged(string chatID, bool lowPriority)
+  signal attachmentsSaved(string chatID, string messageID, int saved, int total, string directory)
 
   BeeperAudioPlayback { id: audioPlayback; beeperData: root }
 
@@ -109,6 +111,34 @@ Scope {
   }
   function setChatTextSize(size) {
     chatTextSize = Math.max(14, Math.min(36, Math.round(size)));
+  }
+  function saveMessageAttachments(message) {
+    const chatID = message?.chatID || currentChatID, messageID = message?.id;
+    const attachments = (message?.attachments || []).map(attachment => Object.assign({}, attachment));
+    const key = JSON.stringify([chatID, messageID]);
+    if (!chatID || !messageID || !attachments.length || attachmentSaveOperations[key]) return false;
+    attachmentSaveOperations = Object.assign({}, attachmentSaveOperations, {[key]: true});
+    let saved = 0, firstError = "", directory = "Downloads";
+    // Keep the original message's files even if the view changes or closes.
+    // Serialize saves and keep going after a failure so every file is tried.
+    function saveNext(index) {
+      if (index === attachments.length) {
+        const operations = Object.assign({}, root.attachmentSaveOperations);
+        delete operations[key]; root.attachmentSaveOperations = operations;
+        if (firstError) root.lastError = firstError;
+        root.attachmentsSaved(chatID, messageID, saved, attachments.length, directory);
+        return;
+      }
+      const attachment = attachments[index];
+      root.request("saveAttachment", {url: Format.attachmentSource(attachment),
+        fileName: attachment.fileName || "", mimeType: attachment.mimeType || attachment.mime || ""}, (result, error) => {
+        if (error || !result?.path) firstError = firstError || error?.message || "Could not save this attachment.";
+        else { ++saved; directory = result.path.split("/").slice(-2, -1)[0] || "Downloads"; }
+        Qt.callLater(() => saveNext(index + 1));
+      }, true);
+    }
+    Qt.callLater(() => saveNext(0));
+    return true;
   }
   function ensureWaveform(url) {
     if (demo || !connected || !url) return;
@@ -556,12 +586,13 @@ Scope {
     retireSendDraft(chatID, saved.id);
     replaceDraft(chatID, saved); persistChatDraft(chatID);
   }
-  function markChatRead(chatID, messageID) {
+  function markChatRead(chatID, messageID, callback) {
     if (!chatID) return;
     const params = {chatID: chatID};
     if (messageID) params.messageID = messageID;
     request("read", params, (result, error) => {
       if (!error) { applyReadState(chatID, result); refreshChats(false); scheduleUnreadCounts(true); }
+      if (callback) callback(result, error);
     });
   }
   function markChatUnread(chatID) {

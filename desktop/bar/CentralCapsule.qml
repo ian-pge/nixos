@@ -108,7 +108,9 @@ Rectangle {
     : root.wifiSelectorActive ? wifiSelector.implicitWidth
     : root.bluetoothSelectorActive ? bluetoothSelector.implicitWidth
     : root.mediaOverlayActive ? nowPlayingIndicator.implicitWidth
-    : overlayVisible ? 280 : workspaceSwitcher.implicitWidth
+    : root.volumeOverlayActive ? volumeIndicator.implicitWidth
+    : root.brightnessOverlayActive ? brightnessIndicator.implicitWidth
+    : workspaceSwitcher.implicitWidth
   readonly property real maximumWidth: Math.min(panelWidth, parent ? parent.width : panelWidth)
   readonly property real targetWidth: Math.min(preferredWidth, maximumWidth)
   readonly property real targetHeight: root.notificationActive
@@ -122,7 +124,11 @@ Rectangle {
     : root.chromeTabsActive ? chromeTabsLauncher.implicitHeight
     : root.updateSelectorActive ? updateSelector.implicitHeight
     : root.wifiSelectorActive ? wifiSelector.implicitHeight
-    : root.overlayVisible ? 36 : workspaceSwitcher.implicitHeight
+    : root.bluetoothSelectorActive ? bluetoothSelector.implicitHeight
+    : root.mediaOverlayActive ? nowPlayingIndicator.implicitHeight
+    : root.volumeOverlayActive ? volumeIndicator.implicitHeight
+    : root.brightnessOverlayActive ? brightnessIndicator.implicitHeight
+    : workspaceSwitcher.implicitHeight
   readonly property var contentModes: ["workspaces", "volume", "audio",
     "brightness", "dictation", "media", "wifi", "bluetooth",
     "launcher", "tabs", "updates", "notification", "calendar", "system", "storage"]

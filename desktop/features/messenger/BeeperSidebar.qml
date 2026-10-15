@@ -9,6 +9,13 @@ Rectangle {
   id: root
   objectName: "beeperSidebar"
   required property var chats
+  readonly property var chatIdentities: chats.map(chat => ({id: chat.id}))
+  readonly property var chatsByID: {
+    const result = Object.create(null);
+    for (const chat of chats) result[chat.id] = chat;
+    return result;
+  }
+  property var previousChatsByID: ({})
   required property var currentNetwork
   property var accountConnectionIssues: ({})
   property string serviceConnectionIssue: ""
@@ -25,6 +32,9 @@ Rectangle {
   property alias list: chatList
   property string visibleSelectionToFollow: ""
   property int selectionFollowRevision: 0
+  property string reflowSelectionID: ""
+  property bool reflowSelectionLocked: false
+  property var bulkViewportAnchor: null
   readonly property bool compact: width < 280
   readonly property int selectionDuration: 200
   readonly property int selectionColorDuration: 120
@@ -38,6 +48,8 @@ Rectangle {
   readonly property bool browsing: chatWheel.driving || chatList.moving || chatScrollBar.pressed
   signal networkCycleRequested()
   signal searchAccepted()
+  signal searchChanged()
+  signal searchCycled(int delta)
   signal chatSelected(int index)
   signal viewportChanged()
   onNetworkKeyChanged: {
@@ -49,6 +61,7 @@ Rectangle {
   onAnimateSelectionChanged: if (!animateSelection) {
     networkTransition.stop(); networkProgress = 1;
     selectionBackground.finish();
+    reflowTimer.stop();
   }
   Component.onCompleted: transitionsReady = true
   NumberAnimation {
@@ -91,12 +104,44 @@ Rectangle {
     const nextIndex = chats.findIndex(chat => chat.id === currentChatID);
     if (nextIndex < 0) return;
     for (let index = 0; index < chatModel.count; ++index) {
-      if (chatModel.get(index).row.id !== currentChatID) continue;
+      if (chatModel.get(index).identity.id !== currentChatID) continue;
+      if (unreadFirst && Format.isChatUnread(previousChatsByID[currentChatID]) && !Format.isChatUnread(chats[nextIndex])) {
+        // A live update may precede the mark-read reply. Cancel both deferred
+        // following and the in-progress selection reveal before the row moves.
+        ++selectionFollowRevision;
+        stopSelectionReveal();
+        return;
+      }
       const item = chatList.itemAtIndex(index);
       if (index !== nextIndex && item && item.y + item.height > chatList.contentY
           && item.y < chatList.contentY + chatList.height) visibleSelectionToFollow = currentChatID;
       break;
     }
+  }
+  function lockReflowSelection() {
+    if (!reflowTimer.running) return;
+    reflowSelectionID = currentChatID;
+    reflowSelectionLocked = true;
+  }
+  function captureBulkViewport() {
+    const index = Math.max(0, chatList.indexAt(1, chatList.contentY + 2));
+    const item = chatList.itemAtIndex(index);
+    bulkViewportAnchor = item ? {id: item.row.id, index: index, offset: chatList.contentY - item.y} : null;
+    ++selectionFollowRevision; stopSelectionReveal();
+    reflowTimer.stop(); selectionBackground.finish();
+  }
+  function restoreBulkViewport() {
+    chatList.forceLayout();
+    if (bulkViewportAnchor && chats.length) {
+      const found = chats.findIndex(chat => chat.id === bulkViewportAnchor.id);
+      const index = found >= 0 ? found : Math.min(bulkViewportAnchor.index, chats.length - 1);
+      chatList.positionViewAtIndex(index, ListView.Beginning);
+      const item = chatList.itemAtIndex(index);
+      if (item) chatList.contentY = Math.max(chatList.originY, Math.min(
+        chatList.originY + Math.max(0, chatList.contentHeight - chatList.height), item.y + bulkViewportAnchor.offset));
+    }
+    bulkViewportAnchor = null;
+    if (animateSelection) { networkTransition.stop(); networkProgress = 0; networkTransition.start(); }
   }
   function restoreVisibleSelection() {
     const id = visibleSelectionToFollow;
@@ -115,6 +160,7 @@ Rectangle {
     interval: root.selectionDuration + 32
     onTriggered: { root.revealTarget = ""; root.revealItem = null; }
   }
+  Timer { id: reflowTimer; interval: root.selectionDuration + 32 }
   color: Theme.surface; radius: 18
   ColumnLayout {
     anchors { fill: parent; margins: 16 }
@@ -189,7 +235,20 @@ Rectangle {
         font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
         leftPadding: 12; selectByMouse: true
         background: Rectangle { radius: 10; color: Qt.alpha(Theme.surfaceRaised, searchField.activeFocus ? 0.7 : 0.45) }
-        onAccepted: root.searchAccepted()
+        onTextChanged: root.searchChanged()
+        onAccepted: if (!inputMethodComposing) root.searchAccepted()
+        Keys.onPressed: event => {
+          if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return;
+          if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !inputMethodComposing) {
+            // Accept before moving focus so this same Enter cannot reach the
+            // message pane or composer after the search field is hidden.
+            event.accepted = true;
+            root.searchAccepted();
+          } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+            if (!inputMethodComposing) root.searchCycled(event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier) ? -1 : 1);
+            event.accepted = true;
+          }
+        }
       }
       Item { visible: !root.searchOpen; Layout.fillWidth: true }
       Item {
@@ -234,9 +293,26 @@ Rectangle {
       transform: Translate { x: 6 * (1 - root.networkProgress) }
       model: KeyedListModel {
         id: chatModel
-        rows: root.chats
-        onUpdating: root.captureVisibleSelection()
-        onUpdated: root.restoreVisibleSelection()
+        // The native list only needs identities. Visible delegates read the
+        // original chat snapshots without copying all participant metadata.
+        rows: root.chatIdentities
+        roleName: "identity"
+        dynamicRoles: false
+        bulkThreshold: 32
+        onUpdating: structural => {
+          root.captureVisibleSelection();
+          if (bulkUpdating) root.captureBulkViewport();
+          else if (structural && root.animateSelection && chatModel.count > 0) {
+            root.reflowSelectionLocked = false;
+            reflowTimer.restart();
+            Qt.callLater(root.lockReflowSelection);
+          }
+        }
+        onUpdated: {
+          root.previousChatsByID = root.chatsByID;
+          if (bulkUpdating) root.restoreBulkViewport();
+          root.restoreVisibleSelection();
+        }
       }
       // Selection is keyed by chat ID below. Native current-item tracking
       // would scroll back to it when a background refresh reorders chats.
@@ -246,6 +322,19 @@ Rectangle {
       boundsBehavior: Flickable.StopAtBounds
       flickableDirection: Flickable.VerticalFlick
       acceptedButtons: Qt.NoButton
+      // Stable layout heights let the view move every surviving row together.
+      displaced: Transition {
+        enabled: root.animateSelection && !root.browsing && !chatModel.bulkUpdating
+        NumberAnimation { properties: "y"; duration: root.selectionDuration; easing.type: Easing.OutCubic }
+      }
+      move: Transition {
+        enabled: root.animateSelection && !root.browsing && !chatModel.bulkUpdating
+        NumberAnimation { properties: "y"; duration: root.selectionDuration; easing.type: Easing.OutCubic }
+      }
+      remove: Transition {
+        enabled: root.animateSelection && !root.browsing && !chatModel.bulkUpdating
+        NumberAnimation { property: "opacity"; to: 0; duration: root.selectionColorDuration }
+      }
       AcceleratedScroll { id: chatWheel; flickable: chatList; onScrolled: root.stopSelectionReveal() }
       onMovementStarted: root.stopSelectionReveal()
       onContentYChanged: root.viewportChanged()
@@ -262,8 +351,8 @@ Rectangle {
         property real startHeight: 0
         property real progress: 1
         readonly property bool running: selectionSlide.running
-        y: targetItem ? startY + (targetItem.y - startY) * progress : 0
-        height: targetItem ? startHeight + (targetItem.height - startHeight) * progress : 0
+        y: targetItem ? startY + (targetItem.visualY - startY) * progress : 0
+        height: targetItem ? startHeight + (targetItem.visualHeight - startHeight) * progress : 0
         width: chatList.width; radius: 14
         visible: targetItem !== null && targetItem.chosen
         color: targetItem ? targetItem.platformAccent : "transparent"
@@ -278,7 +367,7 @@ Rectangle {
           targetItem = item;
           // Offscreen/first selections appear at their destination. Keep a
           // running slide continuous when fast navigation reverses direction.
-          if (previousVisible && root.animateSelection) { progress = 0; selectionSlide.start(); }
+          if (previousVisible && root.animateSelection && !reflowTimer.running) { progress = 0; selectionSlide.start(); }
           else progress = 1;
         }
         NumberAnimation {
@@ -289,14 +378,32 @@ Rectangle {
       }
       delegate: Rectangle {
         id: chatRow
-        objectName: "beeperChatRow-" + row.id
-        required property var row
+        objectName: "beeperChatRow-" + identityName
+        required property var identity
+        readonly property var row: root.chatsByID[identity.id] || identity
         required property int index
+        property bool retiring: false
+        property real retiredProgress: 0
+        readonly property string identityName: (retiring ? "retiring-" : "") + row.id
+        enabled: !retiring
+        Accessible.ignored: retiring
+        ListView.onRemove: {
+          // A fading row is no longer selectable, even if the same chat is
+          // inserted again before this exit transition finishes.
+          retiredProgress = selectionProgress;
+          retiring = true;
+        }
         width: chatList.width
-        height: 78 + (root.selectedRowHeight - 78) * selectionProgress
+        // Freeze layout destinations during reflow. Further keyboard moves
+        // select immediately, then resize once the current reflow has finished.
+        height: !retiring && reflowTimer.running ? (layoutChosen ? root.selectedRowHeight : 78) : visualHeight
+        readonly property real visualHeight: 78 + (root.selectedRowHeight - 78) * selectionProgress
+        readonly property real visualY: y
         radius: 14
-        readonly property bool chosen: row.id === root.currentChatID
-        property real selectionProgress: chosen ? 1 : 0
+        readonly property bool chosen: !retiring && row.id === root.currentChatID
+        readonly property bool layoutChosen: reflowTimer.running && root.reflowSelectionLocked
+          ? row.id === root.reflowSelectionID : chosen
+        property real selectionProgress: retiring ? retiredProgress : layoutChosen ? 1 : 0
         readonly property real avatarDiameter: root.compact ? 60 : 72
         readonly property real maximumTitleScale: root.compact ? 1.125 : 1.25
         readonly property real textX: 68 + (avatarDiameter - 48) * selectionProgress
@@ -307,8 +414,8 @@ Rectangle {
         // text light until the background covers both lines, including long
         // jumps; deselection restores light text before the background leaves.
         readonly property bool selectionCoversText: chosen && selectionBackground.targetItem === chatRow
-          && selectionBackground.y <= y + title.y
-          && selectionBackground.y + selectionBackground.height >= y + metadata.y + metadata.height
+          && selectionBackground.y <= visualY + title.y
+          && selectionBackground.y + selectionBackground.height >= visualY + metadata.y + metadata.height
         property color coveredTitleColor: selectionCoversText ? Theme.background : Theme.foreground
         property color coveredSubtitleColor: selectionCoversText ? Theme.background : Theme.secondary
         readonly property color titleColor: selectionCoversText ? coveredTitleColor : Theme.foreground
@@ -331,13 +438,14 @@ Rectangle {
         onHeightChanged: if (chosen) Qt.callLater(root.containGrowingSelection)
         onYChanged: if (chosen) Qt.callLater(root.containGrowingSelection)
         HoverHandler { id: chatHover }
-        MouseArea { anchors.fill: parent; onClicked: root.chatSelected(chatRow.index) }
+        MouseArea { width: parent.width; height: chatRow.visualHeight; onClicked: root.chatSelected(chatRow.index) }
         // Geometry inside the row is fixed at its largest presentation. Grow
         // the avatar/title with transforms, keeping fonts, clipping and text
         // wrapping unchanged throughout the animation.
         BeeperAvatar {
-          objectName: "beeperChatAvatar-" + chatRow.row.id
+          objectName: "beeperChatAvatar-" + chatRow.identityName
           anchors { left: parent.left; leftMargin: 10; verticalCenter: parent.verticalCenter }
+          anchors.verticalCenterOffset: (chatRow.visualHeight - chatRow.height) / 2
           diameter: chatRow.avatarDiameter
           sourceDiameter: diameter
           transformOrigin: Item.Left
@@ -348,9 +456,9 @@ Rectangle {
         }
         Text {
           id: title
-          objectName: "beeperChatTitle-" + chatRow.row.id
+          objectName: "beeperChatTitle-" + chatRow.identityName
           x: chatRow.textX
-          y: (chatRow.height - chatRow.textHeight) / 2
+          y: (chatRow.visualHeight - chatRow.textHeight) / 2
           width: Math.max(0, (chatRow.width - chatRow.expandedTextX - chatRow.rightInset
             - (markers.width > 0 ? markers.width + 4 : 0)) / chatRow.maximumTitleScale)
           scale: 1 + (chatRow.maximumTitleScale - 1) * chatRow.selectionProgress
@@ -373,7 +481,7 @@ Rectangle {
 
           }
           Icon {
-            objectName: "beeperChatPriorityIcon-" + chatRow.row.id
+            objectName: "beeperChatPriorityIcon-" + chatRow.identityName
             visible: chatRow.row.isLowPriority === true
             name: "chevrons-down"; color: chatRow.titleColor; size: Theme.beeperFont.caption
             Accessible.name: "Low priority conversation. Shift+A to move to inbox."
@@ -387,7 +495,7 @@ Rectangle {
           height: Math.max(preview.implicitHeight, details.implicitHeight)
           Text {
             id: preview
-            objectName: "beeperChatPreview-" + chatRow.row.id
+            objectName: "beeperChatPreview-" + chatRow.identityName
             anchors { left: parent.left; right: parent.right }
             text: Format.preview(chatRow.row).replace(/\n/g, " "); textFormat: Text.PlainText
             elide: Text.ElideRight; color: chatRow.subtitleColor
@@ -396,7 +504,7 @@ Rectangle {
           }
           Text {
             id: details
-            objectName: "beeperChatDetails-" + chatRow.row.id
+            objectName: "beeperChatDetails-" + chatRow.identityName
             anchors { left: parent.left; right: parent.right }
             text: Format.chatSubtitle(chatRow.row) || "Direct message"; textFormat: Text.PlainText
             elide: Text.ElideRight; color: chatRow.subtitleColor
@@ -405,14 +513,15 @@ Rectangle {
           }
         }
         Rectangle {
-          objectName: "beeperUnreadBadge-" + chatRow.row.id
+          objectName: "beeperUnreadBadge-" + chatRow.identityName
           readonly property int diameter: 26
           anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
+          anchors.verticalCenterOffset: (chatRow.visualHeight - chatRow.height) / 2
           visible: chatRow.unread
           width: diameter; height: diameter
           radius: width / 2; color: Theme.beeperUnread
           BeeperRollingText {
-            objectName: "beeperUnreadDigits-" + chatRow.row.id
+            objectName: "beeperUnreadDigits-" + chatRow.identityName
             anchors.centerIn: parent; visible: chatRow.row.unreadCount > 0
             text: chatRow.row.unreadCount > 99 ? "99" : String(chatRow.row.unreadCount || 0)
             color: Theme.background

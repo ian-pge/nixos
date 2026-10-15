@@ -39,6 +39,10 @@ celle de l’autre personne (une conversation directe n’a souvent pas de photo
 propre). Elle part dans l’indice `image-path` sous forme d’URI `file://` locale.
 Une URL non locale passe par `POST /v1/assets/download` (3 secondes au plus) ;
 sans photo disponible, la notification est envoyée sans image.
+Le réseau de la conversation (`network` de Beeper, par exemple `Instagram`) part
+dans l’indice propriétaire `x-quickshell-beeper-network`. La carte Quickshell en
+tire le même badge que la liste des conversations, en bas à droite de la photo ;
+le résumé de reconnexion, sans conversation, n’en porte pas.
 
 ## Protocole QML
 

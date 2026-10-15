@@ -166,6 +166,8 @@ function messageReactions(message, chat, accounts) {
 function hasReadReceipt(value) {
   return value === true || (typeof value === "string" && value !== "" && !isNaN(Date.parse(value)));
 }
+// Keep unchanged empty reader models stable when another message gets a receipt.
+var emptyReaders = Object.freeze([]);
 function messageReaders(message, chat, accounts) {
   // Public API `seen`: boolean, ISO timestamp, or participant ID -> either.
   // Delivery success and our own unread marker do not identify any readers.
@@ -178,9 +180,9 @@ function messageReaders(message, chat, accounts) {
       const person = participantProfile(id, chat, accounts, message?.accountID);
       if (!person.isSelf) readers.push(person);
     }
-    return readers;
+    return readers.length ? readers : emptyReaders;
   }
-  if (!hasReadReceipt(seen) || !message.isSender) return [];
+  if (!hasReadReceipt(seen) || !message.isSender) return emptyReaders;
   if (chat?.type === "single") {
     const contact = people.find(person => person.isSelf === false
       && !participantProfile(person.id, chat, accounts, message?.accountID).isSelf);

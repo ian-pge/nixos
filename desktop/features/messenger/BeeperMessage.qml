@@ -53,6 +53,8 @@ Item {
   signal selectedRequested()
   signal previewRequested(var attachment, var sourceItem)
   signal textSelectionStarted()
+  signal heightInvalidated(var item)
+  onHeightChanged: heightInvalidated(root)
   function attachmentItem(index) { return attachments.itemAt(index); }
   function clearTextSelection() { selectionLayer.item?.deselect(); }
   function playArrival() {

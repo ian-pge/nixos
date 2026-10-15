@@ -15,6 +15,7 @@ Scope {
   property var snapshot: null
   property string error: ""
   property real updatedAt: 0
+  property real lastStartedAt: 0
   // From start() until the process has exited: Process.running only turns
   // true on the next event loop iteration, too late to guard a second start.
   property bool loading: false
@@ -25,6 +26,7 @@ Scope {
 
   function start() {
     if (loading || protocol === null || command.length === 0) return false;
+    lastStartedAt = Date.now();
     loading = true;
     run += 1; context = {}; answered = false; started = false; error = "";
     process.stdinEnabled = true;

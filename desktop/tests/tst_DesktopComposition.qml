@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Networking
 import Quickshell.Wayland
 
@@ -706,6 +707,34 @@ ShellRoot {
         restore();
       }
     }
+    function test_single_line_central_capsules_match_the_bar_height() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], capsule = bar.capsule;
+      try {
+        app.coordinator.messenger.hide();
+        tryCompare(capsule.messengerHost, "presented", false, 1000);
+        for (const [mode, name] of [["volume", "volumeIndicator"],
+            ["brightness", "brightnessIndicator"], ["media", "nowPlayingIndicator"],
+            ["bluetooth", "bluetoothSelector"], ["wifi", "wifiSelector"], ["updates", "updateSelector"]]) {
+          fixture.stage = "compact central capsule: " + mode;
+          app.coordinator.open(mode, bar.monitorName);
+          const view = findChild(capsule, name);
+          compare(view.implicitHeight, bar.blockHeight);
+          compare(capsule.targetHeight, bar.blockHeight);
+          tryCompare(capsule, "height", bar.blockHeight, 1000);
+          compare(capsule.y, bar.barTopInset);
+          compare(capsule.radius, 21);
+          verify(capsule.width <= 434);
+        }
+        compare(findChild(capsule, "voiceDictationIndicator").implicitHeight, 42);
+        compare(capsule.panelWidth, 434, "Do not enlarge the detailed panels");
+        for (const mode of ["calendar", "system", "storage", "audio"]) {
+          app.coordinator.open(mode, bar.monitorName);
+          verify(capsule.targetHeight > 42);
+          compare(capsule.maximumWidth, 434);
+        }
+      } finally { app.coordinator.close(app.coordinator.mode); }
+    }
     function test_registry_and_real_bar_bindings() {
       wait(150);
       compare(app.coordinator.mode, "workspaces");
@@ -751,6 +780,34 @@ ShellRoot {
       } finally {
         host.nativeDialogOpen = false;
         app.coordinator.messenger.hide();
+      }
+    }
+    function test_workspace_switch_closes_chat_and_preserves_draft() {
+      const messenger = app.coordinator.messenger;
+      tryVerify(() => messenger.targetWorkspaceId !== 0 || Hyprland.focusedWorkspace !== null);
+      const bar = app.bars[0], host = bar.capsule.messengerHost;
+      const composer = findChild(host, "beeperComposer");
+      const originalWorkspace = Hyprland.focusedWorkspace.id;
+      const destination = originalWorkspace === 2 ? 3 : 2;
+      const model = messenger.beeperData;
+      try {
+        messenger.show(bar.monitorName);
+        tryCompare(host, "active", true); wait(450);
+        composer.forceActiveFocus(); composer.text = "Draft before switching workspace";
+        const chatID = model.currentChatID;
+        Hyprland.dispatch("hl.dsp.focus({ workspace = " + destination + " })");
+        tryCompare(messenger, "targetWorkspaceId", destination);
+        tryCompare(messenger, "visible", false);
+        verify(!host.wantsKeyboard);
+        tryCompare(host, "presented", false, 1000);
+        messenger.show(bar.monitorName);
+        tryCompare(host, "active", true);
+        compare(model.currentChatID, chatID);
+        compare(composer.text, "Draft before switching workspace");
+      } finally {
+        messenger.hide();
+        Hyprland.dispatch("hl.dsp.focus({ workspace = " + originalWorkspace + " })");
+        tryCompare(messenger, "targetWorkspaceId", originalWorkspace);
       }
     }
     function test_bar_brightness_uses_its_monitor_reading() {

@@ -1,5 +1,5 @@
-github.com/beeper/desktop-api-go/v5 v5.0.1 h1:fXzdK4O0CgXNbDFPZeTLVB0HS36HdnwDz2S7t/IX0Oc=
-github.com/beeper/desktop-api-go/v5 v5.0.1/go.mod h1:WUEtzxs0a2AhNYPlLy2Ip3SEXV9w9h1o3M4zz/qXfi0=
+github.com/beeper/desktop-api-go/v6 v6.0.0 h1:7UFCt7Z2Hcdz4rha7Dke6+031n0aBRucnd6wFYz52ew=
+github.com/beeper/desktop-api-go/v6 v6.0.0/go.mod h1:e7Bz3v6GHATyViJsd7XI9nyc9EQs98EhdsBXl+oKPCw=
 github.com/godbus/dbus/v5 v5.1.0 h1:4KLkAxT3aOY8Li4FRJe/KvhoNFFxo0m6fNuFUO8QJUk=
 github.com/godbus/dbus/v5 v5.1.0/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=

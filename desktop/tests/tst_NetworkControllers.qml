@@ -143,6 +143,24 @@ ShellRoot {
       return JSON.stringify({generation: generation, type: "result", ping: {latency: 12.34},
         download: {bandwidth: 12500000}, upload: {bandwidth: 1250000}});
     }
+    function test_compact_selectors_follow_bar_size_without_enlarging_speed_test() {
+      wifiView.height = Qt.binding(() => wifiView.implicitHeight);
+      bluetoothView.height = Qt.binding(() => bluetoothView.implicitHeight);
+      compare(wifiView.implicitHeight, 42);
+      compare(bluetoothView.implicitHeight, 42);
+      compare(findChild(wifiView, "wifiSelectorIcon").size, 20);
+      compare(findChild(wifiView, "wifiSelectorLabel").font.pixelSize, 16);
+      compare(findChild(bluetoothView, "bluetoothSelectorIcon").size, 20);
+      compare(findChild(bluetoothView, "bluetoothSelectorLabel").font.pixelSize, 16);
+      network.speedTestExpanded = true;
+      compare(wifiView.implicitWidth, 400);
+      compare(wifiView.implicitHeight, 94);
+      compare(findChild(wifiView, "wifiSelectorRow").height, 36);
+      compare(findChild(wifiView, "wifiSelectorIcon").size, 17);
+      compare(findChild(wifiView, "wifiSelectorLabel").font.pixelSize, 14);
+      network.speedTestExpanded = false;
+      compare(wifiView.implicitHeight, 42);
+    }
     function test_wifi_scan_lifecycle_and_device_replacement() {
       verify(wifiDeviceMock.scannerEnabled);
       network.refresh();

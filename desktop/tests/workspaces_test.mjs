@@ -48,7 +48,6 @@ const requests = net.createServer(socket => {
         monitors.splice(monitors.indexOf(externalMonitor), 1);
         const laptop = monitors[0];
         laptop.focused = true; laptop.activeWorkspace = {id: 5, name: "5"};
-        workspaces.splice(5);
         for (const workspace of workspaces) { workspace.monitor = laptop.name; workspace.monitorID = laptop.id; }
         for (const client of eventClients) client.write("monitorremoved>>DP-2\nworkspacev2>>5,5\nfocusedmon>>eDP-1,5\n");
         return socket.end("ok");
@@ -58,9 +57,10 @@ const requests = net.createServer(socket => {
         const laptop = monitors[0];
         laptop.activeWorkspace = {id: 6, name: "6"};
         monitors.unshift(externalMonitor);
-        for (const workspace of workspaces) { workspace.monitor = "DP-2"; workspace.monitorID = 0; }
-        for (let id = 6; id <= 10; id++) workspaces.push({id, name: String(id),
-          monitor: "eDP-1", monitorID: 1, windows: 0, hasfullscreen: false});
+        for (const workspace of workspaces) {
+          workspace.monitor = workspace.id <= 5 ? "DP-2" : "eDP-1";
+          workspace.monitorID = workspace.id <= 5 ? 0 : 1;
+        }
         for (const client of eventClients) client.write("monitoraddedv2>>0,DP-2,Dell\nworkspacev2>>6,6\nfocusedmon>>eDP-1,6\n");
         return socket.end("ok");
       }
@@ -116,9 +116,9 @@ try {
   assert.equal(exitCode, 0, "Quickshell integration tests must complete successfully");
   assert.match(output, /WorkspaceIpc: \d+ passed, 0 failed/);
   assert.doesNotMatch(output, /Binding loop|TypeError|ReferenceError/);
-  assert.deepEqual(requestedWorkspaces, [7, 8, 3, 2, 10, 5, 4]);
+  assert.deepEqual(requestedWorkspaces, [7, 8, 3, 2, 10, 5, 4, 10]);
   assert.ok(monitorRequests >= 7, "Every switch must refresh the authoritative monitor snapshots");
-  console.log("PASS: isolated native IPC, per-monitor focus, unplug/replug and five-slot bar updates");
+  console.log("PASS: isolated native IPC, per-monitor focus and five/ten-slot hotplug updates");
 } finally {
   for (const client of eventClients) client.destroy();
   await Promise.all([events, requests].map(server => new Promise(resolve => server.close(resolve))));

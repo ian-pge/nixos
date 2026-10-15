@@ -15,9 +15,8 @@
     ;
 
   workspaceCount = 10;
-  workspacesPerMonitor = 5;
 
-  # Cycle through the focused monitor's five slots, including empty workspaces.
+  # Follow the focused monitor's range, including all ten slots on a lone laptop.
   cycleWorkspace = step: ''
     function()
       local workspace = hl.get_active_workspace()
@@ -27,12 +26,13 @@
       end
 
       local first = quickshell_workspace_first(monitor)
-      local last = first + ${toString workspacesPerMonitor} - 1
+      local count = quickshell_workspace_count(monitor)
+      local last = first + count - 1
       local target
       if workspace.id < first or workspace.id > last then
         target = ${toString step} > 0 and first or last
       else
-        target = ((workspace.id - first + (${toString step})) % ${toString workspacesPerMonitor}) + first
+        target = ((workspace.id - first + (${toString step})) % count) + first
       end
       hl.dispatch(hl.dsp.focus({ workspace = target }))
     end
@@ -202,8 +202,7 @@ in {
       (mkBind (mainKey "N") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleWifi") {})
       (mkBind (mainKey "B") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleBluetooth") {})
       (mkBind (mainKey "U") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleUpdates") {})
-      (mkBind (mainKey "R") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleUsage") {})
-      (mkBind (mainKey "Y") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleStorage") {})
+      (mkBind (mainKey "R") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleStorage") {})
       (mkBind (mainKey "Q") (mkExec "zeditor /home/ian/.config/nixos") {})
       (mkBind (mainKey "SHIFT + Q") "hl.dsp.exec_cmd(settings)" {})
       (mkBind (mainKey "T") "hl.dsp.exec_cmd(audio)" {})

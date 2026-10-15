@@ -1,4 +1,5 @@
--- Five workspaces alone; external 1–5 and internal 6–10 when docked.
+-- Laptop alone: 1–10. Docked: external 1–5 and internal 6–10.
+-- A lone external display keeps 1–5.
 -- Everything runs in Hyprland's event loop, with no polling subprocess.
 local function internal_output(name)
   return name and (name:match("^eDP%-") or name:match("^LVDS%-") or name:match("^DSI%-"))
@@ -27,9 +28,18 @@ function quickshell_workspace_first(monitor)
   return secondary and monitor and monitor.name == secondary.name and 6 or 1
 end
 
+function quickshell_workspace_count(monitor)
+  local primary, secondary = workspace_outputs()
+  if primary and not secondary and internal_output(primary.name)
+      and monitor and monitor.name == primary.name then
+    return 10
+  end
+  return 5
+end
+
 function quickshell_workspace_target(id)
   local primary, secondary = workspace_outputs()
-  if not primary or (id > 5 and not secondary) then return nil end
+  if not primary or (not secondary and id > quickshell_workspace_count(primary)) then return nil end
   return id
 end
 
@@ -45,19 +55,20 @@ local function reconcile_workspaces()
   local active_id = active and active.id or nil
   local focused_window = hl.get_active_window()
   local changed = false
+  local primary_count = quickshell_workspace_count(primary)
 
   for id = 1, 10 do
     local target = id <= 5 and primary or (secondary or primary)
     hl.workspace_rule({
       workspace = tostring(id), monitor = target.name,
-      persistent = id <= 5 or secondary ~= nil,
+      persistent = id <= primary_count or secondary ~= nil,
       default = id == 1 or (id == 6 and secondary ~= nil),
     })
   end
   -- Materialize persistent destinations before moving windows or selecting one.
   hl.exec_scheduled_prop_refresh_immediately()
 
-  if not secondary then
+  if not secondary and primary_count == 5 then
     -- Merge corresponding slots without closing applications or touching specials.
     for _, window in ipairs(hl.get_windows()) do
       local workspace = window.workspace
@@ -78,19 +89,19 @@ local function reconcile_workspaces()
     end
   end
 
-  local function select_valid_workspace(monitor, first)
+  local function select_valid_workspace(monitor, first, count)
     local workspace = monitor.active_workspace
-    if not workspace or workspace.id < first or workspace.id >= first + 5 then
+    if not workspace or workspace.id < first or workspace.id >= first + count then
       local target = first
-      if not secondary and active_id and active_id >= 6 and active_id <= 10 then
+      if not secondary and primary_count == 5 and active_id and active_id >= 6 and active_id <= 10 then
         target = active_id - 5
       end
       monitor:set_workspace({workspace = target})
       changed = true
     end
   end
-  select_valid_workspace(primary, 1)
-  if secondary then select_valid_workspace(secondary, 6) end
+  select_valid_workspace(primary, 1, primary_count)
+  if secondary then select_valid_workspace(secondary, 6, 5) end
   if changed and focused_window then
     hl.dispatch(hl.dsp.focus({window = focused_window}))
   end

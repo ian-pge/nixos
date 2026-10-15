@@ -3,7 +3,8 @@ import QtQuick
 import "UsageLimits.js" as Limits
 
 // One shared pair of brief CLI reads for every bar, refreshed every five
-// minutes while active. No per-screen collector or long-running CLI.
+// minutes while active, with bounded retries for missing startup readings.
+// No per-screen collector or long-running CLI.
 Scope {
   id: root
   property bool enabled: true
@@ -17,6 +18,9 @@ Scope {
   property string workingDirectory: Quickshell.env("HOME") || Quickshell.workingDirectory
   property int minimumInterval: 60000
   property int refreshInterval: 300000
+  property int startupRetryInterval: 30000
+  property int startupRetryDuration: 300000
+  property real startupStartedAt: 0
   property int timeout: 30000
   property real lastRefresh: 0
   readonly property var claude: claudeSource
@@ -36,15 +40,60 @@ Scope {
     return Limits.expired(claudeSource.snapshot, Date.now())
       || Limits.expired(codexSource.snapshot, Date.now());
   }
-  function refreshWhenActive() { if (active) refresh(); }
+  function startupRetriesAllowed() {
+    return enabled && active && startupWindow.running
+      && Date.now() - startupStartedAt < startupRetryDuration;
+  }
+  function scheduleStartupRetry() {
+    startupRetry.stop();
+    if (!startupRetriesAllowed()) return;
+    const pending = [claudeSource, codexSource].filter(source =>
+      source.snapshot === null && !source.loading && source.lastStartedAt > 0);
+    if (pending.length === 0) return;
+    const nextAttempt = Math.min(...pending.map(source => source.lastStartedAt + startupRetryInterval));
+    startupRetry.interval = Math.max(1, nextAttempt - Date.now());
+    startupRetry.start();
+  }
+  function retryInitialUsage() {
+    if (!startupRetriesAllowed()) return;
+    const now = Date.now();
+    for (const source of [claudeSource, codexSource]) {
+      if (source.snapshot === null && !source.loading && source.lastStartedAt > 0
+          && now - source.lastStartedAt >= startupRetryInterval)
+        source.start();
+    }
+    scheduleStartupRetry();
+  }
+  function refreshWhenActive() {
+    if (!enabled || !active) {
+      startupRetry.stop();
+      return;
+    }
+    // Once per controller lifetime, not on each visibility/enable change.
+    if (startupStartedAt === 0) {
+      startupStartedAt = Date.now();
+      startupWindow.start();
+    }
+    refresh();
+    scheduleStartupRetry();
+  }
 
-  onActiveChanged: if (active) Qt.callLater(root.refreshWhenActive)
-  onEnabledChanged: if (enabled && active) Qt.callLater(root.refreshWhenActive)
+  onActiveChanged: Qt.callLater(root.refreshWhenActive)
+  onEnabledChanged: Qt.callLater(root.refreshWhenActive)
   Component.onCompleted: if (enabled && active) Qt.callLater(root.refreshWhenActive)
   // Re-read a window at its reset time instead of assuming a fresh allowance.
   onNowChanged: if (active && expired()) refresh()
 
   SystemClock { id: clock; precision: SystemClock.Minutes }
+  Timer {
+    id: startupWindow
+    interval: root.startupRetryDuration
+    onTriggered: startupRetry.stop()
+  }
+  Timer {
+    id: startupRetry
+    onTriggered: root.retryInitialUsage()
+  }
   Timer {
     interval: root.refreshInterval
     repeat: true
@@ -58,6 +107,7 @@ Scope {
     protocol: Limits.claude
     timeout: root.timeout
     workingDirectory: root.workingDirectory
+    onLoadingChanged: Qt.callLater(root.scheduleStartupRetry)
   }
   UsageSource {
     id: codexSource
@@ -66,5 +116,6 @@ Scope {
     protocol: Limits.codex
     timeout: root.timeout
     workingDirectory: root.workingDirectory
+    onLoadingChanged: Qt.callLater(root.scheduleStartupRetry)
   }
 }

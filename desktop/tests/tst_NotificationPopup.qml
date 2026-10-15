@@ -17,6 +17,7 @@ ShellRoot {
       property string body: "Salut !"
       property string image: ""
       property string appIcon: ""
+      property var hints: ({})
     }
     QtObject {
       id: notificationState
@@ -63,6 +64,7 @@ ShellRoot {
         message.appName = "Beeper";
         message.summary = "Camille";
         message.body = "Salut !";
+        message.hints = ({});
         popup.width = Qt.binding(() => Math.min(popup.implicitWidth, 434));
         wait(0);
       }
@@ -192,6 +194,22 @@ ShellRoot {
         message.body = row.text;
         verify(isFinite(popup.implicitWidth));
         verify(popup.implicitWidth >= 160 && popup.implicitWidth <= 480);
+      }
+
+      function test_chatNotificationBadgesItsNetwork() {
+        const badge = findChild(popup, "beeperNetworkBadge");
+        verify(badge !== null);
+        verify(!badge.visible, "Ordinary notifications name no network");
+        message.hints = {"x-quickshell-beeper-network": "Instagram"};
+        verify(badge.visible);
+        compare(badge.color.toString(), "#f5bde6");
+        // Bottom-right of the 42 px photo, overlapping its edge like the chat list.
+        compare(badge.width, 18);
+        compare(badge.x + badge.width, 44);
+        compare(badge.y + badge.height, 44);
+        message.hints = {"x-quickshell-beeper-network": "telegram"};
+        compare(badge.color.toString(), "#7dc4e4");
+        compare(popup.implicitWidth, 160, "The badge does not change the card layout");
       }
 
       function test_emptyNotificationStaysWellFormed() {

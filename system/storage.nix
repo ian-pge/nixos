@@ -1,5 +1,5 @@
-{config, localPackages, ...}: {
-  # One shared on-demand scan. The shell only receives aggregate byte counts;
+{config, localPackages, pkgs, ...}: {
+  # One shared on-demand scan. The shell receives byte counts and its own top five;
   # it never runs as root or obtains access to Docker/VM files.
   systemd.services.quickshell-storage = {
     description = "Read-only disk usage report for Quickshell";
@@ -10,10 +10,13 @@
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${localPackages.quickshellSystemStats}/bin/quickshell-storage --home ${config.users.users.ian.home} --output /run/quickshell-storage/report.json";
+      # The scanner publishes mode 0600. Only this user may read the names,
+      # without requiring a new login/group membership or giving write access.
+      ExecStartPost = "${pkgs.acl}/bin/setfacl -m u:ian:r-- /run/quickshell-storage/report.json";
       RuntimeDirectory = "quickshell-storage";
       RuntimeDirectoryMode = "0755";
       RuntimeDirectoryPreserve = "yes";
-      UMask = "0022";
+      UMask = "0077";
       TimeoutStartSec = "15min";
       Nice = 19;
       IOSchedulingClass = "idle";

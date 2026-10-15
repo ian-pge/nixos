@@ -1,7 +1,5 @@
 import QtQuick
-import QtQuick.Controls
 import Quickshell.Widgets
-import "../../ui"
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
 
@@ -54,38 +52,9 @@ Item {
     }
   }
 
-  Rectangle {
-    id: badge
-    objectName: "beeperNetworkBadge"
+  BeeperNetworkBadge {
     width: Math.round(root.diameter * 0.42)
-    height: width
-    x: parent.width - width + 2
-    y: parent.height - height + 2
-    radius: width / 2
-    visible: root.network.name !== ""
-    color: root.connectionProblem ? Theme.error : Theme.beeperNetworkColors[root.network.key] || Theme.surfaceRaised
-    antialiasing: true
-    Accessible.role: Accessible.StaticText
-    Accessible.name: root.network.name + (root.connectionProblem ? ": connection problem" : "")
-    Text {
-      anchors.centerIn: parent
-      visible: !root.network.iconName
-      text: root.network.glyph
-      textFormat: Text.PlainText
-      color: root.connectionProblem || Theme.beeperNetworkColors[root.network.key] ? Theme.background : Theme.selectedForeground
-      font { family: "Ubuntu Nerd Font"; pixelSize: Math.round(badge.width * 0.60); bold: !root.network.logo }
-    }
-    Icon {
-      anchors.centerIn: parent
-      name: root.network.iconName || ""; visible: name !== ""
-      size: Math.round(badge.width * 0.60)
-      color: root.connectionProblem || Theme.beeperNetworkColors[root.network.key] ? Theme.background : Theme.selectedForeground
-    }
-    HoverHandler { id: badgeHover }
-    ToolTip {
-      visible: badgeHover.hovered; text: root.network.name; delay: 350
-      palette.toolTipText: Theme.foreground
-      background: Rectangle { radius: 8; color: Theme.surfaceRaised }
-    }
+    network: String(root.chat?.network || "")
+    connectionProblem: root.connectionProblem
   }
 }

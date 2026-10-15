@@ -12,9 +12,10 @@ FocusScope {
   readonly property var rows: Storage.rows(snapshot)
   readonly property real measuredBytes: Storage.sum(rows)
   readonly property bool partial: snapshot !== null && Storage.incomplete(rows)
-  readonly property var colors: ({docker: Theme.sideApplications, nix: Theme.sideSystem,
-    applications: Theme.sideDisk, personal: Theme.teal,
-    vm: Theme.pink, other: Theme.inactive})
+  // Separate hues make adjacent slices and their legend dots easy to distinguish.
+  readonly property var colors: ({docker: Theme.sideConnectivity, nix: Theme.sideSystem,
+    applications: Theme.sideUpdates, personal: Theme.sideGpu,
+    vm: Theme.error, other: Theme.secondary})
   implicitHeight: footer.y + footer.height + 12
 
   function focusWhenEnabled() {
@@ -126,6 +127,73 @@ FocusScope {
           text: "Caches " + Storage.formatBytes(row.modelData.cacheBytes)
             + " · Données " + Storage.formatBytes(row.modelData.dataBytes)
           font.pixelSize: 10
+        }
+        Repeater {
+          model: row.modelData.details
+          delegate: Item {
+            id: dockerDetail
+            required property var modelData
+            required property int index
+            objectName: "storageDockerDetail_" + modelData.id
+            x: 16; y: 34 + index * 16; width: row.width - x; height: 16
+            Label {
+              objectName: "storageDetailLabel"
+              width: Math.max(0, dockerAmount.x - 8); height: parent.height
+              text: dockerDetail.modelData.label; font.pixelSize: 10
+            }
+            Label {
+              id: dockerAmount
+              objectName: "storageDetailBytes"
+              anchors.right: parent.right; width: implicitWidth; height: parent.height
+              text: (dockerDetail.modelData.partial && dockerDetail.modelData.bytes !== null ? "≥ " : "")
+                + Storage.formatBytes(dockerDetail.modelData.bytes)
+              font.pixelSize: 10
+            }
+          }
+        }
+        Label {
+          objectName: "storagePersonalHeading"
+          x: 16; y: 40; width: parent.width - x; height: 16
+          visible: row.modelData.id === "personal"
+          text: "Les 5 plus volumineux · dans ~"
+          font.pixelSize: 10
+        }
+        Label {
+          objectName: "storagePersonalEmpty"
+          x: 16; y: 58; width: parent.width - x; height: 18
+          visible: row.modelData.id === "personal" && row.modelData.largestEntries.length === 0
+          text: row.modelData.partial ? "Classement indisponible" : "Aucun fichier ou dossier mesuré"
+          font.pixelSize: 10
+        }
+        Repeater {
+          model: row.modelData.largestEntries
+          delegate: Item {
+            id: personalEntry
+            required property var modelData
+            required property int index
+            objectName: "storagePersonalEntry_" + index
+            x: 16; y: 58 + index * 18; width: row.width - x; height: 18
+            Accessible.role: Accessible.StaticText
+            Accessible.name: modelData.path + ": " + entryAmount.text
+            Icon {
+              x: 0; anchors.verticalCenter: parent.verticalCenter
+              name: personalEntry.modelData.kind === "directory" ? "folder" : "file"
+              size: 11; color: Theme.secondary
+            }
+            Label {
+              objectName: "storagePersonalPath"
+              x: 17; width: Math.max(0, entryAmount.x - x - 8); height: parent.height
+              text: personalEntry.modelData.path; font.pixelSize: 10; elide: Text.ElideMiddle
+            }
+            Label {
+              id: entryAmount
+              objectName: "storagePersonalBytes"
+              anchors.right: parent.right; width: implicitWidth; height: parent.height
+              text: (personalEntry.modelData.partial ? "≥ " : "")
+                + Storage.formatEntryBytes(personalEntry.modelData.bytes)
+              font.pixelSize: 10
+            }
+          }
         }
       }
     }

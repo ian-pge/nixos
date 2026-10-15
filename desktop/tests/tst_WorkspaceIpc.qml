@@ -10,6 +10,7 @@ ShellRoot {
   property var first: null
   property var second: null
   property var synchronizer: null
+  property var messenger: null
   property bool observedOldMonitorBug: false
   property bool wrongSourceIndicator: false
   property bool watchingCrossMonitorSwitch: false
@@ -75,6 +76,10 @@ ShellRoot {
       tryCompare(root.first, "activeWorkspaceId", 3);
       tryCompare(root.second, "activeWorkspaceId", 6);
       root.normalExpandedWidth = root.first.expandedImplicitWidth;
+      const messengerComponent = Qt.createComponent("file://" + Quickshell.shellDir + "/../shell/MessengerController.qml");
+      compare(messengerComponent.status, Component.Ready, messengerComponent.errorString());
+      root.messenger = messengerComponent.createObject(root, {beeperData: null});
+      verify(root.messenger !== null);
     }
     function verifyPair(firstId, secondId) {
       console.log("Checking monitor workspaces", firstId, secondId);
@@ -93,24 +98,35 @@ ShellRoot {
     }
     function test_event_sequence() {
       root.watchingCrossMonitorSwitch = true;
+      root.messenger.show(); verify(root.messenger.visible);
       // Exercise the real click dispatcher and real Quickshell C++ event
       // processing against the fake compositor, including workspacev2 first.
       root.first.focusWorkspace(7);
       verifyPair(3, 7);
+      tryCompare(root.messenger, "visible", false);
       console.log("Cross-monitor regression observed:", root.observedOldMonitorBug,
         "wrong indicator:", root.wrongSourceIndicator);
       verify(root.observedOldMonitorBug, "Fixture must reproduce the native model corruption");
       verify(!root.wrongSourceIndicator, "Dell must never highlight the other monitor's workspace");
       root.watchingCrossMonitorSwitch = false;
 
+      root.messenger.show(); verify(root.messenger.visible);
       root.second.focusWorkspace(8);
       verifyPair(3, 8);
+      tryCompare(root.messenger, "visible", false);
       // Going back to an already visible workspace only changes monitor focus.
+      root.messenger.show(); verify(root.messenger.visible);
       root.second.focusWorkspace(3);
       tryVerify(() => Hyprland.focusedMonitor?.name === "DP-2");
       verifyPair(3, 8);
+      tryCompare(root.messenger, "visible", false);
+      // A fresh snapshot of the same workspace must leave the panel open.
+      root.messenger.show(); verify(root.messenger.visible);
+      Hyprland.refreshMonitors(); wait(50);
+      verify(root.messenger.visible);
       root.first.focusWorkspace(2);
       verifyPair(2, 8);
+      tryCompare(root.messenger, "visible", false);
       root.second.focusWorkspace(10);
       verifyPair(2, 10);
       // Reverse direction: eDP-1 is now the source and must keep 10.
@@ -122,9 +138,12 @@ ShellRoot {
       tryVerify(() => root.monitor("DP-2") === null);
       tryCompare(root.second, "firstWorkspaceId", 1);
       tryCompare(root.second, "activeWorkspaceId", 5);
-      compare(root.second.workspaceIds.join(","), "1,2,3,4,5");
+      compare(root.second.workspaceIds.join(","), "1,2,3,4,5,6,7,8,9,10");
       root.second.focusWorkspace(4);
       tryCompare(root.second, "activeWorkspaceId", 4);
+      root.second.focusWorkspace(10);
+      tryCompare(root.second, "activeWorkspaceId", 10);
+      verify(findChild(root.second, "workspace-10").active);
       Hyprland.dispatch("test-monitor-dock");
       tryVerify(() => root.monitor("DP-2") !== null);
       root.first.monitor = root.monitor("DP-2");

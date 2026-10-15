@@ -76,20 +76,36 @@ quickshell-storage --home /home/ian --output /run/quickshell-storage/report.json
 ```
 
 The output parent must already exist. A temporary file in that directory is
-atomically renamed to the requested report, with mode 0644. The old report
+atomically renamed to the requested report, with mode 0600. The system service
+then grants only its configured desktop user read access through a named ACL,
+without group membership changes. The old report
 survives a failed or interrupted scan. `--root /absolute/fixture` restricts
 traversal to a fixture directory for diagnostics; capacity still describes the
 filesystem containing that directory. Invalid, relative and symlink output
 destinations are rejected. The collector has no cleanup or deletion operation;
 it only removes its own temporary report if publication fails.
 
-The schema is `schemaVersion: 1`, a completion-time `measuredAt` in epoch
+The schema is `schemaVersion: 2`, a completion-time `measuredAt` in epoch
 milliseconds, `durationMs`, `estimated: true`, `filesystem`, and `disk` containing
 `totalBytes`, `usedBytes` and `availableBytes` from statvfs. `categories` always
 contains `docker`, `nix`, `applications`, `personal`, `vm` and `other`, each with
 `bytes` and `partial`. Applications additionally contains `cacheBytes` and
-`dataBytes`. `errors` contains an aggregate `count` and a generic `message`;
-private file names never enter the report. A wholly inaccessible category has
+`dataBytes`. Docker adds `breakdown`, five rows (`layers`, `volumes`, `buildCache`,
+`containers`, `other`) with `bytes` and `partial`. These are allocated-directory
+subtotals, not reclaimable Docker sizes. The `layers` group includes writable
+container layers; `containers` covers metadata and logs stored in that directory.
+See Docker's [Btrfs storage layout](https://docs.docker.com/engine/storage/drivers/btrfs-driver/).
+
+Personal data adds `largestEntries`, up to five rows sorted by descending
+allocated bytes, with `path` (relative to `~/`), `bytes`, `kind` (`file` or
+`directory`) and `partial`. Entries are disjoint first-level home files/folders,
+plus `.config/nixos` and `.local/share/chezmoi`. Nested files accumulate into
+their parent entry; filenames inside those folders, other users' homes and
+application data never enter the report. Unsafe or non-UTF-8 bytes and literal
+percent signs are escaped in display paths, preserving distinct names.
+The report is private now that it contains these home entry names.
+`errors` contains an aggregate `count` and a generic `message`.
+A wholly inaccessible category has
 null bytes, while a partially measured category is explicitly a lower bound.
 
 Sizes use allocated blocks (`st_blocks * 512`), including sparse-file handling.

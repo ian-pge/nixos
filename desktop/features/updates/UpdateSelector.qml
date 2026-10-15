@@ -5,6 +5,7 @@ import "../../ui/Theme.js" as Theme
 
 FocusScope {
   id: root
+  objectName: "updateSelector"
 
   required property var updates
   required property var auth
@@ -25,6 +26,9 @@ FocusScope {
     && updates.summaryReady
   readonly property bool progressMode: !authMode && !successMode && !cleaningMode
     && !listMode && !changesMode
+  readonly property bool singleLine: authMode || successMode || cleaningMode || progressMode
+    || (listMode ? compactStatusMode : !changesMode)
+  function uiSize(value) { return singleLine ? Theme.barSize(value) : value; }
   readonly property bool updateProcessing: updates.busy
   readonly property string phaseLabel: {
     if (updates.phase === "updating") return "UPDATING";
@@ -61,63 +65,63 @@ FocusScope {
       ? auth.supplementaryMessage : auth.prompt
 
   implicitWidth: adaptiveWidth()
-  implicitHeight: authMode || successMode || cleaningMode || progressMode ? 36
-    : listMode ? (compactStatusMode ? 36 : 52 + rowCount * 30 + 10)
+  implicitHeight: authMode || successMode || cleaningMode || progressMode ? uiSize(36)
+    : listMode ? (compactStatusMode ? uiSize(36) : 52 + rowCount * 30 + 10)
     : changesMode ? Math.min(750,
       50 + Math.max(1, updates.changes.length) * 34)
-    : 36
+    : uiSize(36)
 
   FontMetrics {
     id: titleMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 14
+    font.pixelSize: root.uiSize(14)
     font.bold: true
   }
 
   FontMetrics {
     id: rowTitleMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 13
+    font.pixelSize: root.uiSize(13)
     font.bold: true
   }
 
   FontMetrics {
     id: dateMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 12
+    font.pixelSize: root.uiSize(12)
     font.bold: true
   }
 
   FontMetrics {
     id: statusMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 11
+    font.pixelSize: root.uiSize(11)
     font.bold: true
   }
 
   FontMetrics {
     id: kindMetrics
     font.family: "Ubuntu Nerd Font"
-    font.pixelSize: 10
+    font.pixelSize: root.uiSize(10)
     font.bold: true
   }
 
   FontMetrics {
     id: versionMetrics
     font.family: "JetBrainsMono Nerd Font"
-    font.pixelSize: 10
+    font.pixelSize: root.uiSize(10)
   }
 
   function headerWidth(title, status) {
-    return 16 + 20 + 10 + titleMetrics.advanceWidth(title) + 12
-      + statusMetrics.advanceWidth(status) + 16;
+    return uiSize(16) + uiSize(20) + uiSize(10) + titleMetrics.advanceWidth(title) + uiSize(12)
+      + statusMetrics.advanceWidth(status) + uiSize(16);
   }
 
   function listContentWidth() {
     let width = headerWidth(listTitleText, listStatusText);
     for (let index = 0; index < availableUpdates.length; ++index) {
       const update = availableUpdates[index];
-      width = Math.max(width, 64
+      width = Math.max(width, uiSize(64)
         + rowTitleMetrics.advanceWidth(update.name || "")
         + dateMetrics.advanceWidth(update.date || ""));
     }
@@ -131,7 +135,7 @@ FocusScope {
       const change = changes[index];
       const versions = versionText(change.oldVersions) + "  →  "
         + versionText(change.newVersions);
-      width = Math.max(width, 80
+      width = Math.max(width, uiSize(80)
         + rowTitleMetrics.advanceWidth(change.name || "")
         + versionMetrics.advanceWidth(versions)
         + kindMetrics.advanceWidth((change.kind || "").toUpperCase()));
@@ -141,29 +145,30 @@ FocusScope {
 
   function adaptiveWidth() {
     if (authMode) {
-      const authContentWidth = 16 + 20 + 10
-        + rowTitleMetrics.advanceWidth(authLabelText) + 10 + 120 + 10 + 42 + 16;
-      return Layout.boundedWidth(authContentWidth, 400, 480);
+      const authContentWidth = uiSize(16) + uiSize(20) + uiSize(10)
+        + rowTitleMetrics.advanceWidth(authLabelText) + uiSize(10) + uiSize(120)
+        + uiSize(10) + uiSize(42) + uiSize(16);
+      return Layout.boundedWidth(authContentWidth, uiSize(400), uiSize(480));
     }
     if (cleaningMode) {
       return Layout.boundedWidth(
-        headerWidth(completionTitleText, completionStatusText), 280, 360);
+        headerWidth(completionTitleText, completionStatusText), uiSize(280), uiSize(360));
     }
     if (successMode) {
       return Layout.boundedWidth(
-        headerWidth(completionTitleText, completionStatusText), 240, 480);
+        headerWidth(completionTitleText, completionStatusText), uiSize(240), uiSize(480));
     }
     if (listMode) {
       return Layout.boundedWidth(listContentWidth(),
-        compactStatusMode ? 220 : 280, compactStatusMode ? 280 : 480);
+        uiSize(compactStatusMode ? 220 : 280), uiSize(compactStatusMode ? 280 : 480));
     }
     if (changesMode)
-      return Layout.boundedWidth(changesContentWidth(), 320, 480);
+      return Layout.boundedWidth(changesContentWidth(), uiSize(320), uiSize(480));
     if (progressMode) {
       return Layout.boundedWidth(
-        headerWidth(progressTitleText, phaseLabel), 240, 480);
+        headerWidth(progressTitleText, phaseLabel), uiSize(240), uiSize(480));
     }
-    return 280;
+    return uiSize(280);
   }
 
   function changeColor(kind) {
@@ -261,10 +266,10 @@ FocusScope {
     Item {
       id: updateIcon
       anchors.left: parent.left
-      anchors.leftMargin: 16
-      y: 9
-      width: 20
-      height: 20
+      anchors.leftMargin: root.uiSize(16)
+      y: root.singleLine ? (parent.height - height) / 2 : 9
+      width: root.uiSize(20)
+      height: root.uiSize(20)
 
       Icon {
         id: checkingIcon
@@ -272,12 +277,12 @@ FocusScope {
         visible: updates.checking
         name: root.spinnerFrame; spinning: true
         color: Theme.sideUpdates
-        size: 17
+        size: root.uiSize(17)
       }
 
       Icon {
 
-        size: 17
+        size: root.uiSize(17)
         anchors.fill: parent
         visible: !updates.checking
 
@@ -291,29 +296,35 @@ FocusScope {
 
     Text {
       anchors.left: updateIcon.right
-      anchors.leftMargin: 10
-      y: 8
-      height: 22
+      anchors.leftMargin: root.uiSize(10)
+      objectName: "updatesTitle"
+      anchors.right: root.singleLine ? listStatus.left : undefined
+      anchors.rightMargin: root.uiSize(12)
+      elide: Text.ElideRight
+      y: root.singleLine ? (parent.height - height) / 2 : 8
+      height: root.uiSize(22)
       verticalAlignment: Text.AlignVCenter
       text: root.listTitleText
       color: Theme.foreground
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: root.uiSize(14)
       font.bold: true
     }
 
     Text {
+      id: listStatus
+      objectName: "updatesStatus"
       anchors.right: parent.right
-      anchors.rightMargin: 16
-      y: 9
-      height: 20
+      anchors.rightMargin: root.uiSize(16)
+      y: root.singleLine ? (parent.height - height) / 2 : 9
+      height: root.uiSize(20)
       verticalAlignment: Text.AlignVCenter
       text: root.listStatusText
       color: updates.checkFailed ? Theme.error
         : updates.checking || availableUpdates.length > 0
           ? Theme.sideUpdates : Theme.secondary
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 11
+      font.pixelSize: root.uiSize(11)
       font.bold: true
     }
 
@@ -321,10 +332,10 @@ FocusScope {
       visible: !root.compactStatusMode
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.leftMargin: 14
-      anchors.rightMargin: 14
-      y: 40
-      height: 1
+      anchors.leftMargin: root.uiSize(14)
+      anchors.rightMargin: root.uiSize(14)
+      y: root.uiSize(40)
+      height: root.uiSize(1)
       color: Theme.surfaceRaised
     }
 
@@ -333,7 +344,7 @@ FocusScope {
       visible: !root.compactStatusMode
       anchors.left: parent.left
       anchors.right: parent.right
-      y: 42
+      y: root.uiSize(42)
       height: Math.max(0, root.height - y)
       clip: true
 
@@ -341,9 +352,9 @@ FocusScope {
         id: updateRows
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 16
-        anchors.rightMargin: 16
-        y: 6
+        anchors.leftMargin: root.uiSize(16)
+        anchors.rightMargin: root.uiSize(16)
+        y: root.uiSize(6)
         spacing: 0
 
         Repeater {
@@ -352,28 +363,28 @@ FocusScope {
           Item {
             required property var modelData
             width: updateRows.width
-            height: 30
+            height: root.uiSize(30)
 
             Rectangle {
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              width: 7
-              height: 7
-              radius: 3.5
+              width: root.uiSize(7)
+              height: root.uiSize(7)
+              radius: root.uiSize(3.5)
               color: Theme.sideUpdates
             }
 
             Text {
               anchors.left: parent.left
-              anchors.leftMargin: 16
+              anchors.leftMargin: root.uiSize(16)
               anchors.right: updateDate.left
-              anchors.rightMargin: 16
+              anchors.rightMargin: root.uiSize(16)
               anchors.verticalCenter: parent.verticalCenter
               text: modelData.name
               color: Theme.foreground
               elide: Text.ElideRight
               font.family: "Ubuntu Nerd Font"
-              font.pixelSize: 13
+              font.pixelSize: root.uiSize(13)
               font.bold: true
             }
 
@@ -384,7 +395,7 @@ FocusScope {
               text: modelData.date
               color: Theme.secondary
               font.family: "Ubuntu Nerd Font"
-              font.pixelSize: 12
+              font.pixelSize: root.uiSize(12)
               font.bold: true
             }
           }
@@ -400,14 +411,14 @@ FocusScope {
 
     Icon {
 
-      size: 17
+      size: root.uiSize(17)
       id: progressIcon
       spinning: root.updateProcessing
       anchors.left: parent.left
-      anchors.leftMargin: 16
-      y: 9
-      width: 20
-      height: 20
+      anchors.leftMargin: root.uiSize(16)
+      y: root.singleLine ? (parent.height - height) / 2 : 9
+      width: root.uiSize(20)
+      height: root.uiSize(20)
 
       name: root.updateProcessing ? root.spinnerFrame
         : updates.phase === "error" ? "triangle-alert"
@@ -419,32 +430,32 @@ FocusScope {
 
     Text {
       anchors.left: progressIcon.right
-      anchors.leftMargin: 10
+      anchors.leftMargin: root.uiSize(10)
       anchors.right: progressStatus.left
-      anchors.rightMargin: 12
-      y: 8
-      height: 22
+      anchors.rightMargin: root.uiSize(12)
+      y: root.singleLine ? (parent.height - height) / 2 : 8
+      height: root.uiSize(22)
       verticalAlignment: Text.AlignVCenter
       text: root.progressTitleText
       color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: root.uiSize(14)
       font.bold: true
     }
 
     Text {
       id: progressStatus
       anchors.right: parent.right
-      anchors.rightMargin: 16
-      y: 9
-      height: 20
+      anchors.rightMargin: root.uiSize(16)
+      y: root.singleLine ? (parent.height - height) / 2 : 9
+      height: root.uiSize(20)
       verticalAlignment: Text.AlignVCenter
       text: root.phaseLabel
       color: updates.phase === "error"
         ? Theme.error : Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 11
+      font.pixelSize: root.uiSize(11)
       font.bold: true
     }
   }
@@ -456,14 +467,14 @@ FocusScope {
 
     Icon {
 
-      size: 17
+      size: root.uiSize(17)
       id: changesIcon
       spinning: updates.phase === "installing"
       anchors.left: parent.left
-      anchors.leftMargin: 16
-      y: 9
-      width: 20
-      height: 20
+      anchors.leftMargin: root.uiSize(16)
+      y: root.singleLine ? (parent.height - height) / 2 : 9
+      width: root.uiSize(20)
+      height: root.uiSize(20)
 
       name: updates.phase === "installing"
         ? root.spinnerFrame
@@ -477,42 +488,42 @@ FocusScope {
 
     Text {
       anchors.left: changesIcon.right
-      anchors.leftMargin: 10
+      anchors.leftMargin: root.uiSize(10)
       anchors.right: changesStatus.left
-      anchors.rightMargin: 12
-      y: 8
-      height: 22
+      anchors.rightMargin: root.uiSize(12)
+      y: root.singleLine ? (parent.height - height) / 2 : 8
+      height: root.uiSize(22)
       verticalAlignment: Text.AlignVCenter
       text: root.changesTitle()
       color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: root.uiSize(14)
       font.bold: true
     }
 
     Text {
       id: changesStatus
       anchors.right: parent.right
-      anchors.rightMargin: 16
-      y: 9
-      height: 20
+      anchors.rightMargin: root.uiSize(16)
+      y: root.singleLine ? (parent.height - height) / 2 : 9
+      height: root.uiSize(20)
       verticalAlignment: Text.AlignVCenter
       text: root.changesStatusText
       color: updates.phase === "error"
         ? Theme.error : Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 11
+      font.pixelSize: root.uiSize(11)
       font.bold: true
     }
 
     Rectangle {
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.leftMargin: 14
-      anchors.rightMargin: 14
-      y: 40
-      height: 1
+      anchors.leftMargin: root.uiSize(14)
+      anchors.rightMargin: root.uiSize(14)
+      y: root.uiSize(40)
+      height: root.uiSize(1)
       color: Theme.surfaceRaised
     }
 
@@ -521,11 +532,11 @@ FocusScope {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
-      anchors.topMargin: 42
+      anchors.topMargin: root.uiSize(42)
       anchors.bottom: parent.bottom
-      anchors.bottomMargin: 8
-      anchors.leftMargin: 16
-      anchors.rightMargin: 16
+      anchors.bottomMargin: root.uiSize(8)
+      anchors.leftMargin: root.uiSize(16)
+      anchors.rightMargin: root.uiSize(16)
       clip: true
       boundsBehavior: Flickable.StopAtBounds
       model: updates.changes
@@ -534,59 +545,59 @@ FocusScope {
       delegate: Item {
         required property var modelData
         width: changeList.width
-        height: 34
+        height: root.uiSize(34)
 
         Rectangle {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          width: 7
-          height: 7
-          radius: 3.5
+          width: root.uiSize(7)
+          height: root.uiSize(7)
+          radius: root.uiSize(3.5)
           color: root.changeColor(modelData.kind)
         }
 
         Text {
           anchors.left: parent.left
-          anchors.leftMargin: 16
-          width: 168
+          anchors.leftMargin: root.uiSize(16)
+          width: root.uiSize(168)
           anchors.verticalCenter: parent.verticalCenter
-          height: 22
+          height: root.uiSize(22)
           verticalAlignment: Text.AlignVCenter
           text: modelData.name
           color: Theme.foreground
           elide: Text.ElideRight
           font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 13
+          font.pixelSize: root.uiSize(13)
           font.bold: true
         }
 
         Text {
           id: versionsText
           anchors.left: parent.left
-          anchors.leftMargin: 194
+          anchors.leftMargin: root.uiSize(194)
           anchors.right: kindText.left
-          anchors.rightMargin: 10
+          anchors.rightMargin: root.uiSize(10)
           anchors.verticalCenter: parent.verticalCenter
-          height: 20
+          height: root.uiSize(20)
           verticalAlignment: Text.AlignVCenter
           text: root.versionText(modelData.oldVersions) + "  →  "
             + root.versionText(modelData.newVersions)
           color: Theme.secondary
           elide: Text.ElideMiddle
           font.family: "JetBrainsMono Nerd Font"
-          font.pixelSize: 10
+          font.pixelSize: root.uiSize(10)
         }
 
         Text {
           id: kindText
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
-          height: 18
+          height: root.uiSize(18)
           verticalAlignment: Text.AlignVCenter
           text: modelData.kind.toUpperCase()
           color: root.changeColor(modelData.kind)
           font.family: "Ubuntu Nerd Font"
-          font.pixelSize: 10
+          font.pixelSize: root.uiSize(10)
           font.bold: true
         }
 
@@ -594,7 +605,7 @@ FocusScope {
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
-          height: 1
+          height: root.uiSize(1)
           color: Theme.surfaceRaised
           opacity: 0.55
         }
@@ -608,7 +619,7 @@ FocusScope {
         text: "No package version changes"
         color: Theme.secondary
         font.family: "Ubuntu Nerd Font"
-        font.pixelSize: 13
+        font.pixelSize: root.uiSize(13)
         font.bold: true
       }
     }
@@ -622,14 +633,14 @@ FocusScope {
 
     Icon {
 
-      size: 17
+      size: root.uiSize(17)
       id: completionIcon
       spinning: root.cleaningMode
       anchors.left: parent.left
-      anchors.leftMargin: 16
+      anchors.leftMargin: root.uiSize(16)
       anchors.verticalCenter: parent.verticalCenter
-      width: 20
-      height: 20
+      width: root.uiSize(20)
+      height: root.uiSize(20)
 
       name: root.cleaningMode ? root.spinnerFrame : "circle-check"
       color: Theme.sideUpdates
@@ -638,31 +649,31 @@ FocusScope {
 
     Text {
       anchors.left: completionIcon.right
-      anchors.leftMargin: 10
+      anchors.leftMargin: root.uiSize(10)
       anchors.right: completionStatus.left
-      anchors.rightMargin: 12
+      anchors.rightMargin: root.uiSize(12)
       anchors.verticalCenter: parent.verticalCenter
-      height: 22
+      height: root.uiSize(22)
       verticalAlignment: Text.AlignVCenter
       text: root.completionTitleText
       color: Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: root.uiSize(14)
       font.bold: true
     }
 
     Text {
       id: completionStatus
       anchors.right: parent.right
-      anchors.rightMargin: 16
+      anchors.rightMargin: root.uiSize(16)
       anchors.verticalCenter: parent.verticalCenter
-      height: 20
+      height: root.uiSize(20)
       verticalAlignment: Text.AlignVCenter
       text: root.completionStatusText
       color: Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 11
+      font.pixelSize: root.uiSize(11)
       font.bold: true
     }
   }
@@ -674,13 +685,13 @@ FocusScope {
 
     Icon {
 
-      size: 18
+      size: root.uiSize(18)
       id: authIcon
       anchors.left: parent.left
-      anchors.leftMargin: 16
+      anchors.leftMargin: root.uiSize(16)
       anchors.verticalCenter: parent.verticalCenter
-      width: 20
-      height: 20
+      width: root.uiSize(20)
+      height: root.uiSize(20)
 
       name: "lock-keyhole"
       color: Theme.sideUpdates
@@ -690,37 +701,37 @@ FocusScope {
     Text {
       id: authLabel
       anchors.left: authIcon.right
-      anchors.leftMargin: 10
+      anchors.leftMargin: root.uiSize(10)
       anchors.verticalCenter: parent.verticalCenter
-      width: 138
-      height: 22
+      width: root.uiSize(138)
+      height: root.uiSize(22)
       verticalAlignment: Text.AlignVCenter
       text: root.authLabelText
       color: auth.supplementaryIsError
         ? Theme.error : Theme.foreground
       elide: Text.ElideRight
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 13
+      font.pixelSize: root.uiSize(13)
       font.bold: true
     }
 
     Rectangle {
       anchors.left: authLabel.right
-      anchors.leftMargin: 10
+      anchors.leftMargin: root.uiSize(10)
       anchors.right: authSubmit.left
-      anchors.rightMargin: 10
+      anchors.rightMargin: root.uiSize(10)
       anchors.verticalCenter: parent.verticalCenter
-      height: 26
-      radius: 8
+      height: root.uiSize(26)
+      radius: root.uiSize(8)
       color: Theme.surface
-      border.width: 1
+      border.width: root.uiSize(1)
       border.color: Theme.sideUpdates
 
       Text {
         anchors.left: parent.left
-        anchors.leftMargin: 10
+        anchors.leftMargin: root.uiSize(10)
         anchors.right: parent.right
-        anchors.rightMargin: 10
+        anchors.rightMargin: root.uiSize(10)
         anchors.verticalCenter: parent.verticalCenter
         text: auth.input.length === 0 ? "Password…"
           : auth.responseVisible
@@ -730,23 +741,23 @@ FocusScope {
           ? Theme.secondary : Theme.foreground
         elide: Text.ElideLeft
         font.family: "JetBrainsMono Nerd Font"
-        font.pixelSize: 13
+        font.pixelSize: root.uiSize(13)
       }
     }
 
     Text {
       id: authSubmit
       anchors.right: parent.right
-      anchors.rightMargin: 16
+      anchors.rightMargin: root.uiSize(16)
       anchors.verticalCenter: parent.verticalCenter
-      width: 42
-      height: 20
+      width: root.uiSize(42)
+      height: root.uiSize(20)
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: "ENTER"
       color: Theme.sideUpdates
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 10
+      font.pixelSize: root.uiSize(10)
       font.bold: true
     }
   }

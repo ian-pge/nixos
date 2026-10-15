@@ -4,6 +4,7 @@ import "../../ui"
 
 Rectangle {
   id: root
+  objectName: "brightnessIndicator"
 
   required property var controller
   property string targetMonitor: ""
@@ -11,9 +12,9 @@ Rectangle {
   readonly property real level: Math.max(0, Math.min(1, (controller.value(targetMonitor) ?? 0) / 100))
   property real displayedLevel: level
 
-  implicitWidth: 280
-  implicitHeight: 36
-  radius: 18
+  implicitWidth: Theme.barSize(280)
+  implicitHeight: Theme.barSize(36)
+  radius: Theme.barSize(18)
   color: GlassState.enabled ? "transparent" : Theme.background
 
   Behavior on displayedLevel {
@@ -25,10 +26,11 @@ Rectangle {
 
   Icon {
 
-    size: 17
+    size: Theme.barSize(17)
     id: brightnessIcon
+    objectName: "brightnessIndicatorIcon"
     anchors.left: parent.left
-    anchors.leftMargin: 15
+    anchors.leftMargin: Theme.barSize(15)
     anchors.verticalCenter: parent.verticalCenter
     name: controller.icon(targetMonitor)
     color: Theme.sideBrightness
@@ -38,19 +40,19 @@ Rectangle {
   Rectangle {
     id: track
     anchors.left: brightnessIcon.right
-    anchors.leftMargin: 13
+    anchors.leftMargin: Theme.barSize(13)
     anchors.right: parent.right
-    anchors.rightMargin: 15
+    anchors.rightMargin: Theme.barSize(15)
     anchors.verticalCenter: parent.verticalCenter
-    height: 8
-    radius: 4
+    height: Theme.barSize(8)
+    radius: Theme.barSize(4)
     color: Theme.surfaceRaised
 
     Rectangle {
       id: fill
       width: track.width * root.displayedLevel
       height: parent.height
-      radius: 4
+      radius: Theme.barSize(4)
       color: Theme.sideBrightness
     }
   }

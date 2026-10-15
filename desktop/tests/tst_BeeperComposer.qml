@@ -113,6 +113,40 @@ ShellRoot {
       verify(fixture.composer.input.activeFocus);
       compare(sendSpy.count, 0); compare(recordSpy.count, 0);
     }
+    function test_emoji_search_reuses_visible_cells_and_updates_their_entries() {
+      const picker = openPicker("coeur");
+      wait(20);
+      const first = picker.grid.itemAtIndex(0); verify(first !== null);
+      picker.searchInput.text = "visage";
+      wait(20);
+      compare(picker.grid.itemAtIndex(0), first);
+      compare(first.entry.emoji, picker.matches[0].emoji);
+      compare(first.entry.name, picker.matches[0].name);
+      compare(picker.grid.count, picker.matches.length);
+    }
+    function test_emoji_pool_covers_scrolling_without_creating_the_catalogue() {
+      const picker = openPicker("");
+      const cells = () => picker.grid.contentItem.children.filter(item => item.objectName.startsWith("beeperEmojiCell-"));
+      const originalCells = cells();
+      verify(picker.matches.length > 3000); verify(originalCells.length < 100);
+      picker.grid.currentIndex = 2500;
+      picker.grid.positionViewAtIndex(2500, GridView.Contain); wait(20);
+      compare(cells(), originalCells);
+      compare(picker.grid.currentItem.entry.emoji, picker.matches[2500].emoji);
+      picker.searchInput.text = "coeur"; wait(20);
+      compare(picker.grid.contentY, 0); compare(picker.grid.currentIndex, 0);
+      compare(cells(), originalCells);
+    }
+    function test_emoji_search_cancels_wheel_motion_and_arrows_keep_the_column_at_edges() {
+      const picker = openPicker("");
+      picker.grid.currentIndex = 3; picker.grid.forceActiveFocus(); keyClick(Qt.Key_Up);
+      compare(picker.grid.currentIndex, 3);
+      mouseWheel(picker.grid, 40, 80, 0, -120);
+      picker.searchInput.text = "visage"; wait(250);
+      compare(picker.grid.contentY, 0);
+      picker.grid.currentIndex = picker.grid.count - 1; keyClick(Qt.Key_Down);
+      compare(picker.grid.currentIndex, picker.grid.count - 1);
+    }
     function test_emoji_replaces_selection_with_complete_unicode_sequence() {
       fixture.composer.editMessageID = "edit"; fixture.composer.editText = "Hello friend!";
       fixture.composer.input.forceActiveFocus(); fixture.composer.input.select(6, 12);
@@ -120,7 +154,7 @@ ShellRoot {
       tryVerify(() => picker.matches.some(entry => entry.emoji === emoji));
       const index = picker.matches.findIndex(entry => entry.emoji === emoji);
       picker.grid.currentIndex = index;
-      picker.grid.positionViewAtIndex(index, GridView.Contain); picker.grid.forceLayout(); wait(20);
+      picker.grid.positionViewAtIndex(index, GridView.Contain); wait(20);
       const button = picker.grid.currentItem;
       verify(button !== null); mouseClick(button);
       compare(fixture.composer.editText, "Hello " + emoji + "!");

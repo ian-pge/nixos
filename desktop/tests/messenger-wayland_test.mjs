@@ -155,7 +155,7 @@ try {
     if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testVideo ? /BeeperVideo:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : testSidebar ? /BeeperSidebar:/ : testPerformance ? /BeeperPerformance:/ : /Messenger integration:/).test(shellLog)) return true;
     if (shell.exitCode !== null) throw new Error("Quickshell exited before reporting the compile result");
     return false;
-  }, testDesktop ? "desktop integration tests" : "messenger QML compilation", testDesktop ? 30_000 : 15_000);
+  }, testDesktop ? "desktop integration tests" : "messenger QML compilation", testDesktop || testSidebar ? 30_000 : 15_000);
   if (renderPreview) {
     const report = JSON.parse(shellLog.match(/Messenger preview: (\{[^\n]+\})/)?.[1] || "{}");
     assert.equal(report.expanded, true, shellLog);
@@ -167,7 +167,7 @@ try {
     : testPerformance ? /BeeperPerformance: \d+ passed, 0 failed/
     : /Messenger integration: all components compile/, shellLog);
   assert.doesNotMatch(shellLog, /(?:ERROR|TypeError|ReferenceError|Binding loop|Cannot assign|Unable to assign \[undefined\])/, shellLog);
-  if (testSidebar) console.log(shellLog.split('\n').filter(line => /Sidebar animation:/.test(line)).join('\n'));
+  if (testSidebar) console.log(shellLog.split('\n').filter(line => /Sidebar (animation|reflow):/.test(line)).join('\n'));
   if (testSidebar && Number.isFinite(sidebarCpuTicks)) console.log("Sidebar animation CPU ticks:", sidebarCpuTicks);
   if (testPerformance) console.log(shellLog.split('\n').filter(line => /Conversation performance:/.test(line)).join('\n'));
   if (env.QS_TOOLTIP_DIAGNOSTIC) console.log(shellLog.split('\n').filter(line => /Tooltip diagnostic|Tooltip pointer:/.test(line)).join('\n'));

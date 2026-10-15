@@ -10,11 +10,26 @@ ShellRoot {
   property bool measuring: false
   property real lastFrame: 0
   property var frameGaps: []
+  property bool watchRowSpacing: false
+  property real smallestRowGap: 1000
+  property int spacingFrames: 0
   readonly property string referenceSource: Quickshell.env("BEEPER_SIDEBAR_SOURCE") || ""
   Window {
     id: window
     width: 420; height: 760; visible: true; color: "#181926"
     onFrameSwapped: {
+      if (fixture.watchRowSpacing) {
+        ++fixture.spacingFrames;
+        for (let index = 0; index < 3; ++index) {
+          const row = sidebar.list.itemAtIndex(index), next = sidebar.list.itemAtIndex(index + 1);
+          if (row && next) {
+            const bodyHeight = item => Math.max(item.textHeight, 48 + (item.avatarDiameter - 48) * item.selectionProgress);
+            const bottom = row.visualY + (row.visualHeight + bodyHeight(row)) / 2;
+            const top = next.visualY + (next.visualHeight - bodyHeight(next)) / 2;
+            fixture.smallestRowGap = Math.min(fixture.smallestRowGap, top - bottom);
+          }
+        }
+      }
       if (!fixture.measuring) return;
       const now = Date.now();
       if (fixture.lastFrame) fixture.frameGaps.push(now - fixture.lastFrame);
@@ -32,6 +47,8 @@ ShellRoot {
   }
   SignalSpy { id: titleWidths; signalName: "widthChanged" }
   SignalSpy { id: avatarWidths; signalName: "widthChanged" }
+  SignalSpy { id: modelMoves; target: fixture.sidebar?.list.model ?? null; signalName: "rowsMoved" }
+  SignalSpy { id: modelRemovals; target: fixture.sidebar?.list.model ?? null; signalName: "rowsRemoved" }
   TextMetrics { id: logoMetrics }
   TestResult { id: results }
   TestCase {
@@ -83,7 +100,8 @@ ShellRoot {
         wait(30);
         compare(highlight.targetItem, selected, "Passive reorder preserves the selected delegate");
         verify(!highlight.running, "Passive layout changes must not start another slide");
-        fuzzyCompare(highlight.y, selected.y, 0.1); fuzzyCompare(highlight.height, selected.height, 0.1);
+        fuzzyCompare(highlight.y, selected.visualY, 0.1); fuzzyCompare(highlight.height, selected.height, 0.1);
+        wait(250); // Finish reflow before exercising an independent keyboard slide.
         sidebar.currentChatID = "chat-3"; sidebar.revealChat(3); wait(35);
         verify(highlight.running);
         const progressBeforeReorder = highlight.progress;
@@ -94,6 +112,113 @@ ShellRoot {
         fuzzyCompare(highlight.y, highlight.targetItem.y, 0.1);
         fuzzyCompare(highlight.height, highlight.targetItem.height, 0.1);
       } finally { sidebar.chats = original; sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(250); }
+    }
+    function test_catalogue_reflow_data() {
+      return [{tag: "archive-500", count: 500, remove: true}, {tag: "read-500", count: 500, remove: false},
+        {tag: "archive-2000", count: 2000, remove: true}, {tag: "read-2000", count: 2000, remove: false}];
+    }
+    function test_bulk_reorder_reuses_visible_slots_and_preserves_the_viewport_anchor() {
+      if (fixture.referenceSource) return;
+      const original = sidebar.chats;
+      try {
+        sidebar.list.positionViewAtIndex(100, ListView.Beginning); wait(250);
+        const top = sidebar.list.indexAt(1, sidebar.list.contentY + 2);
+        const anchor = sidebar.list.itemAtIndex(top);
+        const id = anchor.row.id, offset = sidebar.list.contentY - anchor.y;
+        modelMoves.clear();
+        sidebar.chats = original.slice().reverse(); wait(250);
+        compare(modelMoves.count, 0);
+        const index = sidebar.chats.findIndex(chat => chat.id === id);
+        const restored = sidebar.list.itemAtIndex(index); verify(restored !== null);
+        fuzzyCompare(sidebar.list.contentY - restored.y, offset, 0.5);
+      } finally { sidebar.chats = original; sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(300); }
+    }
+    function test_restored_chat_selection_ignores_its_old_fading_row() {
+      if (fixture.referenceSource) return;
+      const original = sidebar.chats;
+      try {
+        sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(300);
+        const outgoing = sidebar.list.itemAtIndex(1);
+        sidebar.chats = [original[0]].concat(original.slice(2)); sidebar.list.forceLayout();
+        verify(outgoing.retiring); verify(!outgoing.enabled);
+        sidebar.chats = original; sidebar.currentChatID = "chat-1"; sidebar.revealChat(1);
+        const restored = sidebar.list.itemAtIndex(1);
+        verify(restored !== outgoing); verify(!outgoing.chosen); verify(restored.chosen);
+        compare(findChild(sidebar, "beeperChatSelection").targetItem, restored);
+        compare(findChild(sidebar, "beeperChatRow-chat-1"), restored);
+      } finally { sidebar.chats = original; sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(300); }
+    }
+    function test_catalogue_reflow(data) {
+      const original = sidebar.chats;
+      const rows = Array.from({length: data.count}, (_, i) => ({id: "chat-" + i,
+        title: "Synthetic conversation " + i, network: "Telegram", preview: {text: "Synthetic preview"}, unreadCount: 1}));
+      try {
+        sidebar.chats = rows; sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(300);
+        const next = sidebar.list.itemAtIndex(1), following = sidebar.list.itemAtIndex(2);
+        const initialY = next.y, highlight = findChild(sidebar, "beeperChatSelection");
+        modelMoves.clear(); modelRemovals.clear();
+        fixture.frameGaps = []; fixture.lastFrame = Date.now(); fixture.measuring = true;
+        const started = Date.now();
+        sidebar.chats = data.remove ? rows.slice(1)
+          : rows.slice(1).concat([Object.assign({}, rows[0], {unreadCount: 0})]);
+        sidebar.currentChatID = "chat-1"; sidebar.revealChat(0);
+        const applyMs = Date.now() - started;
+        if (!fixture.referenceSource) {
+          compare(modelMoves.count, data.remove ? 0 : 1);
+          compare(modelRemovals.count, data.remove ? 1 : 0);
+          compare(sidebar.list.itemAtIndex(0), next, "Keep the surviving delegate and its avatar");
+          wait(35);
+          verify(next.visualY < initialY && next.visualY > sidebar.list.originY, "The next row glides into place");
+          for (let frame = 0; frame < 10; ++frame) {
+            verify(following.visualY - next.visualY - next.visualHeight >= -1, "Growing contents must not overlap the following row");
+            fuzzyCompare(highlight.y, next.visualY, 0.1);
+            fuzzyCompare(highlight.height, next.visualHeight, 0.1);
+            wait(20);
+          }
+          fuzzyCompare(following.y - next.y, next.height + sidebar.list.spacing, 0.5);
+        } else wait(250);
+        fixture.measuring = false;
+        const frames = fixture.frameGaps.slice().sort((a, b) => a - b);
+        console.log("Sidebar reflow:", JSON.stringify({action: data.remove ? "archive" : "read", chats: data.count,
+          modelMoves: modelMoves.count, modelRemovals: modelRemovals.count, applyMs: applyMs,
+          p95FrameMs: frames.length ? frames[Math.floor((frames.length - 1) * 0.95)] : 0,
+          maxFrameMs: frames.length ? frames[frames.length - 1] : 0}));
+      } finally {
+        fixture.measuring = false; sidebar.chats = original; sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(300);
+      }
+    }
+    function test_repeated_removals_and_navigation_during_reflow_settle_without_overlap_data() {
+      return [{tag: "rapid", pause: 10}, {tag: "mid-reflow", pause: 45}, {tag: "near-end", pause: 150}];
+    }
+    function test_repeated_removals_and_navigation_during_reflow_settle_without_overlap(data) {
+      if (fixture.referenceSource) return;
+      const original = sidebar.chats;
+      try {
+        sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(250);
+        for (let i = 1; i <= 4; ++i) {
+          sidebar.chats = original.slice(i);
+          sidebar.currentChatID = "chat-" + i; sidebar.revealChat(0);
+          wait(data.pause);
+        }
+        fixture.smallestRowGap = 1000; fixture.spacingFrames = 0; fixture.watchRowSpacing = true;
+        sidebar.currentChatID = "chat-5"; sidebar.revealChat(1);
+        wait(500); fixture.watchRowSpacing = false;
+        verify(fixture.spacingFrames > 0);
+        verify(fixture.smallestRowGap >= 0, "Conversation text and avatars must not overlap during navigation: gap " + fixture.smallestRowGap);
+        for (let index = 0; index < 4; ++index) {
+          tryVerify(() => {
+            const row = sidebar.list.itemAtIndex(index), next = sidebar.list.itemAtIndex(index + 1);
+            return row !== null && next !== null && Math.abs(next.y - row.y - row.height - sidebar.list.spacing) <= 0.5;
+          }, 1000);
+        }
+        compare(findChild(sidebar, "beeperChatSelection").targetItem.row.id, "chat-5");
+      } finally {
+        fixture.watchRowSpacing = false;
+        if (results.failed) console.log("Reflow failed geometry", JSON.stringify({scroll: sidebar.list.contentY, origin: sidebar.list.originY,
+          smallestContentGap: fixture.smallestRowGap, frames: fixture.spacingFrames,
+          rows: Array.from({length: 5}, (_, i) => { const row = sidebar.list.itemAtIndex(i); return row ? {id: row.row.id, y: row.y, h: row.height, visual: row.visualHeight} : null; })}));
+        sidebar.chats = original; sidebar.currentChatID = "chat-0"; sidebar.revealChat(0); wait(300);
+      }
     }
     function test_network_transitions_follow_latest_filter_without_delaying_data() {
       if (fixture.referenceSource) return;

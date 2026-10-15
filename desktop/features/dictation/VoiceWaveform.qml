@@ -9,14 +9,15 @@ Item {
   required property bool speechDetected
   required property color accent
   property bool active: true
+  property real sizeScale: 1
   property real elapsedSeconds: 0
   property real peakReference: minimumPeakReference
   property real normalizedEnergy: 0
   property var barLevels: []
 
   readonly property int minimumBarCount: 18
-  readonly property real barWidth: 3
-  readonly property real barSpacing: 2
+  readonly property real barWidth: 3 * sizeScale
+  readonly property real barSpacing: 2 * sizeScale
   readonly property real noiseFloor: 0.006
   readonly property real minimumPeakReference: 0.015
   readonly property int barCount: Math.max(minimumBarCount,
@@ -24,7 +25,7 @@ Item {
 
   implicitWidth: minimumBarCount * barWidth
     + (minimumBarCount - 1) * barSpacing
-  implicitHeight: 22
+  implicitHeight: 22 * sizeScale
 
   function clamp(value) {
     return Math.max(0, Math.min(1, value));
@@ -134,7 +135,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: root.barWidth
         height: root.barWidth
-          + Math.pow(level, 0.78) * (root.height - 2 - root.barWidth)
+          + Math.pow(level, 0.78) * (root.height - 2 * root.sizeScale - root.barWidth)
         radius: width / 2
         color: root.accent
       }

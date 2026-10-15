@@ -4,22 +4,25 @@ import "../../ui"
 
 Rectangle {
   id: root
+  objectName: "voiceDictationIndicator"
 
   required property var controller
   readonly property bool recording: controller.recording
   readonly property color accent: Theme.action
 
-  implicitWidth: 180
-  implicitHeight: 36
-  radius: 18
+  implicitWidth: Theme.barSize(180)
+  implicitHeight: Theme.barSize(36)
+  radius: Theme.barSize(18)
   color: GlassState.enabled ? "transparent" : Theme.background
 
   VoiceWaveform {
+    objectName: "dictationWaveform"
+    sizeScale: Theme.barScale
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.margins: 10
+    anchors.margins: Theme.barSize(10)
     anchors.verticalCenter: parent.verticalCenter
-    height: 22
+    height: Theme.barSize(22)
     energy: root.controller.energy
     speechDetected: root.controller.speechDetected
     accent: root.accent
@@ -29,14 +32,14 @@ Rectangle {
 
   Row {
     anchors.centerIn: parent
-    spacing: 10
+    spacing: Theme.barSize(10)
     visible: !root.recording
 
     Icon {
       anchors.verticalCenter: parent.verticalCenter
       name: "loader-circle"; spinning: true
       color: root.accent
-      size: 17
+      size: Theme.barSize(17)
     }
 
     Text {
@@ -44,7 +47,7 @@ Rectangle {
       text: "Transcription…"
       color: root.accent
       font.family: "Ubuntu Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: Theme.barSize(14)
       font.bold: true
     }
   }

@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "StorageReport.js" as Report
 
-// The privileged service publishes one atomic, aggregate-only report. Scans
-// are shared across monitors and continue if the panel is closed meanwhile.
+// The privileged service publishes one atomic, user-readable report. Scans
+// start with the shell, are shared across monitors and outlive the open panel.
 Scope {
   id: root
   property bool enabled: true
@@ -108,9 +108,9 @@ Scope {
   onActiveChanged: if (active) refresh()
   onEnabledChanged: {
     if (!enabled) cancel();
-    else if (active) refresh();
+    else refresh();
   }
-  Component.onCompleted: if (active) refresh()
+  Component.onCompleted: refresh()
 
   SystemClock { id: clock; precision: SystemClock.Minutes }
   Timer {

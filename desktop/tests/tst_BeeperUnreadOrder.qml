@@ -80,6 +80,89 @@ ShellRoot {
       compare(ids(panel.filteredChats), "unread-e,read-c,read-a,unread-b,manual-d,read-g");
       compare(beeperData.currentChatID, "read-a"); compare(panel.chatIndex, 2);
     }
+    function unreadQueue() {
+      beeperData.chats = readChats(40).concat([
+        {id: "queue-a", title: "Queue A", unreadCount: 1},
+        {id: "queue-b", title: "Queue B", isMarkedUnread: true},
+        {id: "queue-c", title: "Queue C", unreadCount: 2}
+      ]);
+      panel.focusNavigation(); keyClick(Qt.Key_U); panel.chooseChat(1);
+      beeperData.respond("messages", {items: [], hasMore: false});
+      compare(beeperData.currentChatID, "queue-b");
+      panel.focusNavigation();
+    }
+    function test_mark_read_advances_to_next_unread_without_following_the_read_chat() {
+      unreadQueue();
+      beeperData.draftText = "Keep the draft";
+      keyClick(Qt.Key_M);
+      compare(pending("read")[0].params.chatID, "queue-b");
+      compare(beeperData.currentChatID, "queue-b", "Wait for Beeper confirmation");
+      beeperData.respond("read", {id: "queue-b", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "queue-c");
+      compare(beeperData.localDrafts["queue-b"].text, "Keep the draft");
+      compare(panel.chatIndex, 1); compare(panel.navigation, "chats");
+      wait(300);
+      verify(panel.chatList.atYBeginning, "Stay with the unread conversations at the top");
+      // A later HTTP refresh must not restore the marked conversation's focus.
+      beeperData.respond("chats", {items: beeperData.chats, hasMore: false});
+      wait(50); compare(beeperData.currentChatID, "queue-c");
+      verify(panel.chatList.atYBeginning);
+    }
+    function test_read_state_arriving_before_the_action_reply_does_not_scroll_down() {
+      unreadQueue(); keyClick(Qt.Key_M);
+      beeperData.applyReadState("queue-b", {id: "queue-b", unreadCount: 0, isMarkedUnread: false});
+      wait(300);
+      verify(panel.chatList.atYBeginning, "A live read update must not drag the viewport to the read section");
+      beeperData.respond("read", {id: "queue-b", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "queue-c");
+    }
+    function test_failed_read_keeps_selection() {
+      unreadQueue(); keyClick(Qt.Key_M);
+      beeperData.respond("read", null, {message: "Offline"});
+      compare(beeperData.currentChatID, "queue-b");
+      verify(beeperData.currentChat.isMarkedUnread);
+    }
+    function test_read_reply_does_not_override_later_navigation() {
+      unreadQueue(); keyClick(Qt.Key_M);
+      panel.chooseChat(0);
+      beeperData.respond("read", {id: "queue-b", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "queue-a");
+    }
+    function test_read_reply_does_not_override_returning_to_the_same_chat() {
+      unreadQueue(); keyClick(Qt.Key_M);
+      panel.chooseChat(0); panel.chooseChat(1);
+      beeperData.respond("read", {id: "queue-b", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "queue-b");
+    }
+    function test_read_reply_does_not_override_a_changed_sort() {
+      unreadQueue(); keyClick(Qt.Key_M); keyClick(Qt.Key_U);
+      beeperData.respond("read", {id: "queue-b", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "queue-b"); verify(!panel.unreadFirst);
+    }
+    function test_last_unread_returns_to_top_when_no_unread_remains() {
+      unreadQueue();
+      beeperData.applyReadState("queue-a", {id: "queue-a", unreadCount: 0});
+      beeperData.applyReadState("queue-c", {id: "queue-c", unreadCount: 0});
+      keyClick(Qt.Key_M);
+      beeperData.respond("read", {id: "queue-b", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "read-0");
+      wait(300); verify(panel.chatList.atYBeginning);
+    }
+    function test_last_unread_row_selects_the_previous_remaining_unread() {
+      unreadQueue(); panel.chooseChat(2); keyClick(Qt.Key_M);
+      beeperData.respond("read", {id: "queue-c", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "queue-b"); compare(panel.chatIndex, 1);
+    }
+    function test_read_reply_with_new_unread_messages_keeps_selection() {
+      unreadQueue(); keyClick(Qt.Key_M);
+      beeperData.respond("read", {id: "queue-b", unreadCount: 1, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "queue-b"); compare(beeperData.currentChat.unreadCount, 1);
+    }
+    function test_normal_order_keeps_the_marked_conversation_open() {
+      panel.chooseChat(1); keyClick(Qt.Key_M);
+      beeperData.respond("read", {id: "unread-b", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.currentChatID, "unread-b"); verify(!panel.unreadFirst);
+    }
     function test_network_priority_and_search_filters_keep_the_unread_order() {
       keyClick(Qt.Key_U); keyClick(Qt.Key_Tab);
       compare(panel.networkFilter, "telegram"); verify(panel.unreadFirst);

@@ -25,6 +25,7 @@ FocusScope {
   readonly property string conversationConnectionIssue: Format.chatConnectionIssue(beeperData.currentChat, beeperData.accountConnectionIssues, beeperData.serviceConnectionIssue)
   readonly property color conversationAccent: conversationConnectionIssue ? Theme.error : Theme.beeperNetworkColors[Format.networkBadge(beeperData.currentChat?.network).key] || Theme.secondary
   property bool searchOpen: false
+  property string searchChatID: ""
   property bool locatingSearchResult: false
   property string locatingSearchChatID: ""
   property string modal: ""
@@ -64,7 +65,7 @@ FocusScope {
   property bool attachmentPickerStarted: false
   onAttachmentPickerReadyChanged: if (attachmentPickerReady) Qt.callLater(startAttachmentPicker)
   readonly property bool canNavigatePanes: active && windowFocused && !modal && !connectionSurface.visible
-    && !attachmentPicker && !composer.inputMethodComposing
+    && !attachmentPicker && !composer.inputMethodComposing && !searchField.inputMethodComposing
   readonly property bool canPickAttachment: canUseComposerShortcuts && composer.activeFocus
     && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !editMessageID
     && !recording && !preparingRecording && !attachmentPicker && !emojiPickerOpen && !beeperData.stagingAttachments
@@ -97,7 +98,7 @@ FocusScope {
     && !composerSurface?.emojiPickerOpen
     && !(connectionSurface?.visible ?? true)
     && !composer?.activeFocus && !searchField?.activeFocus && !tokenField?.activeFocus
-    && !recording && !preparingRecording && !messageSearch.opened
+    && !recording && !preparingRecording && !searchOpen && !messageSearch.opened
   readonly property bool canZoomText: active && windowFocused && !modal
     && !composerSurface?.emojiPickerOpen
     && !connectionSurface.visible
@@ -131,8 +132,32 @@ FocusScope {
     if (!active || !beeperData.connected || beeperData.currentChatID || !filteredChats.length) return;
     chooseChat(0);
   }
-  function openChatSearch() { closeConversationSearch(false); searchOpen = true; Qt.callLater(() => searchField.forceActiveFocus()); }
-  function closeChatSearch() { searchOpen = false; searchField.text = ""; if (active) navigationFocus.forceActiveFocus(); }
+  function openChatSearch() {
+    closeConversationSearch(false); searchOpen = true; selectSearchChat(0);
+    Qt.callLater(() => { if (active && searchOpen) searchField.forceActiveFocus(); });
+  }
+  function closeChatSearch() { searchOpen = false; searchChatID = ""; searchField.text = ""; if (active) navigationFocus.forceActiveFocus(); }
+  function selectSearchChat(index) {
+    if (!searchOpen) return;
+    searchChatID = filteredChats[index]?.id || "";
+    Qt.callLater(revealSearchChat);
+  }
+  function revealSearchChat() {
+    if (!active || !searchOpen) return;
+    const index = filteredChats.findIndex(chat => chat.id === searchChatID);
+    if (index >= 0) sidebar.revealChat(index);
+  }
+  function cycleSearchChat(delta) {
+    if (!searchOpen || !filteredChats.length) return;
+    const index = filteredChats.findIndex(chat => chat.id === searchChatID);
+    selectSearchChat((index + delta + filteredChats.length) % filteredChats.length);
+  }
+  function acceptChatSearch() {
+    const index = filteredChats.findIndex(chat => chat.id === searchChatID);
+    if (!searchOpen || index < 0) return;
+    chooseChat(index); closeChatSearch(); navigation = "messages";
+    sidebar.revealChat(chatIndex);
+  }
   function openConversationSearch(query = "") {
     closeChatSearch(); messageSearch.opened = true;
     if (query) messageSearch.query = query;
@@ -181,6 +206,25 @@ FocusScope {
     // message selection or read state. Reveal the new start of the list.
     Qt.callLater(sidebar.revealFirstChat);
     schedulePagination();
+  }
+  function markSelectedChatRead() {
+    const chat = beeperData.currentChat;
+    if (!chat) return;
+    const advance = unreadFirst && Format.isChatUnread(chat);
+    const index = chatIndex, generation = beeperData.chatGeneration;
+    const network = networkFilter, lowPriority = showLowPriority;
+    beeperData.markChatRead(chat.id, "", (result, error) => {
+      if (error || !advance || !unreadFirst || !canCycleNetwork
+          || beeperData.chatGeneration !== generation || beeperData.currentChatID !== chat.id
+          || networkFilter !== network || showLowPriority !== lowPriority
+          || Format.isChatUnread(beeperData.currentChat)) return;
+      // Stay in the unread section instead of following this chat down into
+      // the read section. A late reply must not undo subsequent navigation.
+      const unread = filteredChats.filter(Format.isChatUnread);
+      const next = unread[Math.min(index, unread.length - 1)];
+      chooseChat(next ? filteredChats.findIndex(item => item.id === next.id) : 0);
+      focusNavigation();
+    });
   }
   function toggleLowPriorityView() {
     if (!active || !windowFocused || modal || recording || preparingRecording || messageSearch.opened) return;
@@ -239,6 +283,7 @@ FocusScope {
   }
   function compose() { if (composerSurface.enabled && beeperData.currentChatID) { navigation = "compose"; composer.forceActiveFocus(); } }
   function navigatePane(right) {
+    if (right && searchOpen) { acceptChatSearch(); return; }
     composerSurface.closeEmojiPicker();
     closeChatSearch(); closeConversationSearch(false); gPending = false;
     if (!right) focusNavigation();
@@ -383,10 +428,20 @@ FocusScope {
     if (link && linkOpener(link.url) === false) beeperData.lastError = "Could not open this link.";
   }
   function activateSelectedMessage() {
+    if (selectedMessage?.attachments?.length) {
+      // Preserve media playback/preview, including messages mixing files and
+      // media. Messages containing only documents save every attachment.
+      if (selectedMessage.attachments.some(attachment => Format.attachmentType(attachment) !== "file")) {
+        activateSelectedMedia(); return;
+      }
+      if (beeperData.saveMessageAttachments(selectedMessage)) {
+        notice = "Saving attachments…"; noticeTimer.restart();
+      }
+      return;
+    }
     const links = Format.messageLinks(selectedMessage);
     if (links.length === 1) openMessageLink(links[0].url);
     else if (links.length > 1) { linkChoices = links; openModal("links"); }
-    else activateSelectedMedia();
   }
   function startRecording() {
     if (!canStartRecording) return;
@@ -520,7 +575,11 @@ FocusScope {
     updateView();
   }
   onModalChanged: { if (modal !== "links") linkChoices = []; if (modal !== "media") pendingPreviewStep = 0; updateView(); }
-  onFilteredChatsChanged: { syncChatIndex(); schedulePagination(); Qt.callLater(reconcilePrioritySelection); Qt.callLater(ensureInitialChat); }
+  onFilteredChatsChanged: {
+    syncChatIndex();
+    if (searchOpen && !filteredChats.some(chat => chat.id === searchChatID)) selectSearchChat(0);
+    schedulePagination(); Qt.callLater(reconcilePrioritySelection); Qt.callLater(ensureInitialChat);
+  }
   Connections {
     target: root.composer
     function onActiveFocusChanged() {
@@ -529,6 +588,12 @@ FocusScope {
   }
   Connections {
     target: root.beeperData
+    function onAttachmentsSaved(chatID, messageID, saved, total, directory) {
+      if (!root.active || root.beeperData.currentChatID !== chatID) return;
+      root.notice = saved === total ? "Saved " + saved + (saved === 1 ? " attachment to " : " attachments to ") + directory
+        : "Saved " + saved + " / " + total + " attachments · " + (total - saved) + " failed";
+      noticeTimer.restart();
+    }
     function onChatPriorityChanged(chatID, lowPriority) {
       if (root.beeperData.currentChatID === chatID) root.reconcilePrioritySelection();
     }
@@ -785,7 +850,7 @@ FocusScope {
     else if (key === "G") { goEdge(true); event.accepted = true; }
     else if (key === "/") { openChatSearch(); event.accepted = true; }
     else if (key === "?" || event.key === Qt.Key_Question) { if (!event.isAutoRepeat) openModal("help"); event.accepted = true; }
-    else if (key === "m" && beeperData.currentChatID) { if (!event.isAutoRepeat) beeperData.markChatRead(beeperData.currentChatID); event.accepted = true; }
+    else if (key === "m" && beeperData.currentChatID) { if (!event.isAutoRepeat) markSelectedChatRead(); event.accepted = true; }
     else if (key === "n" && beeperData.currentChatID) { if (!event.isAutoRepeat) beeperData.markChatUnread(beeperData.currentChatID); event.accepted = true; }
     else if (key === "r" && selectedMessage) { replyToSelectedMessage(); event.accepted = true; }
     else if (key === "e" && selectedMessage?.isSender) { editSelectedMessage(); event.accepted = true; }
@@ -810,14 +875,19 @@ FocusScope {
       unreadFirst: root.unreadFirst
       accountConnectionIssues: root.beeperData.accountConnectionIssues
       serviceConnectionIssue: root.beeperData.serviceConnectionIssue
-      currentChatID: root.beeperData.currentChatID
+      currentChatID: root.searchOpen ? root.searchChatID : root.beeperData.currentChatID
       unreadCount: root.beeperData.unreadConversationCount(root.networkFilter)
       unreadReady: root.beeperData.unreadCountsReady
       unreadLoading: root.beeperData.loadingUnreadCounts
       searchOpen: root.searchOpen
       onNetworkCycleRequested: root.cycleNetwork(1)
-      onSearchAccepted: { root.chooseChat(0); root.closeChatSearch(); root.navigation = "messages"; }
-      onChatSelected: index => { root.chooseChat(index); root.navigation = "chats"; navigationFocus.forceActiveFocus(); }
+      onSearchChanged: root.selectSearchChat(0)
+      onSearchCycled: delta => root.cycleSearchChat(delta)
+      onSearchAccepted: root.acceptChatSearch()
+      onChatSelected: index => {
+        if (root.searchOpen) { root.selectSearchChat(index); root.acceptChatSearch(); }
+        else { root.chooseChat(index); root.navigation = "chats"; navigationFocus.forceActiveFocus(); }
+      }
       onViewportChanged: root.schedulePagination()
     }
 
@@ -840,11 +910,13 @@ FocusScope {
         enabled: !connectionSurface.visible
         BeeperHistory {
           id: messageList; objectName: "beeperMessages"
+          textScale: root.beeperData.chatTextSize / Theme.beeperFont.body
+          shiftViewport: delta => messageWheel.shiftOrigin(delta)
           anchors { fill: parent; bottomMargin: 12 }
           clip: true
           // Keep the closing morph intact, but do not build histories for
           // panels on other monitors or after this panel becomes invisible.
-          model: KeyedListModel { rows: root.visible ? root.beeperData.messages : [] }
+          model: KeyedListModel { rows: root.visible ? root.beeperData.messages : []; immutableRows: true }
           onLayoutReady: {
             if (root.historyUpdatePending) root.finishHistoryUpdate();
             else if (root.active && root.restoringView) root.restorePosition();
@@ -871,8 +943,6 @@ FocusScope {
             message: row; beeperData: root.beeperData
             networkAccent: root.conversationAccent
             searchQuery: messageSearch.opened ? messageSearch.query : ""
-            textScale: root.beeperData.chatTextSize / Theme.beeperFont.body
-            onTextScaleChanged: messageList.invalidateLayout()
             selected: index === root.messageIndex
             playbackEnabled: root.active && !root.videoPreviewOpen
             viewportReady: false

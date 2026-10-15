@@ -27,11 +27,18 @@ Item {
     when: windowShown
     readonly property real gib: 1073741824
     function sample() {
-      return {schemaVersion: 1, measuredAt: 100000, estimated: true,
+      return {schemaVersion: 2, measuredAt: 100000, estimated: true,
         disk: {usedBytes: 100 * gib, availableBytes: 200 * gib, totalBytes: 300 * gib},
-        categories: [{id:"docker", bytes:30*gib}, {id:"nix", bytes:10*gib},
+        categories: [{id:"docker", bytes:30*gib,
+            breakdown: ["layers", "volumes", "buildCache", "containers", "other"]
+              .map((id, index) => ({id: id, bytes: [15, 10, 3, 1, 1][index] * gib, partial: false}))},
+          {id:"nix", bytes:10*gib},
           {id:"applications", bytes:20*gib, cacheBytes:7*gib, dataBytes:13*gib},
-          {id:"personal", bytes:40*gib}, {id:"vm", bytes:0}, {id:"other", bytes:0}]};
+          {id:"personal", bytes:40*gib,
+            largestEntries: ["Projects", "Downloads", "Videos", "Documents", "archive.tar"]
+              .map((name, index) => ({path: "~/" + name, bytes: [15, 10, 8, 5, 2][index] * gib,
+                kind: index === 4 ? "file" : "directory", partial: false}))},
+          {id:"vm", bytes:0}, {id:"other", bytes:0}]};
     }
     function child(name) { return findChild(panel, name); }
     function row(id) { return child("storageRow_" + id); }
@@ -64,6 +71,24 @@ Item {
       compare(child("storageChartTotal").text, "100,0 Gio");
       compare(child("storageSlice_docker").sweepAngle, 108);
       verify(child("storageNote").text.includes("plusieurs fois"));
+    }
+    function test_docker_breakdown_and_personal_top_five() {
+      compare(findChild(child("storageDockerDetail_layers"), "storageDetailLabel").text, "Images et couches");
+      compare(findChild(child("storageDockerDetail_volumes"), "storageDetailBytes").text, "10,0 Gio");
+      compare(findChild(child("storageDockerDetail_buildCache"), "storageDetailBytes").text, "3,0 Gio");
+      compare(findChild(child("storagePersonalEntry_0"), "storagePersonalPath").text, "~/Projects");
+      compare(findChild(child("storagePersonalEntry_0"), "storagePersonalBytes").text, "15,0 Gio");
+      compare(findChild(child("storagePersonalEntry_4"), "storagePersonalPath").text, "~/archive.tar");
+      verify(child("storagePersonalEntry_5") === null);
+      const report = sample();
+      report.categories[0].breakdown[0] = {id: "layers", bytes: null, partial: true};
+      report.categories[3].largestEntries[0].partial = true;
+      controller.snapshot = report; wait(0);
+      compare(findChild(child("storageDockerDetail_layers"), "storageDetailBytes").text, "—");
+      compare(findChild(child("storagePersonalEntry_0"), "storagePersonalBytes").text, "≥ 15,0 Gio");
+      report.categories[3].largestEntries = [];
+      controller.snapshot = JSON.parse(JSON.stringify(report)); wait(0);
+      verify(findChild(row("personal"), "storagePersonalEmpty").visible);
     }
     function test_donut_renders_the_measured_category_colors() {
       waitForRendering(panel);
@@ -109,7 +134,7 @@ Item {
     function test_layout_at_small_and_large_widths() {
       for (const width of [320, 434, 500]) {
         panel.width = width; wait(20);
-        verify(panel.implicitHeight > 500 && panel.implicitHeight < 620);
+        verify(panel.implicitHeight > 650 && panel.implicitHeight < 820);
         for (const id of ["docker", "nix", "applications", "personal", "vm", "other"]) {
           const item = row(id), title = findChild(item, "storageCategoryLabel");
           const amount = findChild(item, "storageCategoryBytes");
@@ -120,6 +145,17 @@ Item {
         }
         const detail = findChild(row("applications"), "storageApplicationsDetail");
         verify(!detail.truncated, "Both application subtotals fit at " + width);
+        for (const id of ["layers", "volumes", "buildCache", "containers", "other"]) {
+          const item = child("storageDockerDetail_" + id);
+          verify(!findChild(item, "storageDetailLabel").truncated);
+          verify(item.y + item.height <= row("docker").height);
+        }
+        for (let index = 0; index < 5; ++index) {
+          const item = child("storagePersonalEntry_" + index);
+          const path = findChild(item, "storagePersonalPath"), amount = findChild(item, "storagePersonalBytes");
+          verify(path.x + path.width <= amount.x - 7);
+          verify(item.y + item.height <= row("personal").height);
+        }
       }
     }
     function test_keyboard_and_click_refresh() {

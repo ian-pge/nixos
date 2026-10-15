@@ -151,6 +151,86 @@ ShellRoot {
       keyClick(Qt.Key_L, Qt.ControlModifier); verify(panel.composer.activeFocus);
       compare(beeperData.draftText, "Keep");
     }
+    function startChatSearch(query = "chat") {
+      panel.openChatSearch(); tryCompare(panel.searchField, "activeFocus", true);
+      panel.searchField.text = query;
+    }
+    function selectedChatRow(id) { return findChild(panel, "beeperChatRow-" + id); }
+    function test_chat_search_highlights_first_match_before_accepting() {
+      beeperData.selectChat("chat-b");
+      startChatSearch();
+      tryVerify(() => selectedChatRow("chat-a")?.chosen === true);
+      verify(!selectedChatRow("chat-b").chosen);
+      compare(beeperData.currentChatID, "chat-b");
+      panel.searchField.text = "First";
+      compare(panel.filteredChats.length, 1);
+      verify(selectedChatRow("chat-a").chosen);
+      compare(beeperData.currentChatID, "chat-b");
+      keyClick(Qt.Key_Escape);
+      verify(!panel.searchOpen); compare(panel.searchField.text, "");
+      tryVerify(() => selectedChatRow("chat-b")?.chosen === true);
+      compare(closeSpy.count, 0);
+    }
+    function test_chat_search_tab_cycles_results_and_keeps_typing_focus() {
+      beeperData.chats = beeperData.chats.concat([{id: "chat-c", title: "Third chat"}]);
+      startChatSearch();
+      for (const id of ["chat-b", "chat-c", "chat-a"]) {
+        keyClick(Qt.Key_Tab);
+        tryVerify(() => selectedChatRow(id)?.chosen === true);
+        verify(panel.searchField.activeFocus);
+        compare(beeperData.currentChatID, "chat-a"); compare(panel.networkFilter, "all");
+      }
+      keyClick(Qt.Key_Tab, Qt.ShiftModifier);
+      tryVerify(() => selectedChatRow("chat-c")?.chosen === true);
+      verify(panel.searchField.activeFocus);
+      panel.searchField.cursorPosition = panel.searchField.length;
+      keyClick(Qt.Key_Backspace);
+      compare(panel.searchField.text, "cha");
+      tryVerify(() => selectedChatRow("chat-a")?.chosen === true);
+    }
+    function test_chat_search_accepts_highlighted_result_data() {
+      return [{tag: "return", key: Qt.Key_Return, modifiers: Qt.NoModifier},
+        {tag: "keypad_enter", key: Qt.Key_Enter, modifiers: Qt.NoModifier},
+        {tag: "ctrl_l", key: Qt.Key_L, modifiers: Qt.ControlModifier}];
+    }
+    function test_chat_search_accepts_highlighted_result(data) {
+      beeperData.draftText = "Keep this draft";
+      startChatSearch(); keyClick(Qt.Key_Tab);
+      tryVerify(() => selectedChatRow("chat-b")?.chosen === true);
+      keyClick(data.key, data.modifiers);
+      compare(beeperData.currentChatID, "chat-b");
+      verify(!panel.searchOpen); verify(!panel.searchField.activeFocus);
+      compare(panel.searchField.text, ""); compare(panel.navigation, "messages");
+      compare(beeperData.localDrafts["chat-a"].text, "Keep this draft");
+      compare(pending("send").length, 0); compare(pending("read").length, 0);
+    }
+    function test_chat_search_preserves_highlight_on_refresh_and_falls_back_when_removed() {
+      startChatSearch(); keyClick(Qt.Key_Tab);
+      beeperData.chats = beeperData.chats.slice().reverse();
+      tryVerify(() => selectedChatRow("chat-b")?.chosen === true);
+      beeperData.chats = beeperData.chats.filter(chat => chat.id !== "chat-b");
+      tryVerify(() => selectedChatRow("chat-a")?.chosen === true);
+      verify(panel.searchField.activeFocus);
+    }
+    function test_chat_search_mouse_opens_clicked_result() {
+      startChatSearch();
+      tryVerify(() => selectedChatRow("chat-b") !== null);
+      mouseClick(selectedChatRow("chat-b"));
+      compare(beeperData.currentChatID, "chat-b"); verify(!panel.searchOpen);
+      tryVerify(() => selectedChatRow("chat-b")?.chosen === true);
+    }
+    function test_chat_search_without_matches_keeps_search_open() {
+      startChatSearch("missing");
+      compare(panel.filteredChats.length, 0);
+      keyClick(Qt.Key_Tab); keyClick(Qt.Key_Tab, Qt.ShiftModifier);
+      keyClick(Qt.Key_Return); keyClick(Qt.Key_L, Qt.ControlModifier);
+      verify(panel.searchOpen); verify(panel.searchField.activeFocus);
+      compare(beeperData.currentChatID, "chat-a"); compare(panel.networkFilter, "all");
+      panel.searchField.text = "Second";
+      tryVerify(() => selectedChatRow("chat-b")?.chosen === true);
+      keyClick(Qt.Key_L, Qt.ControlModifier);
+      compare(beeperData.currentChatID, "chat-b"); verify(!panel.searchOpen);
+    }
     function test_ctrl_f_stages_selection_and_restores_composer() {
       beeperData.deferAttachments = true;
       beeperData.draftText = "A file for you"; beeperData.replyToMessageID = "message-0";
@@ -415,10 +495,99 @@ ShellRoot {
       keyClick(Qt.Key_Escape); compare(panel.modal, "");
       compare(fixture.openedUrls.length, 1); compare(panel.linkChoices.length, 0);
     }
-    function test_links_take_priority_over_a_media_attachment() {
-      selectLinkedMessage("https://one.example/photo", [], [{type: "image"}]);
+    function test_attachment_takes_priority_over_links() {
+      selectLinkedMessage("https://one.example/photo", [], [{type: "image", srcURL: picture("blue")}]);
       keyClick(Qt.Key_Space);
-      compare(fixture.openedUrls, ["https://one.example/photo"]); compare(panel.modal, "");
+      tryCompare(panel, "modal", "media"); compare(fixture.openedUrls.length, 0);
+      compare(panel.previewAttachment.srcURL, picture("blue"));
+      compare(pending("saveAttachment").length, 0);
+    }
+    function captureFileOpens(media) {
+      media.fileOpener = url => { fixture.openedUrls = fixture.openedUrls.concat([url]); return true; };
+    }
+    function test_space_saves_every_document_without_opening() {
+      const files = [
+        {type: "file", srcURL: "file:///tmp/test-document.pdf", fileName: "document.pdf", mimeType: "application/pdf"},
+        {type: "file", srcURL: "mxc://preview/archive", fileName: "archive.zip", mimeType: "application/zip"},
+        {type: "file", srcURL: "mxc://preview/report", fileName: "report.csv", mimeType: "text/csv"}
+      ];
+      selectLinkedMessage("https://one.example/", [], files);
+      captureFileOpens(findChild(panel, "beeperMessages").itemAtIndex(0).attachmentItem(0));
+      keyClick(Qt.Key_Space);
+      for (const file of files) {
+        tryVerify(() => pending("saveAttachment").length === 1);
+        compare(pending("saveAttachment")[0].params, {url: file.srcURL, fileName: file.fileName, mimeType: file.mimeType});
+        keyClick(Qt.Key_Space); wait(0);
+        compare(pending("saveAttachment").length, 1, "Repeated Space cannot duplicate an active batch");
+        beeperData.respond("saveAttachment", {path: "/home/user/Téléchargements/" + file.fileName, name: file.fileName});
+      }
+      tryCompare(panel, "notice", "Saved 3 attachments to Téléchargements");
+      compare(Object.keys(beeperData.attachmentSaveOperations).length, 0);
+      compare(pending("saveAttachment").length, 0);
+      compare(fixture.openedUrls.length, 0); compare(panel.modal, ""); compare(panel.previewAttachment, null);
+      verify(!beeperData.audioPlayback.active); verify(!beeperData.audioPlayback.playWhenReady);
+      compare(panel.selectedMessage.id, "links");
+      panel.compose(); keyClick(Qt.Key_Space);
+      compare(panel.composer.text, " "); compare(pending("saveAttachment").length, 0);
+    }
+    function test_space_keeps_media_preview_when_documents_are_also_attached() {
+      selectLinkedMessage("Mixed attachments", [], [
+        {type: "file", srcURL: "file:///tmp/document.pdf", fileName: "document.pdf"},
+        {type: "img", srcURL: picture("blue")}
+      ]);
+      captureFileOpens(findChild(panel, "beeperMessages").itemAtIndex(0).attachmentItem(0));
+      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+      compare(panel.previewAttachment.srcURL, picture("blue"));
+      compare(fixture.openedUrls.length, 0); compare(pending("saveAttachment").length, 0);
+    }
+    function test_attachment_batch_continues_after_failure_and_reports_partial_success() {
+      selectLinkedMessage("Files", [], [
+        {id: "missing", type: "file"}, {path: "/tmp/second.pdf", fileName: "second.pdf"}
+      ]);
+      keyClick(Qt.Key_Space);
+      tryVerify(() => pending("saveAttachment").length === 1);
+      compare(pending("saveAttachment")[0].params.url, "missing");
+      beeperData.respond("saveAttachment", null, {message: "First file unavailable"});
+      tryVerify(() => pending("saveAttachment").length === 1);
+      compare(pending("saveAttachment")[0].params.url, "file:///tmp/second.pdf");
+      beeperData.respond("saveAttachment", {path: "/home/user/Downloads/second.pdf"});
+      tryCompare(panel, "notice", "Saved 1 / 2 attachments · 1 failed");
+      compare(beeperData.lastError, "First file unavailable");
+      compare(Object.keys(beeperData.attachmentSaveOperations).length, 0);
+      compare(fixture.openedUrls.length, 0);
+    }
+    function test_attachment_batch_keeps_original_files_when_switching_chat_and_closing() {
+      selectLinkedMessage("Files", [], [{type: "file", srcURL: "mxc://original/one"}, {type: "file", srcURL: "mxc://original/two"}]);
+      keyClick(Qt.Key_Space);
+      tryVerify(() => pending("saveAttachment").length === 1);
+      panel.chooseChat(1); panel.active = false;
+      beeperData.respond("saveAttachment", {path: "/home/user/Downloads/one.pdf"});
+      tryVerify(() => pending("saveAttachment").length === 1);
+      compare(pending("saveAttachment")[0].params.url, "mxc://original/two");
+      beeperData.respond("saveAttachment", {path: "/home/user/Downloads/two.pdf"});
+      tryVerify(() => Object.keys(beeperData.attachmentSaveOperations).length === 0);
+      compare(pending("saveAttachment").length, 0); compare(fixture.openedUrls.length, 0);
+      compare(beeperData.currentChatID, "chat-b");
+    }
+    function test_open_file_button_downloads_before_opening_and_retries_failure() {
+      const media = selectAttachment({type: "file", srcURL: "mxc://preview/document", fileName: "document.pdf"});
+      captureFileOpens(media);
+      media.openFile(); tryCompare(media, "openWhenReady", true);
+      compare(pending("download").length, 1); compare(fixture.openedUrls.length, 0);
+      beeperData.respond("download", null, {message: "Offline"});
+      compare(media.errorText, "Offline"); verify(!media.openWhenReady);
+      media.openFile(); tryCompare(media, "openWhenReady", true);
+      compare(pending("download").length, 1);
+      beeperData.respond("download", {srcURL: "file:///tmp/downloaded.pdf"});
+      compare(fixture.openedUrls, ["file:///tmp/downloaded.pdf"]); verify(!media.openWhenReady);
+    }
+    function test_pending_file_open_is_cancelled_when_panel_closes() {
+      const media = selectAttachment({type: "file", srcURL: "mxc://preview/document"});
+      captureFileOpens(media);
+      media.openFile(); tryCompare(media, "openWhenReady", true);
+      panel.active = false;
+      beeperData.respond("download", {srcURL: "file:///tmp/downloaded.pdf"});
+      compare(fixture.openedUrls.length, 0);
     }
     function test_space_stays_text_while_composing_or_searching_a_linked_message() {
       selectLinkedMessage("https://one.example/");
@@ -738,11 +907,15 @@ ShellRoot {
       tryCompare(panel, "restoringView", false);
       keyClick(Qt.Key_1); compare(pending("react").length, 0);
     }
-    function test_space_opens_selected_video_and_preserves_selection_on_close() {
+    function test_open_selected_video_and_preserve_selection_on_close_data() {
+      return [{tag: "space", key: Qt.Key_Space}, {tag: "o", key: Qt.Key_O}];
+    }
+    function test_open_selected_video_and_preserve_selection_on_close(data) {
       const media = selectAttachment({type: "video", srcURL: "file://" + Quickshell.shellDir + "/fixtures/fullscreen-video.mp4", duration: 20});
       const inlinePlayer = findChild(media, "beeperMediaPlayer"); verify(inlinePlayer !== null);
       inlinePlayer.play(); tryCompare(inlinePlayer, "playbackState", MediaPlayer.PlayingState);
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+      keyClick(data.key); tryCompare(panel, "modal", "media");
+      compare(pending("saveAttachment").length, 0);
       verify(panel.photoPreviewOpen); verify(panel.videoPreviewOpen);
       const viewer = findChild(panel, "beeperPhotoViewer");
       tryCompare(viewer, "activeFocus", true);
@@ -761,10 +934,10 @@ ShellRoot {
       player.audioOutput.muted = true;
       keyClick(Qt.Key_Space); tryCompare(player, "playbackState", MediaPlayer.PlayingState);
       keyClick(Qt.Key_Space); tryCompare(player, "playbackState", MediaPlayer.PausedState);
-      compare(panel.modal, "");
+      compare(panel.modal, ""); compare(pending("saveAttachment").length, 0);
       keyClick(Qt.Key_Return); verify(panel.composer.activeFocus);
       keyClick(Qt.Key_Space); compare(panel.composer.text, " ");
-      compare(player.playbackState, MediaPlayer.PausedState);
+      compare(player.playbackState, MediaPlayer.PausedState); compare(pending("saveAttachment").length, 0);
     }
     function startVoice() {
       const media = selectAttachment({id: "voice-asset", type: "audio", srcURL: silentAudio(), duration: 2});
@@ -838,10 +1011,14 @@ ShellRoot {
       if (data.cancel) { verify(!beeperData.audioPlayback.playWhenReady); verify(player.playbackState !== MediaPlayer.PlayingState); }
       else tryCompare(player, "playbackState", MediaPlayer.PlayingState);
     }
-    function test_space_opens_photo_without_a_header_and_closes_it_again() {
+    function test_open_photo_without_a_header_and_space_closes_it_data() {
+      return [{tag: "space", key: Qt.Key_Space}, {tag: "o", key: Qt.Key_O}];
+    }
+    function test_open_photo_without_a_header_and_space_closes_it(data) {
       const photo = {type: "img", srcURL: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="blue"/></svg>')};
       selectAttachment(photo);
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+      keyClick(data.key); tryCompare(panel, "modal", "media");
+      compare(pending("saveAttachment").length, 0);
       compare(panel.previewAttachment.srcURL, photo.srcURL);
       const photoView = findChild(panel.modalSurface, "beeperFullscreenPhoto");
       verify(photoView.expanded);
@@ -852,7 +1029,7 @@ ShellRoot {
       fuzzyCompare(image.paintedHeight, panel.height, 0.5);
       keyClick(Qt.Key_Space); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message");
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+      keyClick(data.key); tryCompare(panel, "modal", "media");
       keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message");
       keyClick(Qt.Key_Return); keyClick(Qt.Key_Space);

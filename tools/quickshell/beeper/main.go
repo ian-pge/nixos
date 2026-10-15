@@ -19,8 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	beeper "github.com/beeper/desktop-api-go/v5"
-	"github.com/beeper/desktop-api-go/v5/option"
+	beeper "github.com/beeper/desktop-api-go/v6"
+	"github.com/beeper/desktop-api-go/v6/option"
 )
 
 type object = map[string]any
