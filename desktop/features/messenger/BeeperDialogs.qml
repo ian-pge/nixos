@@ -85,6 +85,7 @@ Rectangle {
     "/     Search conversations",
     "Ctrl + /     Search messages in the current conversation",
     "Tab / Shift+Tab in conversation search     Select next / previous result",
+    "Ctrl + j / k in conversation search     Select next / previous result",
     "Enter / Ctrl + l in conversation search     Open selected chat and close search",
     "Enter in message search     Confirm message search",
     "n / N, j / k, Ctrl + j / k     Next / previous message match",

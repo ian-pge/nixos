@@ -39,6 +39,7 @@ Rectangle {
   readonly property int selectionDuration: 200
   readonly property int selectionColorDuration: 120
   readonly property bool animateSelection: enabled && visible
+  readonly property bool animateListTransition: animateSelection && !searchOpen
   readonly property string networkKey: currentNetwork.key
   property bool transitionsReady: false
   property real networkProgress: 1
@@ -53,13 +54,17 @@ Rectangle {
   signal chatSelected(int index)
   signal viewportChanged()
   onNetworkKeyChanged: {
-    if (!transitionsReady || !animateSelection) return;
+    if (!transitionsReady || !animateListTransition) return;
     // The model/filter changes immediately. Only the resulting list's visual
     // transform fades in, so Tab never waits for an outgoing model to finish.
     networkTransition.stop(); networkProgress = 0; networkTransition.start();
   }
-  onAnimateSelectionChanged: if (!animateSelection) {
+  // Search filters on every keystroke: keep the whole list opaque and still,
+  // including when search opens during an unfinished network/sort transition.
+  onAnimateListTransitionChanged: if (!animateListTransition) {
     networkTransition.stop(); networkProgress = 1;
+  }
+  onAnimateSelectionChanged: if (!animateSelection) {
     selectionBackground.finish();
     reflowTimer.stop();
   }
@@ -141,7 +146,7 @@ Rectangle {
         chatList.originY + Math.max(0, chatList.contentHeight - chatList.height), item.y + bulkViewportAnchor.offset));
     }
     bulkViewportAnchor = null;
-    if (animateSelection) { networkTransition.stop(); networkProgress = 0; networkTransition.start(); }
+    if (animateListTransition) { networkTransition.stop(); networkProgress = 0; networkTransition.start(); }
   }
   function restoreVisibleSelection() {
     const id = visibleSelectionToFollow;

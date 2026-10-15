@@ -37,6 +37,7 @@ ShellRoot {
   SignalSpy { id: closeSpy; target: fixture.panel; signalName: "closeRequested" }
   SignalSpy { id: pickerOpenedSpy; target: fixture.panel; signalName: "nativeDialogOpened" }
   SignalSpy { id: pickerClosedSpy; target: fixture.panel; signalName: "nativeDialogClosed" }
+  SignalSpy { id: chatOpacitySpy; target: fixture.panel?.chatList ?? null; signalName: "opacityChanged" }
   TestResult { id: results }
   TestCase {
     name: "BeeperKeyboard"
@@ -171,22 +172,81 @@ ShellRoot {
       tryVerify(() => selectedChatRow("chat-b")?.chosen === true);
       compare(closeSpy.count, 0);
     }
-    function test_chat_search_tab_cycles_results_and_keeps_typing_focus() {
+    function test_chat_search_cycles_results_and_keeps_typing_focus_data() {
+      return [{tag: "tab", next: Qt.Key_Tab, previous: Qt.Key_Tab, modifiers: Qt.NoModifier, reverseModifiers: Qt.ShiftModifier},
+        {tag: "ctrl_j_k", next: Qt.Key_J, previous: Qt.Key_K, modifiers: Qt.ControlModifier, reverseModifiers: Qt.ControlModifier}];
+    }
+    function test_chat_search_cycles_results_and_keeps_typing_focus(data) {
       beeperData.chats = beeperData.chats.concat([{id: "chat-c", title: "Third chat"}]);
+      beeperData.draftText = "Keep this draft";
+      keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.messageIndex, 7);
       startChatSearch();
       for (const id of ["chat-b", "chat-c", "chat-a"]) {
-        keyClick(Qt.Key_Tab);
+        keyClick(data.next, data.modifiers);
         tryVerify(() => selectedChatRow(id)?.chosen === true);
         verify(panel.searchField.activeFocus);
         compare(beeperData.currentChatID, "chat-a"); compare(panel.networkFilter, "all");
+        compare(panel.messageIndex, 7); compare(panel.searchField.text, "chat");
       }
-      keyClick(Qt.Key_Tab, Qt.ShiftModifier);
+      keyClick(data.previous, data.reverseModifiers);
       tryVerify(() => selectedChatRow("chat-c")?.chosen === true);
       verify(panel.searchField.activeFocus);
+      compare(beeperData.draftText, "Keep this draft");
+      for (const method of ["messages", "send", "read"]) compare(pending(method).length, 0);
       panel.searchField.cursorPosition = panel.searchField.length;
       keyClick(Qt.Key_Backspace);
       compare(panel.searchField.text, "cha");
       tryVerify(() => selectedChatRow("chat-a")?.chosen === true);
+    }
+    function test_chat_search_typing_never_fades_the_list_data() {
+      return [{tag: "incremental", groupSize: 3}, {tag: "bulk", groupSize: 80}];
+    }
+    function test_chat_search_typing_never_fades_the_list(data) {
+      const chats = [];
+      for (const prefix of ["abc", "abx", "axy", "xyz"])
+        for (let i = 0; i < data.groupSize; ++i) chats.push({id: prefix + i, title: prefix + i, preview: {text: "…"}});
+      beeperData.chats = chats;
+      wait(180);
+      startChatSearch(""); chatOpacitySpy.clear();
+      const sidebar = findChild(panel, "beeperSidebar");
+      for (const step of [
+        {key: Qt.Key_A, groups: 3}, {key: Qt.Key_B, groups: 2}, {key: Qt.Key_C, groups: 1}, {key: Qt.Key_D, groups: 0},
+        {key: Qt.Key_Backspace, groups: 1}, {key: Qt.Key_Backspace, groups: 2},
+        {key: Qt.Key_Backspace, groups: 3}, {key: Qt.Key_Backspace, groups: 4}
+      ]) {
+        keyClick(step.key);
+        compare(panel.filteredChats.length, step.groups * data.groupSize);
+        compare(sidebar.networkProgress, 1, "Filtering must not restart the whole-list transition");
+        compare(panel.chatList.opacity, 1);
+        wait(20);
+        compare(chatOpacitySpy.count, 0, "Typing and backspacing must keep the list fully opaque");
+        verify(panel.searchField.activeFocus);
+      }
+    }
+    function test_chat_search_ctrl_navigation_does_not_require_loaded_messages() {
+      beeperData.selectChat("chat-b");
+      startChatSearch();
+      keyClick(Qt.Key_J, Qt.ControlModifier);
+      compare(panel.searchChatID, "chat-b"); verify(panel.searchField.activeFocus);
+      compare(pending("messages").length, 1);
+      beeperData.respond("messages", {items: [], hasMore: false}); waitForHistory();
+      keyClick(Qt.Key_K, Qt.ControlModifier);
+      compare(panel.searchChatID, "chat-a"); verify(panel.searchField.activeFocus);
+      compare(beeperData.currentChatID, "chat-b"); compare(pending("messages").length, 0);
+    }
+    function test_chat_search_ctrl_navigation_respects_shortcut_guards_data() {
+      return ["inactive", "unfocused", "modal"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_chat_search_ctrl_navigation_respects_shortcut_guards(data) {
+      startChatSearch();
+      if (data.mode === "inactive") panel.active = false;
+      else if (data.mode === "unfocused") panel.windowFocused = false;
+      else panel.openModal("help");
+      const selected = panel.searchChatID;
+      keyClick(Qt.Key_J, Qt.ControlModifier); compare(panel.searchChatID, selected);
+      keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.searchChatID, selected);
+      compare(panel.messageIndex, -1);
+      compare(beeperData.currentChatID, "chat-a");
     }
     function test_chat_search_accepts_highlighted_result_data() {
       return [{tag: "return", key: Qt.Key_Return, modifiers: Qt.NoModifier},
@@ -223,6 +283,8 @@ ShellRoot {
       startChatSearch("missing");
       compare(panel.filteredChats.length, 0);
       keyClick(Qt.Key_Tab); keyClick(Qt.Key_Tab, Qt.ShiftModifier);
+      keyClick(Qt.Key_J, Qt.ControlModifier); keyClick(Qt.Key_K, Qt.ControlModifier);
+      compare(panel.messageIndex, -1);
       keyClick(Qt.Key_Return); keyClick(Qt.Key_L, Qt.ControlModifier);
       verify(panel.searchOpen); verify(panel.searchField.activeFocus);
       compare(beeperData.currentChatID, "chat-a"); compare(panel.networkFilter, "all");

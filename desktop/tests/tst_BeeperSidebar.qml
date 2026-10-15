@@ -237,6 +237,22 @@ ShellRoot {
         compare(glyph.displayedText, "S"); verify(!glyph.running); compare(sidebar.networkProgress, 1);
       } finally { sidebar.visible = true; sidebar.currentNetwork = original; wait(180); }
     }
+    function test_search_finishes_an_inflight_list_transition() {
+      if (fixture.referenceSource) return;
+      const original = sidebar.currentNetwork;
+      try {
+        sidebar.currentNetwork = {key: "telegram", name: "Telegram", glyph: "T"};
+        compare(sidebar.networkProgress, 0);
+        sidebar.searchOpen = true;
+        compare(sidebar.networkProgress, 1); compare(sidebar.list.opacity, 1);
+        sidebar.currentNetwork = {key: "whatsapp", name: "WhatsApp", glyph: "W"};
+        compare(sidebar.networkProgress, 1);
+        wait(40); compare(sidebar.networkProgress, 1);
+        sidebar.searchOpen = false;
+        sidebar.currentNetwork = original;
+        compare(sidebar.networkProgress, 0);
+      } finally { sidebar.searchOpen = false; sidebar.currentNetwork = original; wait(180); }
+    }
     function test_network_logos_are_not_clipped_to_the_text_advance_width() {
       if (fixture.referenceSource) return;
       const original = sidebar.currentNetwork;

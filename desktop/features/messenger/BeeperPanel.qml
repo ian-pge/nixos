@@ -102,7 +102,10 @@ FocusScope {
   readonly property bool canZoomText: active && windowFocused && !modal
     && !composerSurface?.emojiPickerOpen
     && !connectionSurface.visible
-  readonly property bool canNavigateMessages: active && windowFocused && !modal
+  readonly property bool canNavigateSearchChats: active && windowFocused && searchOpen && !modal
+    && !connectionSurface.visible && !composerSurface?.emojiPickerOpen && !attachmentPicker
+    && !searchField.inputMethodComposing && !composer.inputMethodComposing
+  readonly property bool canNavigateMessages: active && windowFocused && !modal && !searchOpen
     && !messageList.loading
     && !composerSurface?.emojiPickerOpen
     && !connectionSurface.visible && !searchField.activeFocus && !tokenField.activeFocus
@@ -779,13 +782,15 @@ FocusScope {
   }
   Shortcut {
     sequence: "Ctrl+J"; context: Qt.WindowShortcut
-    enabled: root.canNavigateMessages
-    onActivated: messageSearch.opened ? messageSearch.move(1) : root.moveMessageSelection(1)
+    enabled: root.canNavigateSearchChats || root.canNavigateMessages
+    onActivated: root.searchOpen ? root.cycleSearchChat(1)
+      : messageSearch.opened ? messageSearch.move(1) : root.moveMessageSelection(1)
   }
   Shortcut {
     sequence: "Ctrl+K"; context: Qt.WindowShortcut
-    enabled: root.canNavigateMessages
-    onActivated: messageSearch.opened ? messageSearch.move(-1) : root.moveMessageSelection(-1)
+    enabled: root.canNavigateSearchChats || root.canNavigateMessages
+    onActivated: root.searchOpen ? root.cycleSearchChat(-1)
+      : messageSearch.opened ? messageSearch.move(-1) : root.moveMessageSelection(-1)
   }
   Shortcut {
     sequences: ["Ctrl++", "Ctrl+=", "Ctrl+Shift++", "Ctrl+Shift+="]
