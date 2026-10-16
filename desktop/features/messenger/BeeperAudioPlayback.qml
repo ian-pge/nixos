@@ -14,7 +14,8 @@ Scope {
   property string errorText: ""
   property int generation: 0
   property alias player: player
-  readonly property bool active: playWhenReady || player.playbackState === MediaPlayer.PlayingState
+  readonly property bool playing: player.playbackState === MediaPlayer.PlayingState
+  readonly property bool active: playWhenReady || playing
 
   function play(id, attachment) {
     if (!id) return;
@@ -47,6 +48,10 @@ Scope {
     });
   }
   function pause() { playWhenReady = false; player.pause(); }
+  function seek(delta) {
+    if (!player.seekable || player.duration <= 0) return;
+    player.setPosition(Math.max(0, Math.min(player.duration, player.position + delta)));
+  }
   function toggle(id, attachment) {
     if (key === id && active) pause();
     else play(id, attachment);

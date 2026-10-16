@@ -126,7 +126,7 @@ FocusScope {
     stepping = presented && !closing;
     transition.stop(); presented = false; closing = false; waitingForPreview = false; refreshPresentation();
   }
-  // Enter keeps a copy in the download folder; the backend never replaces a file.
+  // d keeps a copy in the download folder; the backend never replaces a file.
   function save() {
     if (!active || !visible || !attachment || saving) return;
     saving = true; notice = "Saving…"; noticeFailed = false; noticeTimer.stop();
@@ -147,6 +147,11 @@ FocusScope {
     onFinished: if (root.closing && root.active && root.visible) root.closeRequested()
   }
   Shortcut {
+    sequence: "D"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.active && root.visible && !!root.attachment
+    onActivated: root.save()
+  }
+  Shortcut {
     sequence: "Space"; context: Qt.WindowShortcut; autoRepeat: false
     enabled: root.active && root.visible && root.video
     onActivated: media.togglePlayback()
@@ -162,11 +167,6 @@ FocusScope {
     onActivated: root.video ? media.seek(5000) : root.stepRequested(1)
   }
   Keys.onPressed: event => {
-    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-      if (!event.isAutoRepeat) root.save();
-      event.accepted = true;
-      return;
-    }
     if (event.key !== Qt.Key_Escape && !(event.key === Qt.Key_Space && !root.video)) return;
     if (!event.isAutoRepeat) root.requestClose();
     event.accepted = true;

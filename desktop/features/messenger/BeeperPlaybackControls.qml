@@ -95,12 +95,20 @@ RowLayout {
     }
   }
   Text {
+    id: timeLabel
     objectName: "beeperMediaTime"
-    Layout.preferredWidth: 44
-    text: Format.duration(root.player.position > 0 ? root.player.position : root.duration)
+    Layout.minimumWidth: timeMetrics.advanceWidth
+    Layout.preferredWidth: Math.max(implicitWidth, timeMetrics.advanceWidth)
+    text: Format.duration(root.player.position) + " / " + Format.duration(root.duration)
     horizontalAlignment: Text.AlignRight
     color: root.accentBackground ? Theme.background : Theme.secondary
     font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption }
+    // Reserve both timestamps so seeking across a minute keeps the track stable.
+    TextMetrics {
+      id: timeMetrics
+      font: timeLabel.font
+      text: Format.duration(root.duration) + " / " + Format.duration(root.duration)
+    }
   }
   BeeperButton {
     objectName: "beeperMediaRate"

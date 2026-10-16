@@ -160,7 +160,9 @@ Scope {
     const url = waveformQueue[0], key = JSON.stringify(url);
     waveformQueue = waveformQueue.slice(1); waveformBusy = true;
     request("waveform", {url: url}, (result, error) => {
-      waveforms = Object.assign({}, waveforms, {[key]: {pending: false, peaks: !error && result?.peaks ? result.peaks : []}});
+      waveforms = Object.assign({}, waveforms, {[key]: {pending: false,
+        peaks: !error && result?.peaks ? result.peaks : [],
+        durationMs: !error && result?.durationMs > 0 ? result.durationMs : 0}});
       waveformBusy = false; Qt.callLater(processWaveforms);
     }, true);
   }

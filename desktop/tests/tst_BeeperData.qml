@@ -19,6 +19,23 @@ ShellRoot {
     when: beeperData !== null && beeperData.demoMessages.studio !== undefined
     function cleanupTestCase() { console.log("BeeperData: " + results.passCount + " passed, " + results.failCount + " failed"); Qt.exit(results.failCount ? 1 : 0); }
     function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName); }
+    function test_waveform_cache_keeps_duration_for_unplayed_voice_notes() {
+      const url = "mxc://test/voice-duration", key = JSON.stringify(url);
+      const data = Qt.createQmlObject('import QtQuick; import "file://' + Quickshell.shellDir
+        + '/../features/messenger"; BeeperData { demo: true; enabled: false; '
+        + 'function request(method, params, callback, quiet) { if (method === "waveform") '
+        + 'callback({peaks: [0.2, 1, 0.4], durationMs: 65000}, null); } }', fixture);
+      try {
+        data.waveformQueue = [url];
+        data.processWaveforms();
+        compare(data.waveforms[key].durationMs, 65000);
+        compare(data.waveforms[key].peaks, [0.2, 1, 0.4]);
+        verify(!data.waveforms[key].pending);
+        verify(!data.waveformBusy);
+      } finally {
+        data.destroy();
+      }
+    }
     function test_switch_discards_stale_async_messages() {
       beeperData.selectChat("lea"); beeperData.selectChat("studio"); beeperData.selectChat("alex");
       wait(20); compare(beeperData.currentChatID, "alex"); compare(beeperData.messages.length, 0);

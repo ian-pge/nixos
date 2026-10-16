@@ -178,20 +178,47 @@ Rectangle {
           id: composer; objectName: "beeperComposer"
           text: root.editMessageID ? root.editText : root.beeperData.draftText
           placeholderText: root.beeperData.currentChat?.isReadOnly ? "Read-only conversation"
-            : root.recording ? "Recording  " + Format.duration(root.recordingDuration)
+            : root.recording ? ""
             : root.preparingRecording ? "Preparing recording…" : root.dictating ? "Dictation in progress…" : "Write a message…"
           // Outside Vim's insert mode, only Vim commands may edit the text.
           readOnly: root.recording || root.preparingRecording || !vimEditor.inserting
           // JetBrains Mono lines are taller than Ubuntu's: 7 + 6 px keep one
           // line within the 40 px row, so the composer still rests at 48 px.
           leftPadding: 10; rightPadding: 6; topPadding: 7; bottomPadding: 6
-          color: Theme.foreground; placeholderTextColor: Theme.inactive
-          selectionColor: Qt.alpha(Theme.sideApplications, 0.4)
-          selectedTextColor: Theme.selectedForeground
+          color: root.recording ? "transparent" : Theme.foreground; placeholderTextColor: Theme.inactive
+          selectionColor: root.recording ? "transparent" : Qt.alpha(Theme.sideApplications, 0.4)
+          selectedTextColor: root.recording ? "transparent" : Theme.selectedForeground
           // Terminal-like input: every character takes the same width.
           font { family: "JetBrainsMono Nerd Font"; pixelSize: root.textSize }
           wrapMode: TextEdit.Wrap; selectByMouse: true
           background: null
+          Row {
+            parent: composerScroll
+            anchors { left: parent.left; top: parent.top; leftMargin: composer.leftPadding; topMargin: composer.topPadding }
+            visible: root.recording
+            spacing: 8
+            Rectangle {
+              id: recordingLed
+              objectName: "beeperRecordingLed"
+              anchors.verticalCenter: parent.verticalCenter
+              width: 8; height: 8; radius: 4
+              color: "#a6da95"
+              property bool blinkOn: true
+              opacity: blinkOn ? 1 : 0
+              Timer {
+                interval: 500; repeat: true
+                running: root.recording && root.active && recordingLed.visible
+                onTriggered: recordingLed.blinkOn = !recordingLed.blinkOn
+                onRunningChanged: recordingLed.blinkOn = true
+              }
+            }
+            Text {
+              objectName: "beeperRecordingLabel"
+              text: "Recording  " + Format.duration(root.recordingDuration)
+              color: Theme.inactive
+              font: composer.font
+            }
+          }
           cursorDelegate: Rectangle {
             id: caret
             objectName: "beeperComposerCursor"

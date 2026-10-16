@@ -74,17 +74,6 @@ Item {
     target: root; property: "arrivalProgress"; to: 1
     duration: 140; easing.type: Easing.OutCubic
   }
-  function activateMedia() {
-    for (let i = 0; i < attachments.count; ++i) {
-      const media = attachments.itemAt(i);
-      if (media?.kind === "audio") { media.togglePlayback(); return; }
-      if (media?.kind === "image" || media?.kind === "gif" || media?.kind === "video") {
-        const attachment = media.sourceReady
-          ? Object.assign({}, media.attachment, {srcURL: media.sourceUrl}) : media.attachment;
-        previewRequested(attachment, media); return;
-      }
-    }
-  }
   function forceMessageLayout() {
     replyQuote.forceLayout(); metadata.forceLayout(); bubble.forceLayout(); readerAvatars.forceLayout(); contents.forceLayout();
   }

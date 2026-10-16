@@ -38,9 +38,10 @@ FocusScope {
   property int previewAttachmentIndex: -1
   property int pendingPreviewStep: 0
   property int previewPagesLeft: 0
-  property var linkChoices: []
-  property var linkOpener: url => Qt.openUrlExternally(url)
-  // Tests replace the system clipboard like the link opener.
+  property var attachmentChoices: []
+  property string attachmentChoiceMessageID: ""
+  property string replyTargetID: ""
+  // Tests replace the system clipboard.
   property var clipboardWriter: text => { Quickshell.clipboardText = text; }
   // The message holding a mouse text selection; only one at a time.
   property Item textSelectionOwner: null
@@ -56,6 +57,7 @@ FocusScope {
   property string recordingChatID: ""
   property bool preparingRecording: false
   property int recordingGeneration: 0
+  property bool recordingCancelled: false
   property var recorder: null
   property Component recorderFactory: recorderComponent
   property var attachmentPicker: null
@@ -102,6 +104,11 @@ FocusScope {
   readonly property bool canZoomText: active && windowFocused && !modal
     && !composerSurface?.emojiPickerOpen
     && !connectionSurface.visible
+  readonly property bool canUseMessageShortcuts: active && windowFocused && !modal && !connectionSurface.visible
+    && !attachmentPicker && !emojiPickerOpen
+    && !composer.activeFocus && !searchField.activeFocus && !tokenField.activeFocus
+    && !conversationSearchBar.input.activeFocus
+  readonly property bool canSeekAudio: canUseMessageShortcuts && !!beeperData.audioPlayback?.playing
   readonly property bool canNavigateSearchChats: active && windowFocused && searchOpen && !modal
     && !connectionSurface.visible && !composerSurface?.emojiPickerOpen && !attachmentPicker
     && !searchField.inputMethodComposing && !composer.inputMethodComposing
@@ -126,7 +133,7 @@ FocusScope {
   clip: true
 
   function clearMessageSelection() { messageIndex = -1; selectedMessageIDBeforeUpdate = ""; }
-  function focusNavigation() { if (!active) return; clearMessageSelection(); navigation = "chats"; if (connectionSurface.visible) connectionSurface.focusInput(true); else navigationFocus.forceActiveFocus(); }
+  function focusNavigation() { if (!active) return; cancelReplyNavigation(); clearMessageSelection(); navigation = "chats"; if (connectionSurface.visible) connectionSurface.focusInput(true); else navigationFocus.forceActiveFocus(); }
   function syncChatIndex() {
     const selected = filteredChats.findIndex(chat => chat.id === beeperData.currentChatID);
     chatIndex = selected >= 0 ? selected : Math.max(0, Math.min(chatIndex, filteredChats.length - 1));
@@ -174,6 +181,7 @@ FocusScope {
     locatingSearchChatID = ""; pendingOpenMessageID = ""; targetPageCount = 0;
   }
   function closeConversationSearch(restoreFocus = true) {
+    cancelReplyNavigation();
     cancelSearchNavigation(); messageSearch.close();
     if (restoreFocus && active) focusNavigation();
   }
@@ -182,6 +190,7 @@ FocusScope {
   }
   function revealSearchMatch(message) {
     if (!active || !messageSearch.opened || message.chatID !== beeperData.currentChatID) return;
+    cancelReplyNavigation();
     messageWheel.reset(); messageList.cancelFlick(); pinLatest = false; restoringView = false;
     locatingSearchResult = true; locatingSearchChatID = message.chatID; targetPageCount = 0;
     beeperData.messagesPaginationBlocked = false;
@@ -260,6 +269,7 @@ FocusScope {
     sidebar.revealChat(chatIndex);
   }
   function moveMessageSelection(delta) {
+    cancelReplyNavigation();
     if (!beeperData.messages.length) return;
     messageWheel.reset();
     messageList.cancelFlick();
@@ -273,6 +283,7 @@ FocusScope {
     rememberPosition();
   }
   function goEdge(last) {
+    cancelReplyNavigation();
     messageWheel.reset();
     restoringView = false;
     pinLatest = false;
@@ -284,7 +295,7 @@ FocusScope {
       if (!last && beeperData.hasOlderMessages) beeperData.loadMessages(true);
     }
   }
-  function compose() { if (composerSurface.enabled && beeperData.currentChatID) { navigation = "compose"; composer.forceActiveFocus(); } }
+  function compose() { if (composerSurface.enabled && beeperData.currentChatID) { cancelReplyNavigation(); navigation = "compose"; composer.forceActiveFocus(); } }
   function navigatePane(right) {
     if (right && searchOpen) { acceptChatSearch(); return; }
     composerSurface.closeEmojiPicker();
@@ -318,7 +329,7 @@ FocusScope {
     attachmentPicker.open();
   }
   function openModal(name) {
-    if (name !== "help" && name !== "media" && name !== "links") return;
+    if (name !== "help" && name !== "media" && name !== "attachments") return;
     modal = name;
     if (photoPreviewOpen && externalPhotoPreview) return;
     Qt.callLater(() => modalSurface.forceActiveFocus());
@@ -334,12 +345,34 @@ FocusScope {
     locatePreview(sourceItem?.attachment || attachment);
     openModal("media");
   }
-  function openFirstAttachment() {
-    if (!selectedMessage?.attachments?.length) return;
-    const media = messageList.itemAtIndex(messageIndex)?.attachmentItem(0) || null;
-    const attachment = media?.sourceReady
-      ? Object.assign({}, selectedMessage.attachments[0], {srcURL: media.sourceUrl}) : selectedMessage.attachments[0];
-    openMedia(attachment, media);
+  function openSelectedAttachments() {
+    const attachments = selectedMessage?.attachments || [];
+    if (!attachments.length) return;
+    if (attachments.length === 1) { openSelectedAttachment(0); return; }
+    attachmentChoiceMessageID = selectedMessage.id;
+    attachmentChoices = attachments.map((attachment, index) => ({
+      index: index, attachment: attachment,
+      title: attachment.fileName || ({image: "Photo", gif: "GIF", video: "Video", audio: "Audio", file: "File"})[Format.attachmentType(attachment)],
+      detail: [attachment.mimeType || attachment.mime || "", Format.bytes(attachment.fileSize)].filter(Boolean).join(" · ")
+    }));
+    openModal("attachments");
+  }
+  function openSelectedAttachment(index) {
+    const message = selectedMessage, attachment = message?.attachments?.[index], chatID = beeperData.currentChatID;
+    if (!attachment) return;
+    if (Format.attachmentType(attachment) === "audio") {
+      beeperData.audioPlayback.play(JSON.stringify([message.chatID || chatID, message.id, index]), attachment);
+      return;
+    }
+    messageList.positionViewAtIndex(messageIndex, ListView.Contain);
+    Qt.callLater(() => {
+      if (!active || !windowFocused || modal || composer.activeFocus || beeperData.currentChatID !== chatID
+          || selectedMessage?.id !== message.id || !selectedMessage.attachments?.[index]
+          || Format.attachmentSource(selectedMessage.attachments[index]) !== Format.attachmentSource(attachment)) return;
+      const media = messageList.itemAtIndex(messageIndex)?.attachmentItem(index) || null;
+      if (Format.attachmentType(attachment) === "file") { media?.openFile(); return; }
+      openMedia(media?.sourceReady ? Object.assign({}, attachment, {srcURL: media.sourceUrl}) : attachment, media);
+    });
   }
   // Preview copies may carry a downloaded srcURL; the history keeps the original.
   function locatePreview(attachment) {
@@ -380,7 +413,7 @@ FocusScope {
   }
   function resumePreviewStep() { if (pendingPreviewStep) stepPreview(pendingPreviewStep); }
   function submitMessage() {
-    if (recording || preparingRecording || composer.inputMethodComposing) return;
+    if (recorder || preparingRecording || composer.inputMethodComposing) return;
     if (editMessageID) {
       const id = editMessageID, chatID = beeperData.currentChatID, text = composer.text;
       beeperData.request("edit", {chatID: chatID, messageID: id, text: text}, (result, error) => {
@@ -399,16 +432,13 @@ FocusScope {
   function reactToSelectedMessage(reaction) {
     beeperData.toggleMessageReaction(selectedMessage, reaction);
   }
-  function activateSelectedMedia() {
-    const messageID = selectedMessage?.id, chatID = beeperData.currentChatID;
-    if (!messageID) return;
-    messageList.positionViewAtIndex(messageIndex, ListView.Contain);
-    // Reveal the selected row first so its viewport-managed player is loaded.
-    Qt.callLater(() => {
-      if (!active || !windowFocused || modal || composer.activeFocus || searchField.activeFocus || conversationSearchBar.input.activeFocus
-          || beeperData.currentChatID !== chatID || selectedMessage?.id !== messageID) return;
-      messageList.itemAtIndex(messageIndex)?.activateMedia();
-    });
+  function toggleSelectedAudio() {
+    const message = selectedMessage, attachments = message?.attachments || [], audio = beeperData.audioPlayback;
+    const key = index => JSON.stringify([message.chatID || beeperData.currentChatID, message.id, index]);
+    // If this message holds several voices, keep controlling the one opened with o.
+    let index = attachments.findIndex((attachment, i) => Format.attachmentType(attachment) === "audio" && audio.key === key(i));
+    if (index < 0) index = attachments.findIndex(attachment => Format.attachmentType(attachment) === "audio");
+    if (index >= 0) audio.toggle(key(index), attachments[index]);
   }
   function claimTextSelection(owner) {
     if (textSelectionOwner && textSelectionOwner !== owner) textSelectionOwner.clearTextSelection();
@@ -426,31 +456,47 @@ FocusScope {
     if (text) copyText(text, "Message copied");
     else { notice = "This message has no text"; noticeTimer.restart(); }
   }
-  function openMessageLink(url) {
-    const link = Format.messageLinks({links: [{url: url}]})[0];
-    if (link && linkOpener(link.url) === false) beeperData.lastError = "Could not open this link.";
-  }
-  function activateSelectedMessage() {
-    if (selectedMessage?.attachments?.length) {
-      // Preserve media playback/preview, including messages mixing files and
-      // media. Messages containing only documents save every attachment.
-      if (selectedMessage.attachments.some(attachment => Format.attachmentType(attachment) !== "file")) {
-        activateSelectedMedia(); return;
-      }
-      if (beeperData.saveMessageAttachments(selectedMessage)) {
-        notice = "Saving attachments…"; noticeTimer.restart();
-      }
-      return;
+  function saveSelectedAttachments() {
+    if (beeperData.saveMessageAttachments(selectedMessage)) {
+      notice = "Saving attachments…"; noticeTimer.restart();
     }
-    const links = Format.messageLinks(selectedMessage);
-    if (links.length === 1) openMessageLink(links[0].url);
-    else if (links.length > 1) { linkChoices = links; openModal("links"); }
+  }
+  function cancelReplyNavigation() {
+    if (!replyTargetID) return;
+    if (replyTargetID && pendingOpenMessageID === replyTargetID) pendingOpenMessageID = "";
+    replyTargetID = ""; targetPageCount = 0;
+    if (notice === "Loading original message…") notice = "";
+  }
+  function jumpToOriginal() {
+    const target = selectedMessage?.linkedMessageID;
+    if (!target || replyTargetID === target) return;
+    closeConversationSearch(false);
+    pendingOpenMessageID = ""; beeperData.targetMessageID = "";
+    messageWheel.reset(); messageList.cancelFlick(); pinLatest = false; restoringView = false;
+    navigation = "messages"; navigationFocus.forceActiveFocus();
+    replyTargetID = target;
+    notice = "Loading original message…"; noticeTimer.stop();
+    resumeReplyNavigation();
+  }
+  function resumeReplyNavigation() {
+    if (!replyTargetID || !active) return;
+    const original = beeperData.quote(replyTargetID);
+    if (original.state === "idle") { beeperData.ensureQuote(replyTargetID); return; }
+    if (original.state === "loading") return;
+    if (original.state !== "ready") {
+      cancelReplyNavigation(); notice = "Original message unavailable"; noticeTimer.restart(); return;
+    }
+    if (pendingOpenMessageID === replyTargetID) return;
+    pendingOpenMessageID = replyTargetID; targetPageCount = 0;
+    beeperData.messagesPaginationBlocked = false;
+    historyUpdatePending = true;
+    finishHistoryUpdate();
   }
   function startRecording() {
     if (!canStartRecording) return;
     if (beeperData.demo) { beeperData.lastError = "The design preview does not activate the microphone."; return; }
     const generation = ++recordingGeneration;
-    preparingRecording = true; recordingChatID = beeperData.currentChatID;
+    preparingRecording = true; recordingCancelled = false; recordingChatID = beeperData.currentChatID;
     beeperData.request("prepareRecording", {}, (result, error) => {
       if (generation !== recordingGeneration) {
         if (result?.path) beeperData.request("discardAttachment", {path: result.path});
@@ -472,11 +518,16 @@ FocusScope {
     if (preparingRecording) { ++recordingGeneration; preparingRecording = false; }
     if (recorder) recorder.stop();
   }
+  function cancelRecording() {
+    recordingCancelled = true;
+    stopRecording();
+  }
   function toggleRecording() {
     if (recording || preparingRecording) stopRecording();
     else if (canStartRecording) { composerSurface.closeEmojiPicker(); startRecording(); }
   }
   function userHistoryScroll() {
+    cancelReplyNavigation();
     cancelSearchNavigation();
     pinLatest = false; restoringView = false; historyWheelTimer.restart();
     Qt.callLater(rememberPosition);
@@ -577,7 +628,7 @@ FocusScope {
     if (!windowFocused && !modal && !emojiPickerOpen) clearMessageSelection();
     updateView();
   }
-  onModalChanged: { if (modal !== "links") linkChoices = []; if (modal !== "media") pendingPreviewStep = 0; updateView(); }
+  onModalChanged: { if (modal !== "attachments") { attachmentChoices = []; attachmentChoiceMessageID = ""; } if (modal !== "media") pendingPreviewStep = 0; updateView(); }
   onFilteredChatsChanged: {
     syncChatIndex();
     if (searchOpen && !filteredChats.some(chat => chat.id === searchChatID)) selectSearchChat(0);
@@ -624,10 +675,14 @@ FocusScope {
       messageList.invalidateLayout();
       if (root.restoringView) Qt.callLater(root.restorePosition);
       else messageWheel.shiftOrigin(messageList.takeAnchorShift());
+      Qt.callLater(root.resumeReplyNavigation);
     }
     function onLoadingChanged() { root.schedulePagination(); }
     function onLoadingMessagesChanged() {
       root.schedulePagination();
+      if (root.replyTargetID && !root.beeperData.loadingMessages && root.beeperData.messagesPaginationBlocked) {
+        root.cancelReplyNavigation(); root.notice = "Could not load the original message. Press i to retry."; noticeTimer.restart();
+      }
       if (root.locatingSearchResult && !root.beeperData.loadingMessages && root.beeperData.messagesPaginationBlocked) {
         root.cancelSearchNavigation();
         messageSearch.errorText = "Could not load the matching message. Press Enter to retry.";
@@ -647,7 +702,7 @@ FocusScope {
       root.historyUpdatePending = false;
       root.pendingPreviewStep = 0;
       if (root.preparingRecording) root.stopRecording();
-      if (root.modal === "links") root.closeModal();
+      if (root.modal === "attachments") root.closeModal();
       root.closeConversationSearch(false);
       root.messageIndex = -1; root.selectedMessageIDBeforeUpdate = "";
       root.syncChatIndex();
@@ -675,9 +730,9 @@ FocusScope {
     const wanted = root.pendingOpenMessageID || root.beeperData.targetMessageID || "";
     if (wanted) root.pinLatest = false;
     const index = wanted ? root.beeperData.messages.findIndex(message => message.id === wanted) : -1;
-    if (index >= 0) { root.messageIndex = index; messageList.positionViewAtIndex(index, ListView.Center); root.pendingOpenMessageID = ""; root.beeperData.targetMessageID = ""; root.targetPageCount = 0; root.locatingSearchResult = false; root.restoringView = false; }
+    if (index >= 0) { root.messageIndex = index; messageList.positionViewAtIndex(index, ListView.Center); root.cancelReplyNavigation(); root.pendingOpenMessageID = ""; root.beeperData.targetMessageID = ""; root.targetPageCount = 0; root.locatingSearchResult = false; root.restoringView = false; }
     else if (wanted && root.beeperData.hasOlderMessages && !root.beeperData.messagesPaginationBlocked
-        && (root.locatingSearchResult || root.targetPageCount < 20)) {
+        && (root.locatingSearchResult || root.replyTargetID || root.targetPageCount < 20)) {
       ++root.targetPageCount;
       const chatID = root.beeperData.currentChatID;
       Qt.callLater(() => {
@@ -688,6 +743,7 @@ FocusScope {
     }
     else if (wanted) {
       if (root.locatingSearchResult) messageSearch.errorText = "This message is no longer available in the conversation.";
+      else if (root.replyTargetID) { root.cancelReplyNavigation(); root.notice = "Original message unavailable in this conversation"; noticeTimer.restart(); }
       else root.beeperData.lastError = "This message is not available in the loaded history.";
       root.pendingOpenMessageID = ""; root.beeperData.targetMessageID = ""; root.targetPageCount = 0;
       root.locatingSearchResult = false; root.restoringView = false;
@@ -718,14 +774,17 @@ FocusScope {
     target: root.recorder
     function onFinished(path) {
       const finishedRecorder = root.recorder;
-      if (root.recordingChatID === root.beeperData.currentChatID) root.beeperData.draftAttachments = [root.recordingAttachment];
+      if (root.recordingCancelled) root.beeperData.request("discardAttachment", {path: path});
+      else if (root.recordingChatID === root.beeperData.currentChatID) root.beeperData.draftAttachments = [root.recordingAttachment];
       else root.beeperData.request("saveDraft", {chatID: root.recordingChatID, text: root.beeperData.localDrafts[root.recordingChatID]?.text || "", attachment: root.recordingAttachment});
       root.recorder = null; root.recordingAttachment = null;
       finishedRecorder.destroy();
     }
     function onFailed(message) {
       const failedRecorder = root.recorder;
-      root.beeperData.lastError = message; root.recorder = null; root.recordingAttachment = null;
+      if (root.recordingCancelled) root.beeperData.request("discardAttachment", {path: root.recordingAttachment.path});
+      else root.beeperData.lastError = message;
+      root.recorder = null; root.recordingAttachment = null;
       failedRecorder.destroy();
     }
   }
@@ -734,8 +793,41 @@ FocusScope {
   // popups and the separate fullscreen window. Only the active monitor owns it.
   Shortcut {
     sequence: "Escape"; context: Qt.ApplicationShortcut; autoRepeat: false
-    enabled: root.active && !!root.beeperData.audioPlayback?.active
-    onActivated: root.beeperData.audioPlayback.pause()
+    enabled: root.active && (root.windowFocused && (root.recorder !== null || root.preparingRecording) || !!root.beeperData.audioPlayback?.active)
+    onActivated: {
+      if (root.recorder || root.preparingRecording) root.cancelRecording();
+      else root.beeperData.audioPlayback.pause();
+    }
+  }
+  Shortcut {
+    sequence: "Space"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.canUseMessageShortcuts && !!root.selectedMessage
+    onActivated: root.toggleSelectedAudio()
+  }
+  Shortcut {
+    sequence: "O"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.canUseMessageShortcuts && !!root.selectedMessage?.attachments?.length
+    onActivated: root.openSelectedAttachments()
+  }
+  Shortcut {
+    sequence: "I"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.canUseMessageShortcuts && !!root.selectedMessage?.linkedMessageID
+    onActivated: root.jumpToOriginal()
+  }
+  Shortcut {
+    sequence: "D"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.canUseMessageShortcuts && !!root.selectedMessage?.attachments?.length
+    onActivated: root.saveSelectedAttachments()
+  }
+  Shortcut {
+    sequence: "H"; context: Qt.WindowShortcut
+    enabled: root.canSeekAudio
+    onActivated: root.beeperData.audioPlayback.seek(-5000)
+  }
+  Shortcut {
+    sequence: "L"; context: Qt.WindowShortcut
+    enabled: root.canSeekAudio
+    onActivated: root.beeperData.audioPlayback.seek(5000)
   }
   Shortcut {
     sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; autoRepeat: false
@@ -762,6 +854,12 @@ FocusScope {
     enabled: root.active && root.windowFocused && !root.composer.inputMethodComposing
       && (root.recording || root.preparingRecording || root.canUseComposerShortcuts && root.canStartRecording)
     onActivated: root.toggleRecording()
+  }
+  Shortcut {
+    sequences: ["Return", "Enter"]; context: Qt.ApplicationShortcut; autoRepeat: false
+    enabled: root.active && root.windowFocused && !root.composer.inputMethodComposing
+      && (root.recording || root.preparingRecording)
+    onActivated: { root.stopRecording(); if (!root.modal) root.compose(); }
   }
   Shortcut {
     sequence: "Ctrl+/"; context: Qt.WindowShortcut; autoRepeat: false
@@ -813,6 +911,7 @@ FocusScope {
     }
     if (event.key === Qt.Key_Escape) {
       if (modal) requestModalClose();
+      else if (replyTargetID) cancelReplyNavigation();
       else if (selectedText) clearTextSelection();
       else if (messageSearch.opened) closeConversationSearch();
       else if (searchOpen) { closeChatSearch(); navigation = "chats"; }
@@ -859,9 +958,7 @@ FocusScope {
     else if (key === "n" && beeperData.currentChatID) { if (!event.isAutoRepeat) beeperData.markChatUnread(beeperData.currentChatID); event.accepted = true; }
     else if (key === "r" && selectedMessage) { replyToSelectedMessage(); event.accepted = true; }
     else if (key === "e" && selectedMessage?.isSender) { editSelectedMessage(); event.accepted = true; }
-    else if (key === "o" && selectedMessage?.attachments?.length) { openFirstAttachment(); event.accepted = true; }
     else if (key === "y" && (selectedText || selectedMessage)) { if (!event.isAutoRepeat) yank(); event.accepted = true; }
-    else if (event.key === Qt.Key_Space && selectedMessage) { if (!event.isAutoRepeat) activateSelectedMessage(); event.accepted = true; }
     else if (/^[1-6]$/.test(key) && selectedMessage) { if (!event.isAutoRepeat) reactToSelectedMessage(quickReactions[Number(key) - 1]); event.accepted = true; }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { compose(); event.accepted = true; }
   }
@@ -954,7 +1051,7 @@ FocusScope {
             inViewport: false
             inVisibleViewport: false
             renderMedia: viewportReady && root.visible && inViewport
-            onSelectedRequested: { root.messageIndex = index; root.navigation = "messages"; navigationFocus.forceActiveFocus(); }
+            onSelectedRequested: { root.cancelReplyNavigation(); root.messageIndex = index; root.navigation = "messages"; navigationFocus.forceActiveFocus(); }
             onPreviewRequested: (attachment, sourceItem) => root.openMedia(attachment, sourceItem)
             onTextSelectionStarted: root.claimTextSelection(messageDelegate)
           }
@@ -1086,13 +1183,19 @@ FocusScope {
     active: root.active
     previewAttachment: root.previewAttachment
     previewOrigin: root.previewOrigin
-    linkChoices: root.linkChoices
+    attachmentChoices: root.attachmentChoices
     vimEditing: root.vimEditing
     accent: root.conversationAccent
-    onLinkSelected: url => {
-      if (!root.linkChoices.some(link => link.url === url)) return;
-      root.closeModal(); root.openMessageLink(url);
+    onAttachmentSelected: index => {
+      const choice = root.attachmentChoices[index];
+      const attachment = root.selectedMessage?.attachments?.[index];
+      if (root.selectedMessage?.id !== root.attachmentChoiceMessageID || !choice
+          || !attachment || Format.attachmentSource(attachment) !== Format.attachmentSource(choice.attachment)) {
+        root.closeModal(); root.notice = "Attachment no longer available"; noticeTimer.restart(); return;
+      }
+      root.closeModal(); root.openSelectedAttachment(index);
     }
+    onDownloadRequested: root.saveSelectedAttachments()
     externalPhotoPreview: root.externalPhotoPreview
     onCloseRequested: root.closeModal()
     onPreviewStepRequested: delta => root.stepPreview(delta)

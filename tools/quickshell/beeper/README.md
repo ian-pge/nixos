@@ -79,6 +79,8 @@ la notification vise un message ; un résumé de reconnexion peut ouvrir le pann
 sans conversation spécifique. Les réponses de l’API gardent leurs champs camelCase
 et leurs champs facultatifs. Les messages et aperçus HTTP ajoutent `plainText`, une
 version sans balises pour les libellés natifs, en conservant `text` intact.
+Les listes HTML gardent leurs puces, leur numérotation et l'indentation des
+sous-listes dans `plainText`, donc aussi dans les aperçus et le texte copié.
 `messagesDeleted {chatID,ids}` permet de retirer les messages déjà chargés, même
 hors de la page courante. L’interface doit conserver les curseurs opaques et
 traiter les erreurs de capacités provenant du réseau.

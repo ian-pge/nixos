@@ -228,8 +228,8 @@ ShellRoot {
           findChild(bar.contentItem, "storageBlock"), findChild(bar.contentItem, "updatesPill")]);
         verifyNonOverlappingSurfaces(bar, surfaces);
         for (const [rowName, names] of [
-            ["leftBarModules", ["calendarBlock", "updatesPill", "connectivityBlock", "storageBlock"]],
-            ["rightBarModules", ["usageBlock", "batteryBlock", "levelsBlock", "systemBlock"]]]) {
+            ["leftBarModules", ["calendarBlock", "connectivityBlock", "updatesPill"]],
+            ["rightBarModules", ["storageBlock", "usageBlock", "batteryBlock", "levelsBlock", "systemBlock"]]]) {
           const row = findChild(bar.contentItem, rowName);
           const children = Array.from(row.children).filter(item => item.visible && item.width > 0);
           compare(children.map(item => item.objectName).join(","), names.join(","));

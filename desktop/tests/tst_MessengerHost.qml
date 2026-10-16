@@ -109,6 +109,7 @@ ShellRoot {
     if (!panel || !grab) { console.error("MessengerHost controls missing"); Qt.exit(1); }
   }
   SignalSpy { id: returnSpy; target: host; signalName: "returnFocusRequested" }
+  SignalSpy { id: viewerSaveSpy; signalName: "savingChanged" }
   Process {
     id: photoCapture
     command: [Quickshell.env("BEEPER_TEST_GRIM") || "grim", Quickshell.env("BEEPER_PHOTO_SCREENSHOT")]
@@ -163,6 +164,13 @@ ShellRoot {
       tryCompare(image, "status", Image.Ready);
       compare(image.width, preview.width); compare(image.height, preview.height);
       compare(host.surfaceItem.width, chatWidth); compare(host.surfaceItem.height, chatHeight);
+      fixture.focusStage = "download from the separate photo window";
+      viewerSaveSpy.target = preview.viewer; viewerSaveSpy.clear();
+      keyClick(Qt.Key_D);
+      tryVerify(() => viewerSaveSpy.count >= 2);
+      // Demo returns no saved path and performs no real filesystem writes.
+      verify(preview.viewer.noticeFailed); compare(preview.viewer.notice, "Could not save this file.");
+      verify(preview.visible); compare(panel.modal, "media");
       if (Quickshell.env("BEEPER_PHOTO_SCREENSHOT")) {
         wait(150);
         fixture.captureExitCode = -1; photoCapture.running = true;

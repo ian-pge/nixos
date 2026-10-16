@@ -8,6 +8,7 @@ ShellRoot {
   property var controls: null
   property var message: null
   property var format: null
+  property alias testPlayer: player
   Component.onCompleted: format = Qt.createQmlObject('import QtQml; import "file://' + Quickshell.shellDir + '/../features/messenger/BeeperFormat.js" as F; QtObject { property var library: F }', fixture).library
   QtObject {
     id: groupData
@@ -26,6 +27,20 @@ ShellRoot {
     function play() { playbackState = MediaPlayer.PlayingState; }
     function pause() { playbackState = MediaPlayer.PausedState; }
     function setPosition(value) { position = value; }
+  }
+  QtObject {
+    id: audioData
+    property bool connected: true
+    property var waveforms: ({})
+    property QtObject audioPlayback: QtObject {
+      property string key: "other-voice"
+      property var player: fixture.testPlayer
+      property bool active: false
+      property bool playWhenReady: false
+      property bool downloading: false
+      property string errorText: ""
+    }
+    function ensureWaveform(url) {}
   }
   Window { id: window; width: 900; height: 600; visible: true }
   TestResult { id: results }
@@ -59,7 +74,7 @@ ShellRoot {
       compare(bubble.width, 420); compare(media.implicitHeight, 48);
       compare(bubble.height, 48 + findChild(message, "beeperSenderName").implicitHeight + 3 + 12);
       verify(media.color === undefined, "Media is an unpainted Item, not a second bubble");
-      compare(findChild(media, "beeperMediaTime").text, "0:34");
+      compare(findChild(media, "beeperMediaTime").text, "0:00 / 0:34");
       message.playbackEnabled = false;
       verify(!findChild(media, "beeperMediaPlay").enabled);
     }
@@ -105,6 +120,7 @@ ShellRoot {
       return [
         {tag: "single", text: "Chat chat", width: 800},
         {tag: "whitespace", text: "Chat\n  chat\tchat\n\nChat ", width: 800},
+        {tag: "list", text: "• Chat\n  1. Un chat et quelques mots qui passent à la ligne.\n• Café", width: 320},
         {tag: "wrapped", text: "Chat and other words. ".repeat(20), width: 320},
         {tag: "literal markup", text: "<b>chat</b> & CHAT\n🙂 café", width: 520}
       ];
@@ -173,6 +189,21 @@ ShellRoot {
       mouseClick(layer, 10, layer.height / 2);
       tryVerify(() => requests === 1);
       compare(message.selectedText, "");
+    }
+    function test_list_markers_are_displayed_and_copied() {
+      controls.visible = false;
+      const text = "• Courses\n  1. Café & pain\n• Maison";
+      message = create("BeeperMessage", {width: 700, message: {id: "list",
+        text: "<ul><li>Courses<ol><li>Café &amp; pain</li></ol></li><li>Maison</li></ul>", plainText: text}});
+      const body = findChild(message, "messageBody");
+      compare(body.text, text);
+      verify(body.visible);
+      const layer = selectionLayer(message);
+      layer.selectAll();
+      compare(message.selectedText, text, "Copy keeps bullets, indentation and numbers");
+      message.searchQuery = "cafe";
+      compare(body.text, text);
+      compare(message.selectedText, text, "Highlighting keeps the selected list intact");
     }
     function test_text_selection_is_really_painted_for_both_message_directions() {
       controls.visible = false;
@@ -267,11 +298,50 @@ ShellRoot {
       compare(player.position, position);
       player.seekable = false; verify(!seek.enabled);
     }
-    function test_time_uses_metadata_before_loading_then_player_position() {
+    function test_time_shows_position_and_total_before_loading_and_during_playback() {
       controls.fallbackDuration = 45000; player.duration = 0;
-      compare(findChild(controls, "beeperMediaTime").text, "0:45");
-      player.duration = 34000; compare(findChild(controls, "beeperMediaTime").text, "0:34");
-      player.position = 12000; compare(findChild(controls, "beeperMediaTime").text, "0:12");
+      const time = findChild(controls, "beeperMediaTime");
+      compare(time.text, "0:00 / 0:45");
+      player.duration = 34000; compare(time.text, "0:00 / 0:34");
+      player.position = 12000; compare(time.text, "0:12 / 0:34");
+      player.position = 34000; compare(time.text, "0:34 / 0:34");
+      player.position = 0; compare(time.text, "0:00 / 0:34");
+    }
+    function test_time_fits_and_track_stays_stable_across_minutes() {
+      const time = findChild(controls, "beeperMediaTime"), seek = findChild(controls, "beeperMediaSeek");
+      player.duration = 754000;
+      player.position = 59000; wait(20);
+      const trackWidth = seek.width;
+      verify(time.width >= time.implicitWidth);
+      verify(time.x > seek.x);
+      player.position = 600000; wait(20);
+      compare(time.text, "10:00 / 12:34");
+      verify(time.width >= time.implicitWidth);
+      compare(seek.width, trackWidth);
+      const rate = findChild(controls, "beeperMediaRate");
+      verify(rate.x + rate.width <= controls.width);
+    }
+    function test_unselected_voice_total_updates_from_waveform_without_loading_player() {
+      controls.visible = false;
+      const source = "mxc://test/unselected-voice", cacheKey = JSON.stringify(source);
+      audioData.waveforms = {[cacheKey]: {pending: true, peaks: []}};
+      audioData.audioPlayback.key = "other-voice";
+      message = create("BeeperMedia", {width: 392, height: 48, beeperData: audioData,
+        audioKey: "voice", attachment: {type: "audio", isVoiceNote: true, srcURL: source}});
+      const time = findChild(message, "beeperMediaTime");
+      audioData.waveforms = {[cacheKey]: {pending: false, peaks: [0.2, 1, 0.4], durationMs: 65000}};
+      compare(time.text, "0:00 / 1:05");
+      compare(audioData.audioPlayback.key, "other-voice");
+      compare(findChild(message, "beeperMediaPlayer").playbackState, MediaPlayer.StoppedState);
+      audioData.audioPlayback.key = "voice";
+      player.position = 12000;
+      compare(time.text, "0:12 / 0:34");
+      audioData.audioPlayback.key = "other-voice";
+      compare(time.text, "0:00 / 1:05");
+      message.attachment = {type: "audio", duration: 45, srcURL: source};
+      compare(time.text, "0:00 / 0:45");
+      message.attachment = {type: "audio", srcURL: "mxc://test/another-voice"};
+      compare(time.text, "0:00 / 0:00", "Duration belongs to its own attachment");
     }
     function test_image_has_no_second_card_and_keeps_preview_action() {
       controls.visible = false;

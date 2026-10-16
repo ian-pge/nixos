@@ -12,6 +12,7 @@ ShellRoot {
   property var copiedTexts: []
   property int recordStarts: 0
   property int recordStops: 0
+  property bool deferRecordFinish: false
   property int pickerOpens: 0
   Component {
     id: fakePicker
@@ -30,7 +31,7 @@ ShellRoot {
       signal finished(string path)
       signal failed(string message)
       function start() { ++fixture.recordStarts; recording = true; }
-      function stop() { ++fixture.recordStops; recording = false; finished(outputPath); }
+      function stop() { ++fixture.recordStops; recording = false; if (!fixture.deferRecordFinish) finished(outputPath); }
     }
   }
   Window { id: window; width: 1280; height: 900; visible: true }
@@ -81,12 +82,11 @@ ShellRoot {
     }
     function init() {
       fixture.openedUrls = []; fixture.copiedTexts = [];
-      fixture.recordStarts = 0; fixture.recordStops = 0;
+      fixture.recordStarts = 0; fixture.recordStops = 0; fixture.deferRecordFinish = false;
       fixture.pickerOpens = 0;
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true, recorderFactory: fakeRecorder, attachmentPickerFactory: fakePicker,
-          linkOpener: url => { fixture.openedUrls = fixture.openedUrls.concat([url]); return true; },
           clipboardWriter: text => { fixture.copiedTexts = fixture.copiedTexts.concat([text]); }});
       beeperData.chats = [
         {id: "chat-a", title: "First chat", accountID: "account-a", capabilities: {reaction: 2}},
@@ -443,6 +443,58 @@ ShellRoot {
       compare(beeperData.draftText, "Keep my caption"); compare(pending("send").length, 0);
       compare(panel.chatList.contentY, chatY); compare(findChild(panel, "beeperMessages").contentY, messageY);
     }
+    function test_enter_finishes_voice_then_sends_on_second_press_data() {
+      const cases = [];
+      for (const mode of ["navigation", "composer", "vim"])
+        for (const key of [Qt.Key_Return, Qt.Key_Enter]) cases.push({tag: mode + "-" + key, mode: mode, key: key});
+      return cases;
+    }
+    function test_enter_finishes_voice_then_sends_on_second_press(data) {
+      beeperData.deferRecording = true; beeperData.draftText = "Keep my caption";
+      panel.vimEditing = data.mode === "vim";
+      if (data.mode !== "navigation") panel.compose();
+      keyClick(Qt.Key_D, Qt.ControlModifier); beeperData.respond("prepareRecording", preparedVoice());
+      verify(panel.recording);
+      keyClick(data.key);
+      verify(!panel.recording); compare(fixture.recordStops, 1);
+      compare(beeperData.draftAttachment.path, preparedVoice().path);
+      compare(beeperData.draftText, "Keep my caption"); compare(pending("send").length, 0);
+      verify(panel.composer.activeFocus);
+      keyClick(data.key); compare(pending("send").length, 1);
+      compare(pending("send")[0].params.attachment.path, preparedVoice().path);
+    }
+    function test_escape_cancels_voice_without_sending_or_closing_panel_data() {
+      return ["navigation", "composer", "vim", "preparing", "delayed"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_escape_cancels_voice_without_sending_or_closing_panel(data) {
+      beeperData.deferRecording = true; beeperData.draftText = "Keep my caption";
+      beeperData.replyToMessageID = "message-0";
+      panel.vimEditing = data.mode === "vim";
+      if (data.mode !== "navigation") panel.compose();
+      fixture.deferRecordFinish = data.mode === "delayed";
+      keyClick(Qt.Key_D, Qt.ControlModifier);
+      if (data.mode !== "preparing") beeperData.respond("prepareRecording", preparedVoice());
+      keyClick(Qt.Key_Escape);
+      verify(!panel.recording); verify(!panel.preparingRecording);
+      compare(closeSpy.count, 0); compare(beeperData.draftAttachment, null);
+      if (data.mode === "preparing") beeperData.respond("prepareRecording", preparedVoice());
+      if (data.mode === "delayed") panel.recorder.finished(preparedVoice().path);
+      compare(panel.recorder, null); compare(beeperData.draftAttachment, null);
+      compare(pending("discardAttachment").length, 1);
+      compare(pending("discardAttachment")[0].params.path, preparedVoice().path);
+      compare(beeperData.draftText, "Keep my caption"); compare(beeperData.replyToMessageID, "message-0");
+      compare(pending("send").length, 0);
+    }
+    function test_enter_does_not_send_caption_while_voice_is_finalizing() {
+      beeperData.deferRecording = true; fixture.deferRecordFinish = true;
+      beeperData.draftText = "Keep my caption"; panel.compose();
+      keyClick(Qt.Key_D, Qt.ControlModifier); beeperData.respond("prepareRecording", preparedVoice());
+      keyClick(Qt.Key_Return); verify(!panel.recording); verify(panel.recorder !== null);
+      keyClick(Qt.Key_Return); compare(pending("send").length, 0);
+      panel.recorder.finished(preparedVoice().path);
+      compare(pending("send").length, 0);
+      keyClick(Qt.Key_Return); compare(pending("send").length, 1);
+    }
     function test_recording_shortcut_keeps_existing_attachment_and_edit_draft() {
       beeperData.deferRecording = true; beeperData.draftText = "Keep text"; panel.compose(); panel.composer.cursorPosition = 0;
       beeperData.draftAttachments = [{type: "file", fileName: "Keep.pdf"}];
@@ -532,34 +584,47 @@ ShellRoot {
       waitForHistory();
       keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.selectedMessage.id, "links");
     }
-    function test_space_opens_one_distinct_link_without_a_popup() {
+    function test_space_never_opens_links() {
       selectLinkedMessage("Read https://one.example/page.", [
         {url: "https://one.example/page", title: "One"}, {url: "javascript:alert(1)"}
       ]);
       keyClick(Qt.Key_Space);
-      compare(fixture.openedUrls, ["https://one.example/page"]); compare(panel.modal, "");
+      compare(fixture.openedUrls, []); compare(panel.modal, "");
       compare(panel.selectedMessage.id, "links");
+      selectLinkedMessage("https://one.example/ https://two.example/");
+      keyClick(Qt.Key_Space); compare(panel.modal, ""); compare(fixture.openedUrls, []);
     }
-    function test_multiple_links_use_j_k_enter_and_escape_without_moving_the_chat() {
-      selectLinkedMessage("https://one.example/page https://two.example/page", [{url: "https://one.example/page", title: "First link"}]);
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "links");
+    function test_attachment_chooser_opens_only_the_chosen_file_data() {
+      return [{tag: "enter", key: Qt.Key_Return}, {tag: "o", key: Qt.Key_O}];
+    }
+    function test_attachment_chooser_opens_only_the_chosen_file(data) {
+      selectLinkedMessage("Files", [], [
+        {type: "file", path: "/tmp/first.pdf", fileName: "First.pdf"},
+        {type: "file", path: "/tmp/second.pdf", fileName: "Second.pdf"}
+      ]);
+      const row = findChild(panel, "beeperMessages").itemAtIndex(0);
+      captureFileOpens(row.attachmentItem(0)); captureFileOpens(row.attachmentItem(1));
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "attachments");
       tryCompare(panel.modalSurface, "activeFocus", true);
-      const list = findChild(panel, "beeperLinksList");
+      const list = findChild(panel, "beeperAttachmentsList");
       compare(list.count, 2); compare(list.currentIndex, 0); compare(fixture.openedUrls.length, 0);
       keyClick(Qt.Key_J); compare(list.currentIndex, 1);
       keyClick(Qt.Key_J); compare(list.currentIndex, 1);
       keyClick(Qt.Key_K); compare(list.currentIndex, 0);
       keyClick(Qt.Key_K); compare(list.currentIndex, 0);
-      keyClick(Qt.Key_J); keyClick(Qt.Key_Return);
-      compare(fixture.openedUrls, ["https://two.example/page"]); compare(panel.modal, "");
+      beeperData.messages = JSON.parse(JSON.stringify(beeperData.messages));
+      keyClick(Qt.Key_J); keyClick(data.key);
+      tryCompare(fixture, "openedUrls", ["file:///tmp/second.pdf"]); compare(panel.modal, "");
       compare(beeperData.currentChatID, "chat-a"); compare(panel.selectedMessage.id, "links");
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "links");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "attachments");
       keyClick(Qt.Key_Escape); compare(panel.modal, "");
-      compare(fixture.openedUrls.length, 1); compare(panel.linkChoices.length, 0);
+      compare(fixture.openedUrls.length, 1); compare(panel.attachmentChoices.length, 0);
     }
-    function test_attachment_takes_priority_over_links() {
+    function test_space_ignores_images_and_o_opens_them() {
       selectLinkedMessage("https://one.example/photo", [], [{type: "image", srcURL: picture("blue")}]);
       keyClick(Qt.Key_Space);
+      compare(panel.modal, ""); compare(panel.previewAttachment, null);
+      keyClick(Qt.Key_O);
       tryCompare(panel, "modal", "media"); compare(fixture.openedUrls.length, 0);
       compare(panel.previewAttachment.srcURL, picture("blue"));
       compare(pending("saveAttachment").length, 0);
@@ -567,7 +632,7 @@ ShellRoot {
     function captureFileOpens(media) {
       media.fileOpener = url => { fixture.openedUrls = fixture.openedUrls.concat([url]); return true; };
     }
-    function test_space_saves_every_document_without_opening() {
+    function test_d_saves_every_attachment_without_opening() {
       const files = [
         {type: "file", srcURL: "file:///tmp/test-document.pdf", fileName: "document.pdf", mimeType: "application/pdf"},
         {type: "file", srcURL: "mxc://preview/archive", fileName: "archive.zip", mimeType: "application/zip"},
@@ -575,12 +640,13 @@ ShellRoot {
       ];
       selectLinkedMessage("https://one.example/", [], files);
       captureFileOpens(findChild(panel, "beeperMessages").itemAtIndex(0).attachmentItem(0));
-      keyClick(Qt.Key_Space);
+      keyClick(Qt.Key_Space); compare(pending("saveAttachment").length, 0);
+      keyClick(Qt.Key_D);
       for (const file of files) {
         tryVerify(() => pending("saveAttachment").length === 1);
         compare(pending("saveAttachment")[0].params, {url: file.srcURL, fileName: file.fileName, mimeType: file.mimeType});
-        keyClick(Qt.Key_Space); wait(0);
-        compare(pending("saveAttachment").length, 1, "Repeated Space cannot duplicate an active batch");
+        keyClick(Qt.Key_D); wait(0);
+        compare(pending("saveAttachment").length, 1, "Repeated d cannot duplicate an active batch");
         beeperData.respond("saveAttachment", {path: "/home/user/Téléchargements/" + file.fileName, name: file.fileName});
       }
       tryCompare(panel, "notice", "Saved 3 attachments to Téléchargements");
@@ -592,13 +658,22 @@ ShellRoot {
       panel.compose(); keyClick(Qt.Key_Space);
       compare(panel.composer.text, " "); compare(pending("saveAttachment").length, 0);
     }
-    function test_space_keeps_media_preview_when_documents_are_also_attached() {
+    function test_mixed_attachments_offer_a_choice_and_d_saves_all_from_the_chooser() {
       selectLinkedMessage("Mixed attachments", [], [
         {type: "file", srcURL: "file:///tmp/document.pdf", fileName: "document.pdf"},
         {type: "img", srcURL: picture("blue")}
       ]);
       captureFileOpens(findChild(panel, "beeperMessages").itemAtIndex(0).attachmentItem(0));
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+      keyClick(Qt.Key_Space); compare(panel.modal, "");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "attachments");
+      tryVerify(() => panel.modalSurface.activeFocus);
+      keyClick(Qt.Key_D); tryVerify(() => pending("saveAttachment").length === 1);
+      compare(pending("saveAttachment")[0].params.url, "file:///tmp/document.pdf");
+      beeperData.respond("saveAttachment", {path: "/home/user/Downloads/document.pdf"});
+      tryVerify(() => pending("saveAttachment").length === 1);
+      compare(pending("saveAttachment")[0].params.url, picture("blue"));
+      beeperData.respond("saveAttachment", {path: "/home/user/Downloads/photo.png"});
+      keyClick(Qt.Key_J); keyClick(Qt.Key_Return); tryCompare(panel, "modal", "media");
       compare(panel.previewAttachment.srcURL, picture("blue"));
       compare(fixture.openedUrls.length, 0); compare(pending("saveAttachment").length, 0);
     }
@@ -606,7 +681,7 @@ ShellRoot {
       selectLinkedMessage("Files", [], [
         {id: "missing", type: "file"}, {path: "/tmp/second.pdf", fileName: "second.pdf"}
       ]);
-      keyClick(Qt.Key_Space);
+      keyClick(Qt.Key_D);
       tryVerify(() => pending("saveAttachment").length === 1);
       compare(pending("saveAttachment")[0].params.url, "missing");
       beeperData.respond("saveAttachment", null, {message: "First file unavailable"});
@@ -620,7 +695,7 @@ ShellRoot {
     }
     function test_attachment_batch_keeps_original_files_when_switching_chat_and_closing() {
       selectLinkedMessage("Files", [], [{type: "file", srcURL: "mxc://original/one"}, {type: "file", srcURL: "mxc://original/two"}]);
-      keyClick(Qt.Key_Space);
+      keyClick(Qt.Key_D);
       tryVerify(() => pending("saveAttachment").length === 1);
       panel.chooseChat(1); panel.active = false;
       beeperData.respond("saveAttachment", {path: "/home/user/Downloads/one.pdf"});
@@ -659,11 +734,137 @@ ShellRoot {
       panel.openChatSearch(); wait(0);
       keyClick(Qt.Key_Space); compare(panel.searchField.text, " "); compare(fixture.openedUrls.length, 0);
     }
-    function test_changing_conversation_cancels_the_link_picker() {
-      selectLinkedMessage("https://one.example/ https://two.example/");
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "links");
+    function test_changing_conversation_cancels_the_attachment_chooser() {
+      selectLinkedMessage("Files", [], [{type: "file", path: "/tmp/first.pdf"}, {type: "file", path: "/tmp/second.pdf"}]);
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "attachments");
       beeperData.selectChat("chat-b");
-      compare(panel.modal, ""); compare(panel.linkChoices.length, 0); compare(fixture.openedUrls.length, 0);
+      compare(panel.modal, ""); compare(panel.attachmentChoices.length, 0); compare(fixture.openedUrls.length, 0);
+    }
+    function test_o_opens_a_single_document_in_its_application() {
+      const media = selectAttachment({type: "file", path: "/tmp/document.pdf"});
+      captureFileOpens(media);
+      keyClick(Qt.Key_O);
+      tryCompare(fixture, "openedUrls", ["file:///tmp/document.pdf"]);
+      compare(panel.modal, ""); compare(pending("saveAttachment").length, 0);
+    }
+    function test_space_does_not_activate_a_focused_file_open_button() {
+      const media = selectAttachment({type: "file", path: "/tmp/document.pdf"});
+      captureFileOpens(media);
+      const button = media.children.find(child => child.children?.some(item => item.text === "Open"))?.children.find(item => item.text === "Open");
+      verify(button !== undefined); button.forceActiveFocus();
+      keyClick(Qt.Key_Space); wait(0);
+      compare(fixture.openedUrls.length, 0); compare(pending("saveAttachment").length, 0);
+    }
+    function test_space_only_controls_audio_in_a_mixed_message() {
+      selectLinkedMessage("Mixed", [], [
+        {type: "img", srcURL: picture("red")},
+        {id: "voice", type: "audio", srcURL: "mxc://preview/voice", duration: 30},
+        {type: "file", path: "/tmp/document.pdf"}
+      ]);
+      keyClick(Qt.Key_Space);
+      verify(beeperData.audioPlayback.playWhenReady);
+      compare(JSON.parse(beeperData.audioPlayback.key), ["chat-a", "links", 1]);
+      compare(panel.modal, ""); compare(pending("saveAttachment").length, 0);
+      keyClick(Qt.Key_Space); verify(!beeperData.audioPlayback.playWhenReady);
+    }
+    function test_space_controls_the_voice_chosen_with_o_when_there_are_several() {
+      selectLinkedMessage("Voices", [], [
+        {type: "audio", srcURL: "mxc://preview/first", duration: 30},
+        {type: "audio", srcURL: "mxc://preview/second", duration: 30}
+      ]);
+      keyClick(Qt.Key_O); tryVerify(() => panel.modalSurface.activeFocus);
+      keyClick(Qt.Key_J); keyClick(Qt.Key_Return);
+      compare(panel.modal, ""); verify(beeperData.audioPlayback.playWhenReady);
+      compare(JSON.parse(beeperData.audioPlayback.key), ["chat-a", "links", 1]);
+      keyClick(Qt.Key_Space); verify(!beeperData.audioPlayback.playWhenReady);
+      compare(pending("download").length, 1);
+      compare(pending("download")[0].params.url, "mxc://preview/second");
+    }
+    function test_message_shortcuts_stay_text_in_inputs_data() {
+      return ["composer", "chat-search", "message-search"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_message_shortcuts_stay_text_in_inputs(data) {
+      selectAttachment({type: "file", path: "/tmp/document.pdf"});
+      let input;
+      if (data.mode === "composer") { panel.compose(); input = panel.composer; }
+      else if (data.mode === "chat-search") { panel.openChatSearch(); input = panel.searchField; }
+      else { panel.openConversationSearch(); input = findChild(panel, "beeperMessageSearchInput"); }
+      tryVerify(() => input.activeFocus);
+      for (const key of [Qt.Key_O, Qt.Key_I, Qt.Key_D, Qt.Key_Space]) keyClick(key);
+      compare(input.text, "oid "); compare(panel.modal, "");
+      compare(pending("saveAttachment").length, 0); compare(fixture.openedUrls.length, 0);
+    }
+    function prepareReply(target = "old-original") {
+      const context = [];
+      for (let i = 0; i < 40; ++i) context.push({id: "context-" + i, chatID: "chat-a", text: "Context " + i,
+        timestamp: new Date(1700000000000 + i * 60000).toISOString()});
+      beeperData.messages = context.concat([{id: "reply", chatID: "chat-a", text: "A reply", linkedMessageID: target,
+        timestamp: new Date(1700000000000 + 40 * 60000).toISOString()}]);
+      waitForHistory(); panel.focusNavigation();
+      keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.selectedMessage.id, "reply");
+    }
+    function oldOriginal() { return {id: "old-original", chatID: "chat-a", text: "Original", timestamp: "2020-01-01T10:00:00Z"}; }
+    function beginOlderReply() {
+      prepareReply();
+      beeperData.hasOlderMessages = true; beeperData.oldestCursor = "reply-page-0";
+      keyClick(Qt.Key_I); compare(panel.replyTargetID, "old-original");
+      tryVerify(() => pending("message").length === 1);
+      beeperData.respond("message", oldOriginal());
+      tryVerify(() => pending("messages").length === 1);
+    }
+    function test_i_selects_and_reveals_the_loaded_original_without_changing_the_draft() {
+      beeperData.draftText = "Keep this draft";
+      prepareReply("context-0");
+      keyClick(Qt.Key_I); tryVerify(() => panel.selectedMessage?.id === "context-0");
+      const history = findChild(panel, "beeperMessages");
+      tryVerify(() => history.itemAtIndex(0)?.inVisibleViewport === true);
+      compare(beeperData.draftText, "Keep this draft"); compare(panel.navigation, "messages");
+      compare(pending("message").length, 0); compare(pending("messages").length, 0);
+      compare(panel.replyTargetID, "");
+    }
+    function test_i_loads_original_context_past_twenty_pages_using_public_cursors() {
+      beginOlderReply();
+      for (let page = 0; page < 22; ++page) {
+        tryVerify(() => pending("messages").length === 1);
+        compare(pending("messages")[0].params.cursor, "reply-page-" + page);
+        compare(pending("messages")[0].params.direction, "before");
+        beeperData.respond("messages", {items: [], oldestCursor: "reply-page-" + (page + 1), hasMore: true});
+      }
+      tryVerify(() => pending("messages").length === 1);
+      beeperData.respond("messages", {items: [oldOriginal()], hasMore: false});
+      tryVerify(() => panel.selectedMessage?.id === "old-original");
+      compare(panel.replyTargetID, ""); compare(panel.notice, ""); compare(beeperData.lastError, "");
+    }
+    function test_i_reports_deleted_or_inaccessible_originals() {
+      prepareReply(); keyClick(Qt.Key_I);
+      tryVerify(() => pending("message").length === 1);
+      beeperData.respond("message", null, {code: "not_found", message: "Missing"});
+      tryCompare(panel, "notice", "Original message unavailable");
+      compare(panel.selectedMessage.id, "reply"); compare(panel.replyTargetID, "");
+      compare(pending("messages").length, 0);
+    }
+    function test_i_history_failure_stops_and_can_retry() {
+      beginOlderReply(); beeperData.respond("messages", null, {message: "Offline"});
+      compare(panel.replyTargetID, ""); verify(panel.notice.includes("Press i to retry"));
+      wait(150); compare(pending("messages").length, 0);
+      keyClick(Qt.Key_I); tryVerify(() => pending("messages").length === 1);
+      beeperData.respond("messages", {items: [oldOriginal()], hasMore: false});
+      tryVerify(() => panel.selectedMessage?.id === "old-original");
+    }
+    function test_leaving_a_reply_lookup_prevents_a_late_jump_data() {
+      return ["escape", "selection", "scroll", "chat", "close"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_leaving_a_reply_lookup_prevents_a_late_jump(data) {
+      beginOlderReply();
+      if (data.mode === "escape") keyClick(Qt.Key_Escape);
+      else if (data.mode === "selection") keyClick(Qt.Key_K, Qt.ControlModifier);
+      else if (data.mode === "scroll") panel.userHistoryScroll();
+      else if (data.mode === "chat") panel.chooseChat(1);
+      else panel.active = false;
+      compare(panel.replyTargetID, "");
+      beeperData.respond("messages", {items: [oldOriginal()], hasMore: false});
+      wait(50);
+      verify(panel.selectedMessage?.id !== "old-original"); compare(closeSpy.count, 0);
     }
     function test_number_keys_react_to_the_selected_message(data) {
       beeperData.chats = beeperData.chats.map(chat => chat.id === "chat-a"
@@ -969,14 +1170,12 @@ ShellRoot {
       tryCompare(panel, "restoringView", false);
       keyClick(Qt.Key_1); compare(pending("react").length, 0);
     }
-    function test_open_selected_video_and_preserve_selection_on_close_data() {
-      return [{tag: "space", key: Qt.Key_Space}, {tag: "o", key: Qt.Key_O}];
-    }
-    function test_open_selected_video_and_preserve_selection_on_close(data) {
+    function test_open_selected_video_and_preserve_selection_on_close() {
       const media = selectAttachment({type: "video", srcURL: "file://" + Quickshell.shellDir + "/fixtures/fullscreen-video.mp4", duration: 20});
       const inlinePlayer = findChild(media, "beeperMediaPlayer"); verify(inlinePlayer !== null);
       inlinePlayer.play(); tryCompare(inlinePlayer, "playbackState", MediaPlayer.PlayingState);
-      keyClick(data.key); tryCompare(panel, "modal", "media");
+      keyClick(Qt.Key_Space); compare(panel.modal, "");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "media");
       compare(pending("saveAttachment").length, 0);
       verify(panel.photoPreviewOpen); verify(panel.videoPreviewOpen);
       const viewer = findChild(panel, "beeperPhotoViewer");
@@ -986,6 +1185,11 @@ ShellRoot {
       tryCompare(fullscreenPlayer, "playbackState", MediaPlayer.PlayingState, 3000);
       keyClick(Qt.Key_Space); tryCompare(fullscreenPlayer, "playbackState", MediaPlayer.PausedState);
       compare(panel.modal, "media"); compare(panel.messageIndex, 0);
+      findChild(viewer, "beeperMediaPlay").forceActiveFocus();
+      keyClick(Qt.Key_D);
+      compare(pending("saveAttachment").length, 1);
+      compare(pending("saveAttachment")[0].params.url, "file://" + Quickshell.shellDir + "/fixtures/fullscreen-video.mp4");
+      compare(fullscreenPlayer.playbackState, MediaPlayer.PausedState);
       keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message"); compare(closeSpy.count, 0);
       verify(inlinePlayer.playbackState !== MediaPlayer.PlayingState);
@@ -1001,12 +1205,75 @@ ShellRoot {
       keyClick(Qt.Key_Space); compare(panel.composer.text, " ");
       compare(player.playbackState, MediaPlayer.PausedState); compare(pending("saveAttachment").length, 0);
     }
-    function startVoice() {
-      const media = selectAttachment({id: "voice-asset", type: "audio", srcURL: silentAudio(), duration: 2});
+    function startVoice(seconds = 2) {
+      // The local 30-second silent FLAC has a seekable duration, unlike a data URL.
+      // Generated with FFmpeg anullsrc=r=8000:cl=mono, -t 30 -c:a flac.
+      const source = seconds === 30 ? Qt.resolvedUrl("fixtures/silent-audio.flac").toString() : silentAudio();
+      const media = selectAttachment({id: "voice-asset", type: "audio", srcURL: source, duration: seconds});
       const player = beeperData.audioPlayback.player;
       player.audioOutput.muted = true;
       keyClick(Qt.Key_Space); tryCompare(player, "playbackState", MediaPlayer.PlayingState);
       return media;
+    }
+    function test_h_l_seek_the_playing_voice_without_requiring_its_selection_data() {
+      return ["navigation", "play", "rate", "slider", "offscreen", "another-chat"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_h_l_seek_the_playing_voice_without_requiring_its_selection(data) {
+      const media = startVoice(30), player = beeperData.audioPlayback.player;
+      tryVerify(() => player.seekable && player.duration === 30000);
+      if (data.mode === "play") findChild(media, "beeperMediaPlay").forceActiveFocus();
+      else if (data.mode === "rate") findChild(media, "beeperMediaRate").forceActiveFocus();
+      else if (data.mode === "slider") findChild(media, "beeperMediaSeek").forceActiveFocus();
+      else if (data.mode === "offscreen") findChild(panel, "beeperMessages").itemAtIndex(0).renderMedia = false;
+      else if (data.mode === "another-chat") {
+        panel.chooseChat(1); beeperData.respond("messages", {items: [], hasMore: false});
+        waitForHistory(); panel.focusNavigation();
+      }
+      const selected = panel.selectedMessage?.id || "", navigation = panel.navigation;
+      player.setPosition(10000);
+      tryVerify(() => Math.abs(player.position - 10000) < 500);
+      keyClick(Qt.Key_H);
+      tryVerify(() => Math.abs(player.position - 5000) < 500, 1000);
+      keyClick(Qt.Key_L);
+      tryVerify(() => Math.abs(player.position - 10000) < 500, 1000);
+      compare(player.playbackState, MediaPlayer.PlayingState);
+      compare(panel.selectedMessage?.id || "", selected);
+      compare(panel.navigation, navigation);
+    }
+    function test_playing_voice_does_not_steal_h_l_from_inputs_or_modals_data() {
+      return ["composer", "chat-search", "message-search", "help"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_playing_voice_does_not_steal_h_l_from_inputs_or_modals(data) {
+      startVoice(30); const player = beeperData.audioPlayback.player;
+      if (data.mode === "composer") {
+        keyClick(Qt.Key_L, Qt.ControlModifier); verify(panel.composer.activeFocus);
+      } else if (data.mode === "chat-search") panel.openChatSearch();
+      else if (data.mode === "message-search") panel.openConversationSearch();
+      else panel.openModal("help");
+      wait(20);
+      player.setPosition(10000);
+      tryVerify(() => Math.abs(player.position - 10000) < 500);
+      keyClick(Qt.Key_H);
+      verify(Math.abs(player.position - 10000) < 500);
+      keyClick(Qt.Key_L);
+      verify(Math.abs(player.position - 10000) < 500);
+      compare(player.playbackState, MediaPlayer.PlayingState);
+      if (data.mode === "composer") compare(beeperData.draftText, "hl");
+      else if (data.mode === "chat-search") compare(panel.searchField.text, "hl");
+      else if (data.mode === "message-search") compare(window.activeFocusItem.text, "hl");
+      else compare(panel.modal, "help");
+    }
+    function test_voice_seek_clamps_to_the_recording_and_paused_navigation_does_not_seek() {
+      startVoice(30); const audio = beeperData.audioPlayback, player = audio.player;
+      tryVerify(() => player.seekable && player.duration === 30000);
+      player.setPosition(1000); keyClick(Qt.Key_H);
+      tryVerify(() => player.position >= 0 && player.position < 500);
+      audio.pause(); player.setPosition(10000);
+      keyClick(Qt.Key_L); compare(player.position, 10000);
+      keyClick(Qt.Key_H); compare(player.position, 10000); compare(panel.navigation, "chats");
+      audio.seek(50000); compare(player.position, 30000);
+      audio.seek(-50000); compare(player.position, 0);
+      compare(player.playbackState, MediaPlayer.PausedState);
     }
     function test_voice_survives_reaction_updates_scrolling_typing_and_chat_changes() {
       const media = startVoice(), player = beeperData.audioPlayback.player;
@@ -1073,13 +1340,10 @@ ShellRoot {
       if (data.cancel) { verify(!beeperData.audioPlayback.playWhenReady); verify(player.playbackState !== MediaPlayer.PlayingState); }
       else tryCompare(player, "playbackState", MediaPlayer.PlayingState);
     }
-    function test_open_photo_without_a_header_and_space_closes_it_data() {
-      return [{tag: "space", key: Qt.Key_Space}, {tag: "o", key: Qt.Key_O}];
-    }
-    function test_open_photo_without_a_header_and_space_closes_it(data) {
+    function test_open_photo_without_a_header_and_space_closes_it() {
       const photo = {type: "img", srcURL: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="blue"/></svg>')};
       selectAttachment(photo);
-      keyClick(data.key); tryCompare(panel, "modal", "media");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "media");
       compare(pending("saveAttachment").length, 0);
       compare(panel.previewAttachment.srcURL, photo.srcURL);
       const photoView = findChild(panel.modalSurface, "beeperFullscreenPhoto");
@@ -1091,7 +1355,7 @@ ShellRoot {
       fuzzyCompare(image.paintedHeight, panel.height, 0.5);
       keyClick(Qt.Key_Space); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message");
-      keyClick(data.key); tryCompare(panel, "modal", "media");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "media");
       keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message");
       keyClick(Qt.Key_Return); keyClick(Qt.Key_Space);
@@ -1115,7 +1379,9 @@ ShellRoot {
     function openFromMessage(index) {
       waitForHistory();
       panel.messageIndex = index; wait(20);
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+      keyClick(Qt.Key_O);
+      if (panel.modal === "attachments") { tryVerify(() => panel.modalSurface.activeFocus); keyClick(Qt.Key_Return); }
+      tryCompare(panel, "modal", "media");
     }
     function test_photo_viewer_h_l_walk_photos_and_gifs_but_not_videos() {
       beeperData.messages = gallery();
@@ -1147,25 +1413,35 @@ ShellRoot {
       compare(panel.selectedMessage.id, "photo-a");
       keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
     }
-    function test_enter_saves_the_viewed_media_without_closing() {
+    function test_d_saves_the_viewed_media_without_closing() {
       beeperData.messages = gallery();
       openFromMessage(4);
       const notice = findChild(panel.modalSurface, "beeperViewerNoticeText");
       keyClick(Qt.Key_Return);
-      compare(panel.modal, "media", "Enter keeps the photo open");
+      compare(pending("saveAttachment").length, 0, "Enter no longer downloads");
+      keyClick(Qt.Key_D);
+      compare(panel.modal, "media", "d keeps the photo open");
       compare(pending("saveAttachment").length, 1);
       compare(pending("saveAttachment")[0].params, {url: picture("yellow"), fileName: "Plage.jpg", mimeType: "image/jpeg"});
       compare(notice.text, "Saving…");
-      keyClick(Qt.Key_Return);
+      keyClick(Qt.Key_D);
       compare(pending("saveAttachment").length, 1, "One save at a time");
       beeperData.respond("saveAttachment", {path: "/home/user/Téléchargements/Plage (2).jpg", name: "Plage (2).jpg"});
       compare(notice.text, "Saved to Téléchargements · Plage (2).jpg");
       verify(!panel.modalSurface.noticeFailed);
-      keyClick(Qt.Key_Return);
+      keyClick(Qt.Key_D);
       beeperData.respond("saveAttachment", null, {code: "save_failed", message: "Could not write the file."});
       compare(notice.text, "Could not write the file.");
       verify(panel.modalSurface.noticeFailed, "Failures use the error color");
       keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
+    }
+    function test_d_in_an_album_downloads_only_the_displayed_attachment() {
+      beeperData.messages = gallery(); openFromMessage(3);
+      keyClick(Qt.Key_L); compare(panel.previewAttachment.id, "c");
+      keyClick(Qt.Key_D); compare(pending("saveAttachment").length, 1);
+      compare(pending("saveAttachment")[0].params.url, "mxc://preview/gif");
+      beeperData.respond("saveAttachment", {path: "/home/user/Downloads/animation.gif", name: "animation.gif"});
+      wait(20); compare(pending("saveAttachment").length, 0); compare(panel.modal, "media");
     }
     function noticeText() { return findChild(panel, "beeperNoticeText").text; }
     function test_y_copies_the_whole_selected_message() {
@@ -1232,7 +1508,7 @@ ShellRoot {
     }
     function test_fullscreen_photo_waits_for_download_without_a_stale_error() {
       selectAttachment({type: "img", srcURL: "mxc://preview/photo"});
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "media");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "media");
       const photo = findChild(panel.modalSurface, "beeperFullscreenPhoto");
       verify(photo.downloading); compare(photo.errorText, "");
       const source = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="blue"/></svg>');

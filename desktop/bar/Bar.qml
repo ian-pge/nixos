@@ -137,19 +137,6 @@ PanelWindow {
       }
     }
 
-    Pill {
-      objectName: "updatesPill"
-      outlined: true
-      y: (window.blockHeight - height) / 2
-      iconOnly: true
-      iconName: services.updates.displayedIcon
-      accent: Theme.sideUpdates
-      forceHovered: coordinator.isOpen("updates", window.monitorName)
-      interactive: true
-      onLeftClicked: coordinator.toggle("updates", window.monitorName)
-      onRightClicked: services.updates.forceStatus()
-    }
-
     BarBlock {
       id: connectivityBlock
       objectName: "connectivityBlock"
@@ -219,22 +206,19 @@ PanelWindow {
       }
     }
 
-    BarBlock {
-      objectName: "storageBlock"
-      circularContent: true
-      accent: Theme.sideSystem
-      forceHovered: coordinator.isOpen("storage", window.monitorName)
-      BarDial {
-        objectName: "storagePill"
-        iconName: "hard-drive"
-        label: "Storage used"
-        value: services.system.diskUsage
-        accent: Theme.sideSystem
-        forceHovered: coordinator.isOpen("storage", window.monitorName)
-        interactive: true
-        onLeftClicked: coordinator.toggle("storage", window.monitorName)
-      }
+    Pill {
+      objectName: "updatesPill"
+      outlined: true
+      y: (window.blockHeight - height) / 2
+      iconOnly: true
+      iconName: services.updates.displayedIcon
+      accent: Theme.sideUpdates
+      forceHovered: coordinator.isOpen("updates", window.monitorName)
+      interactive: true
+      onLeftClicked: coordinator.toggle("updates", window.monitorName)
+      onRightClicked: services.updates.forceStatus()
     }
+
   }
 
   CentralCapsule {
@@ -288,6 +272,23 @@ PanelWindow {
       }
     }
     Behavior on opacity { NumberAnimation { duration: 240 } }
+
+    BarBlock {
+      objectName: "storageBlock"
+      circularContent: true
+      accent: Theme.sideSystem
+      forceHovered: coordinator.isOpen("storage", window.monitorName)
+      BarDial {
+        objectName: "storagePill"
+        iconName: "hard-drive"
+        label: "Storage used"
+        value: services.system.diskUsage
+        accent: Theme.sideSystem
+        forceHovered: coordinator.isOpen("storage", window.monitorName)
+        interactive: true
+        onLeftClicked: coordinator.toggle("storage", window.monitorName)
+      }
+    }
 
     UsageBlock {
       controller: services.usage

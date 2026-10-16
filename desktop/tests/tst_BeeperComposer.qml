@@ -78,6 +78,21 @@ ShellRoot {
       mouseClick(child("beeperComposerAction")); compare(recordSpy.count, 1); compare(sendSpy.count, 0);
       fixture.composer.recording = false; verify(!child("beeperComposerAction").enabled);
     }
+    function test_recording_led_blinks_beside_duration_and_keeps_caption() {
+      model.draftText = "Keep my caption";
+      const led = child("beeperRecordingLed"), label = child("beeperRecordingLabel");
+      verify(!led.visible);
+      fixture.composer.recordingDuration = 12000;
+      fixture.composer.recording = true;
+      verify(led.visible); compare(led.color.toString(), "#a6da95");
+      compare(label.text, "Recording  0:12");
+      verify(label.visible); verify(label.x >= led.x + led.width);
+      compare(led.opacity, 1); tryCompare(led, "opacity", 0, 1000); tryCompare(led, "opacity", 1, 1000);
+      fixture.composer.recording = false;
+      verify(!led.visible); verify(!label.visible);
+      compare(fixture.composer.input.text, "Keep my caption");
+      fixture.composer.preparingRecording = true; verify(!led.visible);
+    }
     function test_edit_and_attachment_modes_use_send_not_record() {
       fixture.composer.editMessageID = "edit"; fixture.composer.editText = "Edited text";
       verify(fixture.composer.sendMode); mouseClick(child("beeperComposerAction")); compare(sendSpy.count, 1);

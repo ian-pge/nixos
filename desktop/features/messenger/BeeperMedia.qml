@@ -32,8 +32,10 @@ Item {
   readonly property bool playWhenReady: sharedAudio ? currentAudio && sharedAudio.playWhenReady : inlinePlayWhenReady
   property string errorText: ""
   readonly property bool sourceReady: /^(file:|https?:|data:)/.test(sourceUrl)
-  readonly property var waveformPeaks: beeperData?.demo ? attachment.previewWaveform || []
-    : beeperData?.waveforms?.[JSON.stringify(sourceUrl)]?.peaks || []
+  readonly property var waveform: beeperData?.waveforms?.[JSON.stringify(sourceUrl)] || null
+  readonly property var waveformPeaks: beeperData?.demo ? attachment.previewWaveform || [] : waveform?.peaks || []
+  // Waveform analysis also supplies the total before the shared player opens this voice note.
+  readonly property real fallbackDuration: (attachment.duration || 0) * 1000 || (kind === "audio" ? waveform?.durationMs || 0 : 0)
   readonly property bool visual: kind === "image" || kind === "gif" || kind === "video"
   readonly property real maximumVisualHeight: expanded ? 430 : 250
   // Public attachment.size is available before decoding. Keep the decoded size
@@ -204,7 +206,7 @@ Item {
         player: audioControls
         accent: root.accent; accentBackground: root.accentBackground
         enabled: root.playbackEnabled
-        fallbackDuration: (root.attachment.duration || 0) * 1000
+        fallbackDuration: root.fallbackDuration
         peaks: root.waveformPeaks
       }
     }
@@ -255,7 +257,7 @@ Item {
           accentBackground: root.accentBackground && root.kind === "audio"
           enabled: root.playbackEnabled
           // Beeper attachment durations are seconds; Qt Multimedia uses ms.
-          fallbackDuration: (root.attachment.duration || 0) * 1000
+          fallbackDuration: root.fallbackDuration
           peaks: root.kind === "audio" ? root.waveformPeaks : []
         }
       }
