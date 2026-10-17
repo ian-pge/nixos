@@ -53,6 +53,10 @@ FocusScope {
   readonly property bool photoPreviewOpen: modal === "media"
     && ["image", "gif", "video"].includes(Format.attachmentType(previewAttachment || {}))
   readonly property bool videoPreviewOpen: modal === "media" && Format.attachmentType(previewAttachment || {}) === "video"
+  readonly property bool imageEditorOpen: modal === "draw"
+  property string imageEditChatID: ""
+  property int imageEditIndex: -1
+  property var imageEditOriginal: null
   property var recordingAttachment: null
   property string recordingChatID: ""
   property bool preparingRecording: false
@@ -95,7 +99,7 @@ FocusScope {
   readonly property var selectedMessage: messageIndex >= 0 && messageIndex < beeperData.messages.length ? beeperData.messages[messageIndex] : null
   readonly property var filteredChats: Format.orderChats(beeperData.chats.filter(chat => Format.isChatInView(chat, showLowPriority)
     && (networkFilter === "all" || Format.networkBadge(chat.network).key === networkFilter)
-    && (!searchField.text || (Format.chatTitle(chat) + " " + Format.preview(chat)).toLowerCase().includes(searchField.text.toLowerCase()))), unreadFirst)
+    && (!searchField.text || (Format.chatTitle(chat) + " " + Format.preview(chat, beeperData.chatPreviews)).toLowerCase().includes(searchField.text.toLowerCase()))), unreadFirst)
   readonly property bool canCycleNetwork: active && windowFocused && !modal && !beeperData.tokenRequired
     && !composerSurface?.emojiPickerOpen
     && !(connectionSurface?.visible ?? true)
@@ -329,9 +333,9 @@ FocusScope {
     attachmentPicker.open();
   }
   function openModal(name) {
-    if (name !== "help" && name !== "media" && name !== "attachments") return;
+    if (name !== "help" && name !== "media" && name !== "attachments" && name !== "draw") return;
     modal = name;
-    if (photoPreviewOpen && externalPhotoPreview) return;
+    if ((photoPreviewOpen || imageEditorOpen) && externalPhotoPreview) return;
     Qt.callLater(() => modalSurface.forceActiveFocus());
   }
   function closeModal() { modal = ""; previewOrigin = null; navigationFocus.forceActiveFocus(); }
@@ -344,6 +348,19 @@ FocusScope {
     previewAttachment = attachment;
     locatePreview(sourceItem?.attachment || attachment);
     openModal("media");
+  }
+  function drawAttachment(index) {
+    const attachment = beeperData.draftAttachments[index];
+    if (!active || modal || recording || preparingRecording || beeperData.sending || beeperData.stagingAttachments
+        || !attachment || Format.attachmentType(attachment) !== "image" || attachment.isSticker) return;
+    imageEditChatID = beeperData.currentChatID; imageEditIndex = index; imageEditOriginal = attachment;
+    previewAttachment = attachment; previewOrigin = null;
+    composerSurface.closeEmojiPicker(); openModal("draw");
+  }
+  function completeImageEdit(attachment) {
+    const replaced = beeperData.replaceDraftImage(imageEditChatID, imageEditIndex, imageEditOriginal, attachment);
+    closeModal(); compose();
+    if (!replaced) beeperData.lastError = "This image is no longer in the draft.";
   }
   function openSelectedAttachments() {
     const attachments = selectedMessage?.attachments || [];
@@ -614,7 +631,7 @@ FocusScope {
     if (!beeperData || !messageList) return;
     if (active) {
       beeperData.viewOwner = root;
-      beeperData.viewFocused = !restoringView && windowFocused && modal !== "media" && !connectionSurface.visible;
+      beeperData.viewFocused = !restoringView && windowFocused && modal !== "media" && modal !== "draw" && !connectionSurface.visible;
       beeperData.viewAtLatest = !restoringView && messageList.atYEnd;
     } else if (beeperData.viewOwner === root) { beeperData.viewOwner = null; beeperData.viewFocused = false; }
   }
@@ -702,7 +719,7 @@ FocusScope {
       root.historyUpdatePending = false;
       root.pendingPreviewStep = 0;
       if (root.preparingRecording) root.stopRecording();
-      if (root.modal === "attachments") root.closeModal();
+      if (root.modal === "attachments" || root.imageEditorOpen) root.closeModal();
       root.closeConversationSearch(false);
       root.messageIndex = -1; root.selectedMessageIDBeforeUpdate = "";
       root.syncChatIndex();
@@ -972,6 +989,7 @@ FocusScope {
       Layout.preferredWidth: root.compact ? 232 : 338
       Layout.fillHeight: true
       chats: root.filteredChats
+      chatPreviews: root.beeperData.chatPreviews || ({})
       currentNetwork: root.currentNetwork
       showLowPriority: root.showLowPriority
       unreadFirst: root.unreadFirst
@@ -1131,6 +1149,7 @@ FocusScope {
         onPasteAttachmentRequested: root.beeperData.pasteAttachment()
         onRecordingToggleRequested: root.toggleRecording()
         onAttachmentsDropped: urls => root.beeperData.stageAttachments(urls)
+        onDrawAttachmentRequested: index => root.drawAttachment(index)
       }
     }
   }
@@ -1197,7 +1216,8 @@ FocusScope {
     }
     onDownloadRequested: root.saveSelectedAttachments()
     externalPhotoPreview: root.externalPhotoPreview
-    onCloseRequested: root.closeModal()
+    onCloseRequested: { const editing = root.imageEditorOpen; root.closeModal(); if (editing) root.compose(); }
+    onImageEdited: attachment => root.completeImageEdit(attachment)
     onPreviewStepRequested: delta => root.stepPreview(delta)
   }
 }

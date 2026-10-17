@@ -38,6 +38,7 @@ Rectangle {
   signal pasteAttachmentRequested()
   signal recordingToggleRequested()
   signal attachmentsDropped(var urls)
+  signal drawAttachmentRequested(int index)
   implicitHeight: composerColumn.implicitHeight + 8
   color: Theme.surface
   radius: 24
@@ -120,8 +121,22 @@ Rectangle {
           width: attachmentList.count === 1 ? attachmentList.width : Math.min(220, attachmentList.width)
           height: 88
           BeeperMedia {
+            id: draftMedia
             anchors.fill: parent; anchors.rightMargin: 28
             attachment: modelData; beeperData: root.beeperData; playbackEnabled: root.active
+          }
+          BeeperButton {
+            objectName: "beeperDrawAttachment" + index
+            x: draftMedia.x + draftMedia.previewRect.x + draftMedia.previewRect.width - width - 4
+            y: draftMedia.y + draftMedia.previewRect.y + 4
+            width: 30; height: 30; padding: 5
+            iconName: "pencil"; iconSize: 18
+            visible: Format.attachmentType(modelData) === "image" && !modelData.isSticker
+            enabled: root.active && !root.busy && !root.recording && draftMedia.previewReady
+            background: Rectangle { radius: 8; color: Qt.alpha(Theme.background, 0.88) }
+            Accessible.name: "Draw on image"
+            ToolTip.visible: hovered; ToolTip.text: "Draw on image"
+            onClicked: root.drawAttachmentRequested(index)
           }
           Button {
             id: removeAttachment

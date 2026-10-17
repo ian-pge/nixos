@@ -46,8 +46,8 @@ in {
       dim_around = true;
     }
     {
-      # Fullscreen chat photo, without blur: it grows from its thumbnail in
-      # 180 ms, and a layer fade would show it translucent and outlast that.
+      # The photo viewer owns a 90 ms opacity fade. Keep compositor animations
+      # from adding movement or extending that transition.
       match.namespace = "quickshell-messenger-photo";
       no_anim = true;
     }

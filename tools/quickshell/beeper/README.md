@@ -69,6 +69,7 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | `stageAttachment`, `clipboardAttachment` | `{path,type?}` ou `{}` ; copie durable et privée `{path,srcURL,type,fileName,mimeType}` |
 | `stageAttachments` | `{paths:[...]}` ; liste de copies privées dans l’ordre choisi ; si un fichier échoue, les copies déjà préparées pour cette sélection sont supprimées |
 | `prepareRecording`, `discardAttachment` | `{}` retourne un fichier `.ogg` de type `voice-note` ; `{path}` supprime uniquement une copie de notre répertoire, non référencée par un brouillon |
+| `prepareImageEdit` | `{fileName?}` réserve un nouveau PNG privé pour le dessin QML ; la copie annotée remplace uniquement l’image choisie dans le brouillon, sans modifier le fichier original ni envoyer de message |
 | `upload`, `download` | `{path}` retourne l’upload API ; `{url}` retourne `{srcURL,error?}` pour les URL média Beeper |
 | `saveAttachment` | `{url,fileName?,mimeType?}` copie le média dans le dossier de téléchargement XDG (`XDG_DOWNLOAD_DIR`, `user-dirs.dirs`, sinon `~/Downloads`) et retourne `{path,name}` ; nom d’origine assaini, jamais d’écrasement (`nom (2).ext`) ; une URL non locale passe par `POST /v1/assets/download`, refusée en démo |
 | `waveform` | `{url}` retourne `{peaks:[0…1],durationMs}` ; analyse locale bornée, sans lecture sonore |

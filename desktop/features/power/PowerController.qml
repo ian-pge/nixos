@@ -24,6 +24,22 @@ Scope {
       percent: device.connected && device.batteryAvailable ? Math.round(device.battery * 100) : null,
       pluggedIn: keyboardPluggedIn(device)
     })).filter(device => device.available || device.pluggedIn)
+  readonly property var mouseBatteries: bluetoothDevices
+    .filter(device => device.icon === "input-mouse")
+    .slice().sort((left, right) => left.address.localeCompare(right.address))
+    .map(device => {
+      const power = mousePowerDevice(device);
+      const pluggedIn = !!power && (power.state === UPowerDeviceState.Charging || power.state === UPowerDeviceState.PendingCharge);
+      const connected = device.connected || pluggedIn;
+      const level = device.connected && device.batteryAvailable && validLevel(device.battery) ? device.battery
+        : power && power.state !== UPowerDeviceState.Unknown && validLevel(power.percentage) ? power.percentage : null;
+      return {
+        name: device.name || device.deviceName || "Mouse",
+        available: connected && level !== null,
+        percent: connected && level !== null ? Math.round(Math.max(0, Math.min(1, level)) * 100) : null,
+        pluggedIn: pluggedIn
+      };
+    }).filter(device => device.available || device.pluggedIn)
   // BlueZ currently exposes a single level for Pixel Buds, not left/right/case.
   // Keep a connected device visible while its first battery report is pending.
   readonly property var earbudBatteries: bluetoothDevices
@@ -37,7 +53,23 @@ Scope {
         ? Math.round(Math.max(0, Math.min(1, device.battery)) * 100) : null,
       pluggedIn: bluetoothCharging(device)
     }))
-  readonly property var accessoryBatteries: keyboardBatteries.concat(earbudBatteries)
+  readonly property var accessoryBatteries: keyboardBatteries.concat(mouseBatteries, earbudBatteries)
+
+  function validLevel(value) { return typeof value === "number" && isFinite(value); }
+  function mousePowerDevice(device) {
+    const present = powerDevices.filter(item => item.ready && item.isPresent);
+    const direct = device.dbusPath && present.find(item => item.nativePath === device.dbusPath);
+    if (direct) return direct;
+    // Logitech HID++ uses a kernel nativePath instead of the BlueZ path.
+    // UPower's QML API exposes the model, but not the serial/address: only
+    // accept an unambiguous model match, never another mouse's charge state.
+    const normalize = value => String(value || "").trim().toLowerCase();
+    const model = normalize(device.deviceName || device.name);
+    if (!model || bluetoothDevices.filter(other => other.icon === "input-mouse"
+        && normalize(other.deviceName || other.name) === model).length !== 1) return null;
+    const matches = present.filter(item => item.type === UPowerDeviceType.Mouse && normalize(item.model) === model);
+    return matches.length === 1 ? matches[0] : null;
+  }
 
   function bluetoothCharging(device) {
     const power = powerDevices.find(item => item.ready && item.isPresent && item.nativePath === device.dbusPath);

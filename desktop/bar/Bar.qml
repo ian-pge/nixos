@@ -332,6 +332,19 @@ PanelWindow {
           }
         }
         Repeater {
+          model: services.power.mouseBatteries.length
+          delegate: BarDial {
+            required property int index
+            readonly property var device: services.power.mouseBatteries[index] ?? null
+            objectName: index === 0 ? "mouseBatteryPill" : "mouseBatteryPill" + index
+            iconName: "mouse"
+            label: (device?.name || "Mouse") + " battery"
+            value: device?.percent ?? null
+            charging: device?.pluggedIn ?? false
+            accent: batteryBlock.batteryColor(value, charging)
+          }
+        }
+        Repeater {
           model: services.power.earbudBatteries.length
           delegate: BarDial {
             required property int index

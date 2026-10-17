@@ -3,6 +3,7 @@ import "../../ui"
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtMultimedia
+import Quickshell.Widgets
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
 
@@ -18,6 +19,10 @@ Item {
   property bool accentBackground: false
   property string audioKey: ""
   readonly property string kind: Format.attachmentType(attachment)
+  readonly property bool animatedPicture: kind === "gif" || !!attachment.isSticker
+    || /image\/(webp|apng)/i.test(attachment.mimeType || attachment.mime || "")
+    || /\.(gif|webp|apng)(?:[?#]|$)/i.test(sourceUrl)
+  readonly property var fileStyle: Format.attachmentFileStyle(attachment)
   readonly property var sharedAudio: kind === "audio" ? beeperData?.audioPlayback || null : null
   readonly property string effectiveAudioKey: audioKey || JSON.stringify(["attachment", attachment.id || attachment.path || Format.attachmentSource(attachment)])
   readonly property bool currentAudio: sharedAudio !== null && sharedAudio.key === effectiveAudioKey
@@ -74,6 +79,10 @@ Item {
     if (!validSize(width, height)) return;
     decodedSize = Qt.size(width, height);
     decodedSource = sourceUrl;
+  }
+  function imageStatusChanged(image) {
+    if (image.status === Image.Error) errorText = "Preview unavailable";
+    else if (image.status === Image.Ready) rememberSize(image.implicitWidth, image.implicitHeight);
   }
   function playPendingMedia() {
     if (sharedAudio) return;
@@ -157,20 +166,62 @@ Item {
 
   Loader {
     id: imageLoader
-    anchors.fill: parent
+    // Round the painted image itself, including portraits in a wider bubble.
+    x: root.expanded ? 0 : root.previewRect.x
+    y: root.expanded ? 0 : root.previewRect.y
+    width: root.expanded ? root.width : root.previewRect.width
+    height: root.expanded ? root.height : root.previewRect.height
     visible: !root.downloading && !root.errorText
     active: root.renderEnabled && (root.kind === "image" || root.kind === "gif")
-    sourceComponent: AnimatedImage {
+    sourceComponent: root.expanded ? plainPhoto : roundedPhoto
+  }
+  Component {
+    id: plainPhoto
+    // Fullscreen photos need no offscreen mask textures or clipping shader.
+    Loader {
+      readonly property int status: item?.status ?? Image.Null
+      sourceComponent: root.animatedPicture ? animatedPhoto : stillPhoto
+    }
+  }
+  Component {
+    id: roundedPhoto
+    ClippingRectangle {
+      color: "transparent"
+      radius: 12
+      readonly property int status: photo.item?.status ?? Image.Null
+      Loader {
+        id: photo
+        anchors.fill: parent
+        sourceComponent: root.animatedPicture ? animatedPhoto : stillPhoto
+      }
+    }
+  }
+  Component {
+    id: stillPhoto
+    Image {
+      id: stillImage
+      objectName: "beeperMediaImage"
+      source: root.sourceReady && !root.downloading ? root.sourceUrl : ""
+      fillMode: Image.PreserveAspectFit
+      asynchronous: true
+      // Share the thumbnail's decoded image with the fullscreen viewer. Keep
+      // sourceSize fixed so the transform never triggers another decode.
+      cache: true
+      onStatusChanged: root.imageStatusChanged(stillImage)
+      MouseArea { anchors.fill: parent; onClicked: root.requestPreview() }
+    }
+  }
+  Component {
+    id: animatedPhoto
+    AnimatedImage {
+      id: animatedImage
       objectName: "beeperMediaImage"
       source: root.sourceReady && !root.downloading ? root.sourceUrl : ""
       fillMode: Image.PreserveAspectFit
       asynchronous: true
       playing: root.playbackEnabled
       cache: false
-      onStatusChanged: {
-        if (status === Image.Error) root.errorText = "Preview unavailable";
-        else if (status === Image.Ready) root.rememberSize(implicitWidth, implicitHeight);
-      }
+      onStatusChanged: root.imageStatusChanged(animatedImage)
       MouseArea { anchors.fill: parent; onClicked: root.requestPreview() }
     }
   }
@@ -267,12 +318,23 @@ Item {
     id: fileRow
     visible: root.kind === "file" && !root.downloading && !root.errorText
     anchors.fill: parent
+    spacing: 12
     Icon {
-      size: Theme.beeperFont.icon; name: "file";  color: root.accentBackground ? Theme.background : Theme.sideApplications }
+      objectName: "beeperAttachmentIcon"
+      size: 32; name: root.fileStyle.icon
+      // A darker version keeps the same file color legible on sent bubbles.
+      color: root.accentBackground ? Qt.darker(Theme.beeperAttachmentColors[root.fileStyle.kind], 2.6)
+        : Theme.beeperAttachmentColors[root.fileStyle.kind]
+    }
     ColumnLayout {
       Layout.fillWidth: true
       Text { Layout.fillWidth: true; text: root.attachment.fileName || "Attachment"; elide: Text.ElideMiddle; color: root.accentBackground ? Theme.background : Theme.foreground; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control } }
-      Text { text: Format.bytes(root.attachment.fileSize || root.attachment.size); color: root.accentBackground ? Theme.background : Theme.secondary; font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary } }
+      Text {
+        objectName: "beeperAttachmentDetails"
+        text: [root.fileStyle.label, Format.bytes(root.attachment.fileSize || root.attachment.size)].filter(Boolean).join(" · ")
+        color: root.accentBackground ? Theme.background : Theme.secondary
+        font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
+      }
     }
     BeeperButton { text: "Open"; prominent: root.accentBackground; accent: root.accent; onClicked: root.openFile() }
   }

@@ -331,17 +331,77 @@ function attachmentType(attachment) {
   if (attachment.isSticker || type === "img" || type === "image" || type === "sticker" || mime.startsWith("image/")) return "image";
   return "file";
 }
+// Presentation only: filename extensions must not change which media player opens.
+var attachmentFileStyles = {
+  pdf: {kind: "pdf", icon: "file-text", label: "PDF"},
+  document: {kind: "document", icon: "file-pen-line", label: "Document"},
+  spreadsheet: {kind: "spreadsheet", icon: "file-spreadsheet", label: "Spreadsheet"},
+  presentation: {kind: "presentation", icon: "file-chart-column", label: "Presentation"},
+  archive: {kind: "archive", icon: "file-archive", label: "Archive"},
+  code: {kind: "code", icon: "file-code", label: "Code"},
+  text: {kind: "text", icon: "file-text", label: "Text"},
+  image: {kind: "image", icon: "file-image", label: "Image"},
+  audio: {kind: "audio", icon: "file-music", label: "Audio"},
+  video: {kind: "video", icon: "file-video-camera", label: "Video"},
+  file: {kind: "file", icon: "file", label: "File"}
+};
+var attachmentFileExtensions = {
+  pdf: ["pdf"],
+  document: ["doc", "docx", "docm", "odt", "rtf", "pages"],
+  spreadsheet: ["xls", "xlsx", "xlsm", "xlsb", "ods", "csv", "tsv", "numbers"],
+  presentation: ["ppt", "pptx", "pptm", "odp", "key"],
+  archive: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst"],
+  code: ["js", "jsx", "ts", "tsx", "json", "py", "go", "rs", "c", "h", "cpp", "hpp", "java", "sh", "bash", "nix", "qml", "html", "css", "xml", "yaml", "yml", "toml", "sql"],
+  text: ["txt", "md", "markdown", "log"],
+  image: ["jpg", "jpeg", "png", "gif", "webp", "svg", "heic", "avif", "bmp", "tif", "tiff"],
+  audio: ["mp3", "m4a", "ogg", "opus", "wav", "flac", "aac"],
+  video: ["mp4", "mov", "mkv", "webm", "avi", "m4v"]
+};
+function attachmentFileStyle(attachment) {
+  const mime = String(attachment?.mimeType || attachment?.mime || "").split(";", 1)[0].trim().toLowerCase();
+  // Prefer a specific MIME type; generic binary/plain-text metadata can fall
+  // back to the filename, including uppercase extensions and staged paths.
+  if (["application/pdf", "application/x-pdf"].includes(mime)) return attachmentFileStyles.pdf;
+  if (/^application\/(vnd\.(ms-excel|openxmlformats-officedocument\.spreadsheetml|oasis\.opendocument\.spreadsheet|apple\.numbers))/.test(mime)
+      || ["text/csv", "text/tab-separated-values"].includes(mime)) return attachmentFileStyles.spreadsheet;
+  if (/^application\/vnd\.(ms-powerpoint|openxmlformats-officedocument\.presentationml|oasis\.opendocument\.presentation|apple\.keynote)/.test(mime)) return attachmentFileStyles.presentation;
+  if (["application/msword", "application/rtf", "text/rtf"].includes(mime)
+      || /^application\/vnd\.(ms-word|openxmlformats-officedocument\.wordprocessingml|oasis\.opendocument\.text|apple\.pages)/.test(mime)) return attachmentFileStyles.document;
+  if (/^application\/(zip|gzip|x-gzip|x-zip-compressed|x-rar-compressed|vnd\.rar|x-7z-compressed|x-tar|x-bzip2?|x-xz|zstd)$/.test(mime)) return attachmentFileStyles.archive;
+  if (mime.startsWith("image/")) return attachmentFileStyles.image;
+  if (mime.startsWith("audio/")) return attachmentFileStyles.audio;
+  if (mime.startsWith("video/")) return attachmentFileStyles.video;
+  if (/^(application|text)\/(json|ld\+json|javascript|x-javascript|typescript|xml|yaml|x-yaml|toml|x-python|x-shellscript|html|css)$/.test(mime)) return attachmentFileStyles.code;
+  const name = String(attachment?.fileName || attachment?.path || "").split(/[\\/]/).pop();
+  const extension = /\.([a-z0-9]+)$/i.exec(name)?.[1].toLowerCase() || "";
+  for (const kind of Object.keys(attachmentFileExtensions))
+    if (attachmentFileExtensions[kind].includes(extension)) return attachmentFileStyles[kind];
+  const media = attachmentType(attachment || {});
+  return attachmentFileStyles[media === "gif" ? "image" : media !== "file" ? media : mime.startsWith("text/") ? "text" : "file"];
+}
 function attachmentSource(attachment) {
   const source = attachment.srcURL || attachment.url || attachment.path || attachment.id || "";
   return source.startsWith("/") ? "file://" + source : source;
 }
-function preview(chat) {
-  const value = chat ? chat.preview : "";
-  if (typeof value === "string") return value;
-  if (value && value.plainText !== undefined) return value.plainText;
-  if (value && value.text) return value.text;
-  if (value && value.attachments && value.attachments.length) return "Attachment";
-  return "Open conversation";
+function previewKey(chat) { return JSON.stringify([chat.preview, chat.lastActivity]); }
+function activityBody(message) {
+  if (!message || message.isDeleted) return "";
+  if (message.previewReaction) return "Reacted" + (typeof message.previewReaction === "string" ? " " + message.previewReaction : "") + " to your message";
+  if (message.isHidden || message.type === "REACTION" || message.type === "NOTICE") return "";
+  const body = text(message).trim();
+  if (body) return body;
+  if (message.attachments?.length) return quotePreview(message);
+  return ({IMAGE: "Photo", VIDEO: "Video", VOICE: "Voice message", AUDIO: "Audio", FILE: "File", STICKER: "Sticker", LOCATION: "Location"})[message.type] || "";
+}
+function preview(chat, previews) {
+  if (typeof chat?.preview === "string") return chat.preview;
+  const cached = previews?.[JSON.stringify(chat?.id)];
+  const resolved = cached?.key === previewKey(chat || {}) && !cached.pending;
+  const message = resolved ? cached.message : chat?.preview;
+  const body = activityBody(message);
+  if (!body) return chat?.preview?.id ? (resolved ? "Message" : "…") : "No messages";
+  const sender = message.isSender ? "You" : chat?.type === "group" ? message.senderName : "";
+  return (sender ? sender + ": " : "") + body;
 }
 function time(value) {
   if (!value) return "";

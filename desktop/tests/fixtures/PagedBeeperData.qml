@@ -12,10 +12,12 @@ BeeperData {
   property bool deferDrafts: false
   property bool deferRecording: false
   property bool deferAttachments: false
+  property bool deferImageEdits: false
   function request(method, params, callback, quiet) {
     if (["accounts", "chats", "unreadCounts", "messages", "message", "search", "send", "read", "unread", "updateChat", "react", "download", "saveAttachment"].includes(method)
         || (deferDrafts && ["getDraft", "saveDraft"].includes(method))
         || (deferAttachments && ["stageAttachment", "stageAttachments"].includes(method))
+        || (deferImageEdits && ["prepareImageEdit", "discardAttachment"].includes(method))
         || (deferRecording && ["prepareRecording", "discardAttachment"].includes(method)))
       requests = requests.concat([{method: method, params: params, callback: callback, quiet: quiet === true}]);
     else if (callback) Qt.callLater(() => callback({}, null));

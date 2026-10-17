@@ -9,6 +9,7 @@ Rectangle {
   id: root
   objectName: "beeperSidebar"
   required property var chats
+  property var chatPreviews: ({})
   readonly property var chatIdentities: chats.map(chat => ({id: chat.id}))
   readonly property var chatsByID: {
     const result = Object.create(null);
@@ -502,7 +503,7 @@ Rectangle {
             id: preview
             objectName: "beeperChatPreview-" + chatRow.identityName
             anchors { left: parent.left; right: parent.right }
-            text: Format.preview(chatRow.row).replace(/\n/g, " "); textFormat: Text.PlainText
+            text: Format.preview(chatRow.row, root.chatPreviews).replace(/\n/g, " "); textFormat: Text.PlainText
             elide: Text.ElideRight; color: chatRow.subtitleColor
             opacity: 1 - chatRow.selectionProgress; visible: opacity > 0
             font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }

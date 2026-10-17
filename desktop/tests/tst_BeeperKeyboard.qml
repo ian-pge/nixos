@@ -1190,7 +1190,7 @@ ShellRoot {
       compare(pending("saveAttachment").length, 1);
       compare(pending("saveAttachment")[0].params.url, "file://" + Quickshell.shellDir + "/fixtures/fullscreen-video.mp4");
       compare(fullscreenPlayer.playbackState, MediaPlayer.PausedState);
-      keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message"); compare(closeSpy.count, 0);
       verify(inlinePlayer.playbackState !== MediaPlayer.PlayingState);
     }
@@ -1340,7 +1340,7 @@ ShellRoot {
       if (data.cancel) { verify(!beeperData.audioPlayback.playWhenReady); verify(player.playbackState !== MediaPlayer.PlayingState); }
       else tryCompare(player, "playbackState", MediaPlayer.PlayingState);
     }
-    function test_open_photo_without_a_header_and_space_closes_it() {
+    function test_o_opens_and_closes_photo_while_space_keeps_it_open() {
       const photo = {type: "img", srcURL: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="blue"/></svg>')};
       selectAttachment(photo);
       keyClick(Qt.Key_O); tryCompare(panel, "modal", "media");
@@ -1353,7 +1353,8 @@ ShellRoot {
       const image = findChild(photoView, "beeperMediaImage");
       tryCompare(image, "status", Image.Ready);
       fuzzyCompare(image.paintedHeight, panel.height, 0.5);
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "");
+      keyClick(Qt.Key_Space); wait(20); compare(panel.modal, "media");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "");
       compare(panel.selectedMessage.id, "media-message");
       keyClick(Qt.Key_O); tryCompare(panel, "modal", "media");
       keyClick(Qt.Key_Escape); tryCompare(panel, "modal", "");
@@ -1515,7 +1516,7 @@ ShellRoot {
       while (pending("download").length) beeperData.respond("download", {srcURL: source});
       tryCompare(findChild(photo, "beeperMediaImage"), "status", Image.Ready);
       compare(photo.errorText, "");
-      keyClick(Qt.Key_Space); tryCompare(panel, "modal", "");
+      keyClick(Qt.Key_O); tryCompare(panel, "modal", "");
     }
     function test_second_space_cancels_audio_while_downloading() {
       const media = selectAttachment({type: "audio", srcURL: "mxc://preview/voice", duration: 2});

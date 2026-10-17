@@ -248,6 +248,27 @@ func (b *backend) prepareRecording() (*attachment, error) {
 	f.Close()
 	return &attachment{Path: f.Name(), SrcURL: fileURL(f.Name()), Type: "voice-note", FileName: "Voice message.ogg", MimeType: "audio/ogg"}, nil
 }
+
+// QML writes the flattened drawing into a fresh private PNG, never the source.
+func (b *backend) prepareImageEdit(fileName string) (*attachment, error) {
+	if b.demo {
+		return nil, fail("demo", "Saving edited images is disabled in the demo.")
+	}
+	f, err := os.CreateTemp(filepath.Join(b.stateDir, "attachments"), "drawing-*.png")
+	if err != nil {
+		return nil, err
+	}
+	if err = f.Close(); err != nil {
+		os.Remove(f.Name())
+		return nil, err
+	}
+	name := filepath.Base(strings.ReplaceAll(fileName, "\\", "/"))
+	name = strings.TrimSuffix(name, filepath.Ext(name))
+	if name == "" || name == "." {
+		name = "Image"
+	}
+	return &attachment{Path: f.Name(), SrcURL: fileURL(f.Name()), Type: "image", FileName: name + "-edited.png", MimeType: "image/png"}, nil
+}
 func (b *backend) discard(path string) error {
 	if b.demo {
 		return nil

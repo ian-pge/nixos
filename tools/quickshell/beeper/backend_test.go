@@ -42,6 +42,32 @@ func jsonResponse(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+func TestPrepareImageEditAllocatesDistinctPrivatePNGFiles(t *testing.T) {
+	b, _ := testBackend(t, nil)
+	first, err := b.handle(b.ctx, "prepareImageEdit", parameters{FileName: "../../holiday.jpg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := first.(*attachment)
+	if a.Type != "image" || a.MimeType != "image/png" || a.FileName != "holiday-edited.png" || a.SrcURL != fileURL(a.Path) {
+		t.Fatalf("wrong edited image metadata: %+v", a)
+	}
+	if filepath.Dir(a.Path) != filepath.Join(b.stateDir, "attachments") || filepath.Ext(a.Path) != ".png" {
+		t.Fatal("edited image escaped the private attachment directory")
+	}
+	info, err := os.Stat(a.Path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 {
+		t.Fatalf("edited image must be a private regular file: %v", err)
+	}
+	second, err := b.prepareImageEdit("holiday.jpg")
+	if err != nil || second.Path == a.Path {
+		t.Fatal("editing must allocate a fresh file")
+	}
+	if err := b.discard(a.Path); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMultipleAttachmentsPersistAndProtectCurrentAndSavedDrafts(t *testing.T) {
 	b, _ := testBackend(t, nil)
 	dir := t.TempDir()

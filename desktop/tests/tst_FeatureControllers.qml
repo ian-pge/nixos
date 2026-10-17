@@ -284,6 +284,38 @@ ShellRoot {
       verify(power.keyboardPluggedIn(keyboard)); compare(power.keyboardBatteries.length, 1);
       telemetry.systemFresh = false; verify(!power.keyboardPluggedIn(keyboard)); compare(power.keyboardBatteries.length, 0);
     }
+    function test_mouse_battery_uses_bluetooth_and_hidpp_charge_state() {
+      const mouse = {icon: "input-mouse", address: "MOUSE", dbusPath: "/mouse", deviceName: "MX Anywhere 3S",
+        connected: true, batteryAvailable: true, battery: 0.35};
+      power.bluetoothDevices = [mouse];
+      compare(power.mouseBatteries.length, 1); compare(power.mouseBatteries[0].percent, 35);
+      verify(!power.mouseBatteries[0].pluggedIn);
+      const report = {type: UPowerDeviceType.Mouse, ready: true, isPresent: true, model: "MX Anywhere 3S",
+        nativePath: "hidpp_battery_0", percentage: 0.35, state: UPowerDeviceState.Charging};
+      power.powerDevices = [report]; verify(power.mouseBatteries[0].pluggedIn);
+      power.bluetoothDevices = [Object.assign({}, mouse, {batteryAvailable: false})];
+      compare(power.mouseBatteries[0].percent, 35, "HID++ supplies the level while BlueZ has no report");
+      power.bluetoothDevices = [Object.assign({}, mouse, {connected: false})];
+      compare(power.mouseBatteries.length, 1, "A charging mouse stays visible");
+      power.powerDevices = [Object.assign({}, report, {state: UPowerDeviceState.Discharging})];
+      compare(power.mouseBatteries.length, 0, "A stale report cannot keep a disconnected mouse visible");
+    }
+    function test_mouse_battery_handles_zero_unknown_and_ambiguous_devices() {
+      const mouse = {icon: "input-mouse", address: "MOUSE", dbusPath: "/mouse", name: "MX Anywhere 3S",
+        connected: true, batteryAvailable: true, battery: 0};
+      power.bluetoothDevices = [mouse]; compare(power.mouseBatteries[0].percent, 0);
+      for (const value of [null, NaN, undefined]) {
+        power.bluetoothDevices = [Object.assign({}, mouse, {battery: value})];
+        compare(power.mouseBatteries.length, 0);
+      }
+      power.bluetoothDevices = [mouse, Object.assign({}, mouse, {address: "OTHER", dbusPath: "/other"})];
+      power.powerDevices = [{type: UPowerDeviceType.Mouse, ready: true, isPresent: true, model: mouse.name,
+        nativePath: "hidpp_battery_0", state: UPowerDeviceState.Charging}];
+      verify(!power.mouseBatteries.some(device => device.pluggedIn));
+      power.powerDevices = [{ready: true, isPresent: true, nativePath: "/mouse", state: UPowerDeviceState.Charging}];
+      verify(power.mouseBatteries[0].pluggedIn); verify(!power.mouseBatteries[1].pluggedIn);
+      compare(power.accessoryBatteries.length, 2);
+    }
     function test_pixel_buds_battery_tracks_connection_and_missing_reports() {
       const buds = {name: "Ian's Pixel Buds Pro 2", deviceName: "Pixel Buds Pro 2",
         address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: true, battery: 0.73};

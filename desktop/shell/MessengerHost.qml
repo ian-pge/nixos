@@ -45,7 +45,7 @@ Item {
   function focusMessenger() {
     if (!active || nativeDialogOpen || controller.blocked) return;
     focusGrab.active = true;
-    if (photoWindow.visible) photoWindow.viewer.forceActiveFocus();
+    if (photoWindow.visible) photoWindow.viewer?.forceActiveFocus();
     else panel.focusNavigation();
   }
   onActiveChanged: {
@@ -116,21 +116,28 @@ Item {
   MessengerPhotoWindow {
     id: photoWindow
     screen: root.panelWindow.screen
-    open: root.active && !root.controller.blocked && panel.photoPreviewOpen
+    open: root.active && !root.controller.blocked && (panel.photoPreviewOpen || panel.imageEditorOpen)
+    editing: panel.imageEditorOpen
     beeperData: root.controller.beeperData
     attachment: panel.previewAttachment
     previewOrigin: panel.previewOrigin
     onVisibleChanged: if (visible) Qt.callLater(() => {
-      if (photoWindow.visible) { focusGrab.active = true; photoWindow.viewer.forceActiveFocus(); }
+      if (photoWindow.visible) { focusGrab.active = true; photoWindow.viewer?.forceActiveFocus(); }
     })
     onCloseRequested: {
       // Retire the old grab before unmapping the exclusive photo surface.
       // Its delayed cleared event must not cancel the chat's new grab.
+      const editing = panel.imageEditorOpen;
       focusGrab.active = false;
       panel.closeModal();
       Qt.callLater(() => {
-        if (root.active && !root.controller.blocked) { focusGrab.active = true; panel.forceActiveFocus(); }
+        if (root.active && !root.controller.blocked) { focusGrab.active = true; if (editing) panel.compose(); else panel.forceActiveFocus(); }
       });
+    }
+    onImageEdited: attachment => {
+      focusGrab.active = false;
+      panel.completeImageEdit(attachment);
+      Qt.callLater(() => { if (root.active && !root.controller.blocked) { focusGrab.active = true; panel.compose(); } });
     }
     onStepRequested: delta => panel.stepPreview(delta)
   }

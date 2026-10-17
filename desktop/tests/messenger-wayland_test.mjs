@@ -1,5 +1,5 @@
 // Compile the real messenger/bar graph in an isolated Wayland session.
-// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--video|--people|--host|--desktop|--sidebar|--performance|--preview]
+// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--video|--drawing|--people|--host|--desktop|--sidebar|--performance|--preview]
 import assert from "node:assert/strict";
 import {spawn, spawnSync, execFile} from "node:child_process";
 import {mkdtemp, mkdir, readdir, readFile, rm, writeFile} from "node:fs/promises";
@@ -39,6 +39,7 @@ const renderAvatar = process.argv.includes("--avatar");
 const renderBubble = process.argv.includes("--bubble");
 const renderMedia = process.argv.includes("--media");
 const testVideo = process.argv.includes("--video");
+const testDrawing = process.argv.includes("--drawing");
 const renderPeople = process.argv.includes("--people");
 const testHost = process.argv.includes("--host");
 const testDesktop = process.argv.includes("--desktop");
@@ -68,6 +69,10 @@ const env = {
 delete env.HYPRLAND_INSTANCE_SIGNATURE;
 delete env.NOTIFY_SOCKET;
 delete env.QT_QUICK_BACKEND;
+if (testDrawing) {
+  env.BEEPER_DRAWING_TEST_DIR = path.join(runtime, "drawings");
+  await mkdir(env.BEEPER_DRAWING_TEST_DIR, {mode: 0o700});
+}
 const exec = promisify(execFile);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 let compositor, shell;
@@ -132,7 +137,7 @@ try {
     assert.match(loaded.stdout, /ok/i, "Load Liquid Glass only into this private compositor");
   }
   const testFile = renderAvatar ? "./tst_BeeperAvatar.qml" : renderBubble ? "./tst_BeeperBubble.qml" : renderMedia ? "./tst_BeeperMedia.qml"
-    : testVideo ? "./tst_BeeperVideo.qml"
+    : testVideo ? "./tst_BeeperVideo.qml" : testDrawing ? "./tst_BeeperImageEditor.qml"
     : renderPeople ? "./tst_BeeperPeople.qml"
     : testHost ? "./tst_MessengerHost.qml" : testDesktop ? "./tst_DesktopComposition.qml" : testSidebar ? "./tst_BeeperSidebar.qml"
     : testPerformance ? "./tst_BeeperPerformance.qml"
@@ -152,16 +157,16 @@ try {
   await until(() => {
     if (compositor.exitCode !== null) throw new Error("Nested compositor exited during QML compilation");
     if (renderPreview && shell.exitCode === 0) return true;
-    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testVideo ? /BeeperVideo:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : testSidebar ? /BeeperSidebar:/ : testPerformance ? /BeeperPerformance:/ : /Messenger integration:/).test(shellLog)) return true;
+    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testVideo ? /BeeperVideo:/ : testDrawing ? /BeeperImageEditor:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : testSidebar ? /BeeperSidebar:/ : testPerformance ? /BeeperPerformance:/ : /Messenger integration:/).test(shellLog)) return true;
     if (shell.exitCode !== null) throw new Error("Quickshell exited before reporting the compile result");
     return false;
-  }, testDesktop ? "desktop integration tests" : "messenger QML compilation", testDesktop || testSidebar ? 30_000 : 15_000);
+  }, testDesktop ? "desktop integration tests" : "messenger QML compilation", testDesktop || testSidebar || testHost ? 30_000 : 15_000);
   if (renderPreview) {
     const report = JSON.parse(shellLog.match(/Messenger preview: (\{[^\n]+\})/)?.[1] || "{}");
     assert.equal(report.expanded, true, shellLog);
     assert.equal(report.progress, Number(env.BEEPER_PREVIEW_PROGRESS || 1), shellLog);
   } else assert.match(shellLog, renderAvatar ? /BeeperAvatar: \d+ passed, 0 failed/
-    : renderBubble ? /BeeperBubble: \d+ passed, 0 failed/ : renderMedia ? /BeeperMedia: \d+ passed, 0 failed/ : testVideo ? /BeeperVideo: \d+ passed, 0 failed/ : renderPeople ? /BeeperPeople: \d+ passed, 0 failed/ : testHost ? /MessengerHost: \d+ passed, 0 failed/
+    : renderBubble ? /BeeperBubble: \d+ passed, 0 failed/ : renderMedia ? /BeeperMedia: \d+ passed, 0 failed/ : testVideo ? /BeeperVideo: \d+ passed, 0 failed/ : testDrawing ? /BeeperImageEditor: \d+ passed, 0 failed/ : renderPeople ? /BeeperPeople: \d+ passed, 0 failed/ : testHost ? /MessengerHost: \d+ passed, 0 failed/
     : testDesktop ? /DesktopComposition: \d+ passed, 0 failed/
     : testSidebar ? /BeeperSidebar: \d+ passed, 0 failed/
     : testPerformance ? /BeeperPerformance: \d+ passed, 0 failed/
@@ -176,6 +181,7 @@ try {
     : renderBubble ? "PASS: independent bubble geometry, reversible animation and concurrent chat/audio focus"
     : renderMedia ? "PASS: message/media layout and native search highlight pixels"
     : testVideo ? "PASS: native Wayland video playback, fullscreen controls and repeated inline decoder teardown"
+    : testDrawing ? "PASS: image drawing, brush controls and full-resolution PNG export"
     : renderPeople ? "PASS: per-person reaction pills, reader avatars, wrapping and live profile updates"
     : testHost ? "PASS: MessengerHost layer surface, keyboard ownership, native dialogs and focus restoration"
     : testDesktop ? "PASS: complete desktop composition and real Bar instantiate with disabled services"

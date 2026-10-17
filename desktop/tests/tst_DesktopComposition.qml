@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Networking
+import Quickshell.Services.UPower
 import Quickshell.Wayland
 
 // Instantiate the complete production composition only in a private nested
@@ -275,6 +276,31 @@ ShellRoot {
         verify(!cpu.known); verify(!memory.known);
         compare(cpu.value, null); compare(memory.value, null);
       } finally { restore(); }
+    }
+    function test_mouse_battery_follows_keyboard_and_shares_battery_states() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;
+      const originalPowerDevices = power.powerDevices, keyboards = power.bluetoothDevices;
+      const mouse = {icon: "input-mouse", address: "MOUSE", dbusPath: "/mouse", deviceName: "MX Anywhere 3S",
+        connected: true, batteryAvailable: true, battery: 0.35};
+      try {
+        power.bluetoothDevices = keyboards.concat([mouse]);
+        tryVerify(() => findChild(bar.contentItem, "mouseBatteryPill") !== null);
+        const dial = findChild(bar.contentItem, "mouseBatteryPill"), keyboard = findChild(bar.contentItem, "keyboardBatteryPill");
+        tryVerify(() => dial.x > keyboard.x);
+        compare(dial.parent, keyboard.parent); compare(dial.width, keyboard.width); compare(dial.height, keyboard.height);
+        compare(dial.iconName, "mouse"); compare(dial.value, 35); compare(dial.tooltipText, "35%");
+        compare(dial.accent.toString(), keyboard.accent.toString());
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, mouse, {battery: 0.12})]);
+        compare(dial.value, 12); compare(dial.accent.toString(), "#ed8796");
+        power.powerDevices = [{ready: true, isPresent: true, type: UPowerDeviceType.Mouse,
+          model: "MX Anywhere 3S", nativePath: "hidpp_battery_0", state: UPowerDeviceState.Charging}];
+        verify(dial.charging); compare(dial.accent.toString(), "#a6da95");
+        power.powerDevices = [];
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, mouse, {connected: false})]);
+        tryVerify(() => findChild(bar.contentItem, "mouseBatteryPill") === null);
+        verify(keyboard.visible);
+      } finally { power.powerDevices = originalPowerDevices; restore(); }
     }
     function test_dials_render_a_full_circle_and_preserve_battery_states() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");

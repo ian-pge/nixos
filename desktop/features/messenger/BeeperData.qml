@@ -31,6 +31,7 @@ Scope {
   property var reactionOperations: ({})
   property var attachmentSaveOperations: ({})
   property var chats: []
+  readonly property alias chatPreviews: previewResolver.entries
   property var unreadCounts: ({})
   property var lowPriorityUnreadCounts: ({})
   property bool lowPriorityUnreadCountsLoaded: false
@@ -103,6 +104,7 @@ Scope {
   signal attachmentsSaved(string chatID, string messageID, int saved, int total, string directory)
 
   BeeperAudioPlayback { id: audioPlayback; beeperData: root }
+  BeeperChatPreviews { id: previewResolver; beeperData: root }
 
   PersistentProperties {
     id: preferences
@@ -252,11 +254,13 @@ Scope {
         chats = chats.filter(chat => !ids.has(chat.id));
         scheduleUnreadCounts(true);
       }
-      else if (response.event === "messagesChanged" && response.data.chatID === currentChatID) {
-        invalidateQuotes(); messagesTimer.restart();
+      else if (response.event === "messagesChanged") {
+        previewResolver.invalidate(response.data.chatID);
+        if (response.data.chatID === currentChatID) { invalidateQuotes(); messagesTimer.restart(); }
       }
       else if (response.event === "messagesDeleted") {
         const chatID = response.data.chatID;
+        previewResolver.invalidate(chatID);
         const ids = new Set(response.data.ids || []);
         const deleted = deletedMessageIDs[chatID] || {};
         ids.forEach(id => { deleted[id] = true; });
@@ -702,6 +706,21 @@ Scope {
   function pasteAttachment() {
     const chatID = currentChatID;
     request("clipboardAttachment", {}, (result, error) => { if (!error && result?.path) appendAttachments(chatID, [result]); });
+  }
+  function replaceDraftImage(chatID, index, original, replacement) {
+    const draft = currentChatID === chatID ? draftSnapshot() : localDrafts[chatID] || {};
+    const files = attachmentsOf(draft).slice();
+    if (deletedChatIDs[chatID] || !files[index] || Format.attachmentSource(files[index]) !== Format.attachmentSource(original)) {
+      request("discardAttachment", {path: replacement.path}, null, true);
+      return false;
+    }
+    files[index] = replacement;
+    replaceDraft(chatID, Object.assign({}, draft, {attachments: files}));
+    persistChatDraft(chatID, (result, error) => {
+      if (!error && original.path && original.path !== replacement.path)
+        request("discardAttachment", {path: original.path}, null, true);
+    });
+    return true;
   }
   function clearAttachment(index = -1) {
     const removed = index < 0 ? draftAttachments : draftAttachments.slice(index, index + 1);

@@ -19,10 +19,12 @@ await writeFile(busConfig, `<busconfig><type>session</type><listen>unix:tmpdir=$
 const baseEnv = {...process.env, QT_QPA_PLATFORM: 'offscreen', QT_QUICK_BACKEND: 'software',
   QT_NO_XDG_DESKTOP_PORTAL: '1', QUICKSHELL_NOTIFICATION_TEST: '1',
   PATH: path.join(here, 'fixtures') + path.delimiter + process.env.PATH,
+  BEEPER_DRAWING_TEST_DIR: path.join(temporary, 'drawings'),
   XDG_CACHE_HOME: path.join(temporary, 'cache'), XDG_STATE_HOME: path.join(temporary, 'state')};
 delete baseEnv.WAYLAND_DISPLAY;
 delete baseEnv.HYPRLAND_INSTANCE_SIGNATURE;
 await mkdir(baseEnv.XDG_CACHE_HOME); await mkdir(baseEnv.XDG_STATE_HOME);
+await mkdir(baseEnv.BEEPER_DRAWING_TEST_DIR);
 let passed = 0;
 async function run(command, args, env = baseEnv, expected = null) {
   const label = args.find(arg => /(?:_test\.mjs|tst_.*\.qml|messenger-load_test\.qml)$/.test(arg)) || args.join(' ');
@@ -47,13 +49,14 @@ try {
   for (const file of ['audio-routes_test.mjs', 'calendar-navigation_test.mjs', 'capsule-content_test.mjs', 'launcher-logic_test.mjs', 'system-panel-state_test.mjs', 'usage-limits_test.mjs', 'storage-report_test.mjs', 'storage-data_test.mjs', 'workspaces_test.mjs', 'messenger-host_test.mjs', 'vim-core_test.mjs', 'pick-attachment_test.mjs']) {
     if (existsSync(path.join(here, file))) await run(process.execPath, [path.join(here, file)]);
   }
-  for (const file of ['tst_AcceleratedScroll.qml', 'tst_KeyedListModel.qml', 'tst_BeeperData.qml', 'tst_BeeperNavigation.qml', 'tst_BeeperConnections.qml', 'tst_BeeperComposer.qml', 'tst_BeeperPanel.qml', 'tst_BeeperSidebar.qml', 'tst_BeeperArrivals.qml', 'tst_BeeperReactions.qml', 'tst_BeeperSendDraft.qml', 'tst_BeeperKeyboard.qml', 'tst_BeeperVim.qml', 'tst_BeeperLowPriority.qml', 'tst_BeeperUnreadOrder.qml', 'tst_BeeperSearch.qml', 'tst_BeeperPagination.qml', 'tst_BeeperQuotes.qml', 'tst_BeeperMedia.qml', 'tst_BeeperPeople.qml', 'tst_BeeperVideo.qml', 'tst_BeeperBubble.qml',
+  for (const file of ['tst_AcceleratedScroll.qml', 'tst_KeyedListModel.qml', 'tst_BeeperData.qml', 'tst_BeeperChatPreviews.qml', 'tst_BeeperNavigation.qml', 'tst_BeeperConnections.qml', 'tst_BeeperComposer.qml', 'tst_BeeperPanel.qml', 'tst_BeeperSidebar.qml', 'tst_BeeperArrivals.qml', 'tst_BeeperReactions.qml', 'tst_BeeperSendDraft.qml', 'tst_BeeperKeyboard.qml', 'tst_BeeperVim.qml', 'tst_BeeperLowPriority.qml', 'tst_BeeperUnreadOrder.qml', 'tst_BeeperSearch.qml', 'tst_BeeperPagination.qml', 'tst_BeeperQuotes.qml', 'tst_BeeperMedia.qml', 'tst_BeeperPeople.qml', 'tst_BeeperVideo.qml', 'tst_BeeperBubble.qml',
     'tst_Icon.qml', 'tst_BeeperAttachmentPicker.qml', 'tst_BeeperHistory.qml', 'tst_MessengerController.qml', 'tst_LauncherControllers.qml', 'tst_NetworkControllers.qml',
     'tst_UpdateControllers.qml', 'tst_CompactCapsules.qml', 'tst_FeatureControllers.qml', 'tst_CollectorLifecycle.qml',
     'tst_ShellCoordinator.qml', 'tst_SystemData.qml', 'tst_UsageController.qml', 'tst_StorageController.qml',
     'tst_WeatherData.qml', 'tst_NotificationData.qml', 'tst_NotificationPopup.qml', 'tst_WorkspaceSwitcher.qml',
     '../pill-test.qml', '../selection-test.qml'])
     await qml(file);
+  await qml('tst_BeeperImageEditor.qml');
   if (process.env.BEEPER_TEST_BACKEND) await qml('tst_MessengerProtocol.qml');
   else console.log('SKIP Go protocol integration: set BEEPER_TEST_BACKEND to the built demo-capable executable.');
 

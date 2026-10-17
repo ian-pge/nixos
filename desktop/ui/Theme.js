@@ -78,3 +78,10 @@ var beeperNetworkColors = {
   all: sideSystem, whatsapp: "#a6da95", telegram: sideApplications,
   signal: sideBluetooth, instagram: pink, sms: sideDate
 };
+// File families keep their identity independently of the conversation network.
+var beeperAttachmentColors = {
+  pdf: "#ed8796", document: "#8aadf4", spreadsheet: "#a6da95",
+  presentation: "#f5a97f", archive: "#eed49f", code: "#8bd5ca",
+  text: "#b8c0e0", image: "#f5bde6", audio: "#c6a0f6",
+  video: "#7dc4e4", file: "#939ab7"
+};

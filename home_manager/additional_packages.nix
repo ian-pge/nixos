@@ -35,7 +35,7 @@
     # herdr
     kalker
     blender
-    # davinci-resolve
+    davinci-resolve
     nvd
     nix-output-monitor
     # zotero

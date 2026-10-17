@@ -148,7 +148,7 @@ ShellRoot {
       tryCompare(host, "active", false); tryCompare(host, "presented", false);
       verify(!host.wantsKeyboard); verify(!panel.active); verify(!model.viewFocused);
     }
-    function test_photo_preview_fills_the_monitor_and_space_restores_the_chat() {
+    function test_photo_preview_fills_the_monitor_and_o_restores_the_chat() {
       fixture.focusStage = "open photo";
       const chatWidth = host.surfaceItem.width, chatHeight = host.surfaceItem.height;
       panel.previewAttachment = model.messages.find(message => message.id === "photo").attachments[0];
@@ -176,8 +176,11 @@ ShellRoot {
         fixture.captureExitCode = -1; photoCapture.running = true;
         tryCompare(fixture, "captureExitCode", 0);
       }
-      fixture.focusStage = "space closes photo";
+      fixture.focusStage = "space leaves photo open";
       keyClick(Qt.Key_Space);
+      wait(30); verify(preview.visible); compare(panel.modal, "media");
+      fixture.focusStage = "o closes photo";
+      keyClick(Qt.Key_O);
       tryCompare(preview, "visible", false);
       compare(panel.modal, ""); verify(host.active);
       fixture.focusStage = "focus returns after photo";
@@ -187,6 +190,39 @@ ShellRoot {
       tryCompare(preview.viewer, "activeFocus", true);
       keyClick(Qt.Key_Escape); tryCompare(preview, "visible", false);
       verify(host.active);
+    }
+    function test_draft_drawing_uses_full_monitor_and_cancel_restores_composer() {
+      fixture.focusStage = "drawing thumbnail";
+      const original = model.messages.find(message => message.id === "photo").attachments[0];
+      model.draftAttachments = [original]; model.draftText = "Keep my caption";
+      panel.compose();
+      tryVerify(() => findChild(panel, "beeperDrawAttachment0") !== null);
+      const button = findChild(panel, "beeperDrawAttachment0"); tryCompare(button, "enabled", true);
+      verify(waitForRendering(button));
+      fixture.focusStage = "open drawing editor";
+      mouseClick(button);
+      const preview = host.photoPreviewWindow;
+      tryCompare(preview, "visible", true);
+      fixture.focusStage = "drawing editor instance";
+      tryVerify(() => preview.viewer?.objectName === "beeperImageEditor");
+      compare(preview.color.a, 1, "The drawing window is opaque so the compositor can occlude the desktop");
+      fixture.focusStage = "drawing image ready";
+      tryCompare(preview.viewer, "imageReady", true);
+      fixture.focusStage = "drawing editor dimensions";
+      tryCompare(preview.viewer, "width", window.screen.width); tryCompare(preview.viewer, "height", window.screen.height);
+      fixture.focusStage = "drawing editor focus";
+      tryCompare(preview.viewer, "activeFocus", true);
+      fixture.focusStage = "draw on image";
+      const area = findChild(preview.viewer, "beeperDrawingMouse");
+      mousePress(area, area.width * 0.25, area.height * 0.5);
+      mouseMove(area, area.width * 0.5, area.height * 0.5);
+      mouseRelease(area, area.width * 0.75, area.height * 0.5);
+      compare(preview.viewer.strokes.length, 1);
+      fixture.focusStage = "cancel drawing and restore focus";
+      keyClick(Qt.Key_Escape); tryCompare(preview, "visible", false);
+      tryCompare(panel.composer, "activeFocus", true); tryCompare(panel, "windowFocused", true);
+      compare(model.draftText, "Keep my caption"); compare(model.draftAttachments[0], original);
+      model.draftAttachments = []; model.draftText = "";
     }
     function test_photo_window_steps_between_photos_with_h_and_l() {
       const messages = model.messages;
@@ -229,10 +265,10 @@ ShellRoot {
       verify(preview.visible); verify(host.wantsKeyboard);
       keyClick(Qt.Key_L); tryVerify(() => player.position >= 5000);
       keyClick(Qt.Key_H); verify(player.position < 5000);
-      keyClick(Qt.Key_Escape); tryCompare(preview, "visible", false);
+      keyClick(Qt.Key_O); tryCompare(preview, "visible", false);
       tryCompare(panel, "windowFocused", true); tryCompare(grab, "active", true);
     }
-    function test_photo_thumbnail_maps_across_surfaces_and_closing_keeps_focus_until_return() {
+    function test_photo_fades_at_final_size_and_closing_keeps_focus_until_return() {
       const history = findChild(panel, "beeperMessages");
       const index = model.messages.findIndex(message => message.id === "photo");
       tryVerify(() => !history.loading && history.itemAtIndex(index) !== null);
@@ -245,20 +281,20 @@ ShellRoot {
       panel.openModal("media");
       const preview = host.photoPreviewWindow;
       tryCompare(preview.viewer, "presented", true);
-      verify(preview.viewer.sharedOrigin, "A visible real thumbnail must morph across the Wayland layer surfaces");
-      const rect = thumbnail.previewRect, point = thumbnail.mapToItem(preview.viewer, rect.x, rect.y);
-      fuzzyCompare(preview.viewer.originRect.x, point.x, 1);
-      fuzzyCompare(preview.viewer.originRect.y, point.y, 1);
-      tryCompare(preview.viewer, "progress", 1);
+      const photo = findChild(preview.viewer, "beeperFullscreenPhoto");
+      compare(photo.x, 0); compare(photo.y, 0); compare(photo.scale, 1);
+      compare(photo.width, preview.width); compare(photo.height, preview.height);
+      compare(photo.transform.length, 0);
+      tryCompare(preview.viewer, "opacity", 1);
       tryCompare(preview.viewer, "activeFocus", true);
       keyClick(Qt.Key_Escape);
       verify(preview.viewer.closing); verify(preview.visible);
-      compare(panel.modal, "media", "Keep the attachment mounted until the shrinking image arrives");
+      compare(panel.modal, "media", "Keep the attachment mounted until the fade finishes");
       tryCompare(preview, "visible", false);
       tryCompare(panel, "windowFocused", true); tryCompare(grab, "active", true);
       panel.openModal("media");
       tryCompare(preview.viewer, "presented", true);
-      tryCompare(preview.viewer, "progress", 1);
+      tryCompare(preview.viewer, "opacity", 1);
       preview.viewer.requestClose();
       controller.blocked = true;
       tryCompare(preview, "visible", false);
@@ -301,7 +337,7 @@ ShellRoot {
           Hyprland.dispatch("hl.dsp.cursor.move({x=4,y=4})");
           wait(30);
           fixture.focusStage = "close photo cycle " + i;
-          keyClick(Qt.Key_Space);
+          keyClick(Qt.Key_O);
           tryCompare(host.photoPreviewWindow, "visible", false);
           wait(250); // Include the compositor's delayed unmap/focus events.
           fixture.focusStage = "settled focus cycle " + i;

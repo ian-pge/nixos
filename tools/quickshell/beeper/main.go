@@ -347,6 +347,8 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return b.clipboard(ctx)
 	case "prepareRecording":
 		return b.prepareRecording()
+	case "prepareImageEdit":
+		return b.prepareImageEdit(p.FileName)
 	case "discardAttachment":
 		return object{}, b.discard(p.Path)
 	case "saveAttachment":

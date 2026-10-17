@@ -16,13 +16,15 @@ Rectangle {
   property bool vimEditing: false
   property color accent: Theme.sideApplications
   property bool externalPhotoPreview: false
+  readonly property bool imageEditing: mode === "draw"
   readonly property bool photoPreview: root.mode === "media"
     && ["image", "gif", "video"].includes(Format.attachmentType(previewAttachment || {}))
-  readonly property Item surface: photoPreview ? photoViewer : modalSurface
+  readonly property Item surface: imageEditing ? imageEditor.item : photoPreview ? photoViewer : modalSurface
   signal closeRequested()
   signal attachmentSelected(int index)
   signal downloadRequested()
   signal previewStepRequested(int delta)
+  signal imageEdited(var attachment)
   function requestClose() {
     if (photoPreview && !externalPhotoPreview) photoViewer.requestClose();
     else closeRequested();
@@ -107,12 +109,12 @@ Rectangle {
     "h / l while audio is playing · outside text input     Back / forward 5 seconds",
     "Esc while audio is playing     Pause before other Esc actions",
     "Audio continues while navigating or hiding the messenger",
-    "Space / Esc on a fullscreen photo     Close photo",
+    "o / Esc on a fullscreen photo     Close photo",
     "h / l on a fullscreen photo     Previous / next photo in this chat",
     "d on fullscreen media     Download the displayed photo or video",
     "Space on fullscreen video     Play / pause",
     "h / l on fullscreen video     Back / forward 5 seconds",
-    "Esc on fullscreen video     Close video",
+    "o / Esc on fullscreen video     Close video",
     "",
     "CHAT TEXT SIZE",
     "Ctrl + wheel or Ctrl + + / -     Zoom in / out",
@@ -155,12 +157,13 @@ Rectangle {
   onModeChanged: if (mode === "help") Qt.callLater(() => { if (root.mode === "help") root.scrollHelp(-Infinity); })
   onAttachmentChoicesChanged: attachmentsList.currentIndex = attachmentChoices.length ? 0 : -1
   visible: root.mode === "help" || root.mode === "attachments" || root.mode === "media" && !(photoPreview && externalPhotoPreview)
-  color: photoPreview ? "transparent" : Qt.alpha(Theme.background, 0.55)
+    || imageEditing && !externalPhotoPreview
+  color: photoPreview || imageEditing ? "transparent" : Qt.alpha(Theme.background, 0.55)
   MouseArea { anchors.fill: parent; onClicked: root.requestClose() }
   Rectangle {
     id: modalSurface
     objectName: "beeperModalSurface"
-    visible: !root.photoPreview
+    visible: !root.photoPreview && !root.imageEditing
     anchors.centerIn: parent
     width: Math.min(parent.width - 60, root.mode === "media" ? 760 : root.mode === "help" ? 700 : 540)
     height: Math.min(parent.height - 60, modalColumn.implicitHeight + 36)
@@ -168,7 +171,7 @@ Rectangle {
     clip: true
     MouseArea { anchors.fill: parent }
     Keys.onPressed: event => {
-      if (event.key === Qt.Key_Escape || root.mode === "media" && event.key === Qt.Key_Space
+      if (event.key === Qt.Key_Escape || root.mode === "media" && event.key === Qt.Key_O
           || root.mode === "help" && (event.key === Qt.Key_Question || event.text === "?")) {
         if (!event.isAutoRepeat) root.closeRequested();
         event.accepted = true;
@@ -222,6 +225,7 @@ Rectangle {
           id: attachmentButton
           required property var modelData
           required property int index
+          readonly property var fileStyle: Format.attachmentFileStyle(modelData.attachment)
           width: attachmentsList.width; height: 72
           prominent: index === attachmentsList.currentIndex
           accent: root.accent; focusPolicy: Qt.NoFocus
@@ -229,21 +233,29 @@ Rectangle {
           onClicked: root.attachmentSelected(index)
           ToolTip.visible: hovered
           ToolTip.text: modelData.title
-          contentItem: Column {
-            spacing: 4
-            Text {
-              width: parent.width
-              text: (attachmentButton.index + 1) + ". " + attachmentButton.modelData.title
-              textFormat: Text.PlainText; elide: Text.ElideRight
-              color: attachmentButton.prominent ? root.accent : Theme.foreground
-              font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control; weight: Font.Medium }
+          contentItem: RowLayout {
+            spacing: 12
+            Icon {
+              objectName: "beeperAttachmentChoiceIcon"
+              size: 32; name: attachmentButton.fileStyle.icon
+              color: Theme.beeperAttachmentColors[attachmentButton.fileStyle.kind]
             }
-            Text {
-              width: parent.width
-              visible: !!attachmentButton.modelData.detail
-              text: attachmentButton.modelData.detail; textFormat: Text.PlainText; elide: Text.ElideMiddle
-              color: Theme.secondary
-              font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
+            ColumnLayout {
+              Layout.fillWidth: true; spacing: 4
+              Text {
+                Layout.fillWidth: true
+                text: (attachmentButton.index + 1) + ". " + attachmentButton.modelData.title
+                textFormat: Text.PlainText; elide: Text.ElideRight
+                color: attachmentButton.prominent ? root.accent : Theme.foreground
+                font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.control; weight: Font.Medium }
+              }
+              Text {
+                Layout.fillWidth: true
+                text: [attachmentButton.fileStyle.label, Format.bytes(attachmentButton.modelData.attachment?.fileSize)].filter(Boolean).join(" · ")
+                textFormat: Text.PlainText; elide: Text.ElideRight
+                color: Theme.secondary
+                font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
+              }
             }
           }
         }
@@ -302,6 +314,20 @@ Rectangle {
     previewOrigin: root.previewOrigin
     onCloseRequested: root.closeRequested()
     onStepRequested: delta => root.previewStepRequested(delta)
+  }
+  Loader {
+    id: imageEditor
+    anchors.fill: parent
+    active: root.active && root.imageEditing && !root.externalPhotoPreview
+    onLoaded: item.forceActiveFocus()
+    sourceComponent: BeeperImageEditor {
+      beeperData: root.beeperData
+      attachment: root.previewAttachment
+      active: root.active && root.imageEditing
+      accent: root.accent
+      onCancelRequested: root.closeRequested()
+      onSaved: attachment => root.imageEdited(attachment)
+    }
   }
   AcceleratedScroll { id: helpWheel; flickable: helpScroll; inputEnabled: root.mode === "help" }
 }
