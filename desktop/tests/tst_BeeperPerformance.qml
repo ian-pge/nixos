@@ -32,9 +32,9 @@ ShellRoot {
     }
     function initTestCase() {
       beeperData = create(Quickshell.shellDir + "/fixtures/PagedBeeperData.qml", fixture, {});
-      beeperData.chats = Array.from({length: 40}, (_, index) => ({id: "chat-" + index,
+      beeperData.replaceChats(Array.from({length: 40}, (_, index) => ({id: "chat-" + index,
         title: "Conversation " + index, network: "Telegram", type: "group",
-        participants: {total: 3, items: [{id: "self", isSelf: true}, {id: "friend", fullName: "Friend"}]}}));
+        participants: {total: 3, items: [{id: "self", isSelf: true}, {id: "friend", fullName: "Friend"}]}})));
       const source = referenceSource || Quickshell.shellDir + "/../features/messenger/BeeperPanel.qml";
       panel = create(source, window.contentItem, {width: 1280, height: 900, active: true, windowFocused: true, beeperData: beeperData});
       hiddenPanel = create(source, window.contentItem, {width: 1280, height: 900, active: false, visible: false, beeperData: beeperData});

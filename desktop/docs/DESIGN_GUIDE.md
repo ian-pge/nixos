@@ -44,6 +44,31 @@ Le masque d'entrée suit les capsules et le panneau réellement présenté ;
 l'espace transparent entre eux reste traversable aux clics. Le survol ne
 déplace pas les widgets ni leurs zones de clic.
 
+Dans le thème opaque, `DimmingPolicy` prend une décision commune par écran :
+assombrir si un special workspace, le chat ou un widget central autre que
+workspaces/volume/luminosité/notification/dictée/média est ouvert. La taille du widget
+n'intervient pas ; Bluetooth suit aussi cette règle. Notifications, dictée
+(enregistrement comme transcription) et indicateur lecture/pause ne demandent pas de voile.
+Une exception ne supprime jamais la demande d'un autre élément encore ouvert.
+Quand un special workspace est actif, Hyprland conserve son voile natif sous
+ses fenêtres : `PanelBackdrop` est immédiatement masqué, même pendant son fondu,
+pour ne pas empiler un second voile au-dessus du special workspace. Sa présence
+vient de l'instantané par moniteur déjà rafraîchi par `WorkspaceMonitorSync`,
+sans polling, temporisation de fermeture ou modification globale de Hyprland.
+Hors special workspace, `PanelBackdrop` dessine le voile sous les widgets.
+Sa force vient du même `decoration.dim_special` Hyprland, transmis par Home Manager
+via `QS_PANEL_DIM_AMOUNT` (repli à 0,6 pour les aperçus). Le voile couvre tout
+le fond, y compris entre et derrière les widgets de la barre : réserver une bande
+claire en haut créerait une démarcation horizontale. Les widgets de la top bar
+et les panneaux sont dessinés au-dessus et ne sont donc pas assombris. Il suit un
+fondu court à l'ouverture et à la fermeture, sans bloquer les clics ni ajouter
+de zone exclusive. Le plein écran média garde ce même voile sous le chat,
+sans ajouter de fond ni modifier l'assombrissement à l'ouverture ou à la fermeture.
+La surface Wayland couvre toute la largeur pour ne laisser aucune bande claire
+sur les côtés ; `barContent` conserve les marges visuelles de 10 px.
+Liquid Glass reste inchangé : son rendu analytique élimine les pixels hors des
+régions de verre, donc ce voile non réfractif est désactivé dans ce mode.
+
 Les indicateurs latéraux sont regroupés dans des blocs sur une seule ligne ; stockage
 et mises à jour restent des capsules autonomes. Un seul `GlassShape` appartient
 à chaque bloc, les cellules internes gardant leurs propres zones de clic et de
@@ -58,6 +83,10 @@ couleur autour de la capsule entière, en retrait du fond avec la même marge et
 la même épaisseur que les cadrans. Il réutilise la région de verre du fond,
 sans contour autour de chaque icône. Les icônes et logos des blocs partagent
 la taille `barIconSize` de `Theme.js`.
+Les pastilles de workspace utilisent cette même marge de liseré sur les quatre
+côtés, y compris pour le workspace spécial. Leur hauteur intérieure est déduite
+de la hauteur de la capsule moins deux marges, sans arrondi indépendant : les
+demi-cercles intérieur et extérieur restent ainsi concentriques aux extrémités.
 Le texte heure/date/météo est en 17 px gras. La connectivité garde son fond
 commun sans liseré global : chaque icône a un cercle complet, de même diamètre
 et épaisseur que les cadrans, sans région de verre supplémentaire.
@@ -106,7 +135,7 @@ barre : hauteur de 42 px à l'échelle actuelle, avec contenu, marges et largeur
 utile agrandis. Volume, luminosité, musique, dictée et Bluetooth suivent cette
 règle ; Wi-Fi et updates ne l'appliquent qu'à leur état compact. Le speed test,
 les listes détaillées, le calendrier, le système, le stockage, les lanceurs et
-les notifications conservent leurs dimensions. Le plafond central reste 434 px.
+les notifications conservent leur échelle, sous le plafond central défini par `CentralCapsule.panelWidth`.
 Ne pas agrandir ces panneaux ni ajouter un défilement pour aligner une capsule.
 La forme d'onde du chat garde son échelle indépendante de celle de la dictée en barre.
 
@@ -121,9 +150,31 @@ pas de ressort, de dépassement de la cible ou de trajet aller-retour.
 Une interruption reprend les valeurs effectivement affichées. Source et
 destination restent brièvement rendues ensemble, pilotées par une seule
 progression ; les composants ne relancent pas chacun leur propre entrée.
-Lors d'une séquence rapide de modes, capturer les opacités et translations
+`ui/Morph.js` définit les fondus et les rapports de taille communs.
+`ui/MorphScale.qml` applique à tous les contenus centraux, chat compris, une
+transformation native avec deux rapports indépendants : largeur de la surface
+sur largeur du contenu, et hauteur de la surface sur hauteur du contenu.
+La mise en page ne suit pas les bords animés : le contenu est temporairement
+étiré ou comprimé, puis retrouve ses proportions normales à l'arrivée.
+Chaque facteur est borné indépendamment entre `Morph.minScale` et `Morph.maxScale`,
+par rapport à la taille normale du contenu. Ce n'est pas une limite d'écart entre
+largeur et hauteur : un changement de largeur seul garde la hauteur inchangée.
+La même borne continue s'applique à l'entrée, à la sortie et aux interruptions,
+sans distinction petit/grand panneau. Quand le plancher de zoom laisse dépasser
+le contenu d'une surface encore petite, son `clip` existant masque ce débordement ;
+le fond poursuit sa transformation avec les fondus, sans réduire davantage le contenu.
+Le centrage suit la surface sans glissement ajouté. Lors d'une interruption,
+conserver les largeurs de mise en page visibles et reprendre les rapports
+depuis la géométrie réellement affichée, sans seconde horloge d'animation.
+Lors d'une séquence rapide de modes, capturer les opacités
 courantes au lieu de faire disparaître brutalement les couches intermédiaires.
 Un passage entre deux panneaux ne doit pas afficher les workspaces entre eux.
+
+La recherche d'applications dimensionne sa hauteur selon le
+nombre de lignes, sous son plafond existant. L'état vide garde assez d'espace
+pour son message. Une fois le lanceur ouvert, le viewport suit la hauteur animée
+de la capsule : le champ de recherche reste en haut, sans zoom ni second fondu
+à chaque frappe. La capsule reste l'unique propriétaire de cette animation.
 
 Les widgets ne rebondissent pas, y compris la capsule de mises à jour.
 Le survol et les états actifs changent seulement la teinte de sélection.
@@ -138,6 +189,20 @@ Pour passer du chat à un panneau, établir d'abord le panneau cible, puis
 fermer le chat. Une seule surface peint le verre jusqu'au relais au même
 rectangle final. Deux fonds ou une seconde animation de hauteur produiraient
 un dernier mouvement parasite.
+Les animations de taille de la capsule pilotent ses dimensions intermédiaires,
+pas les dimensions empruntées au chat. Au relais, une ancienne animation de
+capsule est terminée hors écran : elle ne doit jamais écraser la géométrie du chat.
+
+Les fondus du chat suivent le temps écoulé, comme ceux des autres panneaux,
+et non la progression géométrique déjà accélérée. Ils partagent l'horloge du
+mouvement et repartent des opacités affichées lors d'une interruption.
+Le rayon suit la même règle que la capsule centrale, bornée par sa demi-hauteur,
+pour éviter un changement de contour au passage entre les deux surfaces.
+Pendant ce passage, la capsule reprend le rectangle animé du chat et ses
+contenus suivent les mêmes centrage et zoom indépendant sur chaque axe. Le contenu sortant
+est conservé à l'ouverture ; le widget entrant utilise le fondu du chat à la
+fermeture, sans lui superposer un second fondu. La géométrie de destination
+reste indépendante de ce rectangle animé pour éviter une boucle de taille.
 
 Pendant la fermeture, désactiver le contenu, pas son conteneur visuel :
 le collecteur de `GlassShape` ignore les éléments désactivés, même par un
@@ -403,7 +468,8 @@ Les photos attendent d'être prêtes avant le trajet depuis leur vignette.
 Animer transform/opacité, sans redimensionner l'image décodée. Si la vignette
 est masquée, rognée ou réaffectée, utiliser un fondu plutôt qu'un trajet vers
 une autre image. La règle Hyprland `no_anim` de la surface photo évite un second
-fondu de couche ; le fond est seulement assombri, pas flouté.
+fondu de couche ; la visionneuse reste transparente autour du média et conserve
+l'assombrissement déjà présent derrière le chat, sans flou supplémentaire.
 
 Garder chat et photo dans le même périmètre de focus. À la fermeture, retirer
 l'ancien grab avant de masquer la fenêtre puis créer celui du chat au tour
@@ -470,7 +536,7 @@ vit dans Hyprland, indépendamment de la cloche et de l'état Ne pas déranger.
 Chaque barre présente les workspaces affectés à son moniteur par les
 règles Hyprland, avec sa sélection locale et l'occupation de ces workspaces.
 Les boutons inactifs sont circulaires ; le bouton actif est une capsule dont
-la largeur dépasse sa hauteur de `barSize(16)`, pour garder de l'espace autour
+la largeur dépasse sa hauteur de `barSize(32)`, pour garder de l'espace autour
 du Pac-Man. La hauteur commune est `barSize(28)`, proche du
 diamètre extérieur des cadrans latéraux, sans agrandir les glyphes. La largeur
 du groupe suit ces dimensions, sans modifier celle des panneaux centraux.
@@ -541,7 +607,7 @@ une consigne en attente. Voir le [helper luminosité](../../tools/quickshell/bri
 ### Batterie et télémétrie
 
 Le branchement prime sur l'alerte de niveau : icône et pourcentage sont verts
-branchés, rouges débranchés sous 20 %, sinon dans l'accent normal. Chaque
+branchés, rouges débranchés sous 20 % (40 % pour le téléphone), sinon dans l'accent normal. Chaque
 appareil est indépendant, sans éclair ajouté. Un pourcentage inconnu n'est
 pas une batterie vide.
 
@@ -558,6 +624,16 @@ comme une mesure séparée de l'écouteur gauche, droit ou du boîtier. Un premi
 rapport encore absent reste inconnu ; une déconnexion retire le cadran. Le
 vert exige un état de charge explicite d'UPower, pas un niveau à 100 %.
 
+Le téléphone utilise directement la batterie BlueZ, sans interpoler les paliers
+de 20 % du Pixel. Son branchement à ce PC est reconnu par l'adresse Bluetooth
+associée au constructeur et au numéro de série USB, indépendamment du port/hub
+et de l'identifiant produit variable selon le mode USB. La télémétrie système
+existante fournit cette présence : aucun collecteur supplémentaire. Une donnée
+périmée reste inconnue. Le vert signifie « branché à ce PC », pas « charge en
+cours », et ne détecte pas un chargeur mural. Branché en USB sans Bluetooth,
+le cadran reste visible en vert avec un pourcentage inconnu ; sans les deux,
+il disparaît. Le téléphone n'a pas d'action au clic.
+
 Les collecteurs système/GPU sont partagés ; les tops de processus sont abonnés
 seulement quand le panneau est réellement visible. Les générations évitent
 de présenter un ancien top après réouverture. Un collecteur expiré, une carte
@@ -573,13 +649,6 @@ Le catalogue applications utilise `DesktopEntries`, sans scruter périodiquement
 les fichiers desktop. Une activation d'instance existante doit aussi fonctionner
 depuis un autre workspace normal ou spécial. Une recherche ne réserve pas
 les lettres ordinaires aux commandes de navigation.
-
-TabCtl fournit les onglets et le helper normalise ses erreurs en JSON.
-Les favicons viennent de la base SQLite locale, sans téléchargement.
-Activer un onglet ne suffit pas : focaliser aussi sa fenêtre Hyprland.
-L'extension Chrome est installée manuellement ; Home Manager possède le
-manifeste Native Messaging. Ne pas lancer `tabctl install` sur ce manifeste.
-Diagnostic et protocole : [helper Chrome](../../tools/quickshell/chrome-tabs/README.md).
 
 ## Stockage
 

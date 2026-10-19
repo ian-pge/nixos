@@ -16,7 +16,6 @@
     ./zed
     ./gtk.nix
     ./quickshell.nix
-    ./tabctl.nix
     ./surfingkeys.nix
     ./voxtype.nix
     ./hyprpaper.nix

@@ -48,20 +48,14 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		return []object{{"accountID": "demo-signal", "network": "Signal", "user": object{"id": "demo-self", "fullName": "Moi"}}, {"accountID": "demo-whatsapp", "network": "WhatsApp", "user": object{"id": "demo-self", "fullName": "Moi"}}}, nil
 	case "chats":
 		return demoPage(b.demoChats), nil
-	case "unreadCounts":
-		counts := map[string]int{}
-		lowPriorityCounts := map[string]int{}
+	case "chatStates":
+		items := []object{}
 		for _, chat := range b.demoChats {
 			count, _ := chat["unreadCount"].(int)
-			if count > 0 || boolField(chat, "isMarkedUnread") {
-				if boolField(chat, "isLowPriority") {
-					lowPriorityCounts[textField(chat, "network")]++
-				} else {
-					counts[textField(chat, "network")]++
-				}
-			}
+			items = append(items, object{"id": textField(chat, "id"), "network": textField(chat, "network"),
+				"unreadCount": count, "isMarkedUnread": boolField(chat, "isMarkedUnread"), "isLowPriority": boolField(chat, "isLowPriority")})
 		}
-		return object{"counts": counts, "lowPriorityCounts": lowPriorityCounts}, nil
+		return object{"items": items}, nil
 	case "messages":
 		return demoPage(b.demoMessages[p.ChatID]), nil
 	case "contacts":

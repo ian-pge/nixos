@@ -8,15 +8,15 @@ assert.ok(!existsSync(new URL("../shell/StatusData.qml", import.meta.url)), "No 
 assert.doesNotMatch(shell + bar + capsule, /statusData|StatusData/);
 assert.match(bar, /CentralCapsule\s*\{/);
 assert.match(bar, /item: messengerSurface\.presented \? messengerSurface\.surfaceItem : null/);
-assert.match(bar, /sourceWidth: centerMorph\.width/);
-assert.match(bar, /sourceHeight: centerMorph\.height/);
+assert.match(bar, /sourceWidth: presented \? centerMorph\.targetWidth : centerMorph\.width/);
+assert.match(bar, /sourceHeight: presented \? centerMorph\.targetHeight : centerMorph\.height/);
 assert.match(capsule, /targetWidth: Math\.min\(preferredWidth, maximumWidth\)/);
 assert.match(capsule, /maximumWidth: Math\.min\(panelWidth,/);
 assert.doesNotMatch(capsule, /maximumWidth: workspaceSwitcher\./,
   "Five workspace slots must not shrink calendar, storage or system panels");
 assert.match(capsule, /y: root\.barTopInset/);
 assert.match(capsule, /Math\.max\(root\.messengerHost\.originContentOpacity, overlayReveal\)/);
-assert.match(capsule, /drawBackground: !root\.messengerHost\.presented \|\| \(root\.messengerHost\.active && overlayReveal > 0\)/);
+assert.match(capsule, /drawBackground: !root\.messengerHost\.presented\s*\|\| \(root\.messengerHost\.active && overlayDuringChat && overlayReveal > 0\)/);
 assert.match(capsule, /returningFromChat: root\.messengerHost\.presented && !root\.messengerHost\.active/);
 assert.match(host, /windowFocused: root\.windowFocused && \(activeFocus \|\| emojiPickerOpen\)/);
 assert.doesNotMatch(host, /NotificationPopup|notificationData/,
@@ -38,7 +38,7 @@ for (const name of ["toggleBeeper", "dismissNotification", "toggleDoNotDisturb",
   "mediaPlayPause", "mediaNext", "mediaPrevious", "volumeUp", "volumeDown", "toggleAudioMute",
   "toggleAudio", "toggleCalendar", "toggleMicrophoneMute", "showVolume", "showBrightness",
   "brightnessUp", "brightnessDown", "toggleWifi", "toggleBluetooth", "toggleUpdates",
-  "toggleLauncher", "toggleChromeTabs", "toggleUsage", "toggleStorage"])
+  "toggleLauncher", "toggleUsage", "toggleStorage"])
   assert.ok(ipc.includes("function " + name + "("), "Stable IPC command " + name);
 assert.match(ipc, /target: "topbar"/);
 console.log("PASS: controller ownership, narrow central capsule, independent messenger and stable IPC contracts");

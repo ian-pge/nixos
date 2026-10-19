@@ -39,6 +39,7 @@ Item {
 
       Rectangle {
         id: equalizerBar
+        objectName: "mediaEqualizerBar" + index
         required property int index
         property real level: 4 + (index % 2) * 2
 
@@ -47,7 +48,7 @@ Item {
         width: 3 * Theme.barScale
         height: level * Theme.barScale
         radius: 1.5 * Theme.barScale
-        color: root.playing ? Theme.state : Theme.inactive
+        color: root.playing ? Theme.yellow : Theme.inactive
 
         SequentialAnimation {
           id: barAnimation
@@ -95,11 +96,12 @@ Item {
 
     size: Theme.barSize(16)
     id: playbackIcon
+    objectName: "mediaPlaybackIcon"
     anchors.right: parent.right
     anchors.rightMargin: Theme.barSize(14)
     anchors.verticalCenter: parent.verticalCenter
     name: root.playbackIconText
-    color: Theme.action
+    color: Theme.yellow
 
   }
 

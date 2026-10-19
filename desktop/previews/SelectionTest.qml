@@ -49,24 +49,6 @@ ShellRoot {
     function launchSelected(index, detached) { launched = index; }
   }
   QtObject {
-    id: tabController
-    property var results: [
-      {tab: {title: "Onglet A", url: "https://example.test/a", active: true, pinned: false}},
-      {tab: {title: "Onglet B", url: "https://example.test/b", active: false, pinned: false}}]
-    property var catalog: results
-    property string query: ""
-    property int selectedIndex: 0
-    property bool loading: false
-    property bool actionPending: false
-    property string message: ""
-    property int activated: -1
-    function setQuery(value) { query = value; }
-    function moveSelection(delta) { selectedIndex = (selectedIndex + delta + 2) % 2; }
-    function activateSelected() { activated = selectedIndex; }
-    function closeSelected() {}
-    function requestTabs() {}
-  }
-  QtObject {
     id: audioController
     property var outputs: [{name: "speaker", ready: true, isSink: true}]
     property var inputs: [{name: "mic", ready: true, isSink: false}]
@@ -99,7 +81,6 @@ ShellRoot {
     visible: true
     width: 1000; height: 1000
     AppLauncher { id: apps; width: 480; height: implicitHeight; controller: appController }
-    ChromeTabsLauncher { id: tabs; x: 500; width: 480; height: implicitHeight; controller: tabController }
     WeatherLocationSelector { id: cities; y: 415; width: 430; height: implicitHeight; weather: weatherData }
     AudioSelector { id: audio; y: 650; width: 480; height: implicitHeight; controller: audioController }
     CalendarPanel { id: calendar; x: 500; y: 430; width: 434; height: implicitHeight; controller: state }
@@ -112,9 +93,7 @@ ShellRoot {
     function init() {
       GlassState.enabled = true;
       appController.selectedIndex = 0;
-      tabController.selectedIndex = 0;
       appController.launched = -1;
-      tabController.activated = -1;
       audioController.selectedAudio = null;
       cities.selectedIndex = 0;
       weatherData.chosen = null;
@@ -147,7 +126,6 @@ ShellRoot {
     }
     function test_glass_selection_tints() {
       checkSolid(apps, "appSelection0", Theme.sideApplications);
-      checkTint(tabs, "tabSelection0", Theme.sideApplications);
       checkSolid(cities, "weatherSelection0", Theme.sideWeather);
       checkTint(audio, "audioSelection-speaker", Theme.sideVolume);
       checkSolid(calendar, "2026-09-24", Theme.calendarSelected);
@@ -163,7 +141,6 @@ ShellRoot {
       compare(surface(surface(calendar, "2026-09-24"), "dayNumber").color, Theme.background);
       compare(surface(surface(calendar, "2026-09-23"), "dayNumber").color, Theme.background);
       compare(surface(surface(calendar, "2026-09-25"), "dayNumber").color, Theme.foreground);
-      compare(surface(tabs, "tabIconFrame0").color, Qt.alpha(Theme.sideApplications, 0.08));
       compare(surface(calendar, "2026-09-23").color, Theme.sideWeather);
       compare(surface(calendar, "2026-09-23").color.a, surface(calendar, "2026-09-24").color.a);
     }
@@ -176,12 +153,6 @@ ShellRoot {
       compare(surface(apps, "appSelection0").color.a, 0);
       keyClick(Qt.Key_Return);
       compare(appController.launched, 1);
-
-      surface(tabs, "tabSearchInput").forceActiveFocus();
-      keyClick(Qt.Key_Down);
-      compare(tabController.selectedIndex, 1);
-      keyClick(Qt.Key_Return);
-      compare(tabController.activated, 1);
 
       cities.focusSearch();
       keyClick(Qt.Key_Down);
@@ -233,7 +204,6 @@ ShellRoot {
       GlassState.enabled = false;
       wait(180);
       checkSolid(apps, "appSelection0", Theme.sideApplications);
-      compare(surface(tabs, "tabSelection0").color, Theme.surfaceRaised);
       checkSolid(cities, "weatherSelection0", Theme.sideWeather);
       compare(surface(audio, "audioSelection-speaker").color, Theme.surfaceRaised);
       compare(surface(apps, "appIconFrame0").color.a, 0);
@@ -244,7 +214,6 @@ ShellRoot {
       wait(180);
       checkSolid(apps, "appSelection0", Theme.sideApplications);
       checkSolid(calendar, "2026-09-24", Theme.calendarSelected);
-      checkTint(tabs, "tabSelection0", Theme.sideApplications);
     }
   }
 }

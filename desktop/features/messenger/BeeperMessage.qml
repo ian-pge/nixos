@@ -23,6 +23,9 @@ Item {
   property color networkAccent: Theme.secondary
   property string searchQuery: ""
   readonly property string plainBody: Format.text(message)
+  readonly property var linkedParts: Format.messageParts(message)
+  readonly property bool hasLinkCards: linkedParts.length > 0
+  property var linkOpener: url => Qt.openUrlExternally(url)
   readonly property string highlightedBody: renderMedia ? Format.highlightText(plainBody, searchQuery, Theme.yellow, Theme.background) : ""
   readonly property bool outgoing: !!message.isSender
   readonly property var sender: Format.senderProfile(message, beeperData?.currentChat, beeperData?.accounts)
@@ -37,7 +40,9 @@ Item {
   readonly property color bubbleColor: outgoing ? networkAccent : Theme.surface
   readonly property color contentAccent: outgoing ? Theme.background : senderColor
   readonly property real preferredContentWidth: {
-    let widest = Math.max(body.implicitWidth, senderLabel.implicitWidth, metadata.implicitWidth,
+    // History measures delegates while hidden. Effective visibility must not
+    // change text wrapping (and therefore move the viewport on reveal).
+    let widest = Math.max(!root.hasLinkCards ? body.implicitWidth : 0, linkedBody.item?.implicitWidth || 0, senderLabel.implicitWidth, metadata.implicitWidth,
       root.message.linkedMessageID ? replyQuote.implicitWidth : 0);
     // Use intrinsic sizes, never the width assigned by this bubble. children
     // also tracks Repeater insertions/removals and late image dimensions.
@@ -47,16 +52,17 @@ Item {
     }
     return widest;
   }
-  readonly property string selectedText: selectionLayer.item?.copyText ?? ""
+  readonly property string selectedText: linkedBody.item?.selectedText || selectionLayer.item?.copyText || ""
   // Keeps the selection layer loaded after the pointer leaves.
   property bool hasTextSelection: false
   signal selectedRequested()
   signal previewRequested(var attachment, var sourceItem)
   signal textSelectionStarted()
+  signal copyLinkRequested(string url)
   signal heightInvalidated(var item)
   onHeightChanged: heightInvalidated(root)
   function attachmentItem(index) { return attachments.itemAt(index); }
-  function clearTextSelection() { selectionLayer.item?.deselect(); }
+  function clearTextSelection() { selectionLayer.item?.deselect(); linkedBody.item?.clearTextSelection(); }
   function playArrival() {
     if (!visible || !playbackEnabled || !viewportReady || !inVisibleViewport) return;
     arrivalMessageID = String(message.id || "");
@@ -148,7 +154,7 @@ Item {
           id: body
           objectName: "messageBody"
           width: parent.width
-          visible: !!text
+          visible: !root.hasLinkCards && !!text
           text: root.plainBody
           textFormat: Text.PlainText
           wrapMode: Text.Wrap
@@ -197,6 +203,22 @@ Item {
             }
           }
         }
+        Loader {
+          id: linkedBody
+          width: parent.width
+          active: root.hasLinkCards
+          sourceComponent: BeeperLinkedMessage {
+            parts: root.linkedParts
+            outgoing: root.outgoing; textScale: root.textScale; accent: root.networkAccent
+            renderEnabled: root.renderMedia
+            enabled: root.playbackEnabled && root.renderMedia
+            searchQuery: root.searchQuery
+            onSelectedRequested: root.selectedRequested()
+            onTextSelectionStarted: root.textSelectionStarted()
+            onOpenRequested: url => root.linkOpener(url)
+            onCopyRequested: url => root.copyLinkRequested(url)
+          }
+        }
         Repeater {
           id: attachments
           // Read receipts/reactions replace the message snapshot, not its
@@ -218,20 +240,6 @@ Item {
             accent: root.contentAccent
             accentBackground: root.outgoing
             onPreviewRequested: (attachment, sourceItem) => root.previewRequested(attachment, sourceItem)
-          }
-        }
-        Repeater {
-          model: Format.links(root.message)
-          BeeperButton {
-            required property var modelData
-            objectName: "beeperMessageLink"
-            width: bubble.width
-            iconName: "external-link"
-            text: modelData.title || modelData.url
-            font.pixelSize: Theme.beeperFont.control * root.textScale
-            prominent: true
-            accent: root.outgoing ? root.contentAccent : Theme.sideApplications
-            onClicked: Qt.openUrlExternally(modelData.url)
           }
         }
         Item {

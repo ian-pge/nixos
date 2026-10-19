@@ -161,6 +161,7 @@ func (b *backend) serve(in io.Reader) error {
 	defer jobs.Wait()
 	slots := make(chan struct{}, 8)
 	waveSlots := make(chan struct{}, 2)
+	readSlots := make(chan struct{}, 8)
 	respond := func(req request, p parameters) {
 		ctx, cancel := context.WithTimeout(b.ctx, 90*time.Second)
 		defer cancel()
@@ -198,6 +199,8 @@ func (b *backend) serve(in io.Reader) error {
 			pool := slots
 			if req.Method == "waveform" {
 				pool = waveSlots // Decoding must never consume messaging slots.
+			} else if req.Method == "read" || req.Method == "unread" {
+				pool = readSlots // Catalog/history/media requests must not reject read-state clicks as busy.
 			}
 			select {
 			case pool <- struct{}{}:
@@ -394,8 +397,8 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		return b.raw(ctx, "GET", "v1/accounts", nil)
 	case "chats":
 		return b.raw(ctx, "GET", "v1/chats"+pageQuery(p), nil)
-	case "unreadCounts":
-		return b.unreadCounts(ctx)
+	case "chatStates":
+		return b.chatStates(ctx)
 	case "contacts":
 		if p.AccountID == "" {
 			return nil, fail("invalid_params", "Missing account.")
@@ -454,12 +457,14 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 		r, e := b.raw(ctx, "POST", chatPath(p.ChatID)+"/read", body)
 		if e == nil {
 			b.emit("chatsChanged", object{})
+			return confirmedReadState(p.ChatID, r)
 		}
 		return r, e
 	case "unread":
 		r, e := b.raw(ctx, "POST", chatPath(p.ChatID)+"/unread", object{})
 		if e == nil {
 			b.emit("chatsChanged", object{})
+			return confirmedReadState(p.ChatID, r)
 		}
 		return r, e
 	case "updateChat":

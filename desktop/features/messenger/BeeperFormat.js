@@ -440,8 +440,72 @@ function supports(chat, operation, message) {
 function links(message) {
   return (message?.links || []).filter(link => /^(https?:|mailto:)/i.test(link.url || ""));
 }
-// Keyboard activation also finds plain-text URLs without adding preview cards
-// to messages for which the API did not provide any.
+function trimLinkPunctuation(url) {
+  const counts = {}, opening = {")": "(", "]": "[", "}": "{"};
+  for (const character of url) if ("()[]{}".includes(character)) counts[character] = (counts[character] || 0) + 1;
+  while (url) {
+    const last = url.slice(-1), first = opening[last];
+    if (/[.,;:!?]/.test(last)) url = url.slice(0, -1);
+    else if (first && (counts[last] || 0) > (counts[first] || 0)) { --counts[last]; url = url.slice(0, -1); }
+    else break;
+  }
+  return url;
+}
+function textLinkRanges(body) {
+  const ranges = [], pattern = /\b(?:https?:\/\/|mailto:|www\.)[^\s<>"'`“”‘’«»]+/gi;
+  let match;
+  while ((match = pattern.exec(body)) !== null) {
+    const raw = trimLinkPunctuation(match[0]);
+    if (raw) ranges.push({start: match.index, end: match.index + raw.length,
+      url: /^www\./i.test(raw) ? "https://" + raw : raw});
+  }
+  return ranges;
+}
+function linkPresentation(link) {
+  const url = String(link?.url || "").trim();
+  if (/^mailto:[^\s]+$/i.test(url)) return {url: url, site: "Email", title: link.title || "Envoyer un e-mail", address: url.slice(7).split("?")[0], video: false};
+  const match = /^(https?):\/\/([^\s/?#]+)([^\s?#]*)(?:[?#][^\s]*)?$/i.exec(url);
+  if (!match) return null;
+  const host = match[2].slice(match[2].lastIndexOf("@") + 1).toLowerCase().replace(/^www\./, "");
+  if (!host) return null;
+  const video = ["youtu.be", "youtube.com", "m.youtube.com", "music.youtube.com"].includes(host);
+  let path = match[3] === "/" ? "" : match[3];
+  const videoID = video && /[?&]v=([^&#]+)/.exec(url);
+  if (videoID) path = "/watch?v=" + videoID[1];
+  try { path = decodeURI(path); } catch (_) {}
+  const title = typeof link.title === "string" ? link.title.trim() : "";
+  return {url: url, site: video ? "YouTube" : host,
+    title: title && title !== url ? title : video ? "Vidéo YouTube" : host,
+    address: host + path, video: video};
+}
+// Cards are presentation only. Copying a whole message still uses text(message),
+// including its original URLs, punctuation, tracking parameters and line breaks.
+function messageParts(message) {
+  const body = text(message), metadata = {}, used = new Set(), parts = [];
+  for (const link of links(message)) {
+    const view = linkPresentation(link);
+    if (view && !metadata[view.url]) metadata[view.url] = view;
+  }
+  let cursor = 0, cardCount = 0;
+  function addText(value) {
+    value = value.trim().replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n");
+    if (value && !/^[\s.,;:!?()[\]{}<>"'“”‘’«»]+$/.test(value)) parts.push({kind: "text", text: value});
+  }
+  for (const range of textLinkRanges(body)) {
+    // Literal markup and code remain text, never a link or an HTML resource.
+    const before = body.slice(0, range.start), tagStart = before.lastIndexOf("<");
+    if (tagStart > before.lastIndexOf(">") && tagStart !== range.start - 1 || before.split("`").length % 2 === 0) continue;
+    const view = metadata[range.url] || linkPresentation({url: range.url});
+    if (!view) continue;
+    addText(body.slice(cursor, range.start));
+    parts.push({kind: "link", link: view}); used.add(view.url); ++cardCount;
+    cursor = range.end;
+  }
+  addText(body.slice(cursor));
+  for (const url of Object.keys(metadata)) if (!used.has(url)) { parts.push({kind: "link", link: metadata[url]}); ++cardCount; }
+  return cardCount ? parts : [];
+}
+// Metadata and plain URLs share the same exact opening/copying targets.
 function messageLinks(message) {
   const result = [], seen = new Set();
   function add(value, title) {
@@ -453,20 +517,6 @@ function messageLinks(message) {
     result.push({url: url, title: typeof title === "string" ? title : ""});
   }
   for (const link of Array.isArray(message?.links) ? message.links : []) add(link?.url, link?.title);
-  const candidates = text(message).match(/\b(?:https?:\/\/|mailto:|www\.)[^\s<>"'`“”‘’«»]+/gi) || [];
-  for (let url of candidates) {
-    if (seen.has(url)) continue;
-    // Strip surrounding prose punctuation, preserving balanced URL brackets
-    // such as Wikipedia's /Article_(topic) paths.
-    const counts = {}, opening = {")": "(", "]": "[", "}": "{"};
-    for (const character of url) if ("()[]{}".includes(character)) counts[character] = (counts[character] || 0) + 1;
-    while (url) {
-      const last = url.slice(-1), first = opening[last];
-      if (/[.,;:!?]/.test(last)) url = url.slice(0, -1);
-      else if (first && (counts[last] || 0) > (counts[first] || 0)) { --counts[last]; url = url.slice(0, -1); }
-      else break;
-    }
-    add(url, "");
-  }
+  for (const range of textLinkRanges(text(message))) add(range.url, "");
   return result;
 }

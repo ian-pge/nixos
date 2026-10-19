@@ -2,7 +2,7 @@ import QtQuick
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
 
-// Photos and videos share the same full-monitor surface and dimmed backdrop.
+// Photos and videos share a transparent full-monitor surface over the chat backdrop.
 FocusScope {
   id: root
   objectName: "beeperPhotoViewer"
@@ -134,7 +134,6 @@ FocusScope {
     event.accepted = true;
   }
   Timer { id: noticeTimer; interval: 2600; onTriggered: root.notice = "" }
-  Rectangle { anchors.fill: parent; color: Qt.alpha(Theme.background, 0.28) }
   BeeperMedia {
     id: media
     objectName: "beeperFullscreenPhoto"

@@ -247,6 +247,64 @@ func TestUnreadUsesPublicRouteAndPreservesManualFlag(t *testing.T) {
 	}
 }
 
+func TestReadActionsRemainAvailableWhileBackgroundSlotsAreFull(t *testing.T) {
+	release := make(chan struct{})
+	started := make(chan struct{}, 8)
+	actions := make(chan string, 2)
+	b, _ := testBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/accounts" {
+			started <- struct{}{}
+			<-release
+			jsonResponse(w, []object{})
+			return
+		}
+		actions <- r.URL.Path
+		jsonResponse(w, object{"id": "target"})
+	})
+	reader, writer := io.Pipe()
+	done := make(chan error, 1)
+	go func() { done <- b.serve(reader) }()
+	defer func() {
+		writer.Close()
+		close(release)
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Error(err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Error("request workers did not finish")
+		}
+		reader.Close()
+	}()
+	encoder := json.NewEncoder(writer)
+	for id := 0; id < 8; id++ {
+		if err := encoder.Encode(object{"id": id, "method": "accounts"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range 8 {
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("background requests did not fill the pool")
+		}
+	}
+	for _, method := range []string{"read", "unread"} {
+		if err := encoder.Encode(object{"id": method, "method": method, "params": object{"chatID": "target"}}); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case route := <-actions:
+			if route != "/v1/chats/target/"+method {
+				t.Errorf("unexpected route: %s", route)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("read-state action was blocked by background work")
+		}
+	}
+}
+
 func TestDemoUnreadPreservesMessageReceiptsAndCount(t *testing.T) {
 	b, err := newBackend(context.Background(), io.Discard, t.TempDir(), true)
 	if err != nil {

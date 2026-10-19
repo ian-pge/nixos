@@ -50,8 +50,22 @@ ShellRoot {
     }
     function pending(method) { return beeperData.requests.filter(request => request.method === method); }
     function waitRequest(method) { tryVerify(() => pending(method).length === 1, 2000); return pending(method)[0]; }
+    function stateSnapshot(rows) {
+      return {items: rows.map(row => Object.assign({unreadCount: 0, isMarkedUnread: false, isLowPriority: false, network: ""}, row))};
+    }
+    function seedStates(rows) {
+      beeperData.replaceChats(rows);
+      waitRequest("chatStates"); beeperData.respond("chatStates", stateSnapshot(rows));
+    }
+    function assertState(id, count, marked, total) {
+      const chat = beeperData.chatStore.records[id];
+      compare(chat.unreadCount, count); compare(chat.isMarkedUnread, marked);
+      compare(beeperData.unreadConversationCount("all"), total);
+      const visible = beeperData.chats.find(row => row.id === id);
+      if (visible) { compare(visible.unreadCount, count); compare(visible.isMarkedUnread, marked); }
+    }
     function seedHistory() {
-      beeperData.chats = chats(0, 1); beeperData.selectChat("chat-0");
+      beeperData.replaceChats(chats(0, 1)); beeperData.selectChat("chat-0");
       beeperData.respond("messages", {items: messages(30, 30), oldestCursor: "history-30", hasMore: true});
       tryCompare(panel, "restoringView", false);
       wait(150);
@@ -75,7 +89,7 @@ ShellRoot {
     }
     function test_cached_chats_are_selected_only_after_the_panel_stays_open() {
       panel.active = false;
-      beeperData.chats = chats(0, 3);
+      beeperData.replaceChats(chats(0, 3));
       wait(20); compare(beeperData.currentChatID, "");
       panel.active = true; panel.active = false;
       wait(20); compare(beeperData.currentChatID, ""); compare(pending("messages").length, 0);
@@ -85,17 +99,17 @@ ShellRoot {
     }
     function test_initial_selection_waits_for_a_matching_chat_and_connection() {
       beeperData.networkFilter = "whatsapp";
-      beeperData.chats = chats(0, 2, "Telegram");
+      beeperData.replaceChats(chats(0, 2, "Telegram"));
       wait(20); compare(beeperData.currentChatID, "");
       beeperData.state = "offline";
-      beeperData.chats = beeperData.chats.concat(chats(2, 2, "WhatsApp"));
+      beeperData.replaceChats(beeperData.chats.concat(chats(2, 2, "WhatsApp")));
       wait(20); compare(beeperData.currentChatID, "");
       beeperData.state = "connected";
       tryCompare(beeperData, "currentChatID", "chat-2");
       compare(waitRequest("messages").params.chatID, "chat-2");
     }
     function test_explicit_open_and_existing_selection_win_over_default_selection() {
-      panel.active = false; beeperData.chats = chats(0, 3);
+      panel.active = false; beeperData.replaceChats(chats(0, 3));
       panel.active = true;
       panel.openChat("chat-2", "notification-target");
       wait(20); compare(beeperData.currentChatID, "chat-2");
@@ -122,23 +136,23 @@ ShellRoot {
     }
     function test_unread_errors_do_not_change_flags_and_success_refreshes_target_chat() {
       seedHistory();
-      beeperData.chats = chats(0, 2).map(chat => Object.assign({}, chat, {unreadCount: 0, isMarkedUnread: false}));
+      beeperData.replaceChats(chats(0, 2).map(chat => Object.assign({}, chat, {unreadCount: 0, isMarkedUnread: false})));
       panel.focusNavigation(); keyClick(Qt.Key_N);
       compare(waitRequest("unread").params.chatID, "chat-0");
-      verify(!beeperData.currentChat.isMarkedUnread, "Wait for the API before showing success");
+      verify(!beeperData.currentChat.isMarkedUnread, "Keep confirmed flags until the reply");
       beeperData.respond("unread", null, {message: "Offline"}); wait(20);
       verify(!beeperData.currentChat.isMarkedUnread); compare(pending("chats").length, 0);
       keyClick(Qt.Key_N); compare(waitRequest("unread").params.chatID, "chat-0");
       beeperData.selectChat("chat-1");
       beeperData.respond("messages", {items: [], hasMore: false});
-      beeperData.respond("unread", {});
+      beeperData.respond("unread", {id: "chat-0", unreadCount: 0, isMarkedUnread: true});
       waitRequest("chats");
       beeperData.respond("chats", {items: beeperData.chats.map(chat => chat.id === "chat-0" ? Object.assign({}, chat, {isMarkedUnread: true}) : chat), hasMore: false});
       verify(beeperData.chats.find(chat => chat.id === "chat-0").isMarkedUnread);
       verify(!beeperData.currentChat.isMarkedUnread, "A delayed reply must not mark the newly selected chat");
     }
     function test_partial_unread_reply_preserves_conversation_metadata_and_filter_membership() {
-      beeperData.chats = chats(0, 2, "Telegram"); beeperData.networkFilter = "telegram";
+      beeperData.replaceChats(chats(0, 2, "Telegram")); beeperData.networkFilter = "telegram";
       panel.chooseChat(0); beeperData.respond("messages", {items: [], hasMore: false});
       panel.focusNavigation(); keyClick(Qt.Key_N); waitRequest("unread");
       beeperData.respond("unread", {id: "chat-0", unreadCount: 0, isMarkedUnread: true});
@@ -146,9 +160,146 @@ ShellRoot {
       compare(beeperData.currentChat.network, "Telegram"); verify(beeperData.currentChat.isMarkedUnread);
       verify(panel.filteredChats.some(chat => chat.id === "chat-0"));
     }
+    function test_repeated_marks_wait_for_confirmation_and_are_idempotent_afterwards() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 3}]);
+      verify(beeperData.markChatRead("chat-0"));
+      for (let i = 0; i < 10; ++i) verify(!beeperData.markChatRead("chat-0"));
+      compare(pending("read").length, 1); assertState("chat-0", 3, false, 1);
+      beeperData.respond("read", {id: "chat-0", unreadCount: 0, isMarkedUnread: false});
+      assertState("chat-0", 0, false, 0);
+      for (let i = 0; i < 10; ++i) verify(!beeperData.markChatRead("chat-0"));
+      compare(pending("read").length, 0);
+      verify(beeperData.markChatUnread("chat-0"));
+      for (let i = 0; i < 10; ++i) verify(!beeperData.markChatUnread("chat-0"));
+      compare(pending("unread").length, 1); assertState("chat-0", 0, false, 0);
+      beeperData.respond("unread", {id: "chat-0", unreadCount: 0, isMarkedUnread: true});
+      assertState("chat-0", 0, true, 1);
+      for (let i = 0; i < 10; ++i) verify(!beeperData.markChatUnread("chat-0"));
+      compare(pending("unread").length, 0);
+    }
+    function test_opposite_actions_are_disabled_while_confirmation_is_pending() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 2}]);
+      beeperData.markChatRead("chat-0");
+      for (let i = 0; i < 20; ++i) {
+        verify(!beeperData.markChatUnread("chat-0")); verify(!beeperData.markChatRead("chat-0"));
+        assertState("chat-0", 2, false, 1);
+      }
+      compare(pending("read").length, 1); compare(pending("unread").length, 0);
+      beeperData.respond("read", {id: "chat-0", unreadCount: 0, isMarkedUnread: false});
+      assertState("chat-0", 0, false, 0);
+      verify(beeperData.markChatUnread("chat-0"));
+      beeperData.respond("unread", {id: "chat-0", unreadCount: 0, isMarkedUnread: true});
+      assertState("chat-0", 0, true, 1);
+    }
+    function test_failed_and_empty_acknowledgements_do_not_change_confirmed_state() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 3}]);
+      beeperData.markChatRead("chat-0"); beeperData.respond("read", null, {message: "Offline"});
+      assertState("chat-0", 3, false, 1); compare(beeperData.lastError, "Offline");
+      verify(!beeperData.readStateOperations["chat-0"]);
+      beeperData.markChatRead("chat-0"); beeperData.respond("read", {});
+      assertState("chat-0", 3, false, 1); verify(beeperData.lastError.includes("did not confirm"));
+    }
+    function test_old_catalog_response_cannot_undo_a_confirmed_mark() {
+      const original = {id: "chat-0", network: "Telegram", title: "Keep metadata", unreadCount: 3};
+      seedStates([original]);
+      beeperData.refreshChats(false); beeperData.markChatRead("chat-0");
+      beeperData.respond("read", {id: "chat-0", unreadCount: 0, isMarkedUnread: false});
+      beeperData.respond("chats", {items: [original], hasMore: false});
+      assertState("chat-0", 0, false, 0);
+      waitRequest("chats"); beeperData.respond("chats", {items: [Object.assign({}, original, {unreadCount: 0})]});
+      assertState("chat-0", 0, false, 0); compare(beeperData.chats[0].title, "Keep metadata");
+      beeperData.refreshChats(false); beeperData.respond("chats", {items: [original]});
+      assertState("chat-0", 3, false, 1); // A later external change is authoritative for BOTH views.
+    }
+    function test_late_catalog_page_preserves_newer_scan_state_and_still_loads_metadata() {
+      beeperData.refreshChats(false);
+      waitRequest("chatStates");
+      beeperData.respond("chatStates", stateSnapshot([{id: "chat-0", network: "Telegram", isMarkedUnread: true}]));
+      beeperData.respond("chats", {items: [{id: "chat-0", network: "Telegram", title: "Metadata", unreadCount: 0}]});
+      assertState("chat-0", 0, true, 1); compare(beeperData.chats[0].title, "Metadata");
+      verify(!beeperData.markChatUnread("chat-0")); compare(pending("unread").length, 0);
+    }
+    function test_late_complete_scan_does_not_replace_newer_page_state() {
+      waitRequest("chatStates");
+      beeperData.refreshChats(false);
+      beeperData.respond("chats", {items: [{id: "chat-0", network: "Telegram", unreadCount: 0}]});
+      beeperData.respond("chatStates", stateSnapshot([{id: "chat-0", network: "Telegram", unreadCount: 9}]));
+      assertState("chat-0", 0, false, 0);
+    }
+    function test_complete_scan_and_sidebar_share_the_same_state_and_priority() {
+      seedStates([{id: "chat-0", title: "Loaded", network: "Telegram", unreadCount: 4}]);
+      beeperData.refreshUnreadCounts();
+      beeperData.respond("chatStates", stateSnapshot([
+        {id: "chat-0", network: "Telegram", unreadCount: 0, isLowPriority: true},
+        {id: "hidden", network: "WhatsApp", isMarkedUnread: true}]));
+      assertState("chat-0", 0, false, 1);
+      compare(beeperData.chats[0].title, "Loaded"); verify(beeperData.chats[0].isLowPriority);
+      compare(beeperData.chats.length, 1, "The complete lightweight scan does not invent sidebar metadata");
+      compare(beeperData.unreadConversationCount("whatsapp"), 1);
+    }
+    function test_scan_started_before_a_mutation_cannot_restore_old_flags() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 3}]);
+      beeperData.refreshUnreadCounts(); beeperData.markChatRead("chat-0");
+      beeperData.respond("read", {id: "chat-0", unreadCount: 0, isMarkedUnread: false});
+      beeperData.respond("chatStates", stateSnapshot([{id: "chat-0", network: "Telegram", unreadCount: 3}]));
+      assertState("chat-0", 0, false, 0);
+      waitRequest("chatStates");
+      beeperData.respond("chatStates", stateSnapshot([{id: "chat-0", network: "Telegram", unreadCount: 0}]));
+      assertState("chat-0", 0, false, 0);
+    }
+    function test_pending_mutation_does_not_accept_read_flags_from_background_pages() {
+      seedStates([{id: "chat-0", network: "Telegram", title: "Before", unreadCount: 2}]);
+      beeperData.markChatRead("chat-0"); beeperData.refreshChats(false);
+      beeperData.respond("chats", {items: [{id: "chat-0", network: "Telegram", title: "After", unreadCount: 0}]});
+      assertState("chat-0", 2, false, 1); compare(beeperData.chats[0].title, "After");
+      beeperData.respond("read", null, {message: "Offline"});
+      assertState("chat-0", 2, false, 1);
+    }
+    function test_reply_receipt_and_new_arrival_use_beepers_confirmed_count() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 3, preview: {id: "new-message"}}]);
+      beeperData.markChatRead("chat-0", "old-message");
+      assertState("chat-0", 3, false, 1);
+      compare(pending("read")[0].params.messageID, "old-message");
+      beeperData.respond("read", {id: "chat-0", unreadCount: 1, isMarkedUnread: false});
+      assertState("chat-0", 1, false, 1);
+      beeperData.markChatRead("chat-0");
+      beeperData.respond("read", {id: "chat-0", unreadCount: 0, isMarkedUnread: false});
+      assertState("chat-0", 0, false, 0);
+    }
+    function test_failed_scan_and_invalid_snapshot_keep_last_confirmed_records() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 1}]);
+      beeperData.refreshUnreadCounts(); beeperData.respond("chatStates", null, {message: "Busy"});
+      verify(beeperData.unreadCountsReady); assertState("chat-0", 1, false, 1);
+      beeperData.refreshUnreadCounts(); beeperData.respond("chatStates", {items: [{id: "broken"}]});
+      verify(beeperData.unreadCountsReady); assertState("chat-0", 1, false, 1);
+    }
+    function test_deleted_chat_and_late_mutation_reply_cannot_resurrect_the_counter() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 1}]);
+      beeperData.markChatRead("chat-0");
+      beeperData.acceptLine(JSON.stringify({event: "chatsDeleted", data: {ids: ["chat-0"]}}));
+      compare(beeperData.unreadConversationCount("all"), 0); compare(beeperData.chats.length, 0);
+      beeperData.respond("read", {id: "chat-0", unreadCount: 0, isMarkedUnread: false});
+      compare(beeperData.unreadConversationCount("all"), 0); compare(beeperData.chats.length, 0);
+    }
+    function test_complete_catalog_removal_clears_the_selected_record_and_total() {
+      seedStates([{id: "chat-0", network: "Telegram", unreadCount: 1}]);
+      beeperData.selectChat("chat-0");
+      beeperData.refreshUnreadCounts(); beeperData.respond("chatStates", stateSnapshot([]));
+      compare(beeperData.currentChatID, ""); compare(beeperData.chats.length, 0);
+      compare(beeperData.unreadConversationCount("all"), 0); verify(beeperData.unreadCountsReady);
+    }
+    function test_priority_confirmation_moves_one_record_between_counter_buckets() {
+      seedStates([{id: "chat-0", network: "Telegram", isMarkedUnread: true}]);
+      beeperData.setChatLowPriority("chat-0", true);
+      compare(beeperData.unreadConversationCount("all"), 1);
+      beeperData.respond("updateChat", {isLowPriority: true});
+      compare(beeperData.unreadConversationCount("all"), 0);
+      compare(beeperData.unreadConversationCount("all", true), 1);
+      verify(beeperData.chats[0].isLowPriority);
+    }
     function test_n_preserves_the_backend_priority_placement_of_an_inbox_conversation() {
       const original = {id: "chat-0", title: "Conversation", network: "Google Messages", isLowPriority: false, isMarkedUnread: false, unreadCount: 0};
-      beeperData.chats = [original]; beeperData.networkFilter = "sms";
+      beeperData.replaceChats([original]); beeperData.networkFilter = "sms";
       panel.chooseChat(0); beeperData.respond("messages", {items: messages(0, 3), hasMore: false});
       tryCompare(panel, "restoringView", false); panel.focusNavigation();
       keyClick(Qt.Key_N); waitRequest("unread");
@@ -166,9 +317,14 @@ ShellRoot {
       compare(panel.filteredChats.length, 1, "Subsequent refreshes must not hide it again");
     }
     function test_unread_header_counts_complete_conversations_per_network_not_loaded_messages() {
-      beeperData.chats = [{id: "loaded", network: "Telegram", title: "Only loaded chat", unreadCount: 50}];
-      waitRequest("unreadCounts");
-      beeperData.respond("unreadCounts", {counts: {Telegram: 3, WhatsApp: 2, "Google Messages": 1, Signal: 2}});
+      beeperData.replaceChats([{id: "loaded", network: "Telegram", title: "Only loaded chat", unreadCount: 50}]);
+      waitRequest("chatStates");
+      beeperData.respond("chatStates", stateSnapshot([
+        {id: "loaded", network: "Telegram", unreadCount: 50},
+        {id: "tg-2", network: "Telegram", isMarkedUnread: true}, {id: "tg-3", network: "Telegram", unreadCount: 1},
+        {id: "wa-1", network: "WhatsApp", unreadCount: 1}, {id: "wa-2", network: "WhatsApp", unreadCount: 1},
+        {id: "sms", network: "Google Messages", unreadCount: 1},
+        {id: "sig-1", network: "Signal", unreadCount: 1}, {id: "sig-2", network: "Signal", unreadCount: 1}]));
       const counter = findChild(panel, "beeperUnreadConversationCount");
       compare(counter.text, "8 unread");
       beeperData.networkFilter = "telegram"; compare(counter.text, "3 unread");
@@ -177,26 +333,26 @@ ShellRoot {
       compare(counter.text, "8 unread", "Title search does not change the network's total");
     }
     function test_unread_counter_ignores_late_results_after_disconnect_and_retries_on_connect() {
-      waitRequest("unreadCounts"); beeperData.respond("unreadCounts", {counts: {Telegram: 1}});
+      waitRequest("chatStates"); beeperData.respond("chatStates", stateSnapshot([{id: "target", network: "Telegram", unreadCount: 1}]));
       beeperData.markChatUnread("target"); waitRequest("unread"); beeperData.respond("unread", {});
-      waitRequest("unreadCounts"); beeperData.state = "offline";
-      beeperData.respond("unreadCounts", {counts: {Telegram: 999}});
+      waitRequest("chatStates"); beeperData.state = "offline";
+      beeperData.respond("chatStates", stateSnapshot([{id: "stale", network: "Telegram", unreadCount: 999}]));
       verify(!beeperData.unreadCountsReady);
       const counter = findChild(panel, "beeperUnreadConversationCount"); verify(!counter.text.includes("999"));
-      beeperData.state = "connected"; waitRequest("unreadCounts");
-      beeperData.respond("unreadCounts", {counts: {Telegram: 2}});
+      beeperData.state = "connected"; waitRequest("chatStates");
+      beeperData.respond("chatStates", stateSnapshot([{id: "target", network: "Telegram", unreadCount: 1}, {id: "other", network: "Telegram", unreadCount: 1}]));
       compare(counter.text, "2 unread");
     }
     function test_unread_counter_error_is_not_zero_and_event_refreshes_are_coalesced() {
-      waitRequest("unreadCounts"); beeperData.respond("unreadCounts", null, {message: "Unavailable"});
+      waitRequest("chatStates"); beeperData.respond("chatStates", null, {message: "Unavailable"});
       verify(!beeperData.unreadCountsReady); compare(beeperData.lastError, "");
       compare(findChild(panel, "beeperUnreadConversationCount").text, "— unread");
-      wait(200); compare(pending("unreadCounts").length, 0);
-      beeperData.scheduleUnreadCounts(true); waitRequest("unreadCounts");
+      wait(200); compare(pending("chatStates").length, 0);
+      beeperData.scheduleUnreadCounts(true); waitRequest("chatStates");
       for (let i = 0; i < 10; ++i) beeperData.acceptLine(JSON.stringify({event: "chatsChanged", data: {}}));
-      compare(pending("unreadCounts").length, 1);
-      beeperData.respond("unreadCounts", {counts: {Telegram: 2}});
-      wait(200); compare(pending("unreadCounts").length, 0, "Passive changes are throttled, not scanned for every event");
+      compare(pending("chatStates").length, 1);
+      beeperData.respond("chatStates", stateSnapshot([{id: "target", network: "Telegram", unreadCount: 1}, {id: "other", network: "Telegram", unreadCount: 1}]));
+      wait(200); compare(pending("chatStates").length, 0, "Passive changes are throttled, not scanned for every event");
     }
     function test_chats_fill_viewport_then_paginate_near_bottom() {
       beeperData.refreshChats(false);
@@ -220,7 +376,7 @@ ShellRoot {
       wait(250); compare(pending("chats").length, 0); compare(panel.filteredChats.length, 15);
     }
     function test_sidebar_refresh_does_not_scroll_back_to_the_selected_chat() {
-      beeperData.chats = chats(0, 90);
+      beeperData.replaceChats(chats(0, 90));
       panel.chooseChat(60);
       beeperData.respond("messages", {items: [], hasMore: false});
       const list = panel.chatList;
@@ -230,7 +386,7 @@ ShellRoot {
       verify(first !== null);
       const anchor = first.row.id, offset = first.y - list.contentY;
       const before = beeperData.chats;
-      beeperData.chats = [{id: "new-chat", title: "New activity", network: "Telegram"}].concat(before);
+      beeperData.replaceChats([{id: "new-chat", title: "New activity", network: "Telegram"}].concat(before));
       wait(350); list.forceLayout();
       compare(beeperData.currentChatID, "chat-60");
       const after = list.itemAtIndex(list.indexAt(1, list.contentY + 2));
@@ -239,14 +395,14 @@ ShellRoot {
       const y = list.contentY; wait(250);
       fuzzyCompare(list.contentY, y, 0.5, "No delayed automatic scroll after the refresh");
       const latest = beeperData.chats;
-      beeperData.chats = [latest.find(chat => chat.id === "chat-80")].concat(latest.filter(chat => chat.id !== "chat-80"));
+      beeperData.replaceChats([latest.find(chat => chat.id === "chat-80")].concat(latest.filter(chat => chat.id !== "chat-80")));
       wait(350); list.forceLayout();
       const reordered = list.itemAtIndex(list.indexAt(1, list.contentY + 2));
       compare(reordered.row.id, anchor, "New activity in another chat must not move the reading position");
       fuzzyCompare(reordered.y - list.contentY, offset, 0.5);
     }
     function test_mark_unread_keeps_the_selected_chat_visible_when_the_api_reorders_it() {
-      beeperData.chats = chats(0, 80);
+      beeperData.replaceChats(chats(0, 80));
       panel.chooseChat(40); beeperData.respond("messages", {items: [], hasMore: false});
       const list = panel.chatList;
       wait(100); list.forceLayout();
@@ -254,7 +410,7 @@ ShellRoot {
       verify(selected !== null && selected.y >= list.contentY && selected.y + selected.height <= list.contentY + list.height + 0.5);
       panel.focusNavigation(); keyClick(Qt.Key_N);
       compare(waitRequest("unread").params.chatID, "chat-40");
-      beeperData.respond("unread", {}); waitRequest("chats");
+      beeperData.respond("unread", {id: "chat-40", unreadCount: 0, isMarkedUnread: true}); waitRequest("chats");
       const updated = Object.assign({}, beeperData.chats[40], {isMarkedUnread: true});
       beeperData.respond("chats", {items: [updated].concat(beeperData.chats.filter(chat => chat.id !== updated.id)), hasMore: false});
       wait(100); list.forceLayout();
@@ -265,7 +421,7 @@ ShellRoot {
       verify(moved.unread);
     }
     function test_sidebar_keyboard_selection_cancels_pending_wheel_motion() {
-      beeperData.chats = chats(0, 80);
+      beeperData.replaceChats(chats(0, 80));
       panel.chooseChat(0); beeperData.respond("messages", {items: [], hasMore: false});
       const list = panel.chatList;
       list.positionViewAtIndex(20, ListView.Beginning); list.forceLayout(); wait(20);
@@ -279,7 +435,7 @@ ShellRoot {
       verify(selected.y >= list.contentY && selected.y + selected.height <= list.contentY + list.height + 0.5);
     }
     function test_sidebar_motion_stops_while_a_dialog_is_open() {
-      beeperData.chats = chats(0, 80); wait(20);
+      beeperData.replaceChats(chats(0, 80)); wait(20);
       const list = panel.chatList;
       list.positionViewAtIndex(20, ListView.Beginning); list.forceLayout();
       mouseWheel(list, list.width / 2, list.height / 2, 0, -120);
@@ -327,7 +483,7 @@ ShellRoot {
       compare(beeperData.messages[Math.max(0, list.indexAt(1, list.contentY + 12))].id, before);
     }
     function test_short_history_fills_automatically_and_stops_at_end() {
-      beeperData.chats = chats(0, 1); beeperData.selectChat("chat-0");
+      beeperData.replaceChats(chats(0, 1)); beeperData.selectChat("chat-0");
       beeperData.respond("messages", {items: messages(3, 1), oldestCursor: "history-3", hasMore: true});
       compare(waitRequest("messages").params.cursor, "history-3");
       beeperData.respond("messages", {items: messages(0, 3), oldestCursor: "history-0", hasMore: false});
@@ -421,7 +577,7 @@ ShellRoot {
     }
     function test_late_send_success_never_scrolls_another_chat() {
       seedHistory();
-      beeperData.chats = chats(0, 2);
+      beeperData.replaceChats(chats(0, 2));
       beeperData.draftText = "Old chat send"; beeperData.sendMessage();
       beeperData.selectChat("chat-1");
       beeperData.respond("messages", {items: messages(0, 30).map(row => Object.assign({}, row, {chatID: "chat-1"})), hasMore: false});
@@ -443,7 +599,7 @@ ShellRoot {
       beeperData.respond("messages", {items: messages(60, 1), hasMore: false});
       beeperData.respond("send", {});
       compare(waitRequest("read").params.messageID, "message-59", "The new message must remain unread");
-      beeperData.respond("read", {});
+      beeperData.respond("read", {id: "chat-0", unreadCount: 1, isMarkedUnread: false});
       beeperData.markChatRead(beeperData.currentChatID);
       compare(waitRequest("read").params.chatID, "chat-0");
       verify(!pending("read")[0].params.messageID, "Manual marking covers the entire conversation");
@@ -482,7 +638,7 @@ ShellRoot {
       fuzzyCompare(list.contentY, before - list.height / 2, 2);
     }
     function test_mixed_heights_do_not_resize_the_scrollbar_when_scrolling() {
-      beeperData.chats = chats(0, 1); beeperData.selectChat("chat-0");
+      beeperData.replaceChats(chats(0, 1)); beeperData.selectChat("chat-0");
       const batch = messages(0, 200).map((row, index) => Object.assign(row, index % 3 === 0
         ? {text: "A long message\n".repeat(8)} : index % 3 === 1 ? {attachments: [{type: "img"}]} : {}));
       beeperData.respond("messages", {items: batch, hasMore: false});

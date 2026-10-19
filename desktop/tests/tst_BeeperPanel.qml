@@ -113,9 +113,9 @@ ShellRoot {
       const chats = beeperData.chats, messages = beeperData.messages;
       const list = child("beeperMessages");
       try {
-        beeperData.chats = [{id: "studio", network: "Telegram", type: "single", title: "Camille", participants: {items: [
+        beeperData.replaceChats([{id: "studio", network: "Telegram", type: "single", title: "Camille", participants: {items: [
           {id: "self", isSelf: true}, {id: "camille", fullName: "Camille", isSelf: false}
-        ]}}];
+        ]}}]);
         beeperData.messages = [
           {id: "receipt-first", isSender: true, senderID: "self", text: "First", timestamp: "2026-09-25T10:00:00Z", seen: {self: true}},
           {id: "receipt-last", isSender: true, senderID: "self", text: "Last", timestamp: "2026-09-25T10:01:00Z", seen: {self: true}},
@@ -134,9 +134,9 @@ ShellRoot {
           {id: "receipt-older", isSender: true, text: "Older page", timestamp: "2026-09-25T09:00:00Z"}
         ]);
         wait(20); compare(list.itemAtIndex(0).readReceipt, "Read by Camille");
-        beeperData.chats = chats;
+        beeperData.replaceChats(chats);
         tryCompare(first, "readReceipt", "", 1000);
-      } finally { beeperData.chats = chats; beeperData.messages = messages; }
+      } finally { beeperData.replaceChats(chats); beeperData.messages = messages; }
     }
     function test_ime_enter_does_not_send() {
       verify(!fixture.format.shouldSend(Qt.Key_Return, Qt.NoModifier, true));
@@ -213,8 +213,8 @@ ShellRoot {
       const chats = beeperData.chats;
       try {
         fixture.animationStage = "bottom setup";
-        beeperData.chats = Array.from({length: 30}, (_, index) => ({id: "row-" + index,
-          title: "Conversation " + index, network: "Telegram", type: "group", participants: {total: 12}}));
+        beeperData.replaceChats(Array.from({length: 30}, (_, index) => ({id: "row-" + index,
+          title: "Conversation " + index, network: "Telegram", type: "group", participants: {total: 12}})));
         panel.chooseChat(0); wait(450);
         const list = panel.chatList;
         list.positionViewAtIndex(12, ListView.End); list.forceLayout(); wait(20);
@@ -232,18 +232,18 @@ ShellRoot {
         fixture.animationStage = "bottom final height: " + selected.height;
         compare(selected.height, 128);
         compare(beeperData.currentChatID, "row-12");
-      } finally { beeperData.chats = chats; beeperData.selectChat("studio"); }
+      } finally { beeperData.replaceChats(chats); beeperData.selectChat("studio"); }
     }
     function test_selected_row_uses_total_members_not_the_truncated_participant_list() {
       const chats = beeperData.chats;
       try {
-        beeperData.chats = chats.map(chat => chat.id === "studio" ? Object.assign({}, chat,
-          {participants: {total: 234, hasMore: true, items: [{id: "one"}]}}) : chat);
+        beeperData.replaceChats(chats.map(chat => chat.id === "studio" ? Object.assign({}, chat,
+          {participants: {total: 234, hasMore: true, items: [{id: "one"}]}}) : chat));
         compare(child("beeperChatDetails-studio").text, "234 members");
         compare(fixture.format.chatSubtitle({type: "group", participants: {total: 1}}), "1 member");
         compare(fixture.format.chatSubtitle({type: "group", participants: {items: [{id: "a"}], hasMore: true}}), "Group conversation");
         compare(fixture.format.chatSubtitle({type: "single", network: "Telegram"}), "");
-      } finally { beeperData.chats = chats; }
+      } finally { beeperData.replaceChats(chats); }
     }
     function test_actions_palette_is_removed() {
       compare(child("beeperActionQuery"), null);
@@ -318,10 +318,10 @@ ShellRoot {
     function test_tab_cycles_networks_and_logos() {
       const chats = beeperData.chats;
       try {
-        beeperData.chats = chats.concat([
+        beeperData.replaceChats(chats.concat([
           {id: "instagram-test", title: "Instagram contact", network: "Instagram"},
           {id: "sms-test", title: "SMS contact", network: "Google Messages"}
-        ]);
+        ]));
         compare(panel.networkFilter, "all");
         compare(panel.currentNetwork.name, "All");
         compare(child("beeperNetworkFilter").iconName, "messages-square");
@@ -349,28 +349,28 @@ ShellRoot {
           keyClick(Qt.Key_Tab, Qt.ShiftModifier);
           compare(panel.networkFilter, key);
         }
-      } finally { beeperData.chats = chats; }
+      } finally { beeperData.replaceChats(chats); }
     }
     function test_network_filter_includes_multiple_accounts() {
       const chats = beeperData.chats;
       try {
-        beeperData.chats = chats.concat([{id: "telegram-work", title: "Work", network: "Telegram", accountID: "second-telegram-account"}]);
+        beeperData.replaceChats(chats.concat([{id: "telegram-work", title: "Work", network: "Telegram", accountID: "second-telegram-account"}]));
         keyClick(Qt.Key_Tab);
         compare(panel.filteredChats.length, 2);
         verify(panel.filteredChats.some(chat => chat.accountID === "second-telegram-account"));
         compare(otherPanel.networkFilter, "telegram");
         compare(otherPanel.filteredChats.length, 2);
         compare(beeperData.currentChatID, "design", "The hidden monitor must not change the selection");
-      } finally { beeperData.chats = chats; }
+      } finally { beeperData.replaceChats(chats); }
     }
     function test_all_keeps_the_purple_logo_but_uses_each_conversations_platform_color() {
       const chats = beeperData.chats;
       try {
-        beeperData.chats = chats.concat([
+        beeperData.replaceChats(chats.concat([
           {id: "instagram-colors", title: "Instagram contact", network: "Instagram"},
           {id: "sms-colors", title: "SMS contact", network: "Google Messages"},
           {id: "unknown-colors", title: "Unknown platform", network: "Unknown"}
-        ]);
+        ]));
         beeperData.networkFilter = "all";
         const cases = [
           {id: "design", color: "#7dc4e4"}, {id: "lea", color: "#a6da95"},
@@ -395,7 +395,7 @@ ShellRoot {
           compare(history.itemAtIndex(0).bubbleColor.toString(), item.color);
         }
       } finally {
-        beeperData.chats = chats; beeperData.selectChat("studio");
+        beeperData.replaceChats(chats); beeperData.selectChat("studio");
       }
     }
     function test_network_switch_preserves_draft() {
@@ -413,7 +413,7 @@ ShellRoot {
       const chats = beeperData.chats;
       try {
         beeperData.draftText = "Safe in the previous conversation";
-        beeperData.chats = chats.filter(chat => chat.network !== "Telegram");
+        beeperData.replaceChats(chats.filter(chat => chat.network !== "Telegram"));
         keyClick(Qt.Key_Tab); wait(10);
         compare(panel.networkFilter, "telegram");
         compare(panel.filteredChats.length, 0);
@@ -425,7 +425,7 @@ ShellRoot {
         keyClick(Qt.Key_Tab, Qt.ShiftModifier); wait(10);
         compare(beeperData.currentChatID, "studio");
         compare(beeperData.draftText, "Safe in the previous conversation");
-      } finally { beeperData.chats = chats; }
+      } finally { beeperData.replaceChats(chats); }
     }
     function test_slash_search_is_temporary_and_escape_hides_it() {
       keyClick(Qt.Key_Slash); wait(0);
@@ -472,7 +472,7 @@ ShellRoot {
     function test_reconnection_does_not_ask_for_another_token() {
       const chats = beeperData.chats;
       try {
-        beeperData.chats = [];
+        beeperData.replaceChats([]);
         for (const state of ["loading-token", "keyring-unavailable", "connecting", "offline"]) {
           beeperData.state = state;
           verify(child("beeperConnectionSurface").visible);
@@ -487,17 +487,17 @@ ShellRoot {
         beeperData.savingToken = false;
         compare(child("beeperToken").text, "fictional-test-token", "Keep input until saving succeeds");
         beeperData.tokenStored(); compare(child("beeperToken").text, "");
-        beeperData.chats = chats; beeperData.state = "offline";
+        beeperData.replaceChats(chats); beeperData.state = "offline";
         verify(!child("beeperConnectionSurface").visible, "Keep the cached inbox while reconnecting");
       } finally {
-        beeperData.chats = chats; beeperData.state = "demo"; beeperData.savingToken = false;
+        beeperData.replaceChats(chats); beeperData.state = "demo"; beeperData.savingToken = false;
         child("beeperToken").text = "";
       }
     }
     function test_reconnection_card_is_content_sized_and_centered() {
       const chats = beeperData.chats, status = beeperData.statusMessage, error = beeperData.lastError;
       try {
-        beeperData.chats = []; beeperData.state = "offline";
+        beeperData.replaceChats([]); beeperData.state = "offline";
         beeperData.lastError = ""; beeperData.statusMessage = "Reconnecting automatically with your saved token…";
         wait(30);
         const card = child("beeperConnectionSurface");
@@ -510,14 +510,14 @@ ShellRoot {
         compare(child("beeperHeaderClose"), null);
         mouseClick(child("beeperConnectionClose")); compare(closeSpy.count, 1);
       } finally {
-        beeperData.chats = chats; beeperData.state = "demo";
+        beeperData.replaceChats(chats); beeperData.state = "demo";
         beeperData.statusMessage = status; beeperData.lastError = error;
       }
     }
     function test_reconnection_card_scrolls_long_errors_in_small_panels() {
       const chats = beeperData.chats, error = beeperData.lastError;
       try {
-        beeperData.chats = []; beeperData.state = "needs-token";
+        beeperData.replaceChats([]); beeperData.state = "needs-token";
         beeperData.lastError = "A detailed connection error with context. ".repeat(70);
         panel.width = 480; panel.height = 420; wait(30);
         const card = child("beeperConnectionSurface"), scroll = child("beeperConnectionScroll");
@@ -533,7 +533,7 @@ ShellRoot {
         mouseClick(close); compare(closeSpy.count, 1);
       } finally {
         panel.width = 1280; panel.height = 900;
-        beeperData.chats = chats; beeperData.state = "demo"; beeperData.lastError = error;
+        beeperData.replaceChats(chats); beeperData.state = "demo"; beeperData.lastError = error;
       }
     }
     function test_connection_card_blocks_chat_actions_without_a_full_overlay() {
@@ -584,7 +584,7 @@ ShellRoot {
       otherPanel.active = false; otherPanel.visible = false;
     }
     function test_viewing_and_typing_keep_unread_until_manual_action() {
-      beeperData.chats = beeperData.chats.map(chat => chat.id === "studio" ? Object.assign({}, chat, {unreadCount: 3, isMarkedUnread: true}) : chat);
+      beeperData.replaceChats(beeperData.chats.map(chat => chat.id === "studio" ? Object.assign({}, chat, {unreadCount: 3, isMarkedUnread: true}) : chat));
       panel.windowFocused = false; panel.updateView(); wait(220);
       compare(beeperData.currentChat.unreadCount, 3);
       panel.windowFocused = true;
@@ -600,7 +600,7 @@ ShellRoot {
     function test_n_marks_current_chat_unread_without_inventing_message_count() {
       const chats = beeperData.chats;
       try {
-        beeperData.chats = chats.map(chat => Object.assign({}, chat, {unreadCount: 0, isMarkedUnread: false}));
+        beeperData.replaceChats(chats.map(chat => Object.assign({}, chat, {unreadCount: 0, isMarkedUnread: false})));
         const badge = child("beeperUnreadBadge-studio");
         verify(badge !== null); verify(!badge.visible);
         keyClick(Qt.Key_N); wait(20);
@@ -618,17 +618,17 @@ ShellRoot {
         keyClick(Qt.Key_N); verify(!beeperData.currentChat.isMarkedUnread);
         panel.closeChatSearch(); panel.focusNavigation(); panel.openModal("help"); wait(0);
         keyClick(Qt.Key_N); verify(!beeperData.currentChat.isMarkedUnread);
-      } finally { panel.closeModal(); panel.closeChatSearch(); beeperData.chats = chats; }
+      } finally { panel.closeModal(); panel.closeChatSearch(); beeperData.replaceChats(chats); }
     }
     function test_unread_header_counts_lowPriority_manual_flags_only_in_low_priority() {
       const chats = beeperData.chats;
       try {
-        beeperData.chats = [
+        beeperData.replaceChats([
           {id: "studio", title: "One", network: "Telegram", unreadCount: 50},
           {id: "manual", title: "Two", network: "WhatsApp", unreadCount: 0, isMarkedUnread: true, isLowPriority: true},
           {id: "both", title: "Three", network: "WhatsApp", unreadCount: 3, isMarkedUnread: true},
           {id: "updateChat", title: "LowPriority", network: "Telegram", unreadCount: 7, isLowPriority: true}
-        ];
+        ]);
         beeperData.networkFilter = "all";
         const counter = child("beeperUnreadConversationCount"), logo = child("beeperNetworkFilter");
         compare(counter.text, "2 unread"); compare(counter.parent, logo.parent);
@@ -637,7 +637,7 @@ ShellRoot {
         verify(counter.x > logo.x);
         beeperData.networkFilter = "whatsapp"; compare(counter.text, "1 unread");
         beeperData.networkFilter = "all";
-      } finally { beeperData.chats = chats; }
+      } finally { beeperData.replaceChats(chats); }
     }
     function test_message_text_is_plain_and_media_has_width() {
       const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../features/messenger/BeeperMessage.qml");

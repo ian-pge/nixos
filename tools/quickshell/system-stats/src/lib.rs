@@ -105,11 +105,35 @@ fn usb_devices(root: &Path) -> Vec<Value> {
     devices
 }
 
+fn hidpp_batteries(root: &Path) -> Vec<Value> {
+    let Ok(entries) = fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut batteries: Vec<Value> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            if !name.starts_with("hidpp_battery_") {
+                return None;
+            }
+            let status = fs::read_to_string(entry.path().join("status")).ok()?;
+            let status = status.trim();
+            if !["Charging", "Discharging", "Full", "Not charging", "Unknown"].contains(&status) {
+                return None;
+            }
+            Some(json!({"nativePath": name, "status": status}))
+        })
+        .collect();
+    batteries.sort_by_cached_key(Value::to_string);
+    batteries
+}
+
 pub struct Paths {
     pub proc: PathBuf,
     pub hwmon: PathBuf,
     pub backlight: PathBuf,
     pub usb: PathBuf,
+    pub power_supply: PathBuf,
     pub disk: PathBuf,
 }
 impl Default for Paths {
@@ -119,6 +143,7 @@ impl Default for Paths {
             hwmon: "/sys/class/hwmon".into(),
             backlight: "/sys/class/backlight".into(),
             usb: "/sys/bus/usb/devices".into(),
+            power_supply: "/sys/class/power_supply".into(),
             disk: "/".into(),
         }
     }
@@ -192,8 +217,9 @@ impl Sampler {
         }
         let brightness = self.brightness()?;
         let usb_devices = usb_devices(&self.paths.usb);
+        let hidpp_batteries = hidpp_batteries(&self.paths.power_supply);
         Ok(
-            json!({"cpu":usage,"memory":memory_usage,"disk":self.disk.unwrap().1,"brightness":brightness,"system":system,"usbDevices":usb_devices}),
+            json!({"cpu":usage,"memory":memory_usage,"disk":self.disk.unwrap().1,"brightness":brightness,"system":system,"usbDevices":usb_devices,"hidppBatteries":hidpp_batteries}),
         )
     }
 }
@@ -248,6 +274,7 @@ mod tests {
             hwmon: temp.path().join("hwmon"),
             backlight: temp.path().join("backlight"),
             usb: temp.path().join("usb"),
+            power_supply: temp.path().join("power_supply"),
             disk: temp.path().into(),
         });
         (temp, sampler)
@@ -273,6 +300,30 @@ mod tests {
         let unplugged = sampler.sample(Duration::from_secs(2));
         assert_eq!(unplugged["usbDevices"], json!([]));
         assert!(unplugged["error"].is_null());
+    }
+    #[test]
+    fn hidpp_status_is_raw_optional_and_does_not_infer_charging_from_capacity() {
+        let (temp, mut sampler) = fixture();
+        assert_eq!(sampler.sample(Duration::ZERO)["hidppBatteries"], json!([]));
+        let mouse = temp.path().join("power_supply/hidpp_battery_0");
+        fs::create_dir_all(&mouse).unwrap();
+        fs::write(mouse.join("capacity"), "100\n").unwrap();
+        for status in ["Discharging", "Charging", "Full", "Unknown", "Not charging"] {
+            fs::write(mouse.join("status"), format!("{status}\n")).unwrap();
+            assert_eq!(
+                sampler.sample(Duration::from_secs(1))["hidppBatteries"],
+                json!([{"nativePath":"hidpp_battery_0", "status":status}])
+            );
+        }
+        let laptop = temp.path().join("power_supply/BAT0");
+        fs::create_dir(&laptop).unwrap();
+        fs::write(laptop.join("status"), "Charging\n").unwrap();
+        fs::write(mouse.join("status"), "invalid\n").unwrap();
+        assert_eq!(sampler.sample(Duration::from_secs(2))["hidppBatteries"], json!([]));
+        fs::remove_file(mouse.join("status")).unwrap();
+        let missing = sampler.sample(Duration::from_secs(3));
+        assert_eq!(missing["hidppBatteries"], json!([]));
+        assert!(missing["error"].is_null());
     }
     #[test]
     fn disk_is_cached_and_retried_on_failure() {

@@ -21,7 +21,7 @@ ShellRoot {
     function init() {
       beeperData = create("fixtures/PagedBeeperData.qml", {});
       beeperData.currentChatID = "chat";
-      beeperData.chats = [{id: "chat", title: "Group", type: "group"}];
+      beeperData.replaceChats([{id: "chat", title: "Group", type: "group"}]);
     }
     function cleanup() {
       if (results.failed) console.error("FAILED", qtest_results.functionName);

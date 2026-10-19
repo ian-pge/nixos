@@ -41,11 +41,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791795517,
-        "narHash": "sha256-hmF0FVrUW6UKQ74qyGJSepMYadnIqzVe2h7TQtZdbmo=",
+        "lastModified": 1792238796,
+        "narHash": "sha256-mRsa8oJ8R7fkvR5K+uQYfuxX9Np0ai/KvzTE8FYVx7E=",
         "owner": "catppuccin",
         "repo": "nix",
-        "rev": "2e605f61db52a45a7ff1db414df395ef566565a3",
+        "rev": "30c87b95a628e81ec82a4fa0ed4db85d7c7d46d6",
         "type": "github"
       },
       "original": {
@@ -184,11 +184,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1792123574,
-        "narHash": "sha256-Nfg3uuj6SrYd95vB2acYHLvQfjs9L2WZwMgkaKsQyOs=",
+        "lastModified": 1792381975,
+        "narHash": "sha256-jXmORmL8tbeyDo7/FiPk68P+UBctz/vph2x8XMHg1uM=",
         "owner": "numtide",
         "repo": "llm-agents.nix",
-        "rev": "64f24d6169b8e5996e0c3a3ae696bdf11806b34e",
+        "rev": "84a9f135716cbcdc1fa58ab3c52b85f9a1a0cd0f",
         "type": "github"
       },
       "original": {
@@ -231,11 +231,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1791956154,
-        "narHash": "sha256-jBYGPi4udQ9uo4KQp9m2J0546nJVQitG15gvZSaVVAs=",
+        "lastModified": 1792094642,
+        "narHash": "sha256-zp8ToDMnqZcu4o4IH9pdwXFXGp7yLm/M0dEnNWnyd7I=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "55bfb4d7437bd4e09ab7cba58a43bd68eb310044",
+        "rev": "fe13242281a67641c0102cdb1087f0ebe586c7df",
         "type": "github"
       },
       "original": {
@@ -254,7 +254,6 @@
         "llm-agents": "llm-agents",
         "nix-flatpak": "nix-flatpak",
         "nixpkgs": "nixpkgs_2",
-        "tabctl": "tabctl",
         "voxtype": "voxtype",
         "wlctl": "wlctl"
       }
@@ -286,22 +285,6 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
-        "type": "github"
-      }
-    },
-    "tabctl": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1788814671,
-        "narHash": "sha256-NfD4ZOSuUTTnGBYMkd81wXvsFLrs+aqXCIpakww36rE=",
-        "owner": "slastra",
-        "repo": "tabctl",
-        "rev": "e0336435603ee9d255708fc640e03cae6db42d44",
-        "type": "github"
-      },
-      "original": {
-        "owner": "slastra",
-        "repo": "tabctl",
         "type": "github"
       }
     },

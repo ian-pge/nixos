@@ -60,6 +60,17 @@ ShellRoot {
       compare(root.data.gpu.usage, null);
       verify(!root.data.gpu.poweredOn);
     }
+    function test_hidpp_status_is_validated_expires_and_clears_on_failure() {
+      const full = {nativePath: "hidpp_battery_0", status: "Full"};
+      verify(root.data.acceptSystem({cpu: 0, memory: 0, hidppBatteries: [null, full,
+        {nativePath: "BAT0", status: "Full"}, {nativePath: "hidpp_battery_1", status: "invalid"}]}, 100000));
+      compare(root.data.hidppBatteries, [full]); verify(root.data.systemFresh);
+      root.data.now = 106000; verify(!root.data.systemFresh);
+      root.data.acceptSystem({cpu: 0, memory: 0}, 106000);
+      compare(root.data.hidppBatteries, []);
+      root.data.acceptSystem({cpu: 0, memory: 0, hidppBatteries: [full]}, 106000);
+      root.data.invalidateSystem(); compare(root.data.hidppBatteries, []);
+    }
     function test_native_gpu_reports_sleep_error_and_recovery() {
       const active = JSON.parse('{"text":"0%|13%","gpu":{"poweredOn":true,"name":"Test NVIDIA","usage":0,"temperatureC":42,"memoryUsedBytes":536870912,"memoryTotalBytes":4294967296}}');
       verify(root.data.acceptGpu(active, 100000));

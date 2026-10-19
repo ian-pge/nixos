@@ -34,6 +34,7 @@ Item {
   readonly property real capsuleHeight: bubble.capsuleHeight
   readonly property var photoPreviewWindow: photoWindow
   signal returnFocusRequested()
+  signal aboutToOpen()
 
   HyprlandFocusGrab {
     id: focusGrab
@@ -66,7 +67,11 @@ Item {
   }
   Connections {
     target: root.controller
-    function onAboutToShow() { if (root.monitorName === root.controller.targetMonitor) bubble.prepareOpen(); }
+    function onAboutToShow() {
+      if (root.monitorName !== root.controller.targetMonitor) return;
+      root.aboutToOpen();
+      bubble.prepareOpen();
+    }
     function onFocusSerialChanged() { Qt.callLater(root.focusMessenger); }
     function onBlockedChanged() {
       if (root.controller.blocked) focusGrab.active = false;

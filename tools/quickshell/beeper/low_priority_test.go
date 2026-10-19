@@ -105,13 +105,13 @@ func TestCatalogAndUnreadCountsFollowNativePriorityAcrossRestarts(t *testing.T) 
 		if err := json.Unmarshal(result.(json.RawMessage), &page); err != nil || len(page.Items) != 1 || boolField(page.Items[0], "isLowPriority") != value || page.OldestCursor != "opaque + /&" {
 			t.Fatalf("native catalog was changed: %#v, %v", page, err)
 		}
-		counts, err := b.unreadCounts(b.ctx)
+		states, err := b.chatStates(b.ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		main, low := counts["counts"].(map[string]int)["Telegram"], counts["lowPriorityCounts"].(map[string]int)["Telegram"]
-		if main+low != 1 || (low == 1) != value {
-			t.Fatalf("counts did not follow native priority: %#v", counts)
+		encoded, _ := json.Marshal(states)
+		if err := json.Unmarshal(encoded, &page); err != nil || len(page.Items) != 1 || boolField(page.Items[0], "isLowPriority") != value {
+			t.Fatalf("confirmed state did not follow native priority: %#v", states)
 		}
 		restarted, err := newBackend(b.ctx, io.Discard, b.stateDir, false)
 		if err != nil {

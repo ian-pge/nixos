@@ -26,7 +26,7 @@ in {
       rounding = 10;
       active_opacity = 1.0;
       inactive_opacity = 1.0;
-      dim_special = 0.4;
+      dim_special = 0.6;
       dim_around = 0.55;
       shadow.enabled = false;
       blur = {

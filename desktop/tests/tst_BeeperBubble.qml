@@ -11,6 +11,7 @@ ShellRoot {
   property var bubble: null
   property var panel: null
   property var audioPicker: null
+  property string stage: ""
   function create(name, parent, properties) {
     const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../" + name + ".qml");
     if (component.status !== Component.Ready) { console.error(component.errorString()); Qt.exit(1); return null; }
@@ -90,7 +91,7 @@ ShellRoot {
       console.log("BeeperBubble: " + results.passCount + " passed, " + results.failCount + " failed");
       Qt.callLater(() => Qt.exit(results.failCount ? 1 : 0));
     }
-    function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName); }
+    function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName, fixture.stage); }
     function init() {
       bubble.glassEnabled = false;
       bubble.animate = false;
@@ -201,6 +202,7 @@ ShellRoot {
       const animation = findChild(bubble, "beeperBubbleReveal");
       compare(animation.property, "progress");
       compare(animation.easing.type, Easing.OutCubic);
+      compare(bubble.animationDuration, 220);
       compare(animation.duration, bubble.animationDuration);
       // Keep the real animation/easing but stretch this timing probe so a busy
       // nested compositor cannot skip its early sample within one frame wait.
@@ -226,9 +228,12 @@ ShellRoot {
       compare(animation.duration, bubble.animationDuration);
       wait(90);
       const progress = bubble.progress;
+      const chatOpacity = bubble.contentItem.opacity, originOpacity = bubble.originContentOpacity;
       verify(progress > 0 && progress < 1);
       bubble.expanded = false;
       compare(bubble.progress, progress);
+      fuzzyCompare(bubble.contentItem.opacity, chatOpacity, 0.001);
+      fuzzyCompare(bubble.originContentOpacity, originOpacity, 0.001);
       compare(animation.from, progress); compare(animation.to, 0);
       fuzzyCompare(animation.duration, bubble.animationDuration * progress, 1);
       verify(!bubble.contentItem.enabled); verify(bubble.visible);
@@ -236,6 +241,68 @@ ShellRoot {
       verify(bubble.progress < progress);
       tryCompare(bubble, "visible", false, 800);
       compare(bubble.progress, 0);
+    }
+    function test_fades_follow_elapsed_time_in_both_directions_data() {
+      return [{tag: "opening", expanded: true}, {tag: "closing", expanded: false}];
+    }
+    function test_fades_follow_elapsed_time_in_both_directions(data) {
+      bubble.expanded = !data.expanded;
+      bubble.animate = true;
+      bubble.expanded = data.expanded;
+      findChild(bubble, "beeperBubbleReveal").pause();
+      for (const time of [0.1, 0.18, 0.3, 0.48, 0.78, 0.9]) {
+        const travel = 1 - Math.pow(1 - time, 3);
+        bubble.progress = data.expanded ? travel : 1 - travel;
+        const incoming = data.expanded ? bubble.contentItem.opacity : bubble.originContentOpacity;
+        const outgoing = data.expanded ? bubble.originContentOpacity : bubble.contentItem.opacity;
+        const content = bubble.contentItem, surface = bubble.surfaceItem;
+        const zoom = content.transform[0];
+        const fitX = surface.width / content.width, fitY = surface.height / content.height;
+        const expectedX = Math.max(0.5, Math.min(2, fitX)), expectedY = Math.max(0.5, Math.min(2, fitY));
+        const center = content.mapToItem(surface, content.width / 2, content.height / 2);
+        fixture.stage = JSON.stringify({opening: data.expanded, time, xScale: zoom.xScale, yScale: zoom.yScale,
+          centerX: center.x, centerY: center.y, width: surface.width, height: surface.height,
+          opacity: content.opacity, originOpacity: bubble.originContentOpacity});
+        fuzzyCompare(zoom.xScale, expectedX, 0.001);
+        fuzzyCompare(zoom.yScale, expectedY, 0.001);
+        verify(zoom.xScale >= 0.5 && zoom.xScale <= 2 && zoom.yScale >= 0.5 && zoom.yScale <= 2);
+        verify(surface.clip, "Content must stay masked while the surface is smaller than the 50% floor");
+        const topLeft = content.mapToItem(surface, 0, 0);
+        const bottomRight = content.mapToItem(surface, content.width, content.height);
+        fuzzyCompare(bottomRight.x - topLeft.x, content.width * zoom.xScale, 0.01);
+        fuzzyCompare(bottomRight.y - topLeft.y, content.height * zoom.yScale, 0.01);
+        if (time === 0.3) {
+          verify(zoom.xScale < 0.9 && zoom.yScale < 0.9, "Both axes must follow the panel growth");
+          verify(Math.abs(zoom.xScale - zoom.yScale) > 0.01, "Axes must not share a uniform zoom");
+        }
+        fuzzyCompare(center.x, surface.width / 2, 0.6);
+        fuzzyCompare(center.y, surface.height / 2, 0.6);
+        if (time <= 0.18) fuzzyCompare(incoming, 0, 0.001);
+        if (time >= 0.78) fuzzyCompare(incoming, 1, 0.001);
+        if (time >= 0.48) fuzzyCompare(outgoing, 0, 0.001);
+        if (time === 0.3) {
+          verify(incoming > 0 && incoming < 0.5, "Content must not rush ahead of the shared fade timing");
+          verify(outgoing > 0 && outgoing < 1);
+        }
+      }
+    }
+    function test_rounding_matches_the_source_capsule_and_other_panels() {
+      for (const [height, radius] of [[36, 18], [42, 21], [260, 21]]) {
+        const fresh = fixture.create("shell/BeeperBubble", window.contentItem,
+          {width: 1440, height: 1080, sourceHeight: height, animate: false, glassEnabled: false});
+        try {
+          compare(fresh.surfaceItem.radius, radius);
+          fresh.expanded = true;
+          compare(fresh.surfaceItem.radius, 21);
+          fresh.progress = 0;
+          compare(fresh.surfaceItem.radius, radius);
+          fresh.progress = 0.0001;
+          verify(Math.abs(fresh.surfaceItem.radius - radius) < 0.1, "No rounding jump when the chat takes over");
+          fresh.progress = 1;
+          fresh.expanded = false;
+          compare(fresh.surfaceItem.radius, radius);
+        } finally { fresh.destroy(); }
+      }
     }
     function test_close_preserves_pixels_and_endpoints_while_osd_changes() {
       bubble.animate = true;
@@ -282,10 +349,13 @@ ShellRoot {
       verify(bubble.progress > 0 && bubble.progress < 1);
       const before = bubble.progress;
       const widthBefore = bubble.surfaceItem.width, heightBefore = bubble.surfaceItem.height;
+      const chatOpacity = bubble.contentItem.opacity, originOpacity = bubble.originContentOpacity;
       bubble.expanded = true;
       fuzzyCompare(bubble.progress, before, 0.01);
       fuzzyCompare(bubble.surfaceItem.width, widthBefore, 0.1);
       fuzzyCompare(bubble.surfaceItem.height, heightBefore, 0.1);
+      fuzzyCompare(bubble.contentItem.opacity, chatOpacity, 0.001);
+      fuzzyCompare(bubble.originContentOpacity, originOpacity, 0.001);
       tryCompare(bubble, "progress", 1, 1200);
       bubble.expanded = false;
       tryCompare(bubble, "visible", false, 1200);

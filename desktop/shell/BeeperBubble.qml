@@ -1,6 +1,7 @@
 import QtQuick
 import Local.LiquidGlass
 import "../ui/Theme.js" as Theme
+import "../ui/Morph.js" as Morph
 import "../ui"
 
 // The chat visually grows out of the central capsule, but owns its geometry
@@ -24,13 +25,15 @@ Item {
   // Animate the actual geometry fraction toward either endpoint. Both opening
   // and closing start quickly and decelerate; a reversal starts at this frame.
   property real progress: 0
-  readonly property int animationDuration: 360
+  readonly property int animationDuration: Morph.duration
   property bool initialized: false
   property bool openingPrepared: false
   property rect fromGeometry: Qt.rect(0, 0, 0, 0)
   property rect toGeometry: Qt.rect(0, 0, 0, 0)
   property real fromProgress: 0
   property real toProgress: 1
+  property real fromOriginOpacity: 1
+  property real fromChatOpacity: 0
   readonly property bool animating: reveal.running
   readonly property real panelWidth: Math.min(1280, Math.max(0, width - 54))
   readonly property real tiledWindowHeight: Math.max(0, height - workAreaTop - windowTopGap - windowBottomGap)
@@ -44,7 +47,15 @@ Item {
       fromGeometry.y + (toGeometry.y - fromGeometry.y) * geometryFraction,
       fromGeometry.width + (toGeometry.width - fromGeometry.width) * geometryFraction,
       fromGeometry.height + (toGeometry.height - fromGeometry.height) * geometryFraction)
-  readonly property real originContentOpacity: 1 - smooth(0, 0.48, progress)
+  // Recover elapsed time from the OutCubic geometry animation so fades use
+  // the same timing as CentralCapsule, without a second animation clock.
+  readonly property real transitionTime: Morph.elapsed(geometryFraction)
+  readonly property real originContentOpacity: progress === 0 ? 1 : progress === 1 ? 0
+    : toProgress === 1 ? Morph.outgoing(fromOriginOpacity, transitionTime)
+    : Morph.incoming(fromOriginOpacity, transitionTime)
+  readonly property real chatContentOpacity: progress === 0 ? 0 : progress === 1 ? 1
+    : toProgress === 1 ? Morph.incoming(fromChatOpacity, transitionTime)
+    : Morph.outgoing(fromChatOpacity, transitionTime)
   readonly property Item surfaceItem: surface
   readonly property Item contentItem: content
   readonly property color surfaceColor: glassEnabled ? Qt.alpha(Theme.background, 0.12) : Theme.background
@@ -61,6 +72,7 @@ Item {
   function resetGeometry() {
     fromGeometry = capsuleGeometry(); toGeometry = panelGeometry;
     fromProgress = 0; toProgress = 1;
+    fromOriginOpacity = 1; fromChatOpacity = 0;
   }
   function prepareOpen() {
     if (progress === 0) { captureCapsule(); resetGeometry(); }
@@ -70,6 +82,7 @@ Item {
     if (!initialized) return;
     const start = progress;
     let origin = Qt.rect(surface.x, surface.y, surface.width, surface.height);
+    const originOpacity = originContentOpacity, chatOpacity = chatContentOpacity;
     reveal.stop();
     if (expanded && start === 0) {
       if (!openingPrepared) captureCapsule();
@@ -86,6 +99,7 @@ Item {
     // rectangle, including if the previous transformation was interrupted.
     fromGeometry = origin;
     toGeometry = expanded ? panelGeometry : capsuleGeometry();
+    fromOriginOpacity = originOpacity; fromChatOpacity = chatOpacity;
     fromProgress = start; toProgress = destination;
     reveal.from = start;
     reveal.to = destination;
@@ -113,11 +127,6 @@ Item {
     initialized = true;
   }
 
-  function smooth(start, end, value) {
-    const t = Math.max(0, Math.min(1, (value - start) / (end - start)));
-    return t * t * (3 - 2 * t);
-  }
-
   NumberAnimation {
     id: reveal
     objectName: "beeperBubbleReveal"
@@ -133,7 +142,7 @@ Item {
     height: root.geometry.height
     x: root.geometry.x
     y: root.geometry.y
-    radius: 18
+    radius: Math.min(height / 2, Theme.barSize(18))
     color: root.surfaceColor
     clip: true
     GlassShape {
@@ -146,7 +155,9 @@ Item {
       enabled: root.expanded
       width: root.panelWidth; height: root.panelHeight
       anchors.centerIn: parent
-      opacity: root.smooth(0.18, 0.78, root.progress)
+      anchors.alignWhenCentered: false
+      opacity: root.chatContentOpacity
+      transform: MorphScale { surface: root.surfaceItem; content: root.contentItem }
     }
   }
 }

@@ -44,12 +44,12 @@ ShellRoot {
     function init() {
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       beeperData.accounts = [{id: "account", user: {id: "account-self", fullName: "My account", imgURL: picture("#a6da95")}}];
-      beeperData.chats = [{id: "group", title: "Friends", type: "group", network: "Telegram", accountID: "account", imgURL: picture("#eed49f"), participants: {items: [
+      beeperData.replaceChats([{id: "group", title: "Friends", type: "group", network: "Telegram", accountID: "account", imgURL: picture("#eed49f"), participants: {items: [
         {id: "self", fullName: "Me", isSelf: true},
         {id: "camille", fullName: "Camille", isSelf: false, imgURL: picture("#f5bde6")},
         {id: "noe", fullName: "Noé", isSelf: false, imgURL: picture("#8aadf4")},
         {id: "alex", fullName: "Alex Martin", isSelf: false}
-      ]}}];
+      ]}}]);
       beeperData.currentChatID = "group";
     }
     function cleanup() {
@@ -151,7 +151,7 @@ ShellRoot {
     }
     function test_avatar_sources_update_without_recreating_the_message_and_stop_offscreen() {
       show(); const old = readers()[0].avatarSource;
-      beeperData.chats = beeperData.chats.map(chat => Object.assign({}, chat, {participants: {items: chat.participants.items.map(person => person.id === "camille" ? Object.assign({}, person, {imgURL: picture("#eed49f")}) : person)}}));
+      beeperData.replaceChats(beeperData.chats.map(chat => Object.assign({}, chat, {participants: {items: chat.participants.items.map(person => person.id === "camille" ? Object.assign({}, person, {imgURL: picture("#eed49f")}) : person)}})));
       tryVerify(() => readers()[0].avatarSource !== old);
       compare(findChild(chips()[0], "beeperReactionAvatar").avatarSource, readers()[0].avatarSource);
       messageItem.renderMedia = false;

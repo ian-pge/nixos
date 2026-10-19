@@ -10,6 +10,7 @@ Rectangle {
   objectName: "beeperSidebar"
   required property var chats
   property var chatPreviews: ({})
+  property var readStateOperations: ({})
   readonly property var chatIdentities: chats.map(chat => ({id: chat.id}))
   readonly property var chatsByID: {
     const result = Object.create(null);
@@ -36,6 +37,7 @@ Rectangle {
   property string reflowSelectionID: ""
   property bool reflowSelectionLocked: false
   property var bulkViewportAnchor: null
+  property bool holdingReadViewport: false
   readonly property bool compact: width < 280
   readonly property int selectionDuration: 200
   readonly property int selectionColorDuration: 120
@@ -104,9 +106,22 @@ Rectangle {
     chatWheel.reset(); chatList.cancelFlick();
     chatList.forceLayout(); chatList.positionViewAtBeginning();
   }
+  function holdReadViewport() {
+    holdingReadViewport = true;
+    ++selectionFollowRevision;
+    visibleSelectionToFollow = "";
+    stopSelectionReveal(); chatWheel.reset(); chatList.cancelFlick();
+    return chatList.contentY - chatList.originY;
+  }
+  function releaseReadViewport(offset, index) {
+    chatList.forceLayout();
+    chatList.contentY = chatList.originY + Math.max(0, Math.min(offset, chatList.contentHeight - chatList.height));
+    holdingReadViewport = false;
+    revealChat(index);
+  }
   function captureVisibleSelection() {
     visibleSelectionToFollow = "";
-    if (!enabled || browsing || !currentChatID) return;
+    if (!enabled || browsing || holdingReadViewport || !currentChatID) return;
     const nextIndex = chats.findIndex(chat => chat.id === currentChatID);
     if (nextIndex < 0) return;
     for (let index = 0; index < chatModel.count; ++index) {
@@ -330,12 +345,24 @@ Rectangle {
       acceptedButtons: Qt.NoButton
       // Stable layout heights let the view move every surviving row together.
       displaced: Transition {
+        id: displacedTransition
         enabled: root.animateSelection && !root.browsing && !chatModel.bulkUpdating
-        NumberAnimation { properties: "y"; duration: root.selectionDuration; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          properties: "y"
+          // During a read handoff, the new selection occupies the vacated
+          // slot immediately. Only the other conversations slide around it.
+          duration: root.holdingReadViewport && displacedTransition.ViewTransition.item?.chosen ? 0 : root.selectionDuration
+          easing.type: Easing.OutCubic
+        }
       }
       move: Transition {
+        id: moveTransition
         enabled: root.animateSelection && !root.browsing && !chatModel.bulkUpdating
-        NumberAnimation { properties: "y"; duration: root.selectionDuration; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          properties: "y"
+          duration: root.holdingReadViewport && moveTransition.ViewTransition.item?.chosen ? 0 : root.selectionDuration
+          easing.type: Easing.OutCubic
+        }
       }
       remove: Transition {
         enabled: root.animateSelection && !root.browsing && !chatModel.bulkUpdating
@@ -414,7 +441,8 @@ Rectangle {
         readonly property real maximumTitleScale: root.compact ? 1.125 : 1.25
         readonly property real textX: 68 + (avatarDiameter - 48) * selectionProgress
         readonly property real expandedTextX: 20 + avatarDiameter
-        readonly property real rightInset: 10 + (unread ? 36 : 0)
+        readonly property real rightInset: 10 + (unreadBadge.presence > 0 ? 36 : 0)
+        readonly property bool readStatePending: !!root.readStateOperations[row.id]
         readonly property real textHeight: title.implicitHeight * title.scale + 5 + metadata.height
         // Only the chosen delegate follows the moving background. Keep its
         // text light until the background covers both lines, including long
@@ -519,20 +547,47 @@ Rectangle {
           }
         }
         Rectangle {
+          id: unreadBadge
           objectName: "beeperUnreadBadge-" + chatRow.identityName
           readonly property int diameter: 26
+          readonly property bool pending: chatRow.readStatePending
+          readonly property bool inViewport: chatRow.y + chatRow.height > chatList.contentY
+            && chatRow.y < chatList.contentY + chatList.height
+          readonly property bool motionEnabled: root.animateSelection && inViewport && !chatRow.retiring
+          readonly property bool animating: badgePresence.running
+          readonly property bool present: chatRow.unread
+          property real presence: present ? 1 : 0
           anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
           anchors.verticalCenterOffset: (chatRow.visualHeight - chatRow.height) / 2
-          visible: chatRow.unread
-          width: diameter; height: diameter
-          radius: width / 2; color: Theme.beeperUnread
+          width: diameter; height: diameter; radius: diameter / 2
+          color: Theme.beeperUnread
+          visible: presence > 0
+          // Both directions follow confirmed state, never the pending request.
+          // Only visibility gets a pop; exit starts shrinking immediately.
+          scale: Math.max(0, presence)
+          opacity: Math.max(0, Math.min(1, presence * 3))
+          Behavior on presence {
+            id: badgePresenceBehavior
+            enabled: unreadBadge.motionEnabled
+            NumberAnimation {
+              id: badgePresence
+              duration: 280
+              easing.type: badgePresenceBehavior.targetValue > 0 ? Easing.OutBack : Easing.OutCubic
+              easing.overshoot: 1.9
+            }
+          }
+          onMotionEnabledChanged: if (!motionEnabled) badgePresence.complete();
+          Accessible.name: pending
+            ? root.readStateOperations[chatRow.row.id]?.method === "read" ? "Marking as read" : "Marking as unread"
+            : "Unread conversation"
+          ToolTip.visible: pending && chatHover.hovered
+          ToolTip.text: root.readStateOperations[chatRow.row.id]?.method === "read" ? "Marking as read…" : "Marking as unread…"
           BeeperRollingText {
             objectName: "beeperUnreadDigits-" + chatRow.identityName
             anchors.centerIn: parent; visible: chatRow.row.unreadCount > 0
             text: chatRow.row.unreadCount > 99 ? "99" : String(chatRow.row.unreadCount || 0)
             color: Theme.background
-            animateChanges: root.animateSelection && visible && chatRow.y + chatRow.height > chatList.contentY
-              && chatRow.y < chatList.contentY + chatList.height
+            animateChanges: unreadBadge.motionEnabled && visible
             font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption; bold: true }
           }
         }

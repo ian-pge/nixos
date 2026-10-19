@@ -20,16 +20,27 @@ ShellRoot {
     }
     function pending(method) { return beeperData.requests.filter(request => request.method === method); }
     function request(method) { tryVerify(() => pending(method).length > 0, 1500); return pending(method)[0]; }
+    function stateSnapshot(counts, lowPriorityCounts) {
+      const items = [];
+      for (const lowPriority of [false, true]) {
+        const totals = lowPriority ? lowPriorityCounts : counts;
+        for (const network of Object.keys(totals)) for (let index = 0; index < totals[network]; ++index)
+          items.push({id: network + lowPriority + index, network: network, unreadCount: 1,
+            isMarkedUnread: false, isLowPriority: lowPriority});
+      }
+      // Keep the loaded metadata rows, now confirmed read, in the full catalog.
+      return {items: items.concat(beeperData.chats.map(chat => Object.assign({}, chat, {unreadCount: 0, isMarkedUnread: false})))};
+    }
     function init() {
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true});
-      beeperData.chats = [
+      beeperData.replaceChats([
         {id: "current", title: "Current", network: "Telegram", unreadCount: 3},
         {id: "next", title: "Next", network: "Telegram"},
         {id: "tg-priority", title: "Older Telegram", network: "Telegram", isLowPriority: true},
         {id: "wa-priority", title: "Older WhatsApp", network: "WhatsApp", isLowPriority: true}
-      ];
+      ]);
       beeperData.networkFilter = "telegram"; panel.chooseChat(0);
       beeperData.respond("messages", {items: [{id: "m1", chatID: "current", text: "Message"}], hasMore: false});
       tryCompare(panel, "restoringView", false); panel.focusNavigation(); closeSpy.clear(); wait(20);
@@ -90,7 +101,7 @@ ShellRoot {
       compare(pending("read").length, 0);
     }
     function test_restoring_moves_to_the_next_priority_without_showing_inbox_chats() {
-      beeperData.chats = beeperData.chats.concat([{id: "tg-other", title: "Another priority", network: "Telegram", isLowPriority: true}]);
+      beeperData.replaceChats(beeperData.chats.concat([{id: "tg-other", title: "Another priority", network: "Telegram", isLowPriority: true}]));
       keyClick(Qt.Key_A); compare(beeperData.currentChatID, "tg-priority");
       beeperData.respond("messages", {items: [], hasMore: false});
       beeperData.draftText = "Priority draft";
@@ -108,7 +119,7 @@ ShellRoot {
       compare(pending("read").length, 0);
     }
     function test_priority_view_loads_past_inbox_only_pages() {
-      beeperData.chats = beeperData.chats.filter(chat => !chat.isLowPriority);
+      beeperData.replaceChats(beeperData.chats.filter(chat => !chat.isLowPriority));
       beeperData.chatsInitialized = true; beeperData.hasMoreChats = true; beeperData.chatsCursor = "first";
       keyClick(Qt.Key_A); verify(panel.showLowPriority); compare(panel.filteredChats.length, 0);
       compare(beeperData.currentChatID, ""); compare(request("chats").params.cursor, "first");
@@ -215,7 +226,7 @@ ShellRoot {
       keyClick(Qt.Key_A); keyClick(Qt.Key_A, Qt.ShiftModifier); verify(!panel.showLowPriority); compare(pending("updateChat").length, 0);
     }
     function test_priority_support_is_decided_by_beeper_even_for_read_only_chats() {
-      beeperData.chats = beeperData.chats.map(chat => chat.id === "current" ? Object.assign({}, chat, {isReadOnly: true}) : chat);
+      beeperData.replaceChats(beeperData.chats.map(chat => chat.id === "current" ? Object.assign({}, chat, {isReadOnly: true}) : chat));
       keyClick(Qt.Key_A, Qt.ShiftModifier); compare(request("updateChat").params.changes.isLowPriority, true);
       beeperData.respond("updateChat", null, {message: "Not supported by this account"});
       verify(!beeperData.currentChat.isLowPriority);
@@ -228,48 +239,45 @@ ShellRoot {
       verify(chat.isLowPriority); verify(chat.isMuted); compare(chat.unreadCount, 3);
     }
     function test_legacy_archive_flag_does_not_control_the_priority_views() {
-      beeperData.chats = beeperData.chats.map(chat => chat.id === "current"
-        ? Object.assign({}, chat, {isArchived: true}) : chat);
+      beeperData.replaceChats(beeperData.chats.map(chat => chat.id === "current"
+        ? Object.assign({}, chat, {isArchived: true}) : chat));
       verify(panel.filteredChats.some(chat => chat.id === "current"));
       keyClick(Qt.Key_A);
       verify(!panel.filteredChats.some(chat => chat.id === "current"));
     }
     function test_counter_counts_only_lowPriority_unread_chats_in_the_priority_view() {
       // The dedicated priority counter includes lowPriority manual unread markers.
-      request("unreadCounts"); beeperData.respond("unreadCounts", {
-        counts: {Telegram: 2, WhatsApp: 1}, allCounts: {Telegram: 6, WhatsApp: 3}, lowPriorityCounts: {Telegram: 4, WhatsApp: 2}
-      });
+      request("chatStates"); beeperData.respond("chatStates", stateSnapshot({Telegram: 2, WhatsApp: 1}, {Telegram: 4, WhatsApp: 2}));
       const counter = findChild(panel, "beeperUnreadConversationCount");
       compare(counter.text, "2 unread"); keyClick(Qt.Key_A); compare(counter.text, "4 unread");
       keyClick(Qt.Key_Tab); compare(counter.text, "2 unread");
       keyClick(Qt.Key_A); compare(counter.text, "1 unread");
     }
-    function test_older_backend_does_not_show_an_inclusive_or_fabricated_priority_count() {
-      request("unreadCounts"); beeperData.respond("unreadCounts", {counts: {Telegram: 1}, allCounts: {Telegram: 5}});
+    function test_incomplete_snapshot_does_not_invent_a_ready_counter() {
+      request("chatStates"); beeperData.respond("chatStates", {counts: {Telegram: 1}, allCounts: {Telegram: 5}});
       keyClick(Qt.Key_A); verify(!beeperData.unreadCountsReady);
       compare(findChild(panel, "beeperUnreadConversationCount").text, "— unread");
-      keyClick(Qt.Key_A); verify(beeperData.unreadCountsReady);
-      compare(findChild(panel, "beeperUnreadConversationCount").text, "1 unread");
+      keyClick(Qt.Key_A); verify(!beeperData.unreadCountsReady);
+      compare(findChild(panel, "beeperUnreadConversationCount").text, "— unread");
     }
     function test_no_lowPriority_unread_conversations_is_a_ready_zero() {
-      request("unreadCounts"); beeperData.respond("unreadCounts", {counts: {Telegram: 1}, lowPriorityCounts: {}});
+      request("chatStates"); beeperData.respond("chatStates", stateSnapshot({Telegram: 1}, {}));
       keyClick(Qt.Key_A); verify(beeperData.unreadCountsReady);
       compare(findChild(panel, "beeperUnreadConversationCount").text, "0 unread");
     }
     function test_demo_counter_matches_the_priority_only_filter() {
       beeperData.demo = true;
-      beeperData.chats = beeperData.chats.map(chat => chat.id === "tg-priority" ? Object.assign({}, chat, {isMarkedUnread: true}) : chat);
+      beeperData.replaceChats(beeperData.chats.map(chat => chat.id === "tg-priority" ? Object.assign({}, chat, {isMarkedUnread: true}) : chat));
       compare(beeperData.unreadConversationCount("telegram"), 1);
       keyClick(Qt.Key_A); compare(panel.filteredChats.length, 1);
       compare(beeperData.unreadConversationCount("telegram"), 1);
     }
     function test_manual_unread_markers_and_escape_do_not_reopen_low_priority() {
-      beeperData.chats = beeperData.chats.map(chat => chat.id === "tg-priority" ? Object.assign({}, chat, {isMarkedUnread: true}) : chat);
+      beeperData.replaceChats(beeperData.chats.map(chat => chat.id === "tg-priority" ? Object.assign({}, chat, {isMarkedUnread: true}) : chat));
       verify(!panel.filteredChats.some(chat => chat.id === "tg-priority"));
       keyClick(Qt.Key_A); verify(panel.showLowPriority); compare(panel.filteredChats.length, 1);
       verify(panel.filteredChats.every(chat => chat.isLowPriority));
-      keyClick(Qt.Key_N); request("unread");
-      beeperData.respond("unread", {id: "tg-priority", isMarkedUnread: true});
+      keyClick(Qt.Key_N); compare(pending("unread").length, 0, "Already manually unread: no duplicate write");
       verify(beeperData.currentChat.isLowPriority); verify(panel.showLowPriority);
       keyClick(Qt.Key_Escape); verify(!panel.showLowPriority); compare(closeSpy.count, 0);
       verify(!panel.filteredChats.some(chat => chat.id === "tg-priority"));

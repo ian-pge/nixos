@@ -379,7 +379,7 @@ ShellRoot {
       try {
         fixture.selectorOpen = true;
         tryCompare(selectorInput, "activeFocus", true);
-        model.chats = []; model.state = "offline";
+        model.replaceChats([]); model.state = "offline";
         wait(30);
         verify(findChild(host, "beeperConnectionSurface").visible);
         verify(selectorInput.activeFocus, "A passive reconnect must not steal selector focus");
@@ -398,7 +398,7 @@ ShellRoot {
         tryCompare(findChild(host, "beeperToken"), "activeFocus", true);
         verify(panel.windowFocused);
       } finally {
-        model.chats = chats; model.state = "demo";
+        model.replaceChats(chats); model.state = "demo";
         fixture.selectorOpen = false;
       }
     }
@@ -407,16 +407,16 @@ ShellRoot {
       try {
         fixture.selectorOpen = true;
         tryCompare(selectorInput, "activeFocus", true);
-        model.chats = []; model.state = "offline";
+        model.replaceChats([]); model.state = "offline";
         wait(30);
         verify(selectorInput.activeFocus);
         verify(!panel.windowFocused); verify(!grab.active);
-        model.chats = chats; model.state = "demo";
+        model.replaceChats(chats); model.state = "demo";
         wait(30);
         verify(selectorInput.activeFocus, "Background recovery must not restore chat focus");
         verify(!panel.windowFocused); verify(!grab.active);
       } finally {
-        model.chats = chats; model.state = "demo";
+        model.replaceChats(chats); model.state = "demo";
         fixture.selectorOpen = false;
       }
     }

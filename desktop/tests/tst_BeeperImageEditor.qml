@@ -139,7 +139,7 @@ ShellRoot {
     function test_draft_button_opens_large_editor_and_replaces_only_selected_image() {
       editor.visible = false;
       beeperData = create("fixtures/PagedBeeperData.qml", {deferImageEdits: true});
-      beeperData.chats = [{id: "chat", title: "Chat"}]; beeperData.currentChatID = "chat";
+      beeperData.replaceChats([{id: "chat", title: "Chat"}]); beeperData.currentChatID = "chat";
       beeperData.draftText = "My caption"; beeperData.replyToMessageID = "reply";
       beeperData.draftAttachments = [fixture.attachment, {type: "file", path: "/fixture/keep.txt", fileName: "keep.txt"}];
       panel = create("../features/messenger/BeeperPanel.qml", {width: 900, height: 650, active: true, windowFocused: true, beeperData: beeperData});

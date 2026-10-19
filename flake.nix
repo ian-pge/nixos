@@ -29,10 +29,6 @@
       url = "github:peteonrails/voxtype";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    tabctl = {
-      url = "github:slastra/tabctl";
-      flake = false;
-    };
   };
 
   outputs = inputs @ {nixpkgs, ...}: let

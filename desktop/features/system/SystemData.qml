@@ -7,6 +7,7 @@ Scope {
   property var system: null
   property var gpu: null
   property var usbDevices: []
+  property var hidppBatteries: []
   property real systemUpdatedAt: 0
   property real gpuUpdatedAt: 0
   property real now: clock.date.getTime()
@@ -85,6 +86,9 @@ Scope {
     };
     systemUpdatedAt = time;
     usbDevices = Array.isArray(report.usbDevices) ? report.usbDevices : [];
+    hidppBatteries = Array.isArray(report.hidppBatteries) ? report.hidppBatteries.filter(reading => reading
+      && typeof reading.nativePath === "string" && /^hidpp_battery_[0-9]+$/.test(reading.nativePath)
+      && ["Charging", "Discharging", "Full", "Not charging", "Unknown"].includes(reading.status)) : [];
     acceptTop(report.top, false, time);
     return true;
   }
@@ -112,6 +116,7 @@ Scope {
 
   function invalidateSystem(time = Date.now()) {
     usbDevices = [];
+    hidppBatteries = [];
     systemUpdatedAt = 0;
     system = null;
     processTop = null; processTopUpdatedAt = 0;

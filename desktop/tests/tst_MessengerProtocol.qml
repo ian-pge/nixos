@@ -60,6 +60,31 @@ ShellRoot {
       if (results.failed) console.error("FAILED", qtest_results.functionName);
     }
 
+    function test_repeated_marks_share_confirmed_state_through_the_real_process() {
+      tryVerify(() => beeperData.unreadCountsReady && Object.keys(beeperData.readStateOperations).length === 0, 5000);
+      const chatID = beeperData.currentChatID;
+      beeperData.markChatRead(chatID);
+      tryVerify(() => !beeperData.readStateOperations[chatID], 5000);
+      const baseline = beeperData.unreadConversationCount("all");
+      for (let cycle = 0; cycle < 20; ++cycle) {
+        verify(beeperData.markChatUnread(chatID));
+        compare(beeperData.unreadConversationCount("all"), baseline, "No change before confirmation");
+        for (let press = 0; press < 10; ++press) {
+          verify(!beeperData.markChatUnread(chatID)); verify(!beeperData.markChatRead(chatID));
+        }
+        tryVerify(() => !beeperData.readStateOperations[chatID], 5000);
+        verify(beeperData.currentChat.isMarkedUnread);
+        compare(beeperData.unreadConversationCount("all"), baseline + 1);
+        verify(!beeperData.markChatUnread(chatID));
+        verify(beeperData.markChatRead(chatID));
+        compare(beeperData.unreadConversationCount("all"), baseline + 1);
+        tryVerify(() => !beeperData.readStateOperations[chatID], 5000);
+        verify(!beeperData.currentChat.isMarkedUnread); compare(beeperData.currentChat.unreadCount, 0);
+        compare(beeperData.unreadConversationCount("all"), baseline);
+        verify(!beeperData.markChatRead(chatID));
+      }
+    }
+
     function test_draft_roundtrip_and_exactly_one_send_through_go() {
       const chatID = beeperData.currentChatID;
       const originalCount = beeperData.messages.length;

@@ -29,7 +29,7 @@ ShellRoot {
     property var player: null
     property bool playing: false
     property string labelText: "Example track"
-    property string playbackIconText: "pause"
+    readonly property string playbackIconText: playing ? "pause" : "play"
   }
   Window { id: window; visible: true; width: 650; height: 250 }
   function create(path, properties) {
@@ -88,6 +88,18 @@ ShellRoot {
       verify(waveform.visible);
       verify(waveform.barCount >= waveform.minimumBarCount);
       dictation.recording = false;
+    }
+    function test_media_uses_catppuccin_yellow() {
+      const indicator = views[3], icon = findChild(indicator, "mediaPlaybackIcon");
+      try {
+        for (const playing of [false, true, false]) {
+          media.playing = playing;
+          compare(icon.name, playing ? "pause" : "play");
+          compare(icon.color.toString(), "#eed49f");
+          for (let index = 0; index < 4; ++index)
+            compare(findChild(indicator, "mediaEqualizerBar" + index).color.toString(), playing ? "#eed49f" : "#6e738d");
+        }
+      } finally { media.playing = false; }
     }
   }
 }

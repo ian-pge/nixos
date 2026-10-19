@@ -14,7 +14,6 @@ commands through `localPackages`; Home Manager selects what to install.
 | `quickshell/nix-cleaner/` | `quickshell/nix-cleaner.nix` | Native `nh clean all` integration |
 | `quickshell/system-stats/` | `quickshell/system-stats.nix` | Persistent Rust CPU, RAM, disk and backlight telemetry |
 | `quickshell/gpu-monitor/` | `quickshell/gpu-monitor.nix` | Persistent Rust NVIDIA telemetry through NVML, with runtime-suspend checks |
-| `quickshell/chrome-tabs/` | `quickshell/chrome-tabs.nix` | Rust TabCtl adapter and local SQLite favicon cache |
 | `quickshell/speedtest/` | `quickshell/speedtest.nix` | Generation-tagged Ookla JSON streaming and cancellation |
 | `quickshell/weather/` | `quickshell/weather.nix` | Rust automatic location, current temperature and daily calendar weather |
 | `quickshell/beeper/` | `quickshell/beeper.nix` | Persistent Go Beeper API client, drafts, media and local notifications |
@@ -27,8 +26,6 @@ installs, configures and starts them; the preview uses that same runtime.
 
 The GPU collector lives in `quickshell/gpu-monitor/` and directly loads the
 NVIDIA driver's NVML library; no upstream GPU executable or wrapper is needed.
-The Chrome tab integration and favicons live in `quickshell/chrome-tabs/`;
-`home_manager/tabctl.nix` installs the commands and registers the native host.
 
 The Rust projects are independent Cargo packages, each with its own lockfile.
 Update checker, installer and diff share one project because they form one
@@ -45,7 +42,6 @@ cargo test --manifest-path tools/quickshell/update/Cargo.toml
 cargo test --manifest-path tools/quickshell/brightness/Cargo.toml
 cargo test --manifest-path tools/quickshell/system-stats/Cargo.toml
 cargo test --manifest-path tools/quickshell/gpu-monitor/Cargo.toml
-cargo test --manifest-path tools/quickshell/chrome-tabs/Cargo.toml
 cargo test --manifest-path tools/quickshell/weather/Cargo.toml
 ```
 

@@ -63,7 +63,7 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | `edit`, `delete`, `react` | `{chatID,messageID,text?}`, réaction `{reactionKey,remove?}` |
 | `read`, `updateChat` | `{chatID,messageID?}`, `{chatID,changes:{isMuted?,isPinned?,isLowPriority?}}` |
 | `unread` | `{chatID}` ; marque manuellement la conversation non lue sans inventer de nouveaux messages |
-| `unreadCounts` | `{}` → `{counts:{réseau:nombre},lowPriorityCounts:{réseau:nombre}}` ; deux compteurs disjoints selon `isLowPriority`, marquage manuel compris ; lecture complète des pages de l'API |
+| `chatStates` | `{}` → `{items:[{id,network,unreadCount,isMarkedUnread,isLowPriority}]}` ; parcours complet, y compris les conversations lues, sans doublons ; ces états alimentent le même registre que les lignes visibles, dont dérive le compteur |
 | `getDraft`, `saveDraft` | `{chatID,text?,attachments?,replyToMessageID?,savedDrafts?:[{id,text,attachments?,replyToMessageID?}]}` ; retour `{text,attachments?,replyToMessageID?,savedDrafts?}` ; ancien champ `attachment` toujours lisible ; copies locales de récupération séparées du brouillon courant, conservées si le champ est omis et retirées avec `[]` |
 | `setView` | `{chatID,focused,atLatest}` ; état de vue conservé dans le protocole, sans couper les alertes sonores |
 | `stageAttachment`, `clipboardAttachment` | `{path,type?}` ou `{}` ; copie durable et privée `{path,srcURL,type,fileName,mimeType}` |

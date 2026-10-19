@@ -36,8 +36,11 @@ Item {
     ? presentedSpecialWorkspace.slice(8) : presentedSpecialWorkspace
   readonly property real specialSlotWidth: Math.max(workspaceButtonHeight,
     specialLabel.implicitWidth + Theme.barSize(12))
-  readonly property real workspaceButtonHeight: Theme.barSize(28)
-  readonly property real activeButtonWidth: workspaceButtonHeight + Theme.barSize(16)
+  // Match the other capsules' inset without independently rounding the inner
+  // height: both semicircles must share the same center at the outer edges.
+  readonly property real contentInset: Theme.barOutlineInset()
+  readonly property real workspaceButtonHeight: implicitHeight - 2 * contentInset
+  readonly property real activeButtonWidth: workspaceButtonHeight + Theme.barSize(32)
   readonly property real naturalContentWidth: {
     let total = 0;
     for (const workspaceId of workspaceIds) {
@@ -122,7 +125,7 @@ Item {
       ? special.name : "", animate);
   }
 
-  readonly property real baseImplicitWidth: naturalContentWidth + Theme.barSize(12)
+  readonly property real baseImplicitWidth: naturalContentWidth + 2 * contentInset
   // Workspace capsule geometry only; expanded panels choose their own width.
   readonly property real expandedImplicitWidth: baseImplicitWidth + specialSlotWidth
   implicitWidth: specialWorkspaceVisible ? expandedImplicitWidth : baseImplicitWidth
@@ -177,10 +180,10 @@ Item {
 
       Row {
         id: workspaceRow
-        // Keep odd-sized circles centered without anchor rounding offsets.
+        // Keep fractional-sized circles centered without anchor rounding offsets.
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
-        spacing: (workspaceArea.width - root.naturalContentWidth - Theme.barSize(12))
+        spacing: (workspaceArea.width - root.naturalContentWidth - 2 * root.contentInset)
           / Math.max(1, root.workspaceCount - 1)
 
       Repeater {
@@ -219,10 +222,10 @@ Item {
 
             // Keep the workspace characters, independently of the UI icon set.
             Text {
-              anchors.verticalCenter: parent.verticalCenter
-              // Avoid rounded center anchors on both the glyph and its parent:
-              // the animated button reaches an odd width on the final frame.
+              // Keep the glyph centered at fractional sizes, including the
+              // final frame, without rounded center-anchor offsets.
               x: (parent.width - width) / 2
+              y: (parent.height - height) / 2
               text: workspaceButton.active
                 ? "󰮯"
                 : workspaceButton.occupied ? "󰊠" : ""
@@ -268,9 +271,8 @@ Item {
       visible: root.specialSlotRendered
       opacity: root.specialSlotOpacity()
       anchors.right: parent.right
-      anchors.rightMargin: Theme.barSize(6)
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.alignWhenCentered: false
+      anchors.rightMargin: root.contentInset
+      y: (parent.height - height) / 2
       width: root.specialSlotWidth
       height: root.workspaceButtonHeight
       radius: height / 2
@@ -279,7 +281,8 @@ Item {
       Text {
         id: specialLabel
         objectName: "specialWorkspaceLabel"
-        anchors.centerIn: parent
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
         text: root.specialSlotName
         color: Theme.background
         font.family: "Ubuntu Nerd Font"

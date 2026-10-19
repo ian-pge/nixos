@@ -31,7 +31,6 @@ ShellRoot {
     readonly property var updates: updates
     readonly property var calendar: calendar
     readonly property var appLauncher: apps
-    readonly property var chromeTabs: tabs
     readonly property var brightness: brightness
     readonly property var media: media
     readonly property var dictation: dictation
@@ -67,13 +66,6 @@ ShellRoot {
     property string query: ""
     function setQuery(value) { query = value; fixture.events.push("apps-query:" + value); }
     function refreshResults() { fixture.events.push("apps-refresh"); }
-  }
-  QtObject {
-    id: tabs
-    property string query: ""
-    property int selectedIndex: 0
-    function setQuery(value) { query = value; fixture.events.push("tabs-query:" + value); }
-    function requestTabs() { fixture.events.push("tabs-request"); }
   }
   QtObject {
     id: brightness
@@ -131,7 +123,7 @@ ShellRoot {
       media.player = {name: "Fake player"};
       dictation.active = false;
       messenger.visible = false; beeperData.viewFocused = false;
-      apps.query = ""; tabs.query = ""; tabs.selectedIndex = 0;
+      apps.query = "";
       calendar.selectedDate = "today";
       fixture.events = []; fixture.lifecycle = [];
     }
@@ -179,7 +171,7 @@ ShellRoot {
       verify(events().indexOf("messenger-hide") < 0);
     }
     function test_other_widgets_replace_chat_and_chat_replaces_them() {
-      for (const kind of ["audio", "wifi", "bluetooth", "calendar", "system", "storage", "launcher", "tabs", "updates", "media"]) {
+      for (const kind of ["audio", "wifi", "bluetooth", "calendar", "system", "storage", "launcher", "updates", "media"]) {
         messenger.visible = true;
         controller.open(kind, "A");
         verify(!messenger.visible, kind + " replaces the chat");
@@ -258,16 +250,8 @@ ShellRoot {
       controller.open("launcher", "A");
       compare(apps.query, ""); compare(events(), "apps-query:,apps-refresh");
     }
-    function test_tabs_fresh_and_moved_presentations_refresh_catalog_and_selection() {
-      controller.open("tabs", "A");
-      compare(events(), "tabs-query:,tabs-request");
-      tabs.query = "documentation"; tabs.selectedIndex = 5; fixture.events = [];
-      controller.open("tabs", "B");
-      compare(tabs.query, ""); compare(tabs.selectedIndex, 0);
-      compare(events(), "tabs-query:,tabs-request");
-    }
     function test_media_suppression_under_interactive_panels() {
-      for (const kind of ["audio", "calendar", "system", "storage", "wifi", "bluetooth", "updates", "launcher", "tabs"]) {
+      for (const kind of ["audio", "calendar", "system", "storage", "wifi", "bluetooth", "updates", "launcher"]) {
         controller.open(kind, "A"); controller.showMedia("B");
         verify(controller.isOpen(kind, "A"));
       }

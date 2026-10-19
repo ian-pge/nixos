@@ -27,13 +27,6 @@ old.activated = true;
 assert.equal(windows.forApp(entry, [old, recent]), old);
 assert.equal(windows.forApp(entry, [{ wayland: null, lastIpcObject: { class: "Other" } }]), null);
 
-const activeTab = { id: "1", title: "Example documentation", url: "https://example.org/docs", active: true, windowId: 3 };
-const hiddenTab = { id: "2", title: "Other page", url: "https://other.org", active: false, windowId: 3 };
-const browser = { title: "Example documentation - Google Chrome", wayland: null, lastIpcObject: { class: "google-chrome" } };
-const unrelated = { title: "Unrelated - Google Chrome", wayland: null, lastIpcObject: { class: "google-chrome" } };
-assert.equal(windows.forTab(hiddenTab, [{ tab: activeTab }], [unrelated, browser]), browser);
-assert.equal(windows.forTab(null, [], []), null);
-
 const dispatched = [];
 windows.focus(recent, command => dispatched.push(command));
 assert.deepEqual(dispatched, ['hl.dsp.focus({ window = "address:0x123" })']);

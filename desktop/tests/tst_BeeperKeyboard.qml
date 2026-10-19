@@ -88,10 +88,10 @@ ShellRoot {
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true, recorderFactory: fakeRecorder, attachmentPickerFactory: fakePicker,
           clipboardWriter: text => { fixture.copiedTexts = fixture.copiedTexts.concat([text]); }});
-      beeperData.chats = [
+      beeperData.replaceChats([
         {id: "chat-a", title: "First chat", accountID: "account-a", capabilities: {reaction: 2}},
         {id: "chat-b", title: "Second chat", capabilities: {reaction: 2}}
-      ];
+      ]);
       beeperData.accounts = [{id: "account-a", user: {id: "self"}}];
       beeperData.selectChat("chat-a");
       const messages = [];
@@ -177,7 +177,7 @@ ShellRoot {
         {tag: "ctrl_j_k", next: Qt.Key_J, previous: Qt.Key_K, modifiers: Qt.ControlModifier, reverseModifiers: Qt.ControlModifier}];
     }
     function test_chat_search_cycles_results_and_keeps_typing_focus(data) {
-      beeperData.chats = beeperData.chats.concat([{id: "chat-c", title: "Third chat"}]);
+      beeperData.replaceChats(beeperData.chats.concat([{id: "chat-c", title: "Third chat"}]));
       beeperData.draftText = "Keep this draft";
       keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.messageIndex, 7);
       startChatSearch();
@@ -205,7 +205,7 @@ ShellRoot {
       const chats = [];
       for (const prefix of ["abc", "abx", "axy", "xyz"])
         for (let i = 0; i < data.groupSize; ++i) chats.push({id: prefix + i, title: prefix + i, preview: {text: "…"}});
-      beeperData.chats = chats;
+      beeperData.replaceChats(chats);
       wait(180);
       startChatSearch(""); chatOpacitySpy.clear();
       const sidebar = findChild(panel, "beeperSidebar");
@@ -266,9 +266,9 @@ ShellRoot {
     }
     function test_chat_search_preserves_highlight_on_refresh_and_falls_back_when_removed() {
       startChatSearch(); keyClick(Qt.Key_Tab);
-      beeperData.chats = beeperData.chats.slice().reverse();
+      beeperData.replaceChats(beeperData.chats.slice().reverse());
       tryVerify(() => selectedChatRow("chat-b")?.chosen === true);
-      beeperData.chats = beeperData.chats.filter(chat => chat.id !== "chat-b");
+      beeperData.replaceChats(beeperData.chats.filter(chat => chat.id !== "chat-b"));
       tryVerify(() => selectedChatRow("chat-a")?.chosen === true);
       verify(panel.searchField.activeFocus);
     }
@@ -366,7 +366,7 @@ ShellRoot {
       if (data.mode === "navigation") panel.focusNavigation();
       else if (data.mode === "inactive") panel.active = false;
       else if (data.mode === "unfocused") panel.windowFocused = false;
-      else if (data.mode === "readonly") beeperData.chats = [Object.assign({}, beeperData.currentChat, {isReadOnly: true})];
+      else if (data.mode === "readonly") beeperData.replaceChats([Object.assign({}, beeperData.currentChat, {isReadOnly: true})]);
       else if (data.mode === "editing") panel.editMessageID = "message-0";
       else if (data.mode === "sending") beeperData.sending = true;
       else if (data.mode === "recording") panel.preparingRecording = true;
@@ -548,7 +548,7 @@ ShellRoot {
       beeperData.deferRecording = true;
       if (data.mode === "inactive") panel.active = false;
       else if (data.mode === "unfocused") panel.windowFocused = false;
-      else if (data.mode === "readonly") beeperData.chats = [Object.assign({}, beeperData.currentChat, {isReadOnly: true})];
+      else if (data.mode === "readonly") beeperData.replaceChats([Object.assign({}, beeperData.currentChat, {isReadOnly: true})]);
       else if (data.mode === "sending") beeperData.sending = true;
       else if (data.mode === "dictating") panel.dictating = true;
       else if (data.mode === "search") panel.openChatSearch();
@@ -867,8 +867,8 @@ ShellRoot {
       verify(panel.selectedMessage?.id !== "old-original"); compare(closeSpy.count, 0);
     }
     function test_number_keys_react_to_the_selected_message(data) {
-      beeperData.chats = beeperData.chats.map(chat => chat.id === "chat-a"
-        ? Object.assign({}, chat, {network: data.network, capabilities: {reaction: 2, allowedReactions: data.emoji}}) : chat);
+      beeperData.replaceChats(beeperData.chats.map(chat => chat.id === "chat-a"
+        ? Object.assign({}, chat, {network: data.network, capabilities: {reaction: 2, allowedReactions: data.emoji}}) : chat));
       compare(beeperData.networkFilter, "all");
       keyClick(Qt.Key_1); compare(pending("react").length, 0);
       keyClick(Qt.Key_K, Qt.ControlModifier);
@@ -908,8 +908,8 @@ ShellRoot {
       compare(beeperData.messages[7].reactions.length, 1); compare(beeperData.messages[7].reactions[0].id, "theirs");
     }
     function test_telegram_thumbs_up_uses_the_allowed_unicode_variant() {
-      beeperData.chats = [Object.assign({}, beeperData.currentChat,
-        {network: "Telegram", capabilities: {reaction: 2, allowedReactions: ["👍\uFE0F", "❤️", "🔥"]}})];
+      beeperData.replaceChats([Object.assign({}, beeperData.currentChat,
+        {network: "Telegram", capabilities: {reaction: 2, allowedReactions: ["👍\uFE0F", "❤️", "🔥"]}})]);
       keyClick(Qt.Key_K, Qt.ControlModifier); keyClick(Qt.Key_1);
       compare(pending("react")[0].params.reactionKey, "👍\uFE0F");
       verify(!pending("react")[0].params.remove); compare(beeperData.lastError, "");
@@ -921,8 +921,8 @@ ShellRoot {
       verify(pending("react")[0].params.remove, "The same emoji toggles off even with a different presentation selector");
     }
     function test_reaction_variants_do_not_bypass_allowed_skin_tones_or_sequences() {
-      beeperData.chats = [Object.assign({}, beeperData.currentChat,
-        {capabilities: {reaction: 2, allowedReactions: ["👍🏽", "❤️‍🔥"]}})];
+      beeperData.replaceChats([Object.assign({}, beeperData.currentChat,
+        {capabilities: {reaction: 2, allowedReactions: ["👍🏽", "❤️‍🔥"]}})]);
       keyClick(Qt.Key_K, Qt.ControlModifier); keyClick(Qt.Key_1);
       compare(pending("react").length, 0); verify(!!beeperData.lastError);
     }
@@ -951,8 +951,8 @@ ShellRoot {
     function test_reaction_changes_preserve_other_participants(data) {
       if (data.participants) {
         beeperData.accounts = [];
-        beeperData.chats = [Object.assign({}, beeperData.currentChat,
-          {participants: {items: [{id: "self", isSelf: true}, {id: "contact", isSelf: false}]}})];
+        beeperData.replaceChats([Object.assign({}, beeperData.currentChat,
+          {participants: {items: [{id: "self", isSelf: true}, {id: "contact", isSelf: false}]}})]);
       }
       beeperData.messages = beeperData.messages.map((message, index) => index === 7
         ? Object.assign({}, message, {reactions: [{id: "mine", participantID: "self", reactionKey: "😂"},
@@ -1012,7 +1012,7 @@ ShellRoot {
       beeperData.respond("react", null, {message: "Rejected"});
       compare(pending("react").length, 0); compare(pending("message").length, 0);
       compare(beeperData.messages[7].reactions[0].reactionKey, "💜");
-      beeperData.chats = [Object.assign({}, beeperData.currentChat, {capabilities: {reaction: 2, allowedReactions: ["💜"]}})];
+      beeperData.replaceChats([Object.assign({}, beeperData.currentChat, {capabilities: {reaction: 2, allowedReactions: ["💜"]}})]);
       keyClick(Qt.Key_1); compare(pending("react").length, 0);
       verify(!!beeperData.lastError); compare(beeperData.messages[7].reactions[0].reactionKey, "💜");
     }
@@ -1126,13 +1126,13 @@ ShellRoot {
     function test_reactions_respect_chat_capabilities_and_read_only_state() {
       keyClick(Qt.Key_K, Qt.ControlModifier);
       for (const capability of [false, 0, -1]) {
-        beeperData.chats = [{id: "chat-a", capabilities: {reaction: capability}}];
+        beeperData.replaceChats([{id: "chat-a", capabilities: {reaction: capability}}]);
         keyClick(Qt.Key_2); compare(pending("react").length, 0);
       }
-      beeperData.chats = [{id: "chat-a", capabilities: {reaction: 2}, isReadOnly: true}];
+      beeperData.replaceChats([{id: "chat-a", capabilities: {reaction: 2}, isReadOnly: true}]);
       keyClick(Qt.Key_3); compare(pending("react").length, 0);
       keyClick(Qt.Key_Return); verify(!panel.composer.activeFocus);
-      beeperData.chats = [{id: "chat-a", capabilities: {reaction: 2}}];
+      beeperData.replaceChats([{id: "chat-a", capabilities: {reaction: 2}}]);
       beeperData.state = "offline";
       panel.reactToSelectedMessage("🔥"); compare(pending("react").length, 0);
     }

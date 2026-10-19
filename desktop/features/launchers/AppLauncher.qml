@@ -9,8 +9,11 @@ FocusScope {
   required property var controller
   signal closeRequested()
   readonly property var results: controller.results
+  readonly property int rowHeight: 42
   implicitWidth: 480
-  implicitHeight: 398
+  // Fixed-height rows make this exact even before ListView creates delegates.
+  implicitHeight: Math.min(398, 48 + (results.length > 0
+    ? results.length * rowHeight : Math.max(58, emptyState.implicitHeight + 16)) + 8)
 
   function syncSearchText() {
     if (searchInput.text !== controller.query) {
@@ -169,10 +172,12 @@ FocusScope {
 
     ListView {
       id: appList
+      objectName: "appResults"
       anchors.left: parent.left
       anchors.right: parent.right
       y: 48
-      height: 342
+      height: Math.max(0, root.height - y - 8)
+      onHeightChanged: if (root.enabled) Qt.callLater(root.revealSelection)
       clip: true
       model: root.results
       currentIndex: controller.selectedIndex
@@ -193,7 +198,7 @@ FocusScope {
         }
 
         width: appList.width
-        height: 42
+        height: root.rowHeight
 
         Item {
           anchors.fill: parent
@@ -317,11 +322,12 @@ FocusScope {
     }
 
     Text {
+      id: emptyState
+      objectName: "appEmptyState"
       visible: results.length === 0
-      anchors.left: parent.left
-      anchors.right: parent.right
-      y: 165
-      height: 40
+      anchors.fill: appList
+      anchors.leftMargin: 16
+      anchors.rightMargin: 16
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: "No matching applications"
@@ -329,6 +335,7 @@ FocusScope {
       font.family: "Ubuntu Nerd Font"
       font.pixelSize: 13
       font.bold: true
+      wrapMode: Text.Wrap
     }
   }
 }

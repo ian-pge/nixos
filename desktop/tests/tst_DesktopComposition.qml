@@ -75,20 +75,23 @@ ShellRoot {
     name: "DesktopComposition"
     when: fixture.app !== null
     function initTestCase() {
+      fixture.stage = "initialize desktop viewport";
       const screenWidth = Number(Quickshell.env("QS_BAR_SCREEN_WIDTH") || 1600);
       verify(screenWidth >= 800);
       tryVerify(() => app.bars.length > 0 && app.bars[0].screen.width > 0);
-      // A nested Wayland window can inherit its tiled parent's larger size,
-      // ignoring the fixture's requested output mode. Constrain the actual
-      // production layer surface to the laptop's 1600px logical screen width.
-      // Negative margins also permit testing a viewport wider than the nested
-      // output. QS_BAR_SCREEN_WIDTH optionally probes another display size.
+      // Constrain larger nested outputs to the requested logical viewport.
+      // QS_TEST_FLOAT=1 stabilizes only the test window when tiling is too narrow.
       const bar = app.bars[0];
-      compare(bar.margins.left, 10); compare(bar.margins.right, 10);
-      bar.margins.right = Qt.binding(() => bar.screen.width - screenWidth + 10);
-      tryCompare(bar.contentItem, "width", screenWidth - 20);
+      fixture.stage = "initial margins: " + bar.margins.left + ", " + bar.margins.right;
+      compare(bar.margins.left, 0); compare(bar.margins.right, 0);
+      bar.margins.right = Qt.binding(() => Math.max(0, bar.screen.width - screenWidth));
+      fixture.stage = "viewport width: " + bar.contentItem.width + ", expected " + screenWidth;
+      tryCompare(bar.contentItem, "width", screenWidth);
+      tryCompare(bar.barContent, "width", screenWidth - 20);
+      compare(bar.barContent.x, 10);
     }
     function cleanupTestCase() {
+      if (results.failCount) console.error("Last desktop stage:", fixture.stage);
       console.log("DesktopComposition: " + results.passCount + " passed, " + results.failCount + " failed");
       Qt.callLater(() => Qt.exit(results.failCount ? 1 : 0));
     }
@@ -97,6 +100,146 @@ ShellRoot {
       if (!item.visible) return "";
       return (typeof item.text === "string" ? item.text : "") + " "
         + Array.from(item.children || []).map(visibleText).join(" ");
+    }
+    function test_backdrop_follows_the_common_rule_without_dimming_the_bar() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], capsule = bar.capsule;
+      const backdrop = findChild(bar.contentItem, "panelBackdrop");
+      verify(backdrop !== null);
+      compare(backdrop.dimAmount, 0.6, "The preview must use the special-workspace default without a service environment");
+      try {
+        app.coordinator.messenger.hide();
+        app.coordinator.close(app.coordinator.mode);
+        tryCompare(backdrop, "opacity", 0, 1000);
+        tryCompare(findChild(bar.contentItem, "leftBarModules"), "opacity", 1, 1000);
+        tryCompare(findChild(bar.contentItem, "rightBarModules"), "opacity", 1, 1000);
+        compare(backdrop.y, 0);
+        compare(backdrop.width, bar.contentItem.width);
+        compare(backdrop.height, bar.contentItem.height);
+        verify(!backdrop.enabled);
+        verify(bar.barContent.z > backdrop.z);
+        for (const mode of ["workspaces", "volume", "brightness", "media"]) {
+          app.coordinator.targetMonitor = bar.monitorName; app.coordinator.mode = mode;
+          verify(!backdrop.shown, "An exempt central widget must not request dimming: " + mode);
+        }
+        for (const mode of ["bluetooth", "wifi", "updates", "launcher", "calendar", "system", "storage", "audio"]) {
+          fixture.stage = "backdrop for " + mode;
+          app.coordinator.targetMonitor = bar.monitorName; app.coordinator.mode = mode;
+          fixture.stage += " " + JSON.stringify({shown: backdrop.shown, requested: bar.dimming.requested,
+            keyboard: bar.keyboardSelectorActive, height: capsule.contentViews[mode].implicitHeight,
+            targetMonitor: app.coordinator.targetMonitor, monitor: bar.monitorName});
+          verify(backdrop.shown);
+          tryCompare(backdrop, "opacity", backdrop.dimAmount, 1000);
+          compare(findChild(bar.contentItem, "leftBarModules").opacity, 1);
+          compare(findChild(bar.contentItem, "rightBarModules").opacity, 1);
+        }
+        fixture.stage = "backdrop excludes other monitors";
+        app.coordinator.targetMonitor = "other-preview-monitor";
+        verify(!backdrop.shown);
+        tryCompare(backdrop, "opacity", 0, 1000);
+        app.coordinator.targetMonitor = bar.monitorName;
+        tryCompare(backdrop, "opacity", backdrop.dimAmount, 1000);
+        fixture.stage = "backdrop panel-to-chat handoff";
+        app.coordinator.messenger.show(bar.monitorName);
+        verify(backdrop.shown);
+        compare(backdrop.opacity, backdrop.dimAmount, "Panel-to-chat handoff must not flash the background");
+        fixture.stage = "backdrop chat-to-panel handoff";
+        app.coordinator.targetMonitor = bar.monitorName; app.coordinator.mode = "calendar";
+        app.coordinator.messenger.hide();
+        verify(backdrop.shown);
+        compare(backdrop.opacity, backdrop.dimAmount, "Chat-to-panel handoff keeps the same dimming");
+        app.coordinator.close(app.coordinator.mode);
+        fixture.stage = "backdrop closes: " + JSON.stringify({shown: backdrop.shown, visible: backdrop.visible, opacity: backdrop.opacity});
+        verify(!backdrop.shown); verify(backdrop.visible);
+        tryCompare(backdrop, "visible", false, 1000);
+        compare(backdrop.opacity, 0);
+      } finally {
+        app.coordinator.messenger.hide(); app.coordinator.close(app.coordinator.mode);
+        tryCompare(capsule.messengerHost, "presented", false, 1000);
+      }
+    }
+    function test_special_workspace_uses_native_dimming_without_a_second_veil() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], backdrop = findChild(bar.contentItem, "panelBackdrop");
+      const policy = bar.dimming;
+      try {
+        app.coordinator.messenger.hide(); app.coordinator.close(app.coordinator.mode);
+        // Inject compositor presence only; never open a real special workspace.
+        policy.specialWorkspaceOpen = true;
+        verify(policy.requested); verify(policy.compositorOwnsBackdrop);
+        verify(backdrop.suppressed); verify(!backdrop.visible);
+        for (const mode of ["workspaces", "volume", "brightness", "bluetooth", "launcher"]) {
+          app.coordinator.targetMonitor = bar.monitorName; app.coordinator.mode = mode;
+          verify(policy.requested); verify(!backdrop.shown); verify(!backdrop.visible);
+        }
+        app.coordinator.messenger.show(bar.monitorName);
+        verify(policy.chatOpen); verify(policy.requested);
+        verify(!backdrop.visible, "Chat over a special workspace must not add another veil");
+        policy.specialWorkspaceOpen = false;
+        verify(policy.requested); verify(backdrop.shown);
+        tryVerify(() => backdrop.opacity === backdrop.dimAmount);
+        for (const mode of ["volume", "brightness"]) {
+          app.coordinator.targetMonitor = bar.monitorName; app.coordinator.mode = mode;
+          verify(policy.chatOpen); verify(backdrop.shown);
+        }
+        policy.specialWorkspaceOpen = true;
+        verify(backdrop.suppressed); verify(!backdrop.visible);
+        app.coordinator.close(app.coordinator.mode); app.coordinator.messenger.hide();
+        verify(policy.requested, "The remaining special workspace still owns dimming");
+        policy.specialWorkspaceOpen = false;
+        verify(!policy.requested); verify(!backdrop.shown);
+      } finally {
+        policy.specialWorkspaceOpen = Qt.binding(() => (bar.hyprlandMonitor?.lastIpcObject?.specialWorkspace?.id ?? 0) < 0);
+        app.coordinator.messenger.hide(); app.coordinator.close(app.coordinator.mode);
+        tryCompare(bar.capsule.messengerHost, "presented", false, 1000);
+      }
+    }
+    function test_notification_does_not_request_dimming() {
+      const bar = app.bars[0], capsule = bar.capsule;
+      const backdrop = findChild(bar.contentItem, "panelBackdrop");
+      try {
+        app.coordinator.messenger.hide(); app.coordinator.close(app.coordinator.mode);
+        capsule.services = Object.assign({}, bar.services, {notifications: noticeState});
+        noticeState.targetMonitor = bar.monitorName; noticeState.visible = true;
+        compare(capsule.targetMode, "notification");
+        verify(!bar.dimming.centralRequestsDimming); verify(!backdrop.shown);
+        noticeState.visible = false;
+        verify(!bar.dimming.requested); verify(!backdrop.shown);
+      } finally {
+        noticeState.visible = false;
+        capsule.services = Qt.binding(() => bar.services);
+      }
+    }
+    function test_dictation_does_not_dim_while_recording_or_transcribing() {
+      const bar = app.bars[0], capsule = bar.capsule, dictation = app.services.dictation;
+      const backdrop = findChild(bar.contentItem, "panelBackdrop");
+      const oldState = dictation.state, oldTarget = app.coordinator.dictationTargetMonitor;
+      verify(!dictation.enabled, "Only exercise the disabled test controller, never a microphone");
+      try {
+        app.coordinator.messenger.hide(); app.coordinator.close(app.coordinator.mode);
+        for (const state of ["recording", "streaming", "transcribing"]) {
+          dictation.setState(state);
+          app.coordinator.dictationTargetMonitor = bar.monitorName;
+          compare(capsule.targetMode, "dictation");
+          verify(!bar.dimming.centralRequestsDimming); verify(!backdrop.shown);
+        }
+      } finally {
+        dictation.setState(oldState);
+        app.coordinator.dictationTargetMonitor = oldTarget;
+      }
+    }
+    function verifyBoundedContentScale(view, surface) {
+      compare(view.transform.length, 1, "Every central widget uses the shared two-axis transform");
+      const zoom = view.transform[0];
+      const fitX = surface.width / view.width, fitY = surface.height / view.height;
+      fuzzyCompare(zoom.xScale, Math.max(0.5, Math.min(2, fitX)), 0.001);
+      fuzzyCompare(zoom.yScale, Math.max(0.5, Math.min(2, fitY)), 0.001);
+      verify(zoom.xScale >= 0.5 && zoom.xScale <= 2 && zoom.yScale >= 0.5 && zoom.yScale <= 2);
+      verify(surface.clip, "The surface must mask content when the minimum zoom exceeds its size");
+      const topLeft = view.mapToItem(surface, 0, 0);
+      const bottomRight = view.mapToItem(surface, view.width, view.height);
+      fuzzyCompare(bottomRight.x - topLeft.x, view.width * zoom.xScale, 0.01);
+      fuzzyCompare(bottomRight.y - topLeft.y, view.height * zoom.yScale, 0.01);
     }
     function verifyNonOverlappingSurfaces(bar, surfaces) {
       const bounds = surfaces.map(item => {
@@ -123,6 +266,7 @@ ShellRoot {
         cpu: services.system.cpuUsage, memory: services.system.memoryUsage,
         gpu: services.system.gpuText, disk: services.system.diskUsage,
         systemSnapshot: services.system.telemetry.system, gpuSnapshot: services.system.telemetry.gpu,
+        usbDevices: services.system.telemetry.usbDevices, hidppBatteries: services.system.telemetry.hidppBatteries,
         systemUpdatedAt: services.system.telemetry.systemUpdatedAt, gpuUpdatedAt: services.system.telemetry.gpuUpdatedAt,
         battery: services.power.battery, onBattery: services.power.onBattery,
         keyboards: services.power.bluetoothDevices, brightness: services.brightness.values,
@@ -156,6 +300,8 @@ ShellRoot {
         services.system.gpuText = previous.gpu; services.system.diskUsage = previous.disk;
         services.system.telemetry.system = previous.systemSnapshot;
         services.system.telemetry.gpu = previous.gpuSnapshot;
+        services.system.telemetry.usbDevices = previous.usbDevices;
+        services.system.telemetry.hidppBatteries = previous.hidppBatteries;
         services.system.telemetry.systemUpdatedAt = previous.systemUpdatedAt;
         services.system.telemetry.gpuUpdatedAt = previous.gpuUpdatedAt;
         services.power.battery = previous.battery; services.power.onBattery = previous.onBattery;
@@ -229,8 +375,8 @@ ShellRoot {
           findChild(bar.contentItem, "storageBlock"), findChild(bar.contentItem, "updatesPill")]);
         verifyNonOverlappingSurfaces(bar, surfaces);
         for (const [rowName, names] of [
-            ["leftBarModules", ["calendarBlock", "connectivityBlock", "updatesPill"]],
-            ["rightBarModules", ["storageBlock", "usageBlock", "batteryBlock", "levelsBlock", "systemBlock"]]]) {
+            ["leftBarModules", ["calendarBlock", "connectivityBlock", "updatesPill", "storageBlock"]],
+            ["rightBarModules", ["usageBlock", "batteryBlock", "levelsBlock", "systemBlock"]]]) {
           const row = findChild(bar.contentItem, rowName);
           const children = Array.from(row.children).filter(item => item.visible && item.width > 0);
           compare(children.map(item => item.objectName).join(","), names.join(","));
@@ -245,7 +391,7 @@ ShellRoot {
           app.coordinator.open(mode, bar.monitorName);
           wait(450);
           compare(bar.exclusiveZone, 52);
-          if (mode !== "workspaces") compare(bar.capsule.width, 434);
+          if (mode !== "workspaces") compare(bar.capsule.width, 340);
           verifyNonOverlappingSurfaces(bar, surfaces);
         }
       } finally { app.coordinator.close(app.coordinator.mode); restore(); }
@@ -301,6 +447,100 @@ ShellRoot {
         tryVerify(() => findChild(bar.contentItem, "mouseBatteryPill") === null);
         verify(keyboard.visible);
       } finally { power.powerDevices = originalPowerDevices; restore(); }
+    }
+    function test_phone_battery_shares_the_accessory_dial_and_connection_states() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;
+      const keyboards = power.bluetoothDevices, telemetry = power.telemetry;
+      const phone = {address: "94:45:60:3C:A5:14", name: "Pixel 8 Pro", icon: "phone",
+        connected: true, batteryAvailable: true, battery: 0.8};
+      try {
+        power.bluetoothDevices = keyboards.concat([phone]);
+        tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") !== null);
+        const dial = findChild(bar.contentItem, "phoneBatteryPill");
+        const keyboard = findChild(bar.contentItem, "keyboardBatteryPill");
+        const block = findChild(bar.contentItem, "batteryBlock");
+        tryVerify(() => dial.x > keyboard.x);
+        compare(dial.parent, keyboard.parent); compare(dial.width, keyboard.width); compare(dial.height, keyboard.height);
+        compare(dial.iconName, "smartphone"); compare(dial.value, 80); compare(dial.tooltipText, "80%");
+        compare(dial.lowThreshold, 40); verify(!dial.interactive); compare(dial.actionHint, "");
+        compare(dial.accent.toString(), keyboard.accent.toString());
+        verify(dial.accessibleText.includes("Pixel 8 Pro"));
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: 0.4})]);
+        compare(dial.accent.toString(), "#f4dbd6"); verify(!block.warning);
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: 0.2})]);
+        compare(dial.value, 20); compare(dial.accent.toString(), "#ed8796"); verify(block.warning);
+        telemetry.acceptSystem({cpu: 23, memory: 51, usbDevices: [{vendorId: "18d1", productId: "4ee1", serial: "38051FDJG003S6"}]});
+        verify(dial.charging); compare(dial.accent.toString(), "#a6da95");
+        verify(!block.warning); verify(block.pluggedIn);
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {connected: false})]);
+        verify(dial.pluggedIn); verify(!dial.known); compare(dial.tooltipText, "—");
+        telemetry.acceptSystem({cpu: 23, memory: 51});
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: null})]);
+        tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") !== null);
+        const restoredDial = findChild(bar.contentItem, "phoneBatteryPill");
+        verify(!restoredDial.known); compare(restoredDial.tooltipText, "—"); verify(!block.warning);
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: 0})]);
+        verify(restoredDial.known); compare(restoredDial.tooltipText, "0%");
+        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {connected: false})]);
+        tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") === null);
+        verify(keyboard.visible);
+        power.bluetoothDevices = keyboards.concat([phone]);
+        tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") !== null);
+        compare(findChild(bar.contentItem, "phoneBatteryPill").value, 80);
+      } finally { restore(); }
+    }
+    function test_all_battery_widgets_share_unknown_powered_and_low_states() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;
+      const previousPowerDevices = power.powerDevices;
+      const accessories = [
+        {icon: "input-keyboard", address: "KEYBOARD", dbusPath: "/keyboard", connected: true, batteryAvailable: false},
+        {icon: "input-mouse", address: "MOUSE", dbusPath: "/mouse", name: "Test mouse", connected: true, batteryAvailable: false},
+        {name: "Pixel Buds", address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: false},
+        {icon: "phone", address: "94:45:60:3C:A5:14", name: "Test Pixel", connected: true, batteryAvailable: false}
+      ];
+      const dialNames = ["batteryPill", "keyboardBatteryPill", "mouseBatteryPill", "earbudBatteryPill", "phoneBatteryPill"];
+      try {
+        power.powerDevices = [];
+        power.battery = {ready: true, isPresent: true, percentage: null}; power.onBattery = true;
+        power.bluetoothDevices = accessories;
+        tryVerify(() => dialNames.every(name => findChild(bar.contentItem, name) !== null));
+        const dials = dialNames.map(name => findChild(bar.contentItem, name));
+        const block = findChild(bar.contentItem, "batteryBlock");
+        compare(power.batteries.length, 5); verify(!block.warning); verify(!block.pluggedIn);
+        for (const dial of dials) {
+          verify(dial.visible); verify(!dial.known); compare(dial.tooltipText, "—");
+          compare(dial.indicatorColor.toString(), dials[0].indicatorColor.toString());
+          compare(dial.width, dials[0].width); compare(dial.height, dials[0].height);
+        }
+        power.onBattery = false;
+        power.powerDevices = accessories.filter(device => device.icon !== "phone").map(device => ({ready: true, isPresent: true,
+          nativePath: device.dbusPath, state: UPowerDeviceState.Charging}));
+        power.telemetry.acceptSystem({cpu: 23, memory: 51, usbDevices: [{vendorId: "18d1", serial: "38051FDJG003S6"}]});
+        verify(block.pluggedIn); verify(!block.warning);
+        for (const dial of dials) {
+          verify(dial.pluggedIn); verify(!dial.known); compare(dial.tooltipText, "—");
+          compare(dial.indicatorColor.toString(), "#a6da95");
+          verify(dial.accessibleText.includes("Powered")); verify(!dial.accessibleText.includes("Charging"));
+        }
+        power.onBattery = true; power.powerDevices = [];
+        power.telemetry.acceptSystem({cpu: 23, memory: 51});
+        for (const level of [100, 40, 20, 12, 0]) {
+          power.battery = {ready: true, isPresent: true, percentage: level / 100};
+          power.bluetoothDevices = accessories.map(device => Object.assign({}, device, {batteryAvailable: true, battery: level / 100}));
+          compare(block.warning, level < 40); verify(!block.pluggedIn);
+          for (const dial of dials) {
+            verify(dial.known); compare(dial.tooltipText, level + "%"); verify(!dial.pluggedIn);
+            const threshold = dial.objectName === "phoneBatteryPill" ? 40 : 20;
+            compare(dial.lowThreshold, threshold);
+            compare(dial.indicatorColor.toString(), level < threshold ? "#ed8796" : "#f4dbd6");
+          }
+        }
+        power.bluetoothDevices = accessories.map(device => Object.assign({}, device, {connected: false}));
+        tryVerify(() => dialNames.slice(1).every(name => findChild(bar.contentItem, name) === null));
+        compare(power.batteries.length, 1); verify(findChild(bar.contentItem, "batteryPill").visible);
+      } finally { power.powerDevices = previousPowerDevices; restore(); }
     }
     function test_dials_render_a_full_circle_and_preserve_battery_states() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
@@ -750,16 +990,86 @@ ShellRoot {
           tryCompare(capsule, "height", bar.blockHeight, 1000);
           compare(capsule.y, bar.barTopInset);
           compare(capsule.radius, 21);
-          verify(capsule.width <= 434);
+          verify(capsule.width <= 340);
         }
         compare(findChild(capsule, "voiceDictationIndicator").implicitHeight, 42);
-        compare(capsule.panelWidth, 434, "Do not enlarge the detailed panels");
+        compare(capsule.panelWidth, 340, "Keep the detailed panels within the compact width limit");
         for (const mode of ["calendar", "system", "storage", "audio"]) {
           app.coordinator.open(mode, bar.monitorName);
           verify(capsule.targetHeight > 42);
-          compare(capsule.maximumWidth, 434);
+          compare(capsule.maximumWidth, 340);
         }
       } finally { app.coordinator.close(app.coordinator.mode); }
+    }
+    function test_search_results_resize_without_moving_the_search_field() {
+      const bar = app.bars[0], capsule = bar.capsule;
+      const apps = app.services.appLauncher;
+      const previous = {applications: apps.applications, appQuery: apps.query};
+      const names = Array.from({length: 30}, (_, index) => "Result " + String(index).padStart(2, "0"));
+      try {
+        app.coordinator.messenger.hide();
+        tryCompare(capsule.messengerHost, "presented", false, 1000);
+        apps.applications = names.map(name => ({id: name + ".desktop", name, noDisplay: false,
+          genericName: "", keywords: [], comment: "", startupClass: "", icon: "application-x-executable", actions: []}));
+        const mode = "launcher";
+        const controller = apps;
+        const view = capsule.contentViews[mode];
+        const field = findChild(view, "appSearchInput");
+        const list = findChild(view, "appResults");
+        controller.setQuery("");
+        app.coordinator.targetMonitor = bar.monitorName;
+        app.coordinator.mode = mode;
+        tryCompare(capsule, "visualTargetMode", mode, 1000);
+        tryCompare(capsule, "height", 398, 1000);
+        tryCompare(capsule, "transitionProgress", 1, 1000);
+        tryCompare(field, "activeFocus", true);
+        function stableSearch() {
+          fixture.stage = mode + ": stable search geometry " + JSON.stringify({
+            capsuleHeight: capsule.height, targetHeight: capsule.targetHeight, viewHeight: view.height,
+            scale: view.scale, opacity: view.opacity, fieldY: field.mapToItem(capsule, 0, 0).y,
+            viewport: list.height, focus: field.activeFocus});
+          compare(view.height, capsule.height);
+          compare(view.transform[0].xScale, 1);
+          compare(view.transform[0].yScale, 1);
+          compare(view.opacity, 1);
+          fuzzyCompare(field.mapToItem(capsule, 0, 0).y, 7, 0.01);
+          fuzzyCompare(list.height, capsule.height - 56, 0.01);
+          verify(field.activeFocus);
+        }
+        fixture.stage = mode + ": shrink to a single result";
+        controller.setQuery("Result 09");
+        fixture.stage = mode + ": one result target " + capsule.targetHeight;
+        compare(capsule.targetHeight, 98);
+        let lastHeight = capsule.height;
+        for (let frame = 0; frame < 5; ++frame) {
+          wait(16);
+          fixture.stage = mode + ": shrinking frame " + frame + ", height=" + capsule.height + ", previous=" + lastHeight;
+          verify(capsule.height <= lastHeight && capsule.height >= 98);
+          stableSearch();
+          lastHeight = capsule.height;
+        }
+        verify(capsule.height > 98 && capsule.height < 398, "Resize must animate, not snap");
+        fixture.stage = mode + ": reverse mid-resize";
+        const interruptedHeight = capsule.height;
+        controller.setQuery("");
+        compare(capsule.targetHeight, 398);
+        fuzzyCompare(capsule.height, interruptedHeight, 0.01, "Continue from the displayed size");
+        wait(48);
+        verify(capsule.height > interruptedHeight && capsule.height < 398);
+        stableSearch();
+        fixture.stage = mode + ": compact empty state";
+        controller.setQuery("no-such-result");
+        compare(capsule.targetHeight, 114);
+        tryCompare(capsule, "height", 114, 1000);
+        stableSearch();
+        fixture.stage = mode + ": restore full results";
+        controller.setQuery("");
+        tryCompare(capsule, "height", 398, 1000);
+        stableSearch();
+      } finally {
+        app.coordinator.close(app.coordinator.mode);
+        apps.applications = previous.applications; apps.setQuery(previous.appQuery);
+      }
     }
     function test_registry_and_real_bar_bindings() {
       wait(150);
@@ -854,6 +1164,7 @@ ShellRoot {
       brightness.reset();
     }
     function test_chat_weather_handoff_has_one_material_and_one_endpoint() {
+      fixture.stage = "chat handoff: initialize";
       tryVerify(() => app.bars.length > 0);
       const bar = app.bars[0], capsule = bar.capsule, host = capsule.messengerHost;
       const bubble = findChild(host, "beeperBubble"), animation = findChild(bubble, "beeperBubbleReveal");
@@ -862,20 +1173,41 @@ ShellRoot {
       try {
         bubble.animate = false;
         app.coordinator.messenger.show(bar.monitorName);
+        fixture.stage = "chat handoff: open " + JSON.stringify({progress: bubble.progress,
+          active: host.active, blocked: app.coordinator.messenger.blocked});
         compare(bubble.progress, 1);
         bubble.animate = true;
         app.coordinator.open("calendar", bar.monitorName);
         animation.pause();
+        fixture.stage = "chat handoff: calendar target " + JSON.stringify({targetHeight: capsule.targetHeight,
+          sourceWidth: bubble.capsuleWidth, sourceHeight: bubble.capsuleHeight,
+          targetWidth: capsule.targetWidth, capsuleHeight: capsule.height, surfaceHeight: bubble.surfaceItem.height,
+          presented: host.presented, active: host.active, bubbleVisible: bubble.visible,
+          hostVisible: host.visible, frameVisible: bar.barContent.visible, windowVisible: bar.visible,
+          handoff: capsule.chatHandoff, drawBackground: capsule.drawBackground});
         verify(capsule.targetHeight > 36);
         compare(bubble.capsuleWidth, capsule.targetWidth);
         compare(bubble.capsuleHeight, capsule.targetHeight);
-        compare(capsule.height, capsule.targetHeight);
+        compare(capsule.height, bubble.surfaceItem.height);
         for (const progress of [1, 0.6, 0.3, 0.05, 0.002]) {
           bubble.progress = progress;
+          fixture.stage = "chat handoff frame " + progress + " " + JSON.stringify({visible: bubble.visible,
+            drawBackground: capsule.drawBackground, width: capsule.width, surfaceWidth: bubble.surfaceItem.width,
+            height: capsule.height, surfaceHeight: bubble.surfaceItem.height,
+            calendarHeight: capsule.contentViews.calendar.height, calendarWidth: capsule.contentViews.calendar.width,
+            targetHeight: capsule.targetHeight, targetWidth: capsule.targetWidth,
+            calendarOpacity: capsule.contentViews.calendar.opacity});
           verify(bubble.visible); verify(!capsule.drawBackground);
           verify(!capsuleGlass.enabled);
           verify(!(capsuleGlass.enabled && chatGlass.enabled));
           verify(bubble.surfaceItem.height >= capsule.targetHeight);
+          compare(capsule.width, bubble.surfaceItem.width);
+          compare(capsule.height, bubble.surfaceItem.height);
+          const calendar = capsule.contentViews.calendar;
+          compare(calendar.width, capsule.targetWidth);
+          compare(calendar.height, capsule.targetHeight);
+          compare(calendar.opacity, 1, "The chat transition must be the widget's only fade");
+          verifyBoundedContentScale(calendar, capsule);
         }
         bubble.progress = 0; animation.stop();
         verify(!bubble.visible); verify(capsule.drawBackground);
@@ -887,11 +1219,24 @@ ShellRoot {
 
         // Reopen from weather, then reverse mid-morph toward a different panel.
         app.coordinator.messenger.show(bar.monitorName); animation.pause();
+        verify(!capsule.drawBackground, "Opening from another widget must immediately share one surface");
         compare(bubble.capsuleHeight, settledHeight);
+        compare(capsule.contentViews.calendar.opacity, 1, "Keep the outgoing widget during the chat opening");
+        compare(capsule.contentViews.workspaces.opacity, 0, "Do not replace the outgoing widget with workspaces");
         bubble.progress = 0.45;
         const before = bubble.surfaceItem.height, y = bubble.surfaceItem.y;
+        const calendar = capsule.contentViews.calendar;
+        const alpha = calendar.opacity * capsule.opacity;
+        const xScale = calendar.transform[0].xScale, yScale = calendar.transform[0].yScale;
         app.coordinator.open("wifi", bar.monitorName); animation.pause();
+        fixture.stage = "interrupted chat handoff: " + JSON.stringify({
+          alphaBefore: alpha, alphaAfter: calendar.opacity * capsule.opacity,
+          xBefore: xScale, xAfter: calendar.transform[0].xScale,
+          yBefore: yScale, yAfter: calendar.transform[0].yScale, progress: bubble.progress});
         compare(bubble.surfaceItem.height, before); compare(bubble.surfaceItem.y, y);
+        fuzzyCompare(calendar.opacity * capsule.opacity, alpha, 0.001, "Interrupted handoff preserves the outgoing content");
+        fuzzyCompare(calendar.transform[0].xScale, xScale, 0.001, "Interrupted handoff preserves horizontal zoom");
+        fuzzyCompare(calendar.transform[0].yScale, yScale, 0.001, "Interrupted handoff preserves vertical zoom");
         compare(bubble.capsuleHeight, capsule.targetHeight);
         verify(!capsule.drawBackground);
         bubble.progress = 0; animation.stop();
@@ -900,6 +1245,137 @@ ShellRoot {
         animation.stop(); bubble.animate = false;
         app.coordinator.messenger.hide(); app.coordinator.close(app.coordinator.mode);
         bubble.animate = true;
+      }
+    }
+    function test_compact_widget_changes_keep_bounded_zoom_and_a_fixed_baseline() {
+      tryVerify(() => app.bars.length > 0);
+      const bar = app.bars[0], capsule = bar.capsule;
+      try {
+        app.coordinator.messenger.hide();
+        tryCompare(capsule.messengerHost, "presented", false, 1000);
+        app.coordinator.open("workspaces", bar.monitorName);
+        wait(450);
+        let sawWidthChange = false, sawCompression = false, sawExpansion = false;
+        const initialWidth = capsule.width;
+        for (const mode of ["bluetooth", "workspaces", "bluetooth"]) {
+          app.coordinator.open(mode, bar.monitorName);
+          for (let frame = 0; frame < 8; frame++) {
+            wait(16);
+            fixture.stage = "compact transition to " + mode + ", frame " + frame;
+            compare(capsule.height, bar.blockHeight);
+            if (Math.abs(capsule.width - initialWidth) > 1) sawWidthChange = true;
+            for (const name of ["workspaces", "bluetooth"]) {
+              const view = capsule.contentViews[name];
+              const center = view.mapToItem(capsule, view.width / 2, view.height / 2);
+              fuzzyCompare(center.y, bar.blockHeight / 2, 0.01, name + " must not rise or fall");
+              compare(view.transform[0].yScale, 1, name + " keeps its height during a width-only transition");
+              fuzzyCompare(view.width, Math.min(view.implicitWidth, capsule.maximumWidth), 0.01,
+                name + " keeps its layout while the transform follows the moving edges");
+              verifyBoundedContentScale(view, capsule);
+              if (view.transform[0].xScale < 0.99) sawCompression = true;
+              if (view.transform[0].xScale > 1.01) sawExpansion = true;
+            }
+          }
+          // Reverse before completion, while both contents can still be visible.
+        }
+        verify(sawWidthChange, "Exercise a real change in length");
+        verify(sawCompression && sawExpansion, "Both entering and leaving content must zoom horizontally");
+        wait(450);
+        compare(capsule.contentViews.bluetooth.transform[0].xScale, 1);
+        compare(capsule.contentViews.bluetooth.transform[0].yScale, 1);
+      } finally {
+        app.coordinator.close(app.coordinator.mode);
+      }
+    }
+    function test_horizontal_resize_can_turn_into_chat_without_layout_jump() {
+      tryVerify(() => app.bars.length > 0);
+      const bar = app.bars[0], capsule = bar.capsule, host = capsule.messengerHost;
+      const bubble = findChild(host, "beeperBubble"), animation = findChild(bubble, "beeperBubbleReveal");
+      try {
+        app.coordinator.messenger.hide();
+        tryCompare(host, "presented", false, 1000);
+        app.coordinator.open("workspaces", bar.monitorName); wait(450);
+        app.coordinator.open("bluetooth", bar.monitorName); wait(120);
+        const view = capsule.contentViews.bluetooth;
+        const width = view.width, height = view.height, alpha = view.opacity * capsule.opacity;
+        const xScale = view.transform[0].xScale, yScale = view.transform[0].yScale;
+        app.coordinator.messenger.show(bar.monitorName); animation.pause();
+        fixture.stage = "horizontal resize enters chat: " + JSON.stringify({
+          before: {width, height, alpha}, after: {width: view.width, height: view.height,
+            alpha: view.opacity * capsule.opacity, xScale: view.transform[0].xScale, yScale: view.transform[0].yScale},
+          sourceWidths: capsule.chatSourceWidths, sourceWeights: capsule.chatSourceOpacities,
+          surface: {width: bubble.surfaceItem.width, height: bubble.surfaceItem.height}});
+        fuzzyCompare(view.width, width, 0.01);
+        compare(view.height, height);
+        fuzzyCompare(view.opacity * capsule.opacity, alpha, 0.001);
+        fuzzyCompare(view.transform[0].xScale, xScale, 0.001);
+        fuzzyCompare(view.transform[0].yScale, yScale, 0.001);
+        bubble.progress = 0.25;
+        fixture.stage = "horizontal source during chat morph: " + JSON.stringify({width: view.width,
+          expectedWidth: width, xScale: view.transform[0].xScale, yScale: view.transform[0].yScale,
+          alpha: view.opacity * capsule.opacity});
+        fuzzyCompare(view.width, width, 0.01, "Keep the layout captured during the horizontal resize");
+        verifyBoundedContentScale(view, capsule);
+        verify(view.transform[0].xScale > 1 && view.transform[0].yScale > 1,
+          "Small outgoing content follows growth on both axes, just like large panels");
+        const before = bubble.surfaceItem.width, sourceAlpha = view.opacity * capsule.opacity;
+        app.coordinator.open("wifi", bar.monitorName); animation.pause();
+        fixture.stage = "chat reverses toward a compact widget";
+        fuzzyCompare(bubble.surfaceItem.width, before, 0.01);
+        fuzzyCompare(view.width, width, 0.01);
+        fuzzyCompare(view.opacity * capsule.opacity, sourceAlpha, 0.001);
+        verifyBoundedContentScale(view, capsule);
+      } finally {
+        animation.stop(); bubble.animate = false;
+        app.coordinator.messenger.hide(); app.coordinator.close(app.coordinator.mode);
+        bubble.animate = true;
+      }
+    }
+    function test_every_central_content_keeps_final_layout_and_shared_motion() {
+      fixture.stage = "shared content: initialize";
+      tryVerify(() => app.bars.length > 0);
+      const bar = app.bars[0], capsule = bar.capsule;
+      const animation = findChild(capsule, "capsuleContentTransition");
+      compare(animation.duration, 220);
+      try {
+        app.coordinator.messenger.hide();
+        tryCompare(capsule.messengerHost, "presented", false, 1000);
+        app.coordinator.open("calendar", bar.monitorName);
+        wait(450);
+        // All views participate, including hidden notifications/dictation and
+        // outgoing widgets whose layout must not follow the new outer width.
+        const sizes = {};
+        for (const mode of capsule.contentModes) {
+          const view = capsule.contentViews[mode];
+          sizes[mode] = {width: view.opacity > 0.001 ? view.width
+            : Math.min(view.implicitWidth, capsule.maximumWidth), height: view.height};
+        }
+        app.coordinator.showVolume(bar.monitorName);
+        wait(0); animation.pause();
+        let sawResize = false;
+        for (let frame = 0; frame < 20; frame++) {
+          wait(16);
+          capsule.transitionProgress = frame / 19;
+          if (Math.abs(capsule.width - capsule.targetWidth) > 0.1) sawResize = true;
+          for (const mode of capsule.contentModes) {
+            const view = capsule.contentViews[mode];
+            const center = view.mapToItem(capsule, view.width / 2, view.height / 2);
+            fixture.stage = "shared content " + mode + " frame " + frame + ": " + JSON.stringify({
+              width: view.width, height: view.height, expected: sizes[mode], scale: view.scale,
+              opacity: view.opacity, parentOpacity: capsule.opacity, centerX: center.x, centerY: center.y,
+              surfaceWidth: capsule.width, surfaceHeight: capsule.height});
+            fuzzyCompare(view.width, sizes[mode].width, 0.01, mode + " keeps its layout width");
+            fuzzyCompare(view.height, sizes[mode].height, 0.01, mode + " keeps its layout height");
+            verifyBoundedContentScale(view, capsule);
+            fuzzyCompare(center.x, capsule.width / 2, 0.6, mode + " stays horizontally centered");
+            fuzzyCompare(center.y, capsule.height / 2, 0.6, mode + " stays centered in the growing surface");
+          }
+        }
+        fixture.stage = "shared content: observed resize=" + sawResize;
+        verify(sawResize, "Exercise a moving surface, not only its final frame");
+      } finally {
+        animation.stop();
+        app.coordinator.close(app.coordinator.mode);
       }
     }
     function test_system_notifications_stay_in_bar_without_stealing_chat_focus() {

@@ -43,7 +43,7 @@ Scope {
   }
   function open(kind, monitor = "", restore = false) {
     if (!["workspaces", "volume", "brightness", "media", "audio", "calendar", "system",
-          "storage", "wifi", "bluetooth", "updates", "launcher", "tabs"].includes(kind)) return;
+          "storage", "wifi", "bluetooth", "updates", "launcher"].includes(kind)) return;
     if (kind === "workspaces") { close(mode); return; }
     const target = resolveMonitor(monitor), previous = mode;
     if (notificationCovers(target)) services.notifications.close();
@@ -63,10 +63,6 @@ Scope {
     } else if (kind === "launcher") {
       if (previous !== "launcher") services.appLauncher.setQuery("");
       services.appLauncher.refreshResults();
-    } else if (kind === "tabs") {
-      services.chromeTabs.setQuery("");
-      services.chromeTabs.selectedIndex = 0;
-      services.chromeTabs.requestTabs();
     }
     // Resolve the destination layout before the messenger captures its return
     // geometry, so it morphs to this widget rather than a stale workspace pill.

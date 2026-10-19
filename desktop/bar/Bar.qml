@@ -12,6 +12,8 @@ PanelWindow {
   id: window
   objectName: "desktopBar"
   readonly property Item capsule: centerMorph
+  readonly property Item barContent: contentFrame
+  readonly property QtObject dimming: dimmingPolicy
 
   required property var modelData
   required property var services
@@ -43,8 +45,8 @@ PanelWindow {
 
   margins {
     top: 0
-    left: 10
-    right: 10
+    left: 0
+    right: 0
   }
 
   // Keep the layer surface geometry fixed so expanding the update card cannot
@@ -82,8 +84,33 @@ PanelWindow {
     interval: 360
   }
 
+  DimmingPolicy {
+    id: dimmingPolicy
+    centralMode: centerMorph.targetMode
+    chatOpen: messengerSurface.active
+    specialWorkspaceOpen: (window.hyprlandMonitor?.lastIpcObject?.specialWorkspace?.id ?? 0) < 0
+    opaqueTheme: !GlassState.enabled
+  }
+
+  PanelBackdrop {
+    id: panelBackdrop
+    objectName: "panelBackdrop"
+    shown: dimmingPolicy.shellBackdropWanted
+    suppressed: dimmingPolicy.shellSuppressed
+  }
+
+  Item {
+    id: contentFrame
+    objectName: "barContent"
+    anchors.fill: parent
+    anchors.leftMargin: 10
+    anchors.rightMargin: 10
+    z: 1
+  }
+
   Row {
     id: leftModules
+    parent: contentFrame
     objectName: "leftBarModules"
     z: 2
     anchors.left: parent.left
@@ -219,10 +246,27 @@ PanelWindow {
       onRightClicked: services.updates.forceStatus()
     }
 
+    BarBlock {
+      objectName: "storageBlock"
+      circularContent: true
+      accent: Theme.sideSystem
+      forceHovered: coordinator.isOpen("storage", window.monitorName)
+      BarDial {
+        objectName: "storagePill"
+        iconName: "hard-drive"
+        label: "Storage used"
+        value: services.system.diskUsage
+        accent: Theme.sideSystem
+        forceHovered: coordinator.isOpen("storage", window.monitorName)
+        interactive: true
+        onLeftClicked: coordinator.toggle("storage", window.monitorName)
+      }
+    }
   }
 
   CentralCapsule {
     id: centerMorph
+    parent: contentFrame
     services: window.services
     coordinator: window.coordinator
     messengerHost: messengerSurface
@@ -238,6 +282,7 @@ PanelWindow {
 
   MessengerHost {
     id: messengerSurface
+    parent: contentFrame
     anchors.fill: parent
     controller: window.messenger
     panelWindow: window
@@ -249,13 +294,15 @@ PanelWindow {
     transcribing: services.dictation.transcribing
     barTop: window.capsuleTopInset
     workAreaTop: window.exclusiveZone
-    sourceWidth: centerMorph.width
-    sourceHeight: centerMorph.height
+    sourceWidth: presented ? centerMorph.targetWidth : centerMorph.width
+    sourceHeight: presented ? centerMorph.targetHeight : centerMorph.height
+    onAboutToOpen: centerMorph.captureChatSource()
     onReturnFocusRequested: window.restoreCenterFocus()
   }
 
   Row {
     id: rightModules
+    parent: contentFrame
     objectName: "rightBarModules"
     z: 2
     anchors.right: parent.right
@@ -273,23 +320,6 @@ PanelWindow {
     }
     Behavior on opacity { NumberAnimation { duration: 240 } }
 
-    BarBlock {
-      objectName: "storageBlock"
-      circularContent: true
-      accent: Theme.sideSystem
-      forceHovered: coordinator.isOpen("storage", window.monitorName)
-      BarDial {
-        objectName: "storagePill"
-        iconName: "hard-drive"
-        label: "Storage used"
-        value: services.system.diskUsage
-        accent: Theme.sideSystem
-        forceHovered: coordinator.isOpen("storage", window.monitorName)
-        interactive: true
-        onLeftClicked: coordinator.toggle("storage", window.monitorName)
-      }
-    }
-
     UsageBlock {
       controller: services.usage
     }
@@ -298,70 +328,71 @@ PanelWindow {
       id: batteryBlock
       objectName: "batteryBlock"
       circularContent: true
-      readonly property bool warning: (services.power.batteryAvailable
-        && !services.power.batteryPluggedIn && services.power.batteryPercent < 20)
-        || services.power.accessoryBatteries.some(device =>
-          !device.pluggedIn && device.percent !== null && device.percent < 20)
-      readonly property bool pluggedIn: services.power.batteryPluggedIn
-        || services.power.accessoryBatteries.some(device => device.pluggedIn)
-      visible: services.power.batteryAvailable || services.power.accessoryBatteries.length > 0
+      readonly property bool warning: services.power.batteries.some(device =>
+          !device.pluggedIn && device.percent !== null && device.percent < device.lowThreshold)
+      readonly property bool pluggedIn: services.power.batteries.some(device => device.pluggedIn === true)
+      visible: services.power.batteries.length > 0
       accent: warning ? Theme.error : pluggedIn ? Theme.batteryPluggedIn : Theme.sideBattery
 
       Row {
         spacing: Theme.barSize(4)
-        BarDial {
+        BatteryDial {
           objectName: "batteryPill"
           visible: services.power.batteryAvailable
           iconName: "laptop"
           label: "Laptop battery"
           value: services.power.batteryPercent
-          charging: services.power.batteryPluggedIn
-          accent: batteryBlock.batteryColor(value, charging)
+          pluggedIn: services.power.batteryPluggedIn
         }
         Repeater {
           model: services.power.keyboardBatteries.length
-          delegate: BarDial {
+          delegate: BatteryDial {
             required property int index
             readonly property var device: services.power.keyboardBatteries[index] ?? null
             objectName: index === 0 ? "keyboardBatteryPill" : "keyboardBatteryPill" + index
             iconName: "keyboard"
             label: "Keyboard battery" + (services.power.keyboardBatteries.length > 1 ? " " + (index + 1) : "")
             value: device?.percent ?? null
-            charging: device?.pluggedIn ?? false
-            accent: batteryBlock.batteryColor(value, charging)
+            pluggedIn: device?.pluggedIn === true
           }
         }
         Repeater {
           model: services.power.mouseBatteries.length
-          delegate: BarDial {
+          delegate: BatteryDial {
             required property int index
             readonly property var device: services.power.mouseBatteries[index] ?? null
             objectName: index === 0 ? "mouseBatteryPill" : "mouseBatteryPill" + index
             iconName: "mouse"
             label: (device?.name || "Mouse") + " battery"
             value: device?.percent ?? null
-            charging: device?.pluggedIn ?? false
-            accent: batteryBlock.batteryColor(value, charging)
+            pluggedIn: device?.pluggedIn === true
           }
         }
         Repeater {
           model: services.power.earbudBatteries.length
-          delegate: BarDial {
+          delegate: BatteryDial {
             required property int index
             readonly property var device: services.power.earbudBatteries[index] ?? null
             objectName: index === 0 ? "earbudBatteryPill" : "earbudBatteryPill" + index
             iconName: "headphones"
             label: (device?.name || "Pixel Buds") + " battery"
             value: device?.percent ?? null
-            charging: device?.pluggedIn ?? false
-            accent: batteryBlock.batteryColor(value, charging)
+            pluggedIn: device?.pluggedIn === true
           }
         }
-      }
-
-      function batteryColor(percent, pluggedIn) {
-        return pluggedIn ? Theme.batteryPluggedIn
-          : percent !== null && percent < 20 ? Theme.error : Theme.sideBattery;
+        Repeater {
+          model: services.power.phoneBatteries.length
+          delegate: BatteryDial {
+            required property int index
+            readonly property var device: services.power.phoneBatteries[index] ?? null
+            objectName: index === 0 ? "phoneBatteryPill" : "phoneBatteryPill" + index
+            iconName: "smartphone"
+            label: (device?.name || "Phone") + " battery"
+            value: device?.percent ?? null
+            lowThreshold: device?.lowThreshold ?? 40
+            pluggedIn: device?.pluggedIn === true
+          }
+        }
       }
     }
 

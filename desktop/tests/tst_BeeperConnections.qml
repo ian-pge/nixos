@@ -31,11 +31,11 @@ ShellRoot {
         {accountID: "wa-work", network: "WhatsApp", status: "connected"},
         {id: "telegram", network: "Telegram", status: "connected"}
       ];
-      beeperData.chats = [
+      beeperData.replaceChats([
         {id: "personal", title: "Camille", type: "single", accountID: "wa-personal", network: "WhatsApp"},
         {id: "work", title: "Work", type: "single", accountID: "wa-work", network: "WhatsApp"},
         {id: "telegram-chat", title: "Léa", type: "single", accountID: "telegram", network: "Telegram"}
-      ];
+      ]);
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true});
       beeperData.selectChat("personal");

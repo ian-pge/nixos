@@ -44,6 +44,14 @@ const requests = net.createServer(socket => {
       }
       if (request === "j/workspaces") return socket.end(JSON.stringify(workspaces));
       if (request === "j/clients") return socket.end("[]");
+      if (request === "dispatch test-special-open" || request === "dispatch test-special-close") {
+        const open = request.endsWith("open");
+        monitors.find(monitor => monitor.name === "DP-2").specialWorkspace = open
+          ? {id: -99, name: "special:DimmingTest"} : {id: 0, name: ""};
+        for (const client of eventClients)
+          client.write("activespecial>>" + (open ? "special:DimmingTest" : "") + ",DP-2\n");
+        return socket.end("ok");
+      }
       if (request === "dispatch test-monitor-undock") {
         monitors.splice(monitors.indexOf(externalMonitor), 1);
         const laptop = monitors[0];

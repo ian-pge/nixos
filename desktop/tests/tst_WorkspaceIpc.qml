@@ -151,5 +151,37 @@ ShellRoot {
       compare(root.second.workspaceIds.join(","), "6,7,8,9,10");
       verifyPair(1, 6);
     }
+    function test_special_workspace_dimming_uses_authoritative_monitor_snapshots() {
+      const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../shell/DimmingPolicy.qml");
+      compare(component.status, Component.Ready, component.errorString());
+      const firstPolicy = component.createObject(root, {
+        centralMode: "bluetooth",
+        specialWorkspaceOpen: Qt.binding(() => (root.monitor("DP-2")?.lastIpcObject?.specialWorkspace?.id ?? 0) < 0)
+      });
+      const secondPolicy = component.createObject(root, {
+        specialWorkspaceOpen: Qt.binding(() => (root.monitor("eDP-1")?.lastIpcObject?.specialWorkspace?.id ?? 0) < 0)
+      });
+      try {
+        verify(firstPolicy.shellBackdropWanted);
+        verify(!secondPolicy.requested);
+        Hyprland.dispatch("test-special-open");
+        tryCompare(firstPolicy, "specialWorkspaceOpen", true);
+        verify(firstPolicy.requested); verify(firstPolicy.compositorOwnsBackdrop);
+        verify(!firstPolicy.shellBackdropWanted); verify(!secondPolicy.requested);
+        firstPolicy.centralMode = "brightness";
+        verify(firstPolicy.requested, "An exempt widget cannot cancel native special dimming");
+        firstPolicy.centralMode = "bluetooth";
+        Hyprland.dispatch("test-special-close");
+        tryCompare(firstPolicy, "specialWorkspaceOpen", false);
+        verify(firstPolicy.requested); verify(firstPolicy.shellBackdropWanted);
+        verify(!secondPolicy.requested);
+        firstPolicy.centralMode = "workspaces";
+        verify(!firstPolicy.requested);
+      } finally {
+        Hyprland.dispatch("test-special-close");
+        tryCompare(firstPolicy, "specialWorkspaceOpen", false);
+        firstPolicy.destroy(); secondPolicy.destroy();
+      }
+    }
   }
 }

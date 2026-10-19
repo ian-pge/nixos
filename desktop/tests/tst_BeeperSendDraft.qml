@@ -23,7 +23,7 @@ ShellRoot {
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {deferDrafts: true});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true});
-      beeperData.chats = [{id: "first", title: "First", unreadCount: 2}, {id: "other", title: "Other"}];
+      beeperData.replaceChats([{id: "first", title: "First", unreadCount: 2}, {id: "other", title: "Other"}]);
       panel.chooseChat(0); beeperData.respond("getDraft", {});
       beeperData.respond("messages", {items: [{id: "incoming", chatID: "first", text: "Hello", timestamp: "2026-09-26T10:00:00Z"}], hasMore: false});
       tryCompare(panel, "restoringView", false); panel.compose(); wait(20);

@@ -33,7 +33,7 @@ ShellRoot {
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {beeperData: beeperData, width: 1280, height: 900, active: true, windowFocused: true, vimEditing: true,
           clipboardWriter: text => { fixture.copiedTexts = fixture.copiedTexts.concat([text]); }});
-      beeperData.chats = [{id: "chat-a", title: "First chat", capabilities: {reaction: 2}}];
+      beeperData.replaceChats([{id: "chat-a", title: "First chat", capabilities: {reaction: 2}}]);
       beeperData.selectChat("chat-a");
       beeperData.respond("messages", {items: [{id: "message-0", chatID: "chat-a", senderName: "Contact", text: "Hello",
         timestamp: new Date(1700000000000).toISOString()}], hasMore: false});

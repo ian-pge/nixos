@@ -14,7 +14,7 @@ BeeperData {
   property bool deferAttachments: false
   property bool deferImageEdits: false
   function request(method, params, callback, quiet) {
-    if (["accounts", "chats", "unreadCounts", "messages", "message", "search", "send", "read", "unread", "updateChat", "react", "download", "saveAttachment"].includes(method)
+    if (["accounts", "chats", "chatStates", "messages", "message", "search", "send", "read", "unread", "updateChat", "react", "download", "saveAttachment"].includes(method)
         || (deferDrafts && ["getDraft", "saveDraft"].includes(method))
         || (deferAttachments && ["stageAttachment", "stageAttachments"].includes(method))
         || (deferImageEdits && ["prepareImageEdit", "discardAttachment"].includes(method))

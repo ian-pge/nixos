@@ -12,6 +12,7 @@ Item {
   property url logoSource: ""
   property string badgeText: ""
   property string label: ""
+  property string actionHint: ""
   property var value: null
   property color accent: Theme.foreground
   property bool interactive: false
@@ -20,11 +21,12 @@ Item {
   property bool charging: false
   readonly property bool known: typeof value === "number" && isFinite(value)
   readonly property real fraction: known ? Math.max(0, Math.min(100, value)) / 100 : 0
-  readonly property string tooltipText: known ? Math.round(value) + "%" : "—"
+  readonly property string tooltipText: (known ? Math.round(value) + "%" : "—")
+    + (actionHint ? "\n" + actionHint : "")
   property string accessibleText: label + " · "
     + (known ? Math.round(value) + "%" : "Unavailable")
     + (charging ? " · Charging" : muted ? " · Muted" : "")
-  readonly property color indicatorColor: known && !muted ? accent : Theme.inactive
+  readonly property color indicatorColor: (known || charging) && !muted ? accent : Theme.inactive
   property real displayedFraction: fraction
   Behavior on displayedFraction {
     enabled: root.known
@@ -35,6 +37,7 @@ Item {
   implicitHeight: Theme.barSize(32)
   Accessible.role: interactive ? Accessible.Button : Accessible.Indicator
   Accessible.name: accessibleText
+  Accessible.description: actionHint
   signal leftClicked()
   signal rightClicked()
   signal wheelUp()

@@ -66,7 +66,7 @@ ShellRoot {
       const tail = {id: "older-page-chat", title: "Ancienne conversation"};
       beeperData.chatsInitialized = true; beeperData.chatsCursor = "oldest-page-cursor"; beeperData.hasMoreChats = false;
       beeperData.refreshChats(false);
-      beeperData.chats = beeperData.chats.concat([tail]);
+      beeperData.replaceChats(beeperData.chats.concat([tail]));
       wait(20);
       verify(beeperData.chats.some(chat => chat.id === tail.id));
       compare(beeperData.chatsCursor, "oldest-page-cursor"); verify(!beeperData.hasMoreChats);
@@ -82,8 +82,8 @@ ShellRoot {
     }
     function test_reply_updates_unread_count_without_marking_new_arrivals_or_other_chats() {
       beeperData.selectChat("studio"); wait(20);
-      beeperData.chats = beeperData.chats.map(chat => ["studio", "lea"].includes(chat.id)
-        ? Object.assign({}, chat, {unreadCount: 4, isMarkedUnread: true}) : chat);
+      beeperData.replaceChats(beeperData.chats.map(chat => ["studio", "lea"].includes(chat.id)
+        ? Object.assign({}, chat, {unreadCount: 4, isMarkedUnread: true}) : chat));
       beeperData.draftText = "Reply before a new arrival"; beeperData.sendMessage();
       beeperData.demoMessages.studio = beeperData.demoMessages.studio.concat([
         {id: "after-reply-started", chatID: "studio", text: "New arrival", isUnread: true, timestamp: new Date().toISOString()}

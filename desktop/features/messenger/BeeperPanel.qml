@@ -15,6 +15,7 @@ FocusScope {
   property real dictationEnergy: 0
   property string navigation: "chats"
   property int chatIndex: 0
+  property var pendingReadNavigation: null
   property int messageIndex: -1
   readonly property string networkFilter: beeperData.networkFilter
   readonly property bool showLowPriority: beeperData.showLowPriority
@@ -215,6 +216,7 @@ FocusScope {
   }
   function toggleUnreadFirst() {
     if (!canCycleNetwork) return;
+    pendingReadNavigation = null;
     gPending = false;
     beeperData.unreadFirst = !unreadFirst;
     syncChatIndex();
@@ -225,22 +227,17 @@ FocusScope {
   }
   function markSelectedChatRead() {
     const chat = beeperData.currentChat;
-    if (!chat) return;
-    const advance = unreadFirst && Format.isChatUnread(chat);
-    const index = chatIndex, generation = beeperData.chatGeneration;
-    const network = networkFilter, lowPriority = showLowPriority;
-    beeperData.markChatRead(chat.id, "", (result, error) => {
-      if (error || !advance || !unreadFirst || !canCycleNetwork
-          || beeperData.chatGeneration !== generation || beeperData.currentChatID !== chat.id
-          || networkFilter !== network || showLowPriority !== lowPriority
-          || Format.isChatUnread(beeperData.currentChat)) return;
-      // Stay in the unread section instead of following this chat down into
-      // the read section. A late reply must not undo subsequent navigation.
-      const unread = filteredChats.filter(Format.isChatUnread);
-      const next = unread[Math.min(index, unread.length - 1)];
-      chooseChat(next ? filteredChats.findIndex(item => item.id === next.id) : 0);
-      focusNavigation();
+    if (!chat || beeperData.readStateOperations[chat.id]) return;
+    const navigation = {id: chat.id, generation: beeperData.chatGeneration, network: networkFilter,
+      lowPriority: showLowPriority, mode: root.navigation, previewID: chat.preview?.id || "",
+      advance: unreadFirst && Format.isChatUnread(chat), held: false};
+    pendingReadNavigation = navigation;
+    const accepted = beeperData.markChatRead(chat.id, "", (result, error) => {
+      // A successful reply may still contain the previous unread flags.
+      // Keep the navigation intent until the shared store confirms "read".
+      if ((error || !navigation.advance) && pendingReadNavigation === navigation) pendingReadNavigation = null;
     });
+    if (!accepted && pendingReadNavigation === navigation) pendingReadNavigation = null;
   }
   function toggleLowPriorityView() {
     if (!active || !windowFocused || modal || recording || preparingRecording || messageSearch.opened) return;
@@ -264,13 +261,13 @@ FocusScope {
     focusNavigation();
   }
   function openChat(chatID, messageID) { closeConversationSearch(false); pinLatest = false; pendingOpenMessageID = messageID || ""; beeperData.selectChat(chatID, messageID || ""); navigation = "messages"; }
-  function chooseChat(index) {
+  function chooseChat(index, reveal = true) {
     if (!filteredChats.length) return;
     chatIndex = Math.max(0, Math.min(filteredChats.length - 1, index));
     rememberPosition();
     if (recording || preparingRecording) stopRecording();
     editMessageID = ""; beeperData.selectChat(filteredChats[chatIndex].id, "", true); messageIndex = -1;
-    sidebar.revealChat(chatIndex);
+    if (reveal) sidebar.revealChat(chatIndex);
   }
   function moveMessageSelection(delta) {
     cancelReplyNavigation();
@@ -636,7 +633,7 @@ FocusScope {
     } else if (beeperData.viewOwner === root) { beeperData.viewOwner = null; beeperData.viewFocused = false; }
   }
   onActiveChanged: {
-    if (!active) { arrivalBaseline = null; messageList.clearArrivals(); }
+    if (!active) { pendingReadNavigation = null; arrivalBaseline = null; messageList.clearArrivals(); }
     if (!active) { rememberPosition(); clearMessageSelection(); closeConversationSearch(false); messageWheel.reset(); messageList.cancelFlick(); historyWheelTimer.stop(); pinLatest = false; stopRecording(); beeperData.flushDraft(); modal = ""; closeChatSearch(); }
     else { reconcilePrioritySelection(); restoringView = true; Qt.callLater(ensureInitialChat); Qt.callLater(restorePosition); }
     updateView(); schedulePagination();
@@ -659,6 +656,36 @@ FocusScope {
   }
   Connections {
     target: root.beeperData
+    function onReadStateApplying(chatID) {
+      const navigation = root.pendingReadNavigation;
+      if (!navigation || navigation.id !== chatID || !navigation.advance) return;
+      // An asynchronous completion is not a keyboard shortcut: a temporary
+      // loss of native focus must not make the selection follow the read row.
+      // Actual navigation, typing, a changed view or new activity cancels it.
+      if (!root.active || !root.unreadFirst || root.modal || root.searchOpen || messageSearch.opened
+          || root.recording || root.preparingRecording || root.composer.activeFocus
+          || root.navigation !== navigation.mode || root.beeperData.currentChatID !== chatID
+          || root.beeperData.chatGeneration !== navigation.generation
+          || root.networkFilter !== navigation.network || root.showLowPriority !== navigation.lowPriority
+          || (root.beeperData.currentChat?.preview?.id || "") !== navigation.previewID) {
+        root.pendingReadNavigation = null;
+        return;
+      }
+      navigation.index = root.chatIndex;
+      navigation.viewport = sidebar.holdReadViewport();
+      navigation.held = true;
+    }
+    function onReadStateApplied(chatID) {
+      const navigation = root.pendingReadNavigation;
+      if (!navigation || navigation.id !== chatID || !navigation.held) return;
+      root.pendingReadNavigation = null;
+      const unread = root.filteredChats.filter(Format.isChatUnread);
+      const next = unread[Math.min(navigation.index, unread.length - 1)];
+      root.chooseChat(next ? root.filteredChats.findIndex(item => item.id === next.id) : 0, false);
+      root.navigation = "chats";
+      if (root.windowFocused) root.focusNavigation();
+      sidebar.releaseReadViewport(navigation.viewport, root.chatIndex);
+    }
     function onAttachmentsSaved(chatID, messageID, saved, total, directory) {
       if (!root.active || root.beeperData.currentChatID !== chatID) return;
       root.notice = saved === total ? "Saved " + saved + (saved === 1 ? " attachment to " : " attachments to ") + directory
@@ -972,7 +999,10 @@ FocusScope {
     else if (key === "/") { openChatSearch(); event.accepted = true; }
     else if (key === "?" || event.key === Qt.Key_Question) { if (!event.isAutoRepeat) openModal("help"); event.accepted = true; }
     else if (key === "m" && beeperData.currentChatID) { if (!event.isAutoRepeat) markSelectedChatRead(); event.accepted = true; }
-    else if (key === "n" && beeperData.currentChatID) { if (!event.isAutoRepeat) beeperData.markChatUnread(beeperData.currentChatID); event.accepted = true; }
+    else if (key === "n" && beeperData.currentChatID) {
+      if (!event.isAutoRepeat) { pendingReadNavigation = null; beeperData.markChatUnread(beeperData.currentChatID); }
+      event.accepted = true;
+    }
     else if (key === "r" && selectedMessage) { replyToSelectedMessage(); event.accepted = true; }
     else if (key === "e" && selectedMessage?.isSender) { editSelectedMessage(); event.accepted = true; }
     else if (key === "y" && (selectedText || selectedMessage)) { if (!event.isAutoRepeat) yank(); event.accepted = true; }
@@ -989,6 +1019,7 @@ FocusScope {
       Layout.preferredWidth: root.compact ? 232 : 338
       Layout.fillHeight: true
       chats: root.filteredChats
+      readStateOperations: root.beeperData.readStateOperations
       chatPreviews: root.beeperData.chatPreviews || ({})
       currentNetwork: root.currentNetwork
       showLowPriority: root.showLowPriority
@@ -1072,6 +1103,7 @@ FocusScope {
             onSelectedRequested: { root.cancelReplyNavigation(); root.messageIndex = index; root.navigation = "messages"; navigationFocus.forceActiveFocus(); }
             onPreviewRequested: (attachment, sourceItem) => root.openMedia(attachment, sourceItem)
             onTextSelectionStarted: root.claimTextSelection(messageDelegate)
+            onCopyLinkRequested: url => root.copyText(url, "Link copied")
           }
         }
         Rectangle {

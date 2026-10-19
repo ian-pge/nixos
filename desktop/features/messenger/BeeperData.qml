@@ -27,21 +27,20 @@ Scope {
   property bool showLowPriority: false
   property bool unreadFirst: false
   property var lowPriorityPending: ({})
+  property var readStateOperations: ({})
   property int chatsRevision: 0
   property var reactionOperations: ({})
   property var attachmentSaveOperations: ({})
-  property var chats: []
+  property var chatStore: ({records: {}, order: [], versions: {}, complete: false})
+  property int chatStateSequence: 0
+  readonly property var chats: chatStore.order.map(id => chatStore.records[id]).filter(Boolean)
   readonly property alias chatPreviews: previewResolver.entries
-  property var unreadCounts: ({})
-  property var lowPriorityUnreadCounts: ({})
-  property bool lowPriorityUnreadCountsLoaded: false
-  property bool unreadCountsLoaded: false
   property bool loadingUnreadCounts: false
   property bool unreadCountsDirty: false
   property bool unreadCountsUrgent: false
   property int unreadCountsGeneration: 0
   property real lastUnreadCountsAttempt: 0
-  readonly property bool unreadCountsReady: demo || (unreadCountsLoaded && (!showLowPriority || lowPriorityUnreadCountsLoaded))
+  readonly property bool unreadCountsReady: demo || chatStore.complete
   property var messages: []
   readonly property var readReceiptReaders: Format.readReceiptReaders(messages, currentChat, accounts)
   property var quotedMessages: ({})
@@ -52,7 +51,7 @@ Scope {
   property var searchResults: []
   property string currentChatID: ""
   property string targetMessageID: ""
-  readonly property var currentChat: chats.find(chat => chat.id === currentChatID) || null
+  readonly property var currentChat: chatStore.records[currentChatID] || null
   property var senderColorRegistry: ({})
   property var senderColors: ({})
   property bool loading: false
@@ -101,6 +100,8 @@ Scope {
   signal quotesUpdated()
   signal tokenStored()
   signal chatPriorityChanged(string chatID, bool lowPriority)
+  signal readStateApplying(string chatID)
+  signal readStateApplied(string chatID)
   signal attachmentsSaved(string chatID, string messageID, int saved, int total, string directory)
 
   BeeperAudioPlayback { id: audioPlayback; beeperData: root }
@@ -179,39 +180,101 @@ Scope {
       navigationLoadTimer.stop();
       ++accountsGeneration; loadingAccounts = false;
       ++unreadCountsGeneration; unreadCountsTimer.stop();
-      unreadCountsLoaded = false; lowPriorityUnreadCountsLoaded = false; loadingUnreadCounts = false;
+      loadingUnreadCounts = false;
+      chatStore = Object.assign({}, chatStore, {complete: false});
     }
   }
-  function unreadConversationCount(network) {
-    if (demo) return chats.filter(chat => Format.isChatInView(chat, showLowPriority) && Format.isChatUnread(chat)
+  // All confirmed chat state lives in this store. The ordered sidebar and the
+  // complete unread total are projections of the SAME records, never caches
+  // patched independently. Pending actions do not alter these records.
+  function replaceChats(rows) {
+    commitChatRows(rows, ++chatStateSequence, "replace");
+  }
+  function commitChatRows(rows, sequence, mode) {
+    const records = mode === "replace" ? {} : Object.assign({}, chatStore.records);
+    const versions = mode === "replace" ? {} : Object.assign({}, chatStore.versions);
+    const ids = [], seen = new Set();
+    const stateFields = ["unreadCount", "isMarkedUnread", "network", "isLowPriority"];
+    for (const row of rows) {
+      if (!row?.id || deletedChatIDs[row.id] || seen.has(row.id)) continue;
+      ids.push(row.id); seen.add(row.id);
+      const previous = records[row.id] || {};
+      const merged = Object.assign({}, previous, row);
+      // A later-started read or a confirmed mutation wins over an older HTTP
+      // response. Metadata can still fill a row discovered by the state scan.
+      if ((versions[row.id] || 0) > sequence || (mode !== "patch" && readStateOperations[row.id])) {
+        for (const field of stateFields) {
+          if (previous[field] !== undefined) merged[field] = previous[field];
+          else delete merged[field];
+        }
+      } else {
+        if (mode !== "patch") {
+          merged.unreadCount = row.unreadCount || 0;
+          merged.isMarkedUnread = row.isMarkedUnread === true;
+          merged.isLowPriority = row.isLowPriority === true;
+        }
+        versions[row.id] = sequence;
+      }
+      records[row.id] = merged;
+    }
+    let order = mode === "replace" ? [] : chatStore.order;
+    if (mode === "states") {
+      const present = new Set(ids);
+      for (const id of Object.keys(records))
+        if (!present.has(id) && (versions[id] || 0) <= sequence && !readStateOperations[id]) {
+          delete records[id]; delete versions[id];
+        }
+      order = order.filter(id => records[id]);
+    } else if (mode === "page" || mode === "replace") {
+      const incoming = new Set(ids);
+      order = ids.concat(order.filter(id => !incoming.has(id)));
+    } else if (mode === "older") {
+      const existing = new Set(order);
+      order = order.concat(ids.filter(id => !existing.has(id)));
+    }
+    // Read completion is a confirmed state transition, not necessarily the
+    // first write reply. Pages and full snapshots can deliver it later.
+    const completedReads = ids.filter(id => Format.isChatUnread(chatStore.records[id])
+      && records[id] && !Format.isChatUnread(records[id]));
+    for (const id of completedReads) readStateApplying(id);
+    chatStore = {records: records, order: order, versions: versions,
+      complete: mode === "states" || (mode === "replace" ? demo : chatStore.complete)};
+    for (const id of completedReads) readStateApplied(id);
+    if (mode === "states" && currentChatID && !records[currentChatID]) clearSelection();
+  }
+  function removeChats(ids) {
+    const records = Object.assign({}, chatStore.records), versions = Object.assign({}, chatStore.versions);
+    for (const id of ids) { delete records[id]; delete versions[id]; }
+    chatStore = {records: records, order: chatStore.order.filter(id => records[id]),
+      versions: versions, complete: chatStore.complete};
+  }
+  function unreadConversationCount(network, lowPriorityOnly = showLowPriority) {
+    return Object.values(chatStore.records).filter(chat => Format.isChatUnread(chat)
+      && Format.isChatInView(chat, lowPriorityOnly)
       && (network === "all" || Format.networkBadge(chat.network).key === network)).length;
-    const counts = showLowPriority ? lowPriorityUnreadCounts : unreadCounts;
-    let count = 0;
-    for (const name of Object.keys(counts))
-      if (network === "all" || Format.networkBadge(name).key === network) count += counts[name];
-    return count;
   }
   function scheduleUnreadCounts(immediate = false) {
     if (demo || !connected) return;
     unreadCountsDirty = true; unreadCountsUrgent = unreadCountsUrgent || immediate;
-    if (loadingUnreadCounts) return;
+    if (Object.keys(readStateOperations).length || loadingUnreadCounts) return;
     if (unreadCountsTimer.running && !immediate) return;
     unreadCountsTimer.interval = immediate ? 0 : Math.max(150, 3000 - (Date.now() - lastUnreadCountsAttempt));
     unreadCountsTimer.restart();
   }
   function refreshUnreadCounts() {
     if (demo || !connected || loadingUnreadCounts) return;
-    const generation = unreadCountsGeneration;
+    if (Object.keys(readStateOperations).length) { unreadCountsDirty = true; return; }
+    const generation = unreadCountsGeneration, revision = chatsRevision, sequence = ++chatStateSequence;
     unreadCountsDirty = false; unreadCountsUrgent = false;
     loadingUnreadCounts = true; lastUnreadCountsAttempt = Date.now();
-    request("unreadCounts", {}, (result, error) => {
+    request("chatStates", {}, (result, error) => {
       if (generation !== unreadCountsGeneration || !connected) return;
       loadingUnreadCounts = false;
-      if (!error && result?.counts && typeof result.counts === "object" && !Array.isArray(result.counts)) {
-        unreadCounts = result.counts; unreadCountsLoaded = true;
-        lowPriorityUnreadCountsLoaded = !!result.lowPriorityCounts && typeof result.lowPriorityCounts === "object" && !Array.isArray(result.lowPriorityCounts);
-        if (lowPriorityUnreadCountsLoaded) lowPriorityUnreadCounts = result.lowPriorityCounts;
-      } else { unreadCountsLoaded = false; lowPriorityUnreadCountsLoaded = false; }
+      if (revision !== chatsRevision) { scheduleUnreadCounts(true); return; }
+      if (!error && Array.isArray(result?.items) && result.items.every(row => row?.id
+          && validReadState(row.id, row) && typeof row.network === "string" && typeof row.isLowPriority === "boolean"))
+        commitChatRows(result.items, sequence, "states");
+      // A failed scan leaves the last confirmed records intact.
       if (unreadCountsDirty) scheduleUnreadCounts(unreadCountsUrgent);
     }, true);
   }
@@ -249,9 +312,10 @@ Scope {
       } else if (response.event === "chatsChanged") { refreshTimer.restart(); scheduleUnreadCounts(); }
       else if (response.event === "chatsDeleted") {
         const ids = new Set(response.data.ids || []);
-        ids.forEach(id => { deletedChatIDs[id] = true; });
+        const deleted = Object.assign({}, deletedChatIDs);
+        ids.forEach(id => { deleted[id] = true; }); deletedChatIDs = deleted;
         if (ids.has(currentChatID)) { flushDraft(); ++chatGeneration; currentChatID = ""; messages = []; loadingMessages = false; }
-        chats = chats.filter(chat => !ids.has(chat.id));
+        removeChats(ids);
         scheduleUnreadCounts(true);
       }
       else if (response.event === "messagesChanged") {
@@ -331,12 +395,10 @@ Scope {
     if (loading) { if (!older) trailingChatsRefresh = true; return; }
     if (!older) chatsPaginationBlocked = false;
     const cursor = older ? chatsCursor : "";
-    const revision = chatsRevision;
+    const revision = chatsRevision, sequence = ++chatStateSequence;
     loading = true;
     request("chats", older ? {cursor: cursor, direction: "before"} : {}, (result, error) => {
-      // Discard a read started before a successful priority change, then read
-      // again. Later Beeper snapshots remain authoritative, including edits
-      // made from another client; no placement override is kept locally.
+      // A catalog request started before a local mutation must not undo it.
       if (revision !== chatsRevision) {
         loading = false; trailingChatsRefresh = false;
         Qt.callLater(() => refreshChats(false));
@@ -344,9 +406,7 @@ Scope {
       }
       if (trailingChatsRefresh) { trailingChatsRefresh = false; Qt.callLater(() => refreshChats(false)); }
       if (error || !result) { chatsPaginationBlocked = true; loading = false; return; }
-      const rows = (result.items || []).filter(chat => !deletedChatIDs[chat.id]);
-      if (older) { const ids = new Set(chats.map(chat => chat.id)); chats = chats.concat(rows.filter(chat => !ids.has(chat.id))); }
-      else { const ids = new Set(rows.map(chat => chat.id)); chats = rows.concat(chats.filter(chat => !ids.has(chat.id))); }
+      commitChatRows(result.items || [], sequence, older ? "older" : "page");
       if (older || !chatsInitialized) {
         chatsCursor = result.oldestCursor || "";
         hasMoreChats = !!result.hasMore && !!chatsCursor && chatsCursor !== cursor;
@@ -593,28 +653,46 @@ Scope {
     replaceDraft(chatID, saved); persistChatDraft(chatID);
   }
   function markChatRead(chatID, messageID, callback) {
-    if (!chatID) return;
+    return changeReadState(chatID, "read", messageID || "", callback);
+  }
+  function markChatUnread(chatID, callback) {
+    return changeReadState(chatID, "unread", "", callback);
+  }
+  function validReadState(chatID, result) {
+    return result?.id === chatID && typeof result.unreadCount === "number"
+      && isFinite(result.unreadCount) && result.unreadCount >= 0
+      && typeof result.isMarkedUnread === "boolean";
+  }
+  function changeReadState(chatID, method, messageID, callback) {
+    const chat = chatStore.records[chatID];
+    if (!chat || !connected || deletedChatIDs[chatID] || readStateOperations[chatID]) return false;
+    // Setting an already-confirmed state is a no-op, not another write.
+    if (!messageID && (method === "read" ? !Format.isChatUnread(chat) : chat.isMarkedUnread === true)) return false;
+    ++chatsRevision; lastError = "";
+    const operation = {method: method, messageID: messageID};
+    readStateOperations = Object.assign({}, readStateOperations, {[chatID]: operation});
     const params = {chatID: chatID};
     if (messageID) params.messageID = messageID;
-    request("read", params, (result, error) => {
-      if (!error) { applyReadState(chatID, result); refreshChats(false); scheduleUnreadCounts(true); }
+    request(method, params, (result, error) => {
+      ++chatsRevision;
+      if (!error && !validReadState(chatID, result))
+        error = {message: "Beeper did not confirm the conversation's read state. Refresh to check it."};
+      const operations = Object.assign({}, readStateOperations);
+      delete operations[chatID]; readStateOperations = operations;
+      if (!error && !deletedChatIDs[chatID]) applyReadState(chatID, result);
+      if (error) lastError = error.message || "Could not change the conversation's read state.";
+      else refreshChats(false);
+      scheduleUnreadCounts(true);
       if (callback) callback(result, error);
-    });
-  }
-  function markChatUnread(chatID) {
-    if (!chatID) return;
-    request("unread", {chatID: chatID}, (result, error) => {
-      if (!error) { applyReadState(chatID, result); refreshChats(false); scheduleUnreadCounts(true); }
-    });
+    }, true);
+    return true;
   }
   function applyReadState(chatID, result) {
     if (!result || result.id !== chatID || deletedChatIDs[chatID]) return;
-    // Update only read state in place; a partial reply must not erase the
-    // conversation's title, network or other fields used by sidebar filters.
-    const changes = {};
+    const changes = {id: chatID};
     if (typeof result.unreadCount === "number") changes.unreadCount = result.unreadCount;
     if (typeof result.isMarkedUnread === "boolean") changes.isMarkedUnread = result.isMarkedUnread;
-    chats = chats.map(chat => chat.id === chatID ? Object.assign({}, chat, changes) : chat);
+    commitChatRows([changes], ++chatStateSequence, "patch");
   }
   function setChatLowPriority(chatID, lowPriority) {
     const chat = chats.find(item => item.id === chatID);
@@ -627,7 +705,7 @@ Scope {
       ++chatsRevision;
       const changes = {isLowPriority: typeof result?.isLowPriority === "boolean" ? result.isLowPriority : lowPriority};
       if (typeof result?.isMuted === "boolean") changes.isMuted = result.isMuted;
-      chats = chats.map(item => item.id === chatID ? Object.assign({}, item, changes) : item);
+      commitChatRows([Object.assign({id: chatID}, changes)], ++chatStateSequence, "patch");
       chatPriorityChanged(chatID, changes.isLowPriority);
       refreshChats(false); scheduleUnreadCounts(true);
     });
@@ -776,13 +854,13 @@ Scope {
     state = "demo";
     accounts = [{id: "signal", network: "Signal"}, {id: "whatsapp", network: "WhatsApp"}, {id: "telegram", network: "Telegram"}];
     const now = new Date();
-    chats = [
+    replaceChats([
       {id: "studio", title: "Atelier du dimanche", type: "group", network: "Signal", accountID: "signal", unreadCount: 2, preview: {text: "Camille : cette lumière ✨"}, isPinned: true,
         participants: {total: 3, hasMore: false, items: [{id: "camille", fullName: "Camille"}, {id: "noe", fullName: "Noé"}, {id: "self", fullName: "You", isSelf: true}]}},
       {id: "lea", title: "Léa Martin", network: "WhatsApp", accountID: "whatsapp", unreadCount: 0, preview: {text: "On se retrouve à 18 h ?"}},
       {id: "design", title: "Design & café", network: "Telegram", accountID: "telegram", unreadCount: 4, preview: {text: "Une idée pour le week-end"}},
       {id: "alex", title: "Alex", network: "Signal", accountID: "signal", unreadCount: 0, preview: {text: "Voice message"}},
-      {id: "maison", title: "À la maison", network: "WhatsApp", accountID: "whatsapp", unreadCount: 0, isMuted: true, preview: {text: "À tout à l’heure ♡"}}];
+      {id: "maison", title: "À la maison", network: "WhatsApp", accountID: "whatsapp", unreadCount: 0, isMuted: true, preview: {text: "À tout à l’heure ♡"}}]);
     demoMessages = {studio: [
       {id: "1", chatID: "studio", senderName: "Camille", text: "J’ai trouvé un petit atelier près du canal pour dimanche. Vous venez ?", timestamp: now.toISOString(), isSender: false},
       {id: "2", chatID: "studio", senderName: "Moi", text: "Oui ! Un carnet, un café, et rien de prévu. Ça me va très bien.", linkedMessageID: "1", timestamp: now.toISOString(), isSender: true, seen: {camille: true, noe: now.toISOString()}},
@@ -826,14 +904,11 @@ Scope {
       }
       demoMessages[params.chatID] = rows.map((message, index) => index <= boundary ? Object.assign({}, message, {isUnread: false}) : message);
       const unread = demoMessages[params.chatID].filter(message => !message.isSender && message.isUnread !== false).length;
-      chats = chats.map(chat => chat.id === params.chatID ? Object.assign({}, chat, {unreadCount: unread, isMarkedUnread: false}) : chat);
-      result = chats.find(chat => chat.id === params.chatID) || {};
+      result = Object.assign({}, chatStore.records[params.chatID], {unreadCount: unread, isMarkedUnread: false});
     } else if (method === "unread") {
-      chats = chats.map(chat => chat.id === params.chatID ? Object.assign({}, chat, {isMarkedUnread: true}) : chat);
-      result = chats.find(chat => chat.id === params.chatID) || {};
+      result = Object.assign({}, chatStore.records[params.chatID], {isMarkedUnread: true});
     } else if (method === "updateChat") {
-      chats = chats.map(chat => chat.id === params.chatID ? Object.assign({}, chat, params.changes) : chat);
-      result = chats.find(chat => chat.id === params.chatID) || {};
+      result = Object.assign({}, chatStore.records[params.chatID], params.changes);
     } else if (method === "stageAttachment") result = {path: params.path, srcURL: params.path, type: "file", fileName: params.path.split("/").pop()};
     else if (method === "stageAttachments") result = params.paths.map(path => ({path: path, srcURL: path, type: "file", fileName: path.split("/").pop()}));
     else if (method === "search") {

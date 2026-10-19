@@ -34,7 +34,7 @@ ShellRoot {
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {width: 1280, height: 900, active: true, windowFocused: true, beeperData: beeperData});
-      beeperData.chats = [{id: "chat", title: "Friends", network: "Telegram"}];
+      beeperData.replaceChats([{id: "chat", title: "Friends", network: "Telegram"}]);
       beeperData.selectChat("chat");
       beeperData.respond("messages", {items: Array.from({length: 6}, (_, index) => message(index)), hasMore: false});
       settle();
@@ -70,7 +70,7 @@ ShellRoot {
       verify(!row.arriving, "Read-state refreshes must not replay the arrival");
     }
     function test_first_new_message_after_an_empty_initial_history_animates() {
-      beeperData.chats = beeperData.chats.concat([{id: "empty", title: "Empty conversation", network: "Telegram"}]);
+      beeperData.replaceChats(beeperData.chats.concat([{id: "empty", title: "Empty conversation", network: "Telegram"}]));
       beeperData.selectChat("empty");
       compare(panel.arrivalReadyChatID, "", "Changing conversations must discard the old baseline");
       beeperData.respond("messages", {items: [], hasMore: false}); settle();

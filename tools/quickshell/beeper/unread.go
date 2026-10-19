@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"math"
 	"time"
 )
 
-// Count conversations, not messages. Scan the public catalog rather than just
-// the UI's loaded pages, including manual unread flags with a zero message count.
-func (b *backend) unreadCounts(ctx context.Context) (object, error) {
+// A complete, lightweight catalog of confirmed states. QML merges these into
+// the same records as visible chat pages; there is no separate counter cache.
+func (b *backend) chatStates(ctx context.Context) (object, error) {
 	client, err := b.api()
 	if err != nil {
 		return nil, err
@@ -47,16 +49,29 @@ func (b *backend) unreadCounts(ctx context.Context) (object, error) {
 		}
 		seenCursors[cursor] = true
 	}
-	counts := map[string]int{}
-	lowPriorityCounts := map[string]int{}
+	items := make([]chat, 0, len(byID))
 	for _, row := range byID {
-		if row.UnreadCount > 0 || row.IsMarkedUnread {
-			if row.IsLowPriority {
-				lowPriorityCounts[row.Network]++
-			} else {
-				counts[row.Network]++
-			}
-		}
+		items = append(items, row)
 	}
-	return object{"counts": counts, "lowPriorityCounts": lowPriorityCounts}, nil
+	return object{"items": items}, nil
+}
+
+// The public API returns a Chat. unreadCount is required; isMarkedUnread is
+// optional and defaults to false. Never manufacture success from an empty ACK.
+func confirmedReadState(chatID string, raw json.RawMessage) (json.RawMessage, error) {
+	var chat object
+	if err := json.Unmarshal(raw, &chat); err != nil || textField(chat, "id") != chatID {
+		return nil, fail("invalid_response", "Beeper did not return the conversation's read state.")
+	}
+	count, ok := chat["unreadCount"].(float64)
+	if !ok || count < 0 || math.Trunc(count) != count {
+		return nil, fail("invalid_response", "Beeper did not return a valid unread count.")
+	}
+	marked, present := chat["isMarkedUnread"]
+	if !present {
+		chat["isMarkedUnread"] = false
+	} else if _, ok := marked.(bool); !ok {
+		return nil, fail("invalid_response", "Beeper did not return a valid unread flag.")
+	}
+	return json.Marshal(chat)
 }

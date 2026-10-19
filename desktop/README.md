@@ -53,6 +53,10 @@ node desktop/tests/run.mjs "$quickshell_runtime/bin/quickshell"
 ```
 
 The Wayland harness needs an existing Wayland session, Hyprland and D-Bus.
+For full desktop tests on a crowded tiled workspace, `QS_TEST_FLOAT=1` floats
+and sizes only the harness's temporary compositor window; it does not change
+rules or move existing application windows. This keeps full-screen dimming
+and bar geometry checks independent of the test window's allocated tile size.
 Without `--desktop` it only compiles the graph; with it, the real composition
 runs with `servicesEnabled: false`. Do not launch a second `shell.qml` merely
 to test compilation: that starts real helpers and services. Controller fixtures
@@ -81,6 +85,18 @@ native pointer motion. This exercises the compositor's geometry clipping.
 Backend build/test commands live in each [tool's README](../tools/README.md).
 
 ## Activation and diagnostics
+
+Choose the bar and panel background in
+[`home_manager/quickshell.nix`](../home_manager/quickshell.nix), using
+`programs.quickshell.backgroundStyle`:
+
+- `"macchiato"`: opaque dark Catppuccin Macchiato (`#181926`), without the Liquid Glass plugin.
+- `"liquid-glass"`: refracted, blurred backgrounds using the compositor plugin.
+
+Apply this persistent choice through the usual Home Manager/NixOS rebuild.
+For a temporary change in the current session, use `hyprctl liquidglass disable`
+or `hyprctl liquidglass enable` when the plugin is loaded; this does not change
+the configured choice.
 
 Workspace digits adapt to the connected displays: Cmd+1…0 selects all ten
 workspaces on the laptop alone. With an external screen, Cmd+1…5 targets that

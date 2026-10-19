@@ -2,7 +2,6 @@
   inputs,
   pkgs,
 }: let
-  tabctl = pkgs.callPackage ./tabctl.nix {src = inputs.tabctl;};
   liquidGlassClient = pkgs.callPackage ./quickshell/liquid-glass-client.nix {};
   quickshellRuntime = pkgs.callPackage ./quickshell/runtime.nix {inherit liquidGlassClient;};
   quickshellBeeper = pkgs.callPackage ./quickshell/beeper.nix {};
@@ -15,7 +14,7 @@
   };
 in
   {
-    inherit tabctl liquidGlassClient quickshellRuntime quickshellDesktop quickshellBeeper quickshellSystemStats quickshellWeather;
+    inherit liquidGlassClient quickshellRuntime quickshellDesktop quickshellBeeper quickshellSystemStats quickshellWeather;
     liquidGlass = pkgs.callPackage ./quickshell/liquid-glass.nix {};
     hyprlock = pkgs.writeShellApplication {
       name = "hyprlock";
@@ -37,7 +36,6 @@ in
       '';
     };
     hyprlockAge = pkgs.callPackage ./hyprlock-age.nix {};
-    quickshellChromeTabs = pkgs.callPackage ./quickshell/chrome-tabs.nix {inherit tabctl;};
     quickshellBrightness = pkgs.callPackage ./quickshell/brightness.nix {};
     quickshellBeeperPreview = pkgs.callPackage ./quickshell/beeper-preview.nix {
       inherit quickshellRuntime quickshellDesktop;

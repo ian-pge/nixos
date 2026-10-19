@@ -196,7 +196,6 @@ in {
       (mkBind (mainKey "RETURN") "hl.dsp.exec_cmd(terminal)" {})
       (mkBind (mainKey "W") "hl.dsp.window.close()" {})
       (mkBind (mainKey "CONTROL + Q") (mkExec "uwsm stop") {})
-      (mkBind (mainKey "P") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleChromeTabs") {})
       (mkBind (mainKey "F") "hl.dsp.exec_cmd(fileManager)" {})
       (mkBind (mainKey "SHIFT + F") "hl.dsp.exec_cmd(fileManagerGraphic)" {})
       (mkBind (mainKey "N") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleWifi") {})

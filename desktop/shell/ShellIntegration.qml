@@ -48,6 +48,5 @@ Scope {
     function toggleBluetooth() { root.coordinator.toggle("bluetooth"); }
     function toggleUpdates() { root.coordinator.toggle("updates"); }
     function toggleLauncher() { root.coordinator.toggle("launcher"); }
-    function toggleChromeTabs() { root.coordinator.toggle("tabs"); }
   }
 }

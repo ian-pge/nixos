@@ -117,7 +117,7 @@ ShellRoot {
       interval: 150; running: true
       onTriggered: {
         if (Quickshell.env("BEEPER_PREVIEW_LOW_PRIORITY") === "1") {
-          data.chats = data.chats.map(chat => chat.id === "design" ? Object.assign({}, chat, {isLowPriority: true}) : chat);
+          data.replaceChats(data.chats.map(chat => chat.id === "design" ? Object.assign({}, chat, {isLowPriority: true}) : chat));
           data.showLowPriority = true;
         }
         if (Quickshell.env("BEEPER_PREVIEW_MEDIA") === "1") {
@@ -128,7 +128,7 @@ ShellRoot {
         }
         const connection = Quickshell.env("BEEPER_PREVIEW_CONNECTION") || "";
         if (["offline", "needs-token", "keyring-unavailable"].includes(connection)) {
-          data.clearSelection(); data.chats = []; data.state = connection;
+          data.clearSelection(); data.replaceChats([]); data.state = connection;
           data.statusMessage = connection === "offline" ? "Reconnecting automatically with your saved token…" : "";
         }
         const stage = Quickshell.env("BEEPER_PREVIEW_PROGRESS") || "";

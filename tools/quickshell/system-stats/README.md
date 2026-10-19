@@ -1,7 +1,7 @@
 # System statistics
 
 `quickshell-system-stats` is a persistent Rust process emitting one JSON object
-per second: `cpu`, `memory`, `disk`, `brightness`, `system`, `usbDevices`, or `error` on a failed sample.
+per second: `cpu`, `memory`, `disk`, `brightness`, `system`, `usbDevices`, `hidppBatteries`, or `error` on a failed sample.
 `../../../packages/quickshell/system-stats.nix` builds it without any runtime
 command wrapper or Python dependency.
 
@@ -16,6 +16,13 @@ are retried, and a closed stdout pipe stops the process cleanly.
 USB identity to detect when it is plugged into this computer, including through
 a hub. Bluetooth battery percentages alone do not report charging for Agar BLE.
 Missing USB entries are skipped; unplugging removes the device on the next sample.
+
+`hidppBatteries` contains the raw `status` and `nativePath` of HID++ battery
+entries in `/sys/class/power_supply`. This preserves the distinction between
+"Full" (charge complete) and "Discharging" at 100% that UPower can erase.
+Missing or invalid status files are skipped. The battery UI matches the exact
+native path and only uses fresh samples; it never treats HID++ `online` as an
+indication that a charger is connected.
 
 The additive `system` object supplies `cpuName`, `cpuFrequencyMHz`,
 `cpuTemperatureC`, `memoryUsedBytes`, `memoryTotalBytes`, `swapUsedBytes` and

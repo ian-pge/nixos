@@ -6,9 +6,7 @@ ShellRoot {
   id: fixture
   property var events: []
   property var apps: null
-  property var tabs: null
   property var appView: null
-  property var tabView: null
   property var audioView: null
   property bool ready: false
 
@@ -20,19 +18,15 @@ ShellRoot {
     }
     const directory = "file://" + Quickshell.shellDir + "/../features/launchers/";
     const appComponent = Qt.createComponent(directory + "AppLauncherController.qml");
-    const tabComponent = Qt.createComponent(directory + "ChromeTabsController.qml");
-    if (appComponent.status !== Component.Ready || tabComponent.status !== Component.Ready) {
-      console.error(appComponent.errorString(), tabComponent.errorString());
+    if (appComponent.status !== Component.Ready) {
+      console.error(appComponent.errorString());
       Qt.callLater(() => Qt.exit(1));
       return;
     }
     apps = appComponent.createObject(fixture, {applications: [], toplevels: []});
-    tabs = tabComponent.createObject(fixture, {toplevels: []});
     apps.closeRequested.connect(() => fixture.events.push("close-app"));
-    tabs.closeRequested.connect(() => fixture.events.push("close-tabs"));
     const views = [
       {name: "appView", path: "AppLauncher.qml", controller: apps},
-      {name: "tabView", path: "ChromeTabsLauncher.qml", controller: tabs},
       {name: "audioView", path: "../audio/AudioSelector.qml", controller: audioMock}
     ];
     for (const view of views) {
@@ -44,6 +38,7 @@ ShellRoot {
       }
       fixture[view.name] = component.createObject(window.contentItem,
         {controller: view.controller, width: 480, height: 398, visible: false, enabled: false});
+      fixture[view.name].height = Qt.binding(() => fixture[view.name].implicitHeight);
       fixture[view.name].closeRequested.connect(() => fixture.events.push("close-view"));
     }
     ready = true;
@@ -70,7 +65,7 @@ ShellRoot {
     }
     function cleanup() {
       if (results.failed) console.error("FAILED", qtest_results.functionName);
-      for (const view of [appView, tabView, audioView]) {
+      for (const view of [appView, audioView]) {
         view.enabled = false;
         view.visible = false;
       }
@@ -80,19 +75,14 @@ ShellRoot {
         keywords: [], comment: "", startupClass: "", icon: "application-x-executable", actions: [],
         execute: () => fixture.events.push("launch-" + name)};
     }
+    function setResultCount(count) {
+      const names = Array.from({length: count}, (_, index) => "Result " + String(index).padStart(2, "0"));
+      apps.applications = names.map(entry);
+    }
     function init() {
       fixture.events = [];
       apps.query = "";
       apps.applications = [entry("Terminal"), entry("Éditeur")];
-      tabs.query = "";
-      tabs.action = "";
-      tabs.actionTabId = "";
-      tabs.actionTab = null;
-      tabs.actionToplevel = null;
-      tabs.parseResponse(JSON.stringify({ok: true, tabs: [
-        {id: "one", title: "Documentation", url: "https://example.org/docs", active: false, pinned: false, audible: false},
-        {id: "two", title: "Mail", url: "https://example.org/mail", active: false, pinned: false, audible: false}
-      ]}));
     }
     function test_catalog_query_and_wrapped_selection() {
       compare(apps.results.length, 2);
@@ -106,6 +96,49 @@ ShellRoot {
       compare(apps.results.length, 0);
       apps.moveSelection(1);
       compare(apps.selectedIndex, 0);
+    }
+    function test_result_height_is_content_sized_and_capped() {
+      const view = appView;
+      const list = findChild(view, "appResults");
+      for (const count of [0, 1, 2, 8, 9, 30, 2, 0]) {
+        setResultCount(count);
+        const expected = count === 0 ? 114 : Math.min(398, 56 + count * 42);
+        compare(view.implicitHeight, expected);
+        compare(view.height, expected);
+        compare(list.height, expected - 56);
+      }
+    }
+    function test_filtering_after_scrolling_keeps_selection_visible() {
+      const view = appView;
+      const list = findChild(view, "appResults");
+      const field = findChild(view, "appSearchInput");
+      setResultCount(30);
+      view.visible = true; view.enabled = true;
+      tryCompare(field, "activeFocus", true);
+      view.controller.selectedIndex = 29;
+      tryVerify(() => list.currentItem !== null && list.contentY > list.originY);
+      verify(list.currentItem.y + list.currentItem.height <= list.contentY + list.height + 0.5);
+      view.controller.setQuery("Result 09");
+      compare(view.results.length, 1);
+      compare(view.height, 98);
+      tryCompare(list, "currentIndex", 0);
+      tryVerify(() => list.currentItem !== null && Math.abs(list.contentY - list.originY) < 0.5);
+      verify(field.activeFocus);
+      view.controller.setQuery("");
+      compare(view.height, 398);
+      view.enabled = false; view.visible = false;
+    }
+    function test_empty_message_fits() {
+      const view = appView;
+      view.width = 340;
+      view.visible = true;
+      view.controller.setQuery("no-such-result");
+      const empty = findChild(view, "appEmptyState");
+      verify(empty.visible);
+      compare(empty.y, 48);
+      verify(empty.implicitHeight <= empty.height - 16);
+      verify(empty.y + empty.height <= view.height - 8);
+      view.width = 480;
     }
     function test_catalog_filters_hidden_entries() {
       const hidden = entry("Hidden"); hidden.noDisplay = true;
@@ -125,45 +158,18 @@ ShellRoot {
       apps.launchSelected(0, true);
       compare(fixture.events.join(","), "close-app,new-window");
     }
-    function test_chrome_filter_and_response_failure() {
-      compare(tabs.results.length, 2);
-      tabs.setQuery("mail");
-      compare(tabs.results[0].tab.id, "two");
-      tabs.parseResponse("invalid JSON");
-      compare(tabs.results.length, 0);
-      compare(tabs.message, "Unable to read Chrome tabs");
-      verify(!tabs.loading);
-    }
-    function test_chrome_close_result_preserves_bounded_selection() {
-      tabs.selectedIndex = 1;
-      tabs.action = "close"; tabs.actionTabId = "two";
-      tabs.parseActionResponse('{"ok":true}');
-      compare(tabs.results.length, 1);
-      compare(tabs.results[0].tab.id, "one");
-      compare(tabs.selectedIndex, 0);
-      verify(!tabs.actionPending);
-      compare(fixture.events.length, 0);
-    }
-    function test_chrome_activation_requests_shell_close() {
-      tabs.action = "activate"; tabs.actionTab = tabs.results[0].tab;
-      tabs.parseActionResponse('{"ok":true}');
-      compare(fixture.events.join(","), "close-tabs");
-      verify(!tabs.actionPending);
-      wait(0);
-    }
     function test_views_receive_only_controller_and_request_close() {
-      for (const view of [appView, tabView]) {
-        fixture.events = [];
-        view.visible = true; view.enabled = true;
-        const field = findChild(view, view === appView ? "appSearchInput" : "tabSearchInput");
-        field.forceActiveFocus(); wait(10);
-        verify(field.activeFocus);
-        keyClick(Qt.Key_Down);
-        compare(view.controller.selectedIndex, 1);
-        keyClick(Qt.Key_Escape);
-        compare(fixture.events.join(","), "close-view");
-        view.enabled = false; view.visible = false;
-      }
+      const view = appView;
+      fixture.events = [];
+      view.visible = true; view.enabled = true;
+      const field = findChild(view, "appSearchInput");
+      field.forceActiveFocus(); wait(10);
+      verify(field.activeFocus);
+      keyClick(Qt.Key_Down);
+      compare(view.controller.selectedIndex, 1);
+      keyClick(Qt.Key_Escape);
+      compare(fixture.events.join(","), "close-view");
+      view.enabled = false; view.visible = false;
     }
     function test_audio_view_keeps_keyboard_selection_and_close_contract() {
       audioView.visible = true; audioView.enabled = true;

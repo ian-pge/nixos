@@ -6,6 +6,7 @@ ShellRoot {
   id: root
   property var first: null
   property var second: null
+  property var theme: null
 
   QtObject {
     id: workspaceOne
@@ -58,6 +59,7 @@ ShellRoot {
     height: 130
   }
   Component.onCompleted: {
+    theme = Qt.createQmlObject('import QtQml; import "file://' + Quickshell.shellDir + '/../ui/Theme.js" as T; QtObject { property var library: T }', root).library;
     const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../features/workspaces/WorkspaceSwitcher.qml");
     if (component.status !== Component.Ready) {
       console.error(component.errorString());
@@ -111,6 +113,9 @@ ShellRoot {
     }
     function button(widget, id) { return findChild(widget, "workspace-" + id); }
     function label(widget, id) { return button(widget, id).children[0].children[0]; }
+    function slotHeight() { return root.theme.barSize(36) - 2 * root.theme.barOutlineInset(); }
+    function activeWidth() { return slotHeight() + root.theme.barSize(32); }
+    function baseWidth(count = 5) { return (count - 1) * slotHeight() + activeWidth() + 2 * root.theme.barOutlineInset(); }
     function setWorkspace(monitor, workspace) {
       monitor.activeWorkspace = workspace;
       monitor.lastIpcObject = {
@@ -130,8 +135,8 @@ ShellRoot {
         }
         verify(item !== null, "Every assigned workspace must have a slot");
         compare(item.active, id === activeId);
-        tryCompare(item, "width", id === activeId ? 52 : 33);
-        compare(item.height, 33);
+        tryCompare(item, "width", id === activeId ? activeWidth() : slotHeight());
+        compare(item.height, slotHeight());
         compare(label(widget, id).font.pixelSize, 19, "Keep the original glyph size");
         fuzzyCompare(item.mapToItem(widget, 0, item.height / 2).y, widget.height / 2, 0.01);
         compare(item.children[0].radius, item.height / 2);
@@ -164,12 +169,36 @@ ShellRoot {
       // Focusing a special workspace can leave all normal workspaces unfocused.
       workspaceSix.focused = false;
       for (const widget of [root.first, root.second]) {
-        compare(widget.naturalContentWidth, 184);
-        compare(widget.baseImplicitWidth, 198);
-        compare(widget.expandedImplicitWidth, 231);
+        compare(widget.naturalContentWidth, 4 * slotHeight() + activeWidth());
+        compare(widget.baseImplicitWidth, baseWidth());
+        compare(widget.expandedImplicitWidth, baseWidth() + slotHeight());
       }
       verifyActive(root.first, 1);
       verifyActive(root.second, 6);
+    }
+    function test_outer_insets_match_the_other_capsules_and_curves_are_concentric() {
+      const inset = root.theme.barOutlineInset();
+      for (const widget of [root.first, root.second]) {
+        // Also exercise ten slots constrained to the central capsule's width.
+        if (widget === root.second) widget.monitors = [secondMonitor];
+        widget.width = Qt.binding(() => Math.min(widget.implicitWidth, 340));
+        try {
+          for (const id of [widget.workspaceIds[0], widget.workspaceIds[widget.workspaceCount - 1]]) {
+            setWorkspace(widget.monitor, {id: id});
+            wait(450);
+            const first = button(widget, widget.workspaceIds[0]);
+            const last = button(widget, widget.workspaceIds[widget.workspaceCount - 1]);
+            const left = first.mapToItem(widget, 0, 0);
+            const right = last.mapToItem(widget, last.width, 0);
+            fuzzyCompare(left.x, inset, 0.01, "Left margin matches the shared outline inset");
+            fuzzyCompare(widget.width - right.x, inset, 0.01, "Right margin matches the shared outline inset");
+            fuzzyCompare(left.y, inset, 0.01, "Top margin equals the side margins");
+            fuzzyCompare(widget.height - left.y - first.height, inset, 0.01, "Bottom margin equals the side margins");
+            fuzzyCompare(left.x + first.height / 2, widget.height / 2, 0.01, "Left curves share their center");
+            fuzzyCompare(right.x - last.height / 2, widget.width - widget.height / 2, 0.01, "Right curves share their center");
+          }
+        } finally { widget.width = Qt.binding(() => widget.implicitWidth); }
+      }
     }
     function test_changing_one_workspace_does_not_change_the_other_bar() {
       setWorkspace(secondMonitor, workspaceSeven);
@@ -177,7 +206,7 @@ ShellRoot {
       verifyActive(root.second, 7);
       compare(label(root.second, 7).text, "󰮯");
       compare(label(root.second, 6).text, "󰊠");
-      compare(root.second.expandedImplicitWidth, 231);
+      compare(root.second.expandedImplicitWidth, baseWidth() + slotHeight());
     }
     function test_pacman_stays_centered_through_animation() {
       for (const workspace of [workspaceThree, workspaceOne]) {
@@ -218,15 +247,15 @@ ShellRoot {
       };
       verifyActive(root.first, 3);
       verifyActive(root.second, 7);
-      compare(root.first.expandedImplicitWidth, 231);
-      compare(root.second.expandedImplicitWidth, 231);
+      compare(root.first.expandedImplicitWidth, baseWidth() + slotHeight());
+      compare(root.second.expandedImplicitWidth, baseWidth() + slotHeight());
     }
     function test_monitor_can_disconnect_or_be_reassigned() {
       root.first.monitor = null;
       verifyActive(root.first, 0);
       compare(root.first.monitorName, "");
       verifyActive(root.second, 6);
-      compare(root.first.naturalContentWidth, 165);
+      compare(root.first.naturalContentWidth, 5 * slotHeight());
       root.first.monitor = firstMonitor;
       verifyActive(root.first, 1);
       compare(root.first.monitorName, "DP-2");
@@ -240,7 +269,7 @@ ShellRoot {
       verifyActive(root.second, 0);
       setWorkspace(secondMonitor, {id: 11});
       verifyActive(root.second, 11);
-      compare(root.second.naturalContentWidth, 165);
+      compare(root.second.naturalContentWidth, 5 * slotHeight());
       verifyActive(root.first, 1);
       secondMonitor.lastIpcObject = null;
       verifyActive(root.second, 0);
@@ -249,7 +278,7 @@ ShellRoot {
       root.second.workspaces = [];
       verifyActive(root.second, 6);
       compare(label(root.second, 6).text, "󰮯");
-      compare(root.second.expandedImplicitWidth, 231);
+      compare(root.second.expandedImplicitWidth, baseWidth() + slotHeight());
     }
     function test_special_slot_is_local_and_keeps_the_normal_pacman() {
       secondMonitor.lastIpcObject = {
@@ -262,13 +291,13 @@ ShellRoot {
       compare(root.second.specialSlotName, "Chat");
       verifyActive(root.first, 1);
       verifyActive(root.second, 6);
-      compare(root.first.implicitWidth, 198);
-      compare(root.second.implicitWidth, 198 + root.second.specialSlotWidth);
+      compare(root.first.implicitWidth, baseWidth());
+      compare(root.second.implicitWidth, baseWidth() + root.second.specialSlotWidth);
       secondMonitor.lastIpcObject = {
         activeWorkspace: {id: 6}, specialWorkspace: {id: 0, name: ""}
       };
       root.second.syncSpecialWorkspace(false);
-      compare(root.second.implicitWidth, 198);
+      compare(root.second.implicitWidth, baseWidth());
       verifyActive(root.second, 6);
     }
     function test_special_capsule_fits_text_and_joins_workspace_row() {
@@ -280,8 +309,8 @@ ShellRoot {
         widget.setSpecialWorkspace("special:" + name, false);
         compare(text.text, name);
         compare(text.font.pixelSize, 15);
-        tryCompare(slot, "width", Math.max(33, text.implicitWidth + 14));
-        compare(slot.height, 33);
+        tryCompare(slot, "width", Math.max(slotHeight(), text.implicitWidth + 14));
+        compare(slot.height, slotHeight());
         fuzzyCompare(slot.mapToItem(widget, 0, slot.height / 2).y, widget.height / 2, 0.01);
         compare(slot.radius, slot.height / 2);
         compare(widget.implicitWidth, widget.baseImplicitWidth + slot.width);
@@ -291,7 +320,10 @@ ShellRoot {
         const lastEnd = last.mapToItem(widget, last.width, 0).x;
         const specialStart = slot.mapToItem(widget, 0, 0).x;
         fuzzyCompare(specialStart - lastEnd, lastStart - previousEnd, 0.01);
-        fuzzyCompare(widget.width - specialStart - slot.width, 7, 0.01);
+        fuzzyCompare(widget.width - specialStart - slot.width, root.theme.barOutlineInset(), 0.01);
+        fuzzyCompare(slot.y, root.theme.barOutlineInset(), 0.01);
+        fuzzyCompare(widget.height - slot.y - slot.height, root.theme.barOutlineInset(), 0.01);
+        fuzzyCompare(specialStart + slot.width - slot.radius, widget.width - widget.height / 2, 0.01);
       }
     }
     function test_external_output_always_uses_the_first_five_slots() {
@@ -308,7 +340,7 @@ ShellRoot {
       setWorkspace(secondMonitor, workspaceThree);
       compare(root.second.workspaceIds.join(","), "1,2,3,4,5,6,7,8,9,10");
       verifyActive(root.second, 3, 10);
-      compare(root.second.baseImplicitWidth, 363);
+      compare(root.second.baseImplicitWidth, baseWidth(10));
       setWorkspace(secondMonitor, {id: 10});
       verifyActive(root.second, 10, 10);
       compare(label(root.second, 10).text, "󰮯");

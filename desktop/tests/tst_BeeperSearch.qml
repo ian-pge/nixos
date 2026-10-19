@@ -29,7 +29,7 @@ ShellRoot {
       beeperData = create("fixtures/PagedBeeperData.qml", fixture, {});
       panel = create("../features/messenger/BeeperPanel.qml", window.contentItem,
         {width: 1280, height: 900, beeperData: beeperData, active: true, windowFocused: true});
-      beeperData.chats = [{id: "chat-a", title: "First", network: "WhatsApp"}, {id: "chat-b", title: "Second", network: "Telegram"}];
+      beeperData.replaceChats([{id: "chat-a", title: "First", network: "WhatsApp"}, {id: "chat-b", title: "Second", network: "Telegram"}]);
       beeperData.selectChat("chat-a");
       history = [];
       for (let i = 0; i < 40; ++i) history.push({id: "message-" + i, chatID: "chat-a", senderName: "Contact",

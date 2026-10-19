@@ -234,8 +234,10 @@ dessin natif, rétablit les fonds opaques et libère les textures en cache à la
 frame suivante. Elle ne restaure pas les anciens choix indépendants du verre
 (liseré tournant supprimé, teinte légère des boutons conservée).
 
-Pour un retour permanent, mettre `enableLiquidGlass = false;` dans
-`home_manager/hyprland/default.nix`, puis reconstruire la configuration NixOS.
+Pour un retour permanent au fond sombre Catppuccin Macchiato, mettre
+`backgroundStyle = "macchiato";` dans le bloc `programs.quickshell` de
+`home_manager/quickshell.nix`, puis reconstruire la configuration NixOS.
+La valeur `"liquid-glass"` sélectionne le verre.
 Le plugin ne sera plus chargé au démarrage ; utiliser la commande `disable`
 pour la session courante. On peut également le décharger avec
 `hyprctl plugin unload CHEMIN_DU_PLUGIN` ; le repli opaque reste automatique.

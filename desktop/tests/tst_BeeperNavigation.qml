@@ -14,7 +14,7 @@ ShellRoot {
       compare(component.status, Component.Ready, component.errorString());
       beeperData = component.createObject(fixture, {navigationLoadDelay: 90, deferDrafts: true});
       verify(beeperData !== null);
-      beeperData.chats = [{id: "a"}, {id: "b"}, {id: "c"}];
+      beeperData.replaceChats([{id: "a"}, {id: "b"}, {id: "c"}]);
     }
     function cleanup() {
       if (results.failed) console.error("FAILED", qtest_results.functionName);

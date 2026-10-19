@@ -46,7 +46,6 @@ ShellRoot {
     readonly property var audio: audioFeature
     readonly property var auth: authFeature
     readonly property var appLauncher: appLauncherFeature
-    readonly property var chromeTabs: chromeTabsFeature
     readonly property var brightness: brightnessFeature
     readonly property var calendar: calendarFeature
     readonly property var dictation: dictationFeature
@@ -72,7 +71,6 @@ ShellRoot {
 
   AudioController { id: audioFeature; enabled: desktop.servicesEnabled; selectorVisible: panels.mode === "audio" }
   AppLauncherController { id: appLauncherFeature; onCloseRequested: panels.close("launcher") }
-  ChromeTabsController { id: chromeTabsFeature; onCloseRequested: panels.close("tabs") }
   NetworkController { id: networkFeature; active: desktop.servicesEnabled && panels.mode === "wifi"; onCloseRequested: panels.close("wifi") }
   BluetoothController { id: bluetoothFeature; active: desktop.servicesEnabled && panels.mode === "bluetooth"; onCloseRequested: panels.close("bluetooth") }
   UpdateController {
