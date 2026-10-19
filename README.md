@@ -41,12 +41,17 @@ sudo nixos-rebuild switch --flake /etc/nixos
 ## Development environments
 
 From this repository, enter `nix develop .#rust`, `nix develop .#cpp`,
-`nix develop .#go`, or `nix develop .#threejs`. The Go shell provides Go,
+`nix develop .#go`, `nix develop .#android`, or `nix develop .#threejs`. The Go shell provides Go,
 gopls, Delve and golangci-lint; each Go project keeps its own `go.mod` and
 `go.sum`. The Three.js shell provides Node.js/npm; browser
 dependencies are local to each project's lockfile, never installed globally.
 The [glass shape viewer](tools/liquid-glass/viewer/README.md) uses this shell
 and has its own `.envrc`. No NixOS rebuild is needed for these environments.
+
+The Android shell provides JDK 17, SDK platform 36, build tools 35.0.0, ADB
+and Gradle without Android Studio, an emulator or an NDK. SDK license acceptance
+is scoped to that environment. [Battery Relay](tools/battery-relay/README.md)
+is the initial Android/Bluetooth development project.
 
 ## Beeper messaging in Quickshell
 

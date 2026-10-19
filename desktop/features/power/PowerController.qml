@@ -11,6 +11,9 @@ Scope {
   property bool onBattery: enabled ? UPower.onBattery : true
   property var powerDevices: enabled ? UPower.devices.values : []
   property var bluetoothDevices: enabled ? Bluetooth.devices.values : []
+  property string phoneName: "Phone"
+  readonly property var phoneRelay: relay
+  BatteryRelayData { id: relay; enabled: root.enabled }
   readonly property var laptopBattery: batteryReading("Laptop", battery?.isPresent === true,
     battery?.ready ? battery.percentage : null,
     battery?.isPresent && battery.ready ? !onBattery
@@ -43,14 +46,9 @@ Scope {
     .slice().sort((left, right) => left.address.localeCompare(right.address))
     .map(device => batteryReading(device.name || device.deviceName || "Pixel Buds", device.connected,
       device.batteryAvailable ? device.battery : null, bluetoothPower(device), 1))
-  // Use the reported Bluetooth level as-is (the Pixel's hands-free profile
-  // reports 20% steps). USB presence is independent from that battery report.
-  readonly property var phoneBatteries: bluetoothDevices
-    .filter(device => device.icon === "phone")
-    .slice().sort((left, right) => left.address.localeCompare(right.address))
-    .map(device => batteryReading(device.name || device.deviceName || "Phone", device.connected,
-      device.connected && device.batteryAvailable ? device.battery : null, phonePluggedIn(device), 1, 40))
-    .filter(device => device.available)
+  // Battery Relay is the phone's only provider, including its power state.
+  readonly property var phoneBatteries: relay.connected
+    ? [batteryReading(phoneName, true, relay.percent, relay.pluggedIn, 100, 40, relay.charging)] : []
   readonly property var accessoryBatteries: keyboardBatteries.concat(mouseBatteries, earbudBatteries, phoneBatteries)
   readonly property var batteries: (batteryAvailable ? [laptopBattery] : []).concat(accessoryBatteries)
 
@@ -61,14 +59,15 @@ Scope {
       ? Math.round(value * 100 / maximum) : null;
   }
 
-  function batteryReading(name, connected, level, pluggedIn, maximum = 100, lowThreshold = 20) {
+  function batteryReading(name, connected, level, pluggedIn, maximum = 100, lowThreshold = 20, charging = null) {
     const available = connected === true || pluggedIn === true;
     return {
       name: name,
       available: available,
       percent: available ? percent(level, maximum) : null,
       lowThreshold: lowThreshold,
-      pluggedIn: available && typeof pluggedIn === "boolean" ? pluggedIn : null
+      pluggedIn: available && typeof pluggedIn === "boolean" ? pluggedIn : null,
+      charging: available && typeof charging === "boolean" ? charging : null
     };
   }
 
@@ -132,11 +131,4 @@ Scope {
     return bluetoothPower(device);
   }
 
-  function phonePluggedIn(device) {
-    // Match this Pixel, not another Google phone. Its USB product ID changes
-    // between charging/MTP/ADB modes; vendor + serial remain the same.
-    // This confirms attachment to this PC, not that charging is in progress.
-    if (device.address !== "94:45:60:3C:A5:14" || !telemetry?.systemFresh) return null;
-    return telemetry.usbDevices.some(usb => usb.vendorId === "18d1" && usb.serial === "38051FDJG003S6");
-  }
 }

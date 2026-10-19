@@ -24,6 +24,13 @@ The installed config is `top-bar`, the IPC target is `topbar`, and the service
 is `quickshell.service`. Runtime paths such as `quickshell/top-bar` and
 `quickshell-beeper` are independent of the source layout.
 
+The phone battery dial uses only [Battery Relay](../tools/battery-relay/README.md).
+Set `programs.quickshell.phoneBatteryServiceUuid` to the public UUID displayed
+by its Android app. One packaged receiver is shared by all bars; its exact
+percentage and power flags replace the old native Bluetooth/USB phone reading.
+Disconnect, process exit or a stale stream removes the unavailable phone dial,
+with no fallback. Other batteries retain their existing sources and visuals.
+
 ## Build, preview and test
 
 Run from the repository root:

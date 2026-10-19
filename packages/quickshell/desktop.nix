@@ -11,6 +11,7 @@
   quickshellSystemStats,
   quickshellWeather,
   quickshellBeeper,
+  batteryRelayReceiver,
   claude-code,
   codex,
   systemd,
@@ -52,6 +53,8 @@ in
     chmod -R u+w "$out"
     substituteInPlace "$out/features/system/SystemController.qml" \
       --replace-fail '"quickshell-system-stats"' '"${quickshellSystemStats}/bin/quickshell-system-stats"'
+    substituteInPlace "$out/features/power/BatteryRelayData.qml" \
+      --replace-fail '"battery-relay-receiver"' '"${batteryRelayReceiver}/bin/battery-relay-receiver"'
     substituteInPlace "$out/features/storage/StorageController.qml" \
       --replace-fail '["systemctl",' '["${systemd}/bin/systemctl",' \
       --replace-fail '["cat",' '["${coreutils}/bin/cat",'

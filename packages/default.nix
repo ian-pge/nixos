@@ -7,14 +7,15 @@
   quickshellBeeper = pkgs.callPackage ./quickshell/beeper.nix {};
   quickshellSystemStats = pkgs.callPackage ./quickshell/system-stats.nix {};
   quickshellWeather = pkgs.callPackage ./quickshell/weather.nix {};
+  batteryRelayReceiver = pkgs.callPackage ./battery-relay.nix {};
   llmAgents = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
   quickshellDesktop = pkgs.callPackage ./quickshell/desktop.nix {
-    inherit quickshellBeeper quickshellSystemStats quickshellWeather;
+    inherit quickshellBeeper quickshellSystemStats quickshellWeather batteryRelayReceiver;
     inherit (llmAgents) claude-code codex;
   };
 in
   {
-    inherit liquidGlassClient quickshellRuntime quickshellDesktop quickshellBeeper quickshellSystemStats quickshellWeather;
+    inherit liquidGlassClient quickshellRuntime quickshellDesktop quickshellBeeper quickshellSystemStats quickshellWeather batteryRelayReceiver;
     liquidGlass = pkgs.callPackage ./quickshell/liquid-glass.nix {};
     hyprlock = pkgs.writeShellApplication {
       name = "hyprlock";

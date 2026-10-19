@@ -270,9 +270,12 @@ ShellRoot {
         systemUpdatedAt: services.system.telemetry.systemUpdatedAt, gpuUpdatedAt: services.system.telemetry.gpuUpdatedAt,
         battery: services.power.battery, onBattery: services.power.onBattery,
         keyboards: services.power.bluetoothDevices, brightness: services.brightness.values,
+        phoneName: services.power.phoneName, phoneSnapshot: services.power.phoneRelay.snapshot,
+        phoneConnected: services.power.phoneRelay.reportedConnected,
         weather: services.calendar.weather.snapshot,
         claude: services.usage.claude.snapshot, codex: services.usage.codex.snapshot
       };
+      services.power.phoneRelay.invalidate();
       services.system.cpuUsage = 23; services.system.memoryUsage = 51;
       services.system.gpuText = "17%"; services.system.diskUsage = 42;
       services.system.telemetry.acceptSystem({cpu: 23, memory: 51});
@@ -306,6 +309,10 @@ ShellRoot {
         services.system.telemetry.gpuUpdatedAt = previous.gpuUpdatedAt;
         services.power.battery = previous.battery; services.power.onBattery = previous.onBattery;
         services.power.bluetoothDevices = previous.keyboards;
+        services.power.phoneName = previous.phoneName;
+        services.power.phoneRelay.invalidate();
+        services.power.phoneRelay.reportedConnected = previous.phoneConnected;
+        services.power.phoneRelay.snapshot = previous.phoneSnapshot;
         services.brightness.values = previous.brightness;
         services.calendar.weather.snapshot = previous.weather;
         services.usage.claude.snapshot = previous.claude; services.usage.codex.snapshot = previous.codex;
@@ -448,46 +455,46 @@ ShellRoot {
         verify(keyboard.visible);
       } finally { power.powerDevices = originalPowerDevices; restore(); }
     }
+    function relaySample(percent, pluggedIn = false, charging = false) {
+      const relay = app.services.power.phoneRelay, time = Date.now();
+      relay.accept({event: "connection", connected: true});
+      verify(relay.accept({event: "battery", device: "phone", percent, pluggedIn, charging,
+        updatedAt: time + 2000, receivedAt: time}));
+    }
     function test_phone_battery_shares_the_accessory_dial_and_connection_states() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
       const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;
-      const keyboards = power.bluetoothDevices, telemetry = power.telemetry;
-      const phone = {address: "94:45:60:3C:A5:14", name: "Pixel 8 Pro", icon: "phone",
-        connected: true, batteryAvailable: true, battery: 0.8};
       try {
-        power.bluetoothDevices = keyboards.concat([phone]);
+        power.phoneName = "Pixel 8 Pro";
+        relaySample(95);
         tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") !== null);
         const dial = findChild(bar.contentItem, "phoneBatteryPill");
         const keyboard = findChild(bar.contentItem, "keyboardBatteryPill");
         const block = findChild(bar.contentItem, "batteryBlock");
         tryVerify(() => dial.x > keyboard.x);
         compare(dial.parent, keyboard.parent); compare(dial.width, keyboard.width); compare(dial.height, keyboard.height);
-        compare(dial.iconName, "smartphone"); compare(dial.value, 80); compare(dial.tooltipText, "80%");
+        compare(dial.iconName, "smartphone"); compare(dial.value, 95); compare(dial.tooltipText, "95%");
         compare(dial.lowThreshold, 40); verify(!dial.interactive); compare(dial.actionHint, "");
         compare(dial.accent.toString(), keyboard.accent.toString());
         verify(dial.accessibleText.includes("Pixel 8 Pro"));
-        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: 0.4})]);
-        compare(dial.accent.toString(), "#f4dbd6"); verify(!block.warning);
-        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: 0.2})]);
-        compare(dial.value, 20); compare(dial.accent.toString(), "#ed8796"); verify(block.warning);
-        telemetry.acceptSystem({cpu: 23, memory: 51, usbDevices: [{vendorId: "18d1", productId: "4ee1", serial: "38051FDJG003S6"}]});
+        relaySample(40); compare(dial.accent.toString(), "#f4dbd6"); verify(!block.warning);
+        relaySample(39); compare(dial.value, 39); compare(dial.accent.toString(), "#ed8796"); verify(block.warning);
+        relaySample(39, true, true);
         verify(dial.charging); compare(dial.accent.toString(), "#a6da95");
         verify(!block.warning); verify(block.pluggedIn);
-        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {connected: false})]);
+        relaySample(null, true, false);
         verify(dial.pluggedIn); verify(!dial.known); compare(dial.tooltipText, "—");
-        telemetry.acceptSystem({cpu: 23, memory: 51});
-        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: null})]);
-        tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") !== null);
-        const restoredDial = findChild(bar.contentItem, "phoneBatteryPill");
-        verify(!restoredDial.known); compare(restoredDial.tooltipText, "—"); verify(!block.warning);
-        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {battery: 0})]);
-        verify(restoredDial.known); compare(restoredDial.tooltipText, "0%");
-        power.bluetoothDevices = keyboards.concat([Object.assign({}, phone, {connected: false})]);
+        relaySample(null, null, null);
+        verify(!dial.pluggedIn); verify(!dial.known); verify(!block.warning);
+        relaySample(0); verify(dial.known); compare(dial.tooltipText, "0%");
+        power.phoneRelay.accept({event: "connection", connected: false});
         tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") === null);
-        verify(keyboard.visible);
-        power.bluetoothDevices = keyboards.concat([phone]);
+        verify(keyboard.visible); verify(!block.pluggedIn); verify(!block.warning);
+        relaySample(96);
         tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") !== null);
-        compare(findChild(bar.contentItem, "phoneBatteryPill").value, 80);
+        compare(findChild(bar.contentItem, "phoneBatteryPill").value, 96);
+        power.phoneRelay.invalidate(); // EOF/stale: never retain the last green dial.
+        tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") === null);
       } finally { restore(); }
     }
     function test_all_battery_widgets_share_unknown_powered_and_low_states() {
@@ -497,14 +504,13 @@ ShellRoot {
       const accessories = [
         {icon: "input-keyboard", address: "KEYBOARD", dbusPath: "/keyboard", connected: true, batteryAvailable: false},
         {icon: "input-mouse", address: "MOUSE", dbusPath: "/mouse", name: "Test mouse", connected: true, batteryAvailable: false},
-        {name: "Pixel Buds", address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: false},
-        {icon: "phone", address: "94:45:60:3C:A5:14", name: "Test Pixel", connected: true, batteryAvailable: false}
+        {name: "Pixel Buds", address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: false}
       ];
       const dialNames = ["batteryPill", "keyboardBatteryPill", "mouseBatteryPill", "earbudBatteryPill", "phoneBatteryPill"];
       try {
         power.powerDevices = [];
         power.battery = {ready: true, isPresent: true, percentage: null}; power.onBattery = true;
-        power.bluetoothDevices = accessories;
+        power.bluetoothDevices = accessories; relaySample(null, null, null);
         tryVerify(() => dialNames.every(name => findChild(bar.contentItem, name) !== null));
         const dials = dialNames.map(name => findChild(bar.contentItem, name));
         const block = findChild(bar.contentItem, "batteryBlock");
@@ -515,9 +521,9 @@ ShellRoot {
           compare(dial.width, dials[0].width); compare(dial.height, dials[0].height);
         }
         power.onBattery = false;
-        power.powerDevices = accessories.filter(device => device.icon !== "phone").map(device => ({ready: true, isPresent: true,
+        power.powerDevices = accessories.map(device => ({ready: true, isPresent: true,
           nativePath: device.dbusPath, state: UPowerDeviceState.Charging}));
-        power.telemetry.acceptSystem({cpu: 23, memory: 51, usbDevices: [{vendorId: "18d1", serial: "38051FDJG003S6"}]});
+        relaySample(null, true, false);
         verify(block.pluggedIn); verify(!block.warning);
         for (const dial of dials) {
           verify(dial.pluggedIn); verify(!dial.known); compare(dial.tooltipText, "—");
@@ -525,10 +531,10 @@ ShellRoot {
           verify(dial.accessibleText.includes("Powered")); verify(!dial.accessibleText.includes("Charging"));
         }
         power.onBattery = true; power.powerDevices = [];
-        power.telemetry.acceptSystem({cpu: 23, memory: 51});
         for (const level of [100, 40, 20, 12, 0]) {
           power.battery = {ready: true, isPresent: true, percentage: level / 100};
           power.bluetoothDevices = accessories.map(device => Object.assign({}, device, {batteryAvailable: true, battery: level / 100}));
+          relaySample(level);
           compare(block.warning, level < 40); verify(!block.pluggedIn);
           for (const dial of dials) {
             verify(dial.known); compare(dial.tooltipText, level + "%"); verify(!dial.pluggedIn);
@@ -538,6 +544,7 @@ ShellRoot {
           }
         }
         power.bluetoothDevices = accessories.map(device => Object.assign({}, device, {connected: false}));
+        power.phoneRelay.invalidate();
         tryVerify(() => dialNames.slice(1).every(name => findChild(bar.contentItem, name) === null));
         compare(power.batteries.length, 1); verify(findChild(bar.contentItem, "batteryPill").visible);
       } finally { power.powerDevices = previousPowerDevices; restore(); }

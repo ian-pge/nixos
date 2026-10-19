@@ -55,6 +55,7 @@ ShellRoot {
       system.topRequested = false; system.telemetry.invalidateSystem(); system.telemetry.invalidateGpu();
       media.players = []; feedback = []; mediaActions = []; sampledBrightness = -1;
       power.battery = null; power.onBattery = true; power.powerDevices = []; power.bluetoothDevices = [];
+      power.phoneRelay.invalidate(); power.phoneRelay.now = Date.now(); power.phoneName = "Pixel 8 Pro";
       telemetry.systemFresh = true; telemetry.usbDevices = []; telemetry.hidppBatteries = [];
     }
     function test_brightness_values_belong_to_each_monitor() {
@@ -292,14 +293,15 @@ ShellRoot {
       power.bluetoothDevices = [
         {icon: "input-keyboard", address: "KEYBOARD", connected: true, batteryAvailable: false},
         {icon: "input-mouse", address: "MOUSE", connected: true, batteryAvailable: false},
-        {name: "Pixel Buds", address: "BUDS", connected: true, batteryAvailable: false},
-        {icon: "phone", address: "PHONE", connected: true, batteryAvailable: false}
+        {name: "Pixel Buds", address: "BUDS", connected: true, batteryAvailable: false}
       ];
+      verify(phoneSample(null, null, null));
       compare(power.batteries.length, 5);
       for (const reading of power.batteries) {
         verify(reading.available); compare(reading.percent, null); verify(reading.pluggedIn !== true);
       }
       power.bluetoothDevices = power.bluetoothDevices.map(device => Object.assign({}, device, {connected: false}));
+      power.phoneRelay.invalidate();
       compare(power.accessoryBatteries.length, 0);
       compare(power.batteries.length, 1, "The integrated battery stays visible");
     }
@@ -415,67 +417,53 @@ ShellRoot {
       power.bluetoothDevices = [Object.assign({}, buds, {name: "Another headset", deviceName: "Other headset"})];
       compare(power.earbudBatteries.length, 0);
     }
-    function test_phone_battery_uses_bluetooth_steps_and_usb_presence() {
-      const phone = {address: "94:45:60:3C:A5:14", name: "Pixel 8 Pro", icon: "phone",
-        connected: true, batteryAvailable: true, battery: 0.2};
-      power.bluetoothDevices = [phone];
-      compare(power.phoneBatteries.length, 1); compare(power.accessoryBatteries.length, 1);
-      compare(power.phoneBatteries[0].name, "Pixel 8 Pro");
-      compare(power.phoneBatteries[0].percent, 20); compare(power.phoneBatteries[0].pluggedIn, false);
-      compare(power.phoneBatteries[0].lowThreshold, 40);
-      for (const level of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
-        power.bluetoothDevices = [Object.assign({}, phone, {battery: level})];
-        compare(power.phoneBatteries[0].percent, Math.round(level * 100));
+    function phoneSample(level, pluggedIn = false, charging = false) {
+      const relay = power.phoneRelay;
+      relay.accept({event: "connection", connected: true});
+      return relay.accept({event: "battery", device: "phone", percent: level, pluggedIn, charging,
+        updatedAt: relay.now + 2000, receivedAt: relay.now});
+    }
+    function test_phone_battery_uses_only_precise_relay_values() {
+      power.bluetoothDevices = [{address: "OLD-PHONE", icon: "phone", connected: true, batteryAvailable: true, battery: 0.8}];
+      telemetry.usbDevices = [{vendorId: "phone-vendor", serial: "phone-usb"}];
+      compare(power.phoneBatteries.length, 0, "Native phone battery and USB cannot create a reading");
+      for (const level of [0, 1, 19, 39, 40, 73, 95, 100]) {
+        verify(phoneSample(level));
+        compare(power.phoneBatteries.length, 1); compare(power.phoneBatteries[0].percent, level);
+        compare(power.phoneBatteries[0].lowThreshold, 40);
+        compare(power.phoneBatteries[0].name, "Pixel 8 Pro");
       }
-      verify(!power.phoneBatteries[0].pluggedIn, "A full battery does not imply charging");
-      telemetry.usbDevices = [{vendorId: "18d1", productId: "4ee1", serial: "38051FDJG003S6"}];
-      verify(power.phoneBatteries[0].pluggedIn);
-      power.bluetoothDevices = [Object.assign({}, phone, {connected: false})];
-      compare(power.phoneBatteries.length, 1); compare(power.phoneBatteries[0].percent, null);
-      verify(power.phoneBatteries[0].pluggedIn, "USB power stays known without a Bluetooth battery report");
+      verify(!power.phoneBatteries[0].pluggedIn, "100% does not imply external power");
       telemetry.usbDevices = [];
+      verify(phoneSample(95, true, true));
+      verify(power.phoneBatteries[0].pluggedIn); verify(power.phoneBatteries[0].charging);
+    }
+    function test_phone_disconnect_never_falls_back_to_other_providers() {
+      power.bluetoothDevices = [{address: "OLD-PHONE", icon: "phone", connected: true, batteryAvailable: true, battery: 0.8}];
+      power.powerDevices = [{ready: true, isPresent: true, nativePath: "/phone", state: UPowerDeviceState.Charging}];
+      telemetry.usbDevices = [{vendorId: "phone-vendor", serial: "phone-usb"}];
+      verify(phoneSample(73, true, true));
+      power.phoneRelay.accept({event: "connection", connected: false});
+      compare(power.phoneBatteries.length, 0); compare(power.accessoryBatteries.length, 0);
+      power.phoneRelay.accept({event: "connection", connected: true});
+      compare(power.phoneBatteries.length, 0, "A connection report is not a measurement");
+      verify(phoneSample(74, false, false)); compare(power.phoneBatteries[0].percent, 74);
+    }
+    function test_phone_unknown_and_charge_states_come_from_the_relay() {
+      verify(phoneSample(null, null, null));
+      compare(power.phoneBatteries.length, 1); compare(power.phoneBatteries[0].percent, null);
+      compare(power.phoneBatteries[0].pluggedIn, null); compare(power.phoneBatteries[0].charging, null);
+      verify(phoneSample(100, true, false));
+      verify(power.phoneBatteries[0].pluggedIn); compare(power.phoneBatteries[0].charging, false);
+      power.phoneRelay.invalidate();
       compare(power.phoneBatteries.length, 0);
     }
-    function test_phone_battery_hides_disconnected_unpowered_devices() {
-      const phone = {address: "PHONE", icon: "phone", connected: true, batteryAvailable: true, battery: 0.8};
-      for (const state of [{connected: false}, {icon: "computer"}]) {
-        power.bluetoothDevices = [Object.assign({}, phone, state)];
-        compare(power.phoneBatteries.length, 0); compare(power.accessoryBatteries.length, 0);
-      }
-      power.bluetoothDevices = [phone]; compare(power.phoneBatteries.length, 1);
-      power.bluetoothDevices = [Object.assign({}, phone, {batteryAvailable: false})];
-      compare(power.phoneBatteries.length, 1);
-      compare(power.phoneBatteries[0].percent, null); compare(power.phoneBatteries[0].pluggedIn, null);
-      power.bluetoothDevices = []; compare(power.phoneBatteries.length, 0);
-    }
-    function test_phone_usb_requires_matching_identity_and_fresh_telemetry() {
-      const phone = {address: "94:45:60:3C:A5:14", icon: "phone", connected: true, batteryAvailable: false};
-      power.bluetoothDevices = [phone];
-      for (const usb of [{vendorId: "18d1", serial: "another-pixel"}, {vendorId: "wrong", serial: "38051FDJG003S6"}]) {
-        telemetry.usbDevices = [usb]; compare(power.phoneBatteries[0].pluggedIn, false);
-      }
-      for (const productId of ["4ee1", "4ee2", "4ee7"]) {
-        telemetry.usbDevices = [{vendorId: "18d1", productId: productId, serial: "38051FDJG003S6"}];
-        verify(power.phoneBatteries[0].pluggedIn);
-        compare(power.phoneBatteries[0].percent, null);
-      }
-      telemetry.systemFresh = false; compare(power.phoneBatteries[0].pluggedIn, null);
-      telemetry.systemFresh = true;
-      power.bluetoothDevices = [Object.assign({}, phone, {address: "ANOTHER-PHONE"})];
-      compare(power.phoneBatteries[0].pluggedIn, null);
-      telemetry.usbDevices = []; power.bluetoothDevices = [phone];
-      power.powerDevices = [{ready: true, isPresent: true, nativePath: "/phone", state: UPowerDeviceState.Charging}];
-      compare(power.phoneBatteries[0].pluggedIn, false, "Only this PC's USB attachment counts for the phone");
-    }
-    function test_phone_battery_unknown_is_not_zero_and_sorting_is_stable() {
-      const phone = {address: "PHONE", icon: "phone", connected: true, batteryAvailable: true};
-      for (const level of [null, undefined, NaN, Infinity, -1, 1.01, "0.8"]) {
-        power.bluetoothDevices = [Object.assign({}, phone, {battery: level})];
-        compare(power.phoneBatteries.length, 1); compare(power.phoneBatteries[0].percent, null);
-      }
-      power.bluetoothDevices = [Object.assign({}, phone, {address: "Z", battery: 0.8}),
-        Object.assign({}, phone, {address: "A", battery: 0.2})];
-      compare(power.phoneBatteries.map(device => device.percent), [20, 80]);
+    function test_phone_stale_or_invalid_reading_is_removed() {
+      verify(phoneSample(73, true, true));
+      power.phoneRelay.now += power.phoneRelay.staleAfterMs;
+      compare(power.phoneBatteries.length, 0);
+      verify(phoneSample(74, false, false)); compare(power.phoneBatteries.length, 1);
+      verify(!phoneSample(101)); compare(power.phoneBatteries.length, 0);
     }
     function test_pixel_buds_full_battery_is_not_assumed_to_be_charging() {
       power.bluetoothDevices = [{name: "Pixel Buds Pro", address: "BUDS", dbusPath: "/buds",

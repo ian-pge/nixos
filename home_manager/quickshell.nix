@@ -11,6 +11,11 @@
       Catppuccin Macchiato, or the Liquid Glass compositor effect.
     '';
   };
+  options.programs.quickshell.phoneBatteryServiceUuid = lib.mkOption {
+    type = lib.types.nullOr (lib.types.strMatching "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+    default = null;
+    description = "Public installation UUID displayed by the Battery Relay Android app; not a secret or authentication key.";
+  };
 
   config = {
     home.packages = with localPackages; [
@@ -24,12 +29,14 @@
       quickshellGpuMonitor
       quickshellWeather
       quickshellSpeedtest
+      batteryRelayReceiver
     ];
 
     programs.quickshell = {
       enable = true;
       # Choose "macchiato" for opaque dark backgrounds, or "liquid-glass".
       backgroundStyle = "macchiato";
+      phoneBatteryServiceUuid = "e167a6ba-8246-4729-8ae6-4f1ecde39e1c";
       package = localPackages.quickshellRuntime;
 
       configs.top-bar = localPackages.quickshellDesktop;
@@ -56,10 +63,13 @@
         # and the next login sees an already-running (but invisible) service.
         PartOf = ["graphical-session.target"];
       };
-      Service.Environment = [
-        "QSG_RENDER_LOOP=threaded"
-        "QS_PANEL_DIM_AMOUNT=${toString config.wayland.windowManager.hyprland.settings.config.decoration.dim_special}"
-      ];
+      Service.Environment =
+        [
+          "QSG_RENDER_LOOP=threaded"
+          "QS_PANEL_DIM_AMOUNT=${toString config.wayland.windowManager.hyprland.settings.config.decoration.dim_special}"
+        ]
+        ++ lib.optional (config.programs.quickshell.phoneBatteryServiceUuid != null)
+        "QS_PHONE_BATTERY_SERVICE_UUID=${config.programs.quickshell.phoneBatteryServiceUuid}";
     };
   };
 }
