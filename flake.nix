@@ -21,10 +21,6 @@
       url = "github:numtide/llm-agents.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    wlctl = {
-      url = "github:aashish-thapa/wlctl";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     voxtype = {
       url = "github:peteonrails/voxtype";
       inputs.nixpkgs.follows = "nixpkgs";

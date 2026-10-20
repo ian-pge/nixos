@@ -1,4 +1,4 @@
-package dev.ian.batteryrelay
+package dev.ian.ble
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -25,6 +25,7 @@ import java.util.UUID
 
 data class RelayState(
     val running: Boolean = false,
+    val connected: Boolean = false,
     val status: String = "Relais arrêté",
     val battery: BatterySnapshot? = null,
     val lastSentMs: Long? = null,
@@ -49,7 +50,9 @@ class RelayService : Service() {
     private val preferences by lazy { getSharedPreferences(PREFERENCES, MODE_PRIVATE) }
     private val manager by lazy { getSystemService(BluetoothManager::class.java) }
     private val notifications by lazy { getSystemService(NotificationManager::class.java) }
-    private val heartbeat = Runnable { queue.refresh(); sendNext() }
+    private val fitbit by lazy { FitbitRepository.get(this) }
+    private val fitbitObserver: (FitbitState) -> Unit = { updateFitbit(); sendNext() }
+    private val heartbeat = Runnable { updateFitbit(); queue.refresh(); sendNext() }
     private val sendTimeout = Runnable {
         val device = subscriber
         subscriber = null
@@ -102,7 +105,7 @@ class RelayService : Service() {
             else startAdvertising()
         }
         override fun onConnectionStateChange(device: BluetoothDevice, result: Int, newState: Int) = dispatch {
-            Log.d("BatteryRelay", "BLE server connection result=$result state=$newState approvedAddress=${device.address == address}")
+            Log.d("BLE", "BLE server connection result=$result state=$newState approvedAddress=${device.address == address}")
             // Android can report links also used by other apps (e.g. Fitbit).
             // Ignore those; never disconnect another device to enforce our ACL.
             if (device.address != address) return@dispatch
@@ -118,7 +121,7 @@ class RelayService : Service() {
         }
         override fun onCharacteristicReadRequest(device: BluetoothDevice, requestId: Int, offset: Int,
                                                  value: BluetoothGattCharacteristic) = dispatch {
-            val payload = queue.latest?.encode(System.currentTimeMillis())
+            val payload = queue.phoneSnapshot?.encode(System.currentTimeMillis())
             val result = when {
                 !approved(device) -> BluetoothGatt.GATT_INSUFFICIENT_AUTHORIZATION
                 value.uuid != BatterySnapshot.BATTERY_UUID -> BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED
@@ -160,7 +163,7 @@ class RelayService : Service() {
                 queue.resetConnection()
                 handler.removeCallbacks(heartbeat)
                 handler.removeCallbacks(sendTimeout)
-                if (enable) { stopAdvertising(); status("Connecté — abonnement du PC actif"); sendNext() }
+                if (enable) { stopAdvertising(); updateFitbit(); status("Connecté — abonnement du PC actif"); sendNext() }
                 else { status("PC non abonné — en attente"); startAdvertising() }
             }
         }
@@ -168,8 +171,9 @@ class RelayService : Service() {
             if (subscriber?.address != device.address) return@dispatch
             handler.removeCallbacks(sendTimeout)
             if (result != BluetoothGatt.GATT_SUCCESS) { sendTimeout.run(); return@dispatch }
-            queue.acknowledge()
-            publish(state.copy(status = "Connecté — batterie transmise", lastSentMs = System.currentTimeMillis()))
+            val sent = queue.acknowledge() ?: return@dispatch
+            if (sent.kind == BatterySnapshot.PHONE)
+                publish(state.copy(status = "Connecté — batterie transmise", lastSentMs = System.currentTimeMillis()))
             handler.removeCallbacks(heartbeat)
             handler.postDelayed(heartbeat, HEARTBEAT_MS)
             sendNext()
@@ -183,6 +187,7 @@ class RelayService : Service() {
         val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(bluetoothReceiver, filter, RECEIVER_EXPORTED)
         else registerReceiver(bluetoothReceiver, filter)
+        fitbit.observe(fitbitObserver)
     }
     override fun onBind(intent: Intent): IBinder = LocalBinder()
     fun observe(observer: (RelayState) -> Unit) { observers.add(observer); observer(state) }
@@ -212,8 +217,11 @@ class RelayService : Service() {
         enabled = true
         preferences.edit().putString(KEY_ADDRESS, requested).putBoolean(KEY_ENABLED, true).apply()
         try {
+            // Mandatory for a foreground service even without POST_NOTIFICATIONS.
+            // Android 13+ keeps the service in Active apps, not the notification drawer.
             startForeground(NOTIFICATION_ID, notification("Démarrage du relais BLE…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
             foreground = true
+            fitbit.setRelayActive(true)
             publish(state.copy(running = true, status = "Démarrage du relais BLE…", lastSentMs = null))
             openServer()
         } catch (_: ForegroundServiceStartNotAllowedException) {
@@ -290,6 +298,17 @@ class RelayService : Service() {
             handler.postDelayed(sendTimeout, 20_000L)
         } catch (_: SecurityException) { stopRelay("Autorisation Bluetooth retirée") }
     }
+    private fun updateFitbit() {
+        val reading = fitbit.state.takeIf { it.enabled && !it.consentNeeded }?.selected
+        val now = System.currentTimeMillis()
+        if (reading != null && reading.percent != null && reading.isFresh(now)) {
+            queue.update(BatteryPacket(BatterySnapshot(reading.percent, null, null), BatterySnapshot.FITBIT, reading.lastSyncMs))
+        } else if (queue.fitbitPacket?.snapshot?.percent != null) {
+            // All-unknown Fitbit packet withdraws an earlier reading. No Fitbit
+            // packets are sent at all before this optional provider is used.
+            queue.update(BatteryPacket(BatterySnapshot(null, null, null), BatterySnapshot.FITBIT, now))
+        }
+    }
     private fun closeServer() {
         generation++
         handler.removeCallbacks(heartbeat)
@@ -303,6 +322,7 @@ class RelayService : Service() {
     }
     private fun stopRelay(message: String, disable: Boolean = true) {
         enabled = false
+        fitbit.setRelayActive(false)
         if (disable) preferences.edit().putBoolean(KEY_ENABLED, false).apply()
         closeServer()
         foreground = false
@@ -313,21 +333,24 @@ class RelayService : Service() {
     private fun status(message: String) = publish(state.copy(status = message))
     private fun publish(value: RelayState) {
         val changed = value.status != state.status
-        if (changed) Log.d("BatteryRelay", value.status)
-        state = value
-        observers.toList().forEach { it(value) }
-        if (foreground && changed) notifications.notify(NOTIFICATION_ID, notification(value.status))
+        if (changed) Log.d("BLE", value.status)
+        state = value.copy(connected = enabled && subscriber != null)
+        observers.toList().forEach { it(state) }
+        if (foreground && changed && notifications.areNotificationsEnabled())
+            notifications.notify(NOTIFICATION_ID, notification(value.status))
     }
     private fun notification(message: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, RelayService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_battery)
-            .setContentTitle("Battery Relay").setContentText(message).setContentIntent(open)
+            .setContentTitle("BLE").setContentText(message).setContentIntent(open)
             .setOngoing(true).setOnlyAlertOnce(true)
             .addAction(Notification.Action.Builder(null, "Arrêter", stop).build()).build()
     }
     override fun onDestroy() {
         enabled = false
+        fitbit.removeObserver(fitbitObserver)
+        fitbit.setRelayActive(false)
         closeServer()
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(bluetoothReceiver)
@@ -335,9 +358,9 @@ class RelayService : Service() {
         super.onDestroy()
     }
     companion object {
-        const val ACTION_START = "dev.ian.batteryrelay.START"
-        const val ACTION_RESUME = "dev.ian.batteryrelay.RESUME"
-        const val ACTION_STOP = "dev.ian.batteryrelay.STOP"
+        const val ACTION_START = "dev.ian.ble.START"
+        const val ACTION_RESUME = "dev.ian.ble.RESUME"
+        const val ACTION_STOP = "dev.ian.ble.STOP"
         const val EXTRA_ADDRESS = "address"
         const val PREFERENCES = "relay"
         const val KEY_ADDRESS = "pc_address"

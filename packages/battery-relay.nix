@@ -6,7 +6,7 @@
 }:
 rustPlatform.buildRustPackage {
   pname = "battery-relay-receiver";
-  version = "0.1.0";
+  version = "0.2.1";
   src = lib.fileset.toSource {
     root = ../tools/battery-relay/receiver;
     fileset = lib.fileset.unions [
@@ -19,7 +19,7 @@ rustPlatform.buildRustPackage {
   nativeBuildInputs = [pkg-config];
   buildInputs = [dbus];
   meta = {
-    description = "Unpaired BLE phone battery telemetry for Quickshell";
+    description = "Phone and Fitbit battery telemetry relayed over BLE for Quickshell";
     mainProgram = "battery-relay-receiver";
     platforms = lib.platforms.linux;
   };

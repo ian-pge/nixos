@@ -58,10 +58,25 @@ adapter shutdown invalidates the session immediately. BlueZ's generic Connected
 property alone is insufficient because another Bluetooth profile may keep it true.
 Screen-off scheduling and reconnection must be validated on the actual Pixel.
 
-The source timestamp is not the packet reception time. Future Google Health
-integration must preserve the Fitbit's last-sync timestamp rather than relabeling
-cached data as newly measured. A Fitbit packet cannot keep the phone session alive.
-V1 reserves the Fitbit kind but the first Android build sends phone data only.
+The source timestamp is not the packet reception time. Google Health's Fitbit
+reading preserves `lastSyncTime`; forwarding it again never creates a new
+measurement. A Fitbit packet cannot start or keep the phone session alive.
+The Android sender prioritizes phone snapshots and shares a single outstanding
+indication slot between both sources. Reads still return the current phone.
+
+Version 0.2 of the applications implements kind 2. Fitbit packets are sent only
+after this optional provider has supplied data; no fake device is advertised.
+Fitbit's power fields are always unknown because the API does not supply them.
+When its consent is removed, device disappears or last sync is too old, a kind-2
+packet with percentage 255 and flags 0 withdraws the previous Fitbit reading.
+Its timestamp is the withdrawal time, **not** a fresh battery measurement.
+Consumers hide that source. A connection/EOF loss clears both sources.
+
+The receiver must be updated to 0.2 before enabling the optional Fitbit provider;
+the earlier phone-only receiver rejected kind 2. The wire layout remains v1.
+PC consumers independently enforce a 6-hour Fitbit source-age limit and the
+180-second phone/session liveness limit. The app fetches Google every 15 minutes
+while enabled; BLE heartbeats can carry the same cloud timestamp in between.
 
 ## Receiver output
 
@@ -70,6 +85,7 @@ Stdout is newline-delimited JSON; diagnostics go to stderr.
 ```json
 {"event":"connection","connected":true}
 {"event":"battery","device":"phone","percent":73,"pluggedIn":true,"charging":false,"updatedAt":1700000000000,"receivedAt":1700000000123}
+{"event":"battery","device":"fitbit","percent":42,"pluggedIn":null,"charging":null,"updatedAt":1699999100000,"receivedAt":1700000000124}
 {"event":"connection","connected":false}
 ```
 

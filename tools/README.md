@@ -6,14 +6,15 @@ recipe in `packages/<name>.nix`. Quickshell tools are grouped under
 `packages/default.nix` exports the final
 commands through `localPackages`; Home Manager selects what to install.
 
-[Battery Relay](battery-relay/README.md) sends phone battery telemetry over BLE.
+[Battery Relay](battery-relay/README.md) sends phone and optional Fitbit battery telemetry over BLE.
 Its Android project uses `nix develop .#android`, and its receiver uses
 `nix develop .#rust`. Nix packages the receiver; Quickshell owns one instance
-shared by all bars. It is the phone widget's only data source.
+shared by all bars. It is the phone widget's only data source. Fitbit access uses
+Google Health with explicit OAuth consent; the phone itself stays local.
 
 | Sources | Nix recipe | Commands |
 | --- | --- | --- |
-| `battery-relay/receiver/` | `battery-relay.nix` | Unpaired BLE phone battery receiver |
+| `battery-relay/receiver/` | `battery-relay.nix` | Unpaired BLE phone/Fitbit battery receiver |
 | `hyprlock-age/` | `hyprlock-age.nix` | Fractional age for Hyprlock |
 | `quickshell/update/` | `quickshell/update.nix` | Update checker, installer, closure diff and privileged activator |
 | `quickshell/brightness/` | `quickshell/brightness.nix` | Internal backlight and external DDC/CI brightness |

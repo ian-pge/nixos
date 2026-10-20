@@ -47,8 +47,6 @@
     wget
     pika-backup
     inkscape
-    polychromatic
-    razergenie
     unrar
     mutagen
     antigravity-ide

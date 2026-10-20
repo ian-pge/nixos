@@ -465,6 +465,22 @@ ShellRoot {
       verify(phoneSample(74, false, false)); compare(power.phoneBatteries.length, 1);
       verify(!phoneSample(101)); compare(power.phoneBatteries.length, 0);
     }
+    function test_fitbit_uses_dated_cloud_values_and_never_guesses_charging() {
+      verify(phoneSample(80));
+      const relay = power.phoneRelay;
+      const value = {event: "battery", device: "fitbit", percent: 100, pluggedIn: null, charging: null,
+        updatedAt: relay.now - 60000, receivedAt: relay.now};
+      verify(relay.accept(value)); compare(power.fitbitBatteries.length, 1);
+      compare(power.fitbitBatteries[0].percent, 100); compare(power.fitbitBatteries[0].pluggedIn, null);
+      compare(power.fitbitBatteries[0].charging, null); compare(power.fitbitBatteries[0].lowThreshold, 20);
+      compare(power.fitbitBatteries[0].updatedAt, value.updatedAt);
+      compare(power.accessoryBatteries.length, 2);
+      verify(relay.accept(Object.assign({}, value, {percent: 0})));
+      compare(power.fitbitBatteries[0].percent, 0);
+      verify(relay.accept(Object.assign({}, value, {percent: null})));
+      compare(power.fitbitBatteries.length, 0); compare(power.phoneBatteries.length, 1);
+      verify(relay.accept(value)); relay.invalidate(); compare(power.fitbitBatteries.length, 0);
+    }
     function test_pixel_buds_full_battery_is_not_assumed_to_be_charging() {
       power.bluetoothDevices = [{name: "Pixel Buds Pro", address: "BUDS", dbusPath: "/buds",
         connected: true, batteryAvailable: true, battery: 1}];

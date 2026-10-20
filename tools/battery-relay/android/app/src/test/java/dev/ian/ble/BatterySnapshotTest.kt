@@ -1,4 +1,4 @@
-package dev.ian.batteryrelay
+package dev.ian.ble
 
 import org.junit.Assert.*
 import org.junit.Test
@@ -51,12 +51,12 @@ class BatterySnapshotTest {
         val second = BatterySnapshot(41, true, true)
         val latest = BatterySnapshot(42, true, true)
         queue.update(first)
-        assertEquals(first, queue.next())
+        assertEquals(first, queue.next()?.snapshot)
         queue.update(second)
         queue.update(latest)
         assertNull(queue.next())
         queue.acknowledge()
-        assertEquals(latest, queue.next())
+        assertEquals(latest, queue.next()?.snapshot)
         queue.acknowledge()
         assertNull(queue.next())
         queue.update(latest)
@@ -67,22 +67,57 @@ class BatterySnapshotTest {
         val queue = SnapshotQueue()
         val snapshot = BatterySnapshot(40, false, false)
         queue.update(snapshot)
-        assertEquals(snapshot, queue.next())
+        assertEquals(snapshot, queue.next()?.snapshot)
         queue.acknowledge()
         queue.resetConnection()
-        assertEquals(snapshot, queue.next())
+        assertEquals(snapshot, queue.next()?.snapshot)
     }
 
     @Test fun heartbeatResendsWithoutOverlappingAnActiveWrite() {
         val queue = SnapshotQueue()
         val snapshot = BatterySnapshot(60, false, false)
         queue.update(snapshot)
-        assertEquals(snapshot, queue.next())
+        assertEquals(snapshot, queue.next()?.snapshot)
         queue.refresh()
         assertNull(queue.next())
         queue.acknowledge()
         assertNull(queue.next())
         queue.refresh()
-        assertEquals(snapshot, queue.next())
+        assertEquals(snapshot, queue.next()?.snapshot)
+    }
+
+    @Test fun bothSourcesShareOneIndicationSlotAndRetainSourceTime() {
+        val queue = SnapshotQueue()
+        val phone = BatterySnapshot(71, true, false)
+        val fitbit = BatteryPacket(BatterySnapshot(42, null, null), BatterySnapshot.FITBIT, 1_700_000_000_000)
+        queue.update(fitbit); queue.update(phone)
+        assertEquals(BatterySnapshot.PHONE, queue.next()?.kind)
+        assertNull(queue.next()); queue.acknowledge()
+        assertEquals(fitbit, queue.next())
+        assertEquals("01022a000000018bcfe56800", fitbit.encode(1_800_000_000_000).joinToString("") { "%02x".format(it) })
+        queue.update(BatterySnapshot(72, true, true))
+        assertNull(queue.next()); queue.acknowledge()
+        assertEquals(72, queue.next()?.snapshot?.percent); queue.acknowledge()
+        assertNull(queue.next())
+        queue.resetConnection()
+        assertEquals(BatterySnapshot.PHONE, queue.next()?.kind); queue.acknowledge()
+        assertEquals(fitbit, queue.next())
+    }
+
+    @Test fun clearingFitbitDoesNotClearPhoneAndNewSyncIsNotDeduplicated() {
+        val queue = SnapshotQueue()
+        val first = BatteryPacket(BatterySnapshot(42, null, null), BatterySnapshot.FITBIT, 100)
+        queue.update(first); assertEquals(first, queue.next()); queue.acknowledge()
+        val next = first.copy(sourceTimeMs = 200)
+        queue.update(next); assertEquals(next, queue.next()); queue.acknowledge()
+        queue.update(BatterySnapshot(80, false, false))
+        val clear = BatteryPacket(BatterySnapshot(null, null, null), BatterySnapshot.FITBIT, 300)
+        queue.update(clear)
+        assertEquals(80, queue.next()?.snapshot?.percent); queue.acknowledge()
+        assertEquals(clear, queue.next()); queue.acknowledge()
+        assertEquals(80, queue.phoneSnapshot?.percent)
+        assertNull(queue.fitbitPacket)
+        queue.refresh(); assertEquals(BatterySnapshot.PHONE, queue.next()?.kind); queue.acknowledge()
+        assertNull(queue.next())
     }
 }

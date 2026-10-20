@@ -82,8 +82,51 @@ ShellRoot {
     }
     function test_other_devices_never_refresh_the_phone() {
       connect(); fixture.data.accept(report()); const original = fixture.data.snapshot;
-      verify(!fixture.data.accept(report({device: "fitbit", percent: 90})));
+      verify(fixture.data.accept(report({device: "fitbit", percent: 90, pluggedIn: null, charging: null})));
       compare(fixture.data.snapshot, original); compare(fixture.data.percent, 73);
+      verify(!fixture.data.accept(report({device: "future-device"})));
+      compare(fixture.data.snapshot, original);
+    }
+    function fitbitReport(overrides = {}) {
+      return report(Object.assign({device: "fitbit", percent: 42, pluggedIn: null, charging: null,
+        updatedAt: fixture.data.now - 15 * 60000}, overrides));
+    }
+    function test_fitbit_needs_phone_and_retains_cloud_sync_time() {
+      connect(); verify(!fixture.data.accept(fitbitReport())); verify(!fixture.data.fitbitAvailable);
+      fixture.data.accept(report()); verify(fixture.data.accept(fitbitReport()));
+      verify(fixture.data.fitbitAvailable); compare(fixture.data.fitbitPercent, 42);
+      compare(fixture.data.fitbitUpdatedAt, fixture.data.now - 15 * 60000);
+      verify(fixture.data.accept(fitbitReport({percent: 0}))); compare(fixture.data.fitbitPercent, 0);
+    }
+    function test_fitbit_heartbeats_cannot_make_old_cloud_data_fresh() {
+      connect(); fixture.data.accept(report());
+      const sourceTime = fixture.data.now - fixture.data.fitbitMaxAgeMs + 60000;
+      verify(fixture.data.accept(fitbitReport({updatedAt: sourceTime}))); verify(fixture.data.fitbitAvailable);
+      fixture.data.now += 60000;
+      fixture.data.accept(report());
+      verify(!fixture.data.accept(fitbitReport({updatedAt: sourceTime})));
+      verify(!fixture.data.fitbitAvailable); verify(fixture.data.connected);
+    }
+    function test_fitbit_cannot_extend_phone_liveness_and_clear_is_explicit() {
+      connect(); fixture.data.accept(report()); fixture.data.accept(fitbitReport());
+      fixture.data.now += fixture.data.staleAfterMs - 1;
+      verify(fixture.data.accept(fitbitReport()));
+      fixture.data.now += 1;
+      verify(!fixture.data.connected); verify(!fixture.data.fitbitAvailable);
+      fixture.data.accept(report()); fixture.data.accept(fitbitReport());
+      verify(fixture.data.accept(fitbitReport({percent: null}))); verify(!fixture.data.fitbitAvailable);
+      verify(fixture.data.connected);
+      fixture.data.accept(fitbitReport()); fixture.data.invalidate();
+      compare(fixture.data.fitbitSnapshot, null); verify(!fixture.data.fitbitAvailable);
+    }
+    function test_bad_fitbit_never_invents_charge_or_breaks_phone() {
+      for (const bad of [{percent: 101}, {percent: -1}, {percent: 2.5}, {percent: "42"},
+          {pluggedIn: true}, {charging: false}, {updatedAt: 0}, {updatedAt: fixture.data.now + 300001},
+          {updatedAt: fixture.data.now - fixture.data.fitbitMaxAgeMs}, {receivedAt: fixture.data.now + 6000}]) {
+        connect(); fixture.data.accept(report()); fixture.data.accept(fitbitReport());
+        verify(!fixture.data.accept(fitbitReport(bad))); verify(!fixture.data.fitbitAvailable);
+        compare(fixture.data.percent, 73); verify(fixture.data.connected);
+      }
     }
     function test_receiver_eof_clears_values_without_disconnect_packet() {
       fixture.data.command = fixture.fakeReceiver(100); fixture.data.enabled = true;

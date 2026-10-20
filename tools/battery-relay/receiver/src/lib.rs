@@ -160,11 +160,49 @@ pub fn link_usable(connected: bool, blocked: bool) -> bool {
     connected && !blocked
 }
 
+/// Recovery may release only our selected, unpaired private-address LE link.
+/// A generic Device1.Disconnect also releases profiles on that device, so
+/// public-address/paired/trusted devices are deliberately excluded.
+pub struct RecoveryLink {
+    pub selected: bool,
+    pub connected: bool,
+    pub blocked: bool,
+    pub random_address: bool,
+    pub paired: bool,
+    pub trusted: bool,
+}
+
+impl RecoveryLink {
+    pub fn can_reset(&self) -> bool {
+        self.selected
+            && self.connected
+            && !self.blocked
+            && self.random_address
+            && !self.paired
+            && !self.trusted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const VECTOR: [u8; 12] = [1, 1, 73, 7, 0, 0, 1, 0x8b, 0xcf, 0xe5, 0x68, 0];
+
+    #[test]
+    fn link_recovery_is_limited_to_our_connected_private_unpaired_device() {
+        for flags in 0..64 {
+            let link = RecoveryLink {
+                selected: flags & 1 != 0,
+                connected: flags & 2 != 0,
+                random_address: flags & 4 != 0,
+                blocked: flags & 8 != 0,
+                paired: flags & 16 != 0,
+                trusted: flags & 32 != 0,
+            };
+            assert_eq!(link.can_reset(), flags == 7, "flags={flags}");
+        }
+    }
 
     #[test]
     fn shared_android_vector() {

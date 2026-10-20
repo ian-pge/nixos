@@ -13,6 +13,8 @@ Scope {
   property real now: clock.date.getTime()
   property bool reportedConnected: false
   property var snapshot: null
+  property var fitbitSnapshot: null
+  property int fitbitMaxAgeMs: 6 * 60 * 60 * 1000
   property var transport: null
   property int generation: 0
   property bool initialized: false
@@ -25,8 +27,16 @@ Scope {
   readonly property var pluggedIn: connected ? (snapshot?.pluggedIn ?? null) : null
   readonly property var charging: connected ? (snapshot?.charging ?? null) : null
   readonly property var updatedAt: connected ? (snapshot?.updatedAt ?? null) : null
+  // Google Health supplies the Fitbit's last sync, not a live BLE measurement.
+  // Relaying the same reading again must never make its source date newer.
+  readonly property bool fitbitFresh: fitbitSnapshot !== null
+    && now - fitbitSnapshot.receivedAt < staleAfterMs && fitbitSnapshot.receivedAt <= now + 5000
+    && now - fitbitSnapshot.updatedAt < fitbitMaxAgeMs && fitbitSnapshot.updatedAt <= now + 300000
+  readonly property bool fitbitAvailable: connected && fitbitFresh && fitbitSnapshot?.percent !== null
+  readonly property var fitbitPercent: fitbitAvailable ? (fitbitSnapshot?.percent ?? null) : null
+  readonly property var fitbitUpdatedAt: fitbitAvailable ? (fitbitSnapshot?.updatedAt ?? null) : null
 
-  function invalidate() { reportedConnected = false; snapshot = null; }
+  function invalidate() { reportedConnected = false; snapshot = null; fitbitSnapshot = null; }
   function timestamp(value) { return Number.isSafeInteger(value) && value > 0; }
   function nullableBoolean(value) { return value === null || typeof value === "boolean"; }
   function accept(report) {
@@ -38,7 +48,21 @@ Scope {
       else reportedConnected = true;
       return true;
     }
-    // Reserved future devices cannot establish or extend the phone session.
+    if (report.event === "battery" && report.device === "fitbit") {
+      // A bad/absent Fitbit reading cannot break the local phone's battery.
+      if (!connected || !(report.percent === null || Number.isInteger(report.percent) && report.percent >= 0 && report.percent <= 100)
+          || report.pluggedIn !== null || report.charging !== null
+          || !timestamp(report.updatedAt) || !timestamp(report.receivedAt)
+          || report.receivedAt > now + 5000 || now - report.receivedAt >= staleAfterMs
+          || report.updatedAt > now + 300000 || now - report.updatedAt >= fitbitMaxAgeMs) {
+        fitbitSnapshot = null; return false;
+      }
+      // An all-unknown packet explicitly withdraws a disconnected/revoked source.
+      fitbitSnapshot = report.percent === null ? null : {percent: report.percent,
+        updatedAt: report.updatedAt, receivedAt: report.receivedAt};
+      return true;
+    }
+    // Unknown future sources cannot establish or extend the phone session.
     if (report.event === "battery" && report.device !== "phone") return false;
     if (report.event !== "battery" || !reportedConnected
         || !(report.percent === null || Number.isInteger(report.percent) && report.percent >= 0 && report.percent <= 100)
@@ -98,7 +122,10 @@ Scope {
   onCommandChanged: reconfigure()
   // Also expire after suspend, even when the process has not emitted EOF.
   // Keep the transport state so a fresh heartbeat can restore the reading.
-  onNowChanged: if (snapshot !== null && !fresh) snapshot = null
+  onNowChanged: {
+    if (snapshot !== null && !fresh) snapshot = null;
+    if (fitbitSnapshot !== null && !fitbitFresh) fitbitSnapshot = null;
+  }
   Component.onCompleted: { initialized = true; start(); }
   Component.onDestruction: if (transport !== null) transport.running = false
 
@@ -110,6 +137,12 @@ Scope {
       id: receiver
       property int runGeneration: 0
       stdout: SplitParser { onRead: line => root.receive(line, receiver.runGeneration) }
+      stderr: SplitParser {
+        onRead: line => {
+          if (receiver.runGeneration === root.generation && line.length)
+            console.warn("Battery Relay:", line.slice(0, 512));
+        }
+      }
       onExited: root.exited(receiver, runGeneration)
     }
   }

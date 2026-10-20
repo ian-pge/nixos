@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BatteryRelay"
+rootProject.name = "BLE"
 include(":app")

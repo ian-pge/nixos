@@ -497,6 +497,32 @@ ShellRoot {
         tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") === null);
       } finally { restore(); }
     }
+    function test_fitbit_follows_phone_and_shows_dated_cloud_reading() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], restore = fictionalReadings(bar), relay = app.services.power.phoneRelay;
+      try {
+        relaySample(80);
+        const sync = Date.now() - 15 * 60000;
+        const report = {event: "battery", device: "fitbit", percent: 42, pluggedIn: null, charging: null,
+          updatedAt: sync, receivedAt: Date.now()};
+        verify(relay.accept(report));
+        tryVerify(() => findChild(bar.contentItem, "fitbitBatteryPill") !== null);
+        const dial = findChild(bar.contentItem, "fitbitBatteryPill");
+        const phone = findChild(bar.contentItem, "phoneBatteryPill");
+        tryVerify(() => dial.x > phone.x);
+        compare(dial.parent, phone.parent); compare(dial.width, phone.width); compare(dial.height, phone.height);
+        compare(dial.iconName, "watch"); compare(dial.value, 42); compare(dial.lowThreshold, 20);
+        verify(dial.tooltipText.includes("Google Health")); verify(dial.tooltipText.includes("Charge inconnue"));
+        verify(!dial.charging); verify(!dial.interactive);
+        verify(relay.accept(Object.assign({}, report, {percent: 19})));
+        compare(dial.accent.toString(), "#ed8796");
+        verify(relay.accept(Object.assign({}, report, {percent: 100})));
+        verify(!dial.charging); compare(dial.accent.toString(), "#f4dbd6");
+        relay.accept(Object.assign({}, report, {percent: null}));
+        tryVerify(() => findChild(bar.contentItem, "fitbitBatteryPill") === null);
+        verify(findChild(bar.contentItem, "phoneBatteryPill") !== null);
+      } finally { relay.invalidate(); restore(); }
+    }
     function test_all_battery_widgets_share_unknown_powered_and_low_states() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
       const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;

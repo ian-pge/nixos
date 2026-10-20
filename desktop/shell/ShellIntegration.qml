@@ -23,6 +23,17 @@ Scope {
   }
   IpcHandler {
     target: "topbar"
+    // Read-only diagnostics for the actual bar; no second Bluetooth subscriber.
+    function batteryStatus(): string {
+      const power = root.services.power;
+      const relay = power.phoneRelay;
+      return JSON.stringify({
+        configured: relay.configured, connected: relay.connected,
+        receiverRunning: relay.transport !== null,
+        phoneAgeMs: relay.snapshot === null ? null : relay.now - relay.snapshot.receivedAt,
+        phone: power.phoneBatteries, fitbit: power.fitbitBatteries
+      });
+    }
     function toggleBeeper() { root.messenger.toggle(); }
     function dismissNotification() { root.services.notifications.close(); }
     function toggleDoNotDisturb() { root.services.notifications.toggleDoNotDisturb(); }

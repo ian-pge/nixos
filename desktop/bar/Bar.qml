@@ -393,6 +393,23 @@ PanelWindow {
             pluggedIn: device?.pluggedIn === true
           }
         }
+        Repeater {
+          model: services.power.fitbitBatteries.length
+          delegate: BatteryDial {
+            required property int index
+            readonly property var device: services.power.fitbitBatteries[index] ?? null
+            objectName: index === 0 ? "fitbitBatteryPill" : "fitbitBatteryPill" + index
+            iconName: "watch"
+            label: "Fitbit battery"
+            value: device?.percent ?? null
+            lowThreshold: device?.lowThreshold ?? 20
+            // The cloud API has no explicit plugged/charging state.
+            pluggedIn: false
+            actionHint: device?.updatedAt
+              ? "Google Health · " + Qt.formatDateTime(new Date(device.updatedAt), "dd/MM hh:mm") + "\nCharge inconnue"
+              : ""
+          }
+        }
       }
     }
 

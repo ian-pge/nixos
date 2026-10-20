@@ -1,11 +1,15 @@
 use anyhow::{Context, Result, bail};
-use battery_relay_receiver::{DeviceKind, Event, RelayState, SNAPSHOT_UUID, Snapshot, link_usable};
+use battery_relay_receiver::{
+    Event, RecoveryLink, RelayState, SNAPSHOT_UUID, Snapshot, link_usable,
+};
 use bluer::{
-    Adapter, AdapterEvent, AdapterProperty, Device, DeviceEvent, DeviceProperty, DiscoveryFilter,
-    DiscoveryTransport, Uuid, gatt::remote::Characteristic,
+    Adapter, AdapterEvent, AdapterProperty, AddressType, Device, DeviceEvent, DeviceProperty,
+    DiscoveryFilter, DiscoveryTransport, Uuid, gatt::remote::Characteristic,
 };
 use futures::StreamExt;
 use std::{
+    fmt,
+    future::Future,
     io::{self, Write},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -24,6 +28,70 @@ No pairing agent, trust changes, power changes or audio profile commands.
 --check is read-only. --discover scans for 15 seconds without connecting.
 Stdout is NDJSON battery/connection events; diagnostics go to stderr.
 ";
+
+const GATT_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// A broken GATT session must not be reused indefinitely. Let the supervising
+/// shell start a fresh D-Bus client after the selected LE link is released.
+#[derive(Debug)]
+struct SessionLost(&'static str);
+impl fmt::Display for SessionLost {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
+impl std::error::Error for SessionLost {}
+
+async fn bounded<T>(
+    operation: &'static str,
+    limit: Duration,
+    future: impl Future<Output = Result<T>>,
+) -> Result<T> {
+    tokio::time::timeout(limit, future)
+        .await
+        .map_err(|_| SessionLost(operation))?
+}
+
+async fn recover_selected_link(device: &Device) -> Result<()> {
+    // No name/address fallback: this Device was selected through the configured
+    // service UUID in THIS session. Never reset paired/trusted/public-address
+    // links (which may include audio), another device, or the adapter itself.
+    let link = bounded(
+        "reading recovery link state timed out",
+        GATT_TIMEOUT,
+        async {
+            Ok(RecoveryLink {
+                selected: true,
+                connected: device.is_connected().await?,
+                blocked: device.is_blocked().await?,
+                random_address: device.address_type().await? == AddressType::LeRandom,
+                paired: device.is_paired().await?,
+                trusted: device.is_trusted().await?,
+            })
+        },
+    )
+    .await?;
+    if !link.connected {
+        return Ok(());
+    }
+    if !link.can_reset() {
+        bail!(
+            "automatic link reset refused: selected device is no longer an unpaired, untrusted private LE link"
+        );
+    }
+    eprintln!(
+        "Battery Relay: releasing the selected private LE link to rediscover its battery service."
+    );
+    bounded(
+        "releasing the selected LE link timed out",
+        GATT_TIMEOUT,
+        async {
+            device.disconnect().await?;
+            Ok(())
+        },
+    )
+    .await
+}
 #[derive(Debug, Default, PartialEq)]
 struct Options {
     adapter: Option<String>,
@@ -171,14 +239,25 @@ fn discovery_filter(service: Uuid) -> DiscoveryFilter {
 }
 
 async fn discover(adapter: &Adapter, service: Uuid, list_only: bool) -> Result<Option<Device>> {
-    adapter
-        .set_discovery_filter(discovery_filter(service))
-        .await?;
+    bounded(
+        "setting the discovery filter timed out",
+        GATT_TIMEOUT,
+        async {
+            adapter
+                .set_discovery_filter(discovery_filter(service))
+                .await?;
+            Ok(())
+        },
+    )
+    .await?;
     // BlueR first replays cached devices. An Android advertising address may
     // have rotated since that cache was populated: wait for a live update.
     let mut cached: std::collections::HashSet<_> =
         adapter.device_addresses().await?.into_iter().collect();
-    let events = adapter.discover_devices_with_changes().await?;
+    let events = bounded("starting BLE discovery timed out", GATT_TIMEOUT, async {
+        Ok(adapter.discover_devices_with_changes().await?)
+    })
+    .await?;
     tokio::pin!(events);
     let deadline = tokio::time::sleep(Duration::from_secs(15));
     tokio::pin!(deadline);
@@ -206,10 +285,18 @@ async fn discover(adapter: &Adapter, service: Uuid, list_only: bool) -> Result<O
             // Keep our discovery handle alive until Connect completes. Dropping
             // it first schedules StopDiscovery concurrently with connection setup.
             if !device.is_connected().await? {
-                device
-                    .connect()
-                    .await
-                    .context("connect to the advertised BLE service")?;
+                bounded(
+                    "connecting to the advertised BLE service timed out",
+                    GATT_TIMEOUT,
+                    async {
+                        device
+                            .connect()
+                            .await
+                            .context("connect to the advertised BLE service")?;
+                        Ok(())
+                    },
+                )
+                .await?;
             }
             return Ok(Some(device));
         }
@@ -248,13 +335,14 @@ async fn accept_snapshot(
     epoch: Instant,
     output: &EventOutput,
 ) -> Result<()> {
-    if !approved(device).await {
+    if !bounded("checking the battery link timed out", GATT_TIMEOUT, async {
+        Ok(approved(device).await)
+    })
+    .await?
+    {
         bail!("phone disconnected or blocked");
     }
     let packet = Snapshot::decode(bytes)?;
-    if packet.device != DeviceKind::Phone {
-        bail!("this phone-only build does not consume Fitbit snapshots");
-    }
     for event in state.receive(packet, epoch.elapsed(), epoch_ms()?) {
         output.emit(&event).await?;
     }
@@ -267,44 +355,75 @@ async fn receive_session(
     state: &mut RelayState,
     epoch: Instant,
     output: &EventOutput,
+    selected: &mut Option<Device>,
 ) -> Result<()> {
     // StopNotify does not necessarily close the ACL. The phone may advertise a
     // new private address while the old link is still alive. Reuse that verified
     // service before attempting a second connection to the same physical phone.
-    let mut existing = None;
-    for address in adapter.device_addresses().await? {
-        let candidate = adapter.device(address)?;
-        if approved(&candidate).await
-            && candidate
-                .uuids()
+    let device = bounded(
+        "finding the selected BLE device timed out",
+        Duration::from_secs(45),
+        async {
+            for address in adapter.device_addresses().await? {
+                let candidate = adapter.device(address)?;
+                if approved(&candidate).await
+                    && candidate
+                        .uuids()
+                        .await?
+                        .unwrap_or_default()
+                        .contains(&service)
+                {
+                    return Ok(candidate);
+                }
+            }
+            discover(adapter, service, false)
                 .await?
-                .unwrap_or_default()
-                .contains(&service)
-            && find_characteristic(&candidate, service).await.is_ok()
-        {
-            existing = Some(candidate);
-            break;
-        }
-    }
-    let device = match existing {
-        Some(device) => device,
-        None => discover(adapter, service, false)
-            .await?
-            .context("selected phone not advertising Battery Relay")?,
-    };
-    let device_events = device.events().await?;
-    let adapter_events = adapter.events().await?;
+                .context("selected phone not advertising Battery Relay")
+        },
+    )
+    .await?;
+    // Both paths selected this device by the configured UUID, never by its name.
+    *selected = Some(device.clone());
+    let (device_events, adapter_events) =
+        bounded("watching the battery link timed out", GATT_TIMEOUT, async {
+            Ok((device.events().await?, adapter.events().await?))
+        })
+        .await?;
     tokio::pin!(device_events, adapter_events);
-    if !approved(&device).await {
+    if !bounded(
+        "checking the selected link timed out",
+        GATT_TIMEOUT,
+        async { Ok(approved(&device).await) },
+    )
+    .await?
+    {
         bail!("phone disconnected or was blocked during connection");
     }
-    let characteristic = find_characteristic(&device, service).await?;
-    let values = characteristic
-        .notify()
-        .await
-        .context("subscribe to unencrypted battery indications")?;
+    let characteristic = bounded(
+        "resolving the battery service timed out",
+        GATT_TIMEOUT,
+        find_characteristic(&device, service),
+    )
+    .await
+    .map_err(|error| error.context(SessionLost("selected battery service is unavailable")))?;
+    let values = bounded(
+        "subscribing to battery indications timed out",
+        GATT_TIMEOUT,
+        async {
+            characteristic
+                .notify()
+                .await
+                .context("subscribe to unencrypted battery indications")
+        },
+    )
+    .await
+    .map_err(|error| error.context(SessionLost("battery subscription failed")))?;
     tokio::pin!(values);
-    let initial = characteristic.read().await.context("read phone battery")?;
+    let initial = bounded("reading the phone battery timed out", GATT_TIMEOUT, async {
+        characteristic.read().await.context("read phone battery")
+    })
+    .await
+    .map_err(|error| error.context(SessionLost("phone battery read failed")))?;
     accept_snapshot(&initial, &device, state, epoch, output).await?;
     eprintln!("Unpaired BLE battery subscription active.");
     let mut tick = tokio::time::interval(Duration::from_secs(1));
@@ -312,13 +431,16 @@ async fn receive_session(
     loop {
         tokio::select! {
             value = values.next() => {
-                let value = value.context("battery service disappeared")?;
+                let value = value.ok_or(SessionLost("battery service disappeared"))?;
                 accept_snapshot(&value, &device, state, epoch, output).await?;
             }
             event = device_events.next() => match event {
                 None => bail!("phone disappeared"),
                 Some(DeviceEvent::PropertyChanged(DeviceProperty::Connected(false)
                     | DeviceProperty::Blocked(true))) => bail!("phone disconnected or blocked"),
+                Some(DeviceEvent::PropertyChanged(DeviceProperty::Uuids(uuids)))
+                    if !uuids.contains(&service) =>
+                        return Err(SessionLost("the connected phone lost its battery service").into()),
                 _ => {}
             },
             event = adapter_events.next() => match event {
@@ -328,7 +450,7 @@ async fn receive_session(
             _ = tick.tick() => {
                 if state.expire(epoch.elapsed()).is_some() {
                     output.emit(&Event::Connection { connected: false }).await?;
-                    bail!("phone heartbeat expired");
+                    return Err(SessionLost("phone heartbeat expired").into());
                 }
             }
         }
@@ -336,15 +458,27 @@ async fn receive_session(
 }
 
 async fn run(options: Options) -> Result<()> {
-    let session = bluer::Session::new().await?;
-    let adapter = match options.adapter {
-        Some(name) => session.adapter(&name)?,
-        None => session.default_adapter().await?,
-    };
+    let (session, adapter) = bounded(
+        "opening the Bluetooth client timed out",
+        GATT_TIMEOUT,
+        async {
+            let session = bluer::Session::new().await?;
+            let adapter = match options.adapter.as_deref() {
+                Some(name) => session.adapter(name)?,
+                None => session.default_adapter().await?,
+            };
+            Ok((session, adapter))
+        },
+    )
+    .await?;
     if options.check {
         return check(&adapter).await;
     }
-    if !adapter.is_powered().await? {
+    if !bounded("checking adapter power timed out", GATT_TIMEOUT, async {
+        Ok(adapter.is_powered().await?)
+    })
+    .await?
+    {
         bail!("enable Bluetooth before starting");
     }
     if options.discover {
@@ -367,7 +501,9 @@ async fn run(options: Options) -> Result<()> {
     let work = async {
         let mut retry = 1;
         loop {
-            let result = receive_session(&adapter, service, &mut state, epoch, &output).await;
+            let mut selected = None;
+            let result =
+                receive_session(&adapter, service, &mut state, epoch, &output, &mut selected).await;
             let had_session = state.is_connected();
             if let Some(event) = state.disconnect() {
                 output.emit(&event).await?;
@@ -377,8 +513,22 @@ async fn run(options: Options) -> Result<()> {
                     return Err(error);
                 }
                 eprintln!("Battery Relay: {error:#}");
+                if error.downcast_ref::<SessionLost>().is_some() {
+                    if let Some(device) = selected
+                        && let Err(recovery) = recover_selected_link(&device).await
+                    {
+                        eprintln!("Battery Relay: {recovery:#}");
+                    }
+                    // A fresh process also releases stale BlueR notification
+                    // sessions. Quickshell owns the bounded restart delay.
+                    return Err(error);
+                }
             }
-            if !adapter.is_powered().await? {
+            if !bounded("checking adapter power timed out", GATT_TIMEOUT, async {
+                Ok(adapter.is_powered().await?)
+            })
+            .await?
+            {
                 bail!("Bluetooth switched off");
             }
             if had_session {
@@ -403,8 +553,10 @@ async fn run(options: Options) -> Result<()> {
         let _ = output.emit(&event).await;
     }
     // StopNotify and our own discovery session are released on drop. Never
-    // disconnect the entire phone: another app/profile may be using its link.
+    // reset a healthy link on normal shutdown. Link recovery above is separate
+    // and restricted to the selected private, unpaired LE device.
     tokio::time::sleep(Duration::from_millis(250)).await;
+    drop(session);
     result
 }
 #[tokio::main(flavor = "current_thread")]
@@ -479,6 +631,53 @@ mod tests {
         let mut output = Vec::new();
         emit(&mut output, &Event::Connection { connected: false }).unwrap();
         assert_eq!(output, b"{\"event\":\"connection\",\"connected\":false}\n");
+    }
+
+    #[tokio::test]
+    async fn hung_gatt_operation_is_cancelled_and_requires_a_fresh_session() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        struct Cancelled(Arc<AtomicBool>);
+        impl Drop for Cancelled {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let guard = Cancelled(cancelled.clone());
+        let result: Result<()> = bounded(
+            "test subscription timed out",
+            Duration::from_millis(10),
+            async move {
+                let _guard = guard;
+                std::future::pending().await
+            },
+        )
+        .await;
+        assert!(result.unwrap_err().downcast_ref::<SessionLost>().is_some());
+        assert!(cancelled.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn operation_deadlines_preserve_success_and_real_errors() {
+        assert_eq!(
+            bounded("unused", Duration::from_secs(1), async { Ok(42) })
+                .await
+                .unwrap(),
+            42
+        );
+        let error = bounded::<()>("unused", Duration::from_secs(1), async {
+            Err(io::Error::from(io::ErrorKind::BrokenPipe).into())
+        })
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<io::Error>().unwrap().kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        assert!(error.downcast_ref::<SessionLost>().is_none());
     }
 
     #[tokio::test]

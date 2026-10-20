@@ -29,7 +29,15 @@ Set `programs.quickshell.phoneBatteryServiceUuid` to the public UUID displayed
 by its Android app. One packaged receiver is shared by all bars; its exact
 percentage and power flags replace the old native Bluetooth/USB phone reading.
 Disconnect, process exit or a stale stream removes the unavailable phone dial,
-with no fallback. Other batteries retain their existing sources and visuals.
+with no fallback. The optional Fitbit dial uses the same BLE stream; its Google
+Health last-sync time is shown in the tooltip, charging stays unknown, and
+readings older than six hours are hidden. See Battery Relay's owner setup before
+enabling Fitbit: it requires the 0.2 receiver and a Google OAuth registration.
+Other batteries retain their existing sources and visuals.
+Receiver 0.2.1 also recovers lost GATT services on the selected unpaired private
+LE link; Bluetooth operations have deadlines so a failed client can be restarted.
+After activating the packages, inspect the actual bar without another Bluetooth
+subscriber using `qs ipc -c top-bar call topbar batteryStatus`.
 
 ## Build, preview and test
 

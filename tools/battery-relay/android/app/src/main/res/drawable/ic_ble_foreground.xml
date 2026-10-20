@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Desktop computer. Screen and stand stay inside the 66dp safe circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#EED49F" android:fillType="evenOdd"
+        android:pathData="M33,32H75Q81,32 81,38V62Q81,68 75,68H33Q27,68 27,62V38Q27,32 33,32Z M34,37Q32,37 32,39V61Q32,63 34,63H74Q76,63 76,61V39Q76,37 74,37Z" />
+    <path android:fillColor="#C6A0F6"
+        android:pathData="M51,68H57V76H66.5Q69,76 69,78.5Q69,81 66.5,81H41.5Q39,81 39,78.5Q39,76 41.5,76H51Z" />
+</vector>

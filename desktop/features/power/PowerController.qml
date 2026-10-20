@@ -49,7 +49,9 @@ Scope {
   // Battery Relay is the phone's only provider, including its power state.
   readonly property var phoneBatteries: relay.connected
     ? [batteryReading(phoneName, true, relay.percent, relay.pluggedIn, 100, 40, relay.charging)] : []
-  readonly property var accessoryBatteries: keyboardBatteries.concat(mouseBatteries, earbudBatteries, phoneBatteries)
+  readonly property var fitbitBatteries: relay.fitbitAvailable
+    ? [Object.assign(batteryReading("Fitbit", true, relay.fitbitPercent, null), {updatedAt: relay.fitbitUpdatedAt})] : []
+  readonly property var accessoryBatteries: keyboardBatteries.concat(mouseBatteries, earbudBatteries, phoneBatteries, fitbitBatteries)
   readonly property var batteries: (batteryAvailable ? [laptopBattery] : []).concat(accessoryBatteries)
 
   // Every source uses the same visibility and unknown-value rules. A missing

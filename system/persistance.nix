@@ -78,8 +78,6 @@
         ".local/share/chezmoi"
         ".config/pika-backup"
         ".local/share/DaVinciResolve"
-        ".config/polychromatic"
-        ".config/openrazer"
         ".config/chezmoi"
         ".local/state/wireplumber"
         ".config/gcloud"

@@ -55,7 +55,7 @@ acknowledged by the Bluetooth stack, not by the final widget.
 
 See [../PROTOCOL.md](../PROTOCOL.md) for the canonical 12-byte payload. The
 characteristic UUID is `d973f2e0-b19e-4f19-9a67-6c414c65f802`; the primary
-service UUID is installation-specific. This build accepts phone snapshots only.
+service UUID is installation-specific. This build accepts phone and Fitbit snapshots.
 
 Stdout is NDJSON; diagnostics go to stderr:
 
@@ -89,4 +89,40 @@ disk; consumers must discard an incomplete final JSON line.
 Unit tests cover the wire format, unknown values, lifecycle expiry, service
 selection, blocked links and output failures. On the Pixel, real reception,
 receiver restart and recovery after an actual BLE disconnect have been tested.
-Long-term idle power, out-of-range recovery and reboot startup remain unverified.
+The owner also confirmed automatic reconnection after a real phone reboot.
+Long-term idle power and out-of-range recovery remain unverified.
+
+### Connection recovery (0.2.1)
+
+Android can remove/recreate its GATT service while the underlying LE link stays
+connected, notably during an app update. A Bluetooth connection alone is not
+proof that the battery subscription still works. A removed service/UUID, failed
+subscription/read, expired heartbeat or timed-out operation invalidates the
+session. GATT operations have a 15-second deadline; device lookup has a
+45-second total deadline.
+
+On such a failure, the receiver may release **only the device selected through
+the configured service UUID in that session**, and only if its address is random,
+it is connected, unpaired, untrusted and not blocked. All property checks must
+succeed. This uses BlueZ's normal device disconnect API; it releases that LE
+link, not merely one characteristic. It never disconnects a public-address,
+paired/trusted or unrelated device, removes a device, resets the adapter, or
+changes audio profiles. A fresh receiver process is then started by Quickshell's
+existing five-second supervisor. This also clears stuck client-side notification
+sessions instead of reusing them forever.
+
+Diagnostics are now collected by Quickshell from stderr. The read-only
+`qs ipc -c top-bar call topbar batteryStatus` command reports the actual bar's
+connection, age and visible battery readings without starting a second receiver.
+The optional hardware soak test uses `BATTERY_RELAY_SOAK_MS=240000` and
+`BATTERY_RELAY_REQUIRE_FITBIT=1` to require four minutes of uninterrupted phone
+updates and a current Fitbit reading; any disconnect resets the stable interval.
+It does not itself interrupt devices or install an APK.
+
+Version 0.2 accepts both phone and Fitbit packets. Only phone packets establish
+or extend transport liveness; Fitbit retains its original Google Health sync
+timestamp, with null plugged/charging fields. An all-unknown Fitbit packet
+withdraws its previous reading. Quickshell additionally expires cloud readings
+after six hours. Real Fitbit reception has now been verified following owner
+OAuth configuration; the separate protocol/parser/UI unit tests use fictitious
+data, not a connected Fitbit account.

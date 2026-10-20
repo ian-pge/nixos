@@ -1,4 +1,4 @@
-package dev.ian.batteryrelay
+package dev.ian.ble
 
 import android.app.ForegroundServiceStartNotAllowedException
 import android.bluetooth.BluetoothAdapter
@@ -13,24 +13,24 @@ class RelayStartupReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         val preferences = context.getSharedPreferences(RelayService.PREFERENCES, Context.MODE_PRIVATE)
         if (!preferences.getBoolean(RelayService.KEY_ENABLED, false)) {
-            Log.d("BatteryRelay", "Automatic resume skipped: relay disabled")
+            Log.d("BLE", "Automatic resume skipped: relay disabled")
             return
         }
         val address = preferences.getString(RelayService.KEY_ADDRESS, null)
         if (address == null || !BluetoothAdapter.checkBluetoothAddress(address) || !RelayService.hasPermissions(context)) {
-            Log.w("BatteryRelay", "Automatic resume skipped: configuration or Bluetooth permission missing")
+            Log.w("BLE", "Automatic resume skipped: configuration or Bluetooth permission missing")
             return
         }
         try {
             // The service rechecks the opt-in when handling this request, so a
             // queued boot/update cannot undo the user's subsequent Stop action.
             context.startForegroundService(Intent(context, RelayService::class.java).setAction(RelayService.ACTION_RESUME))
-            Log.i("BatteryRelay", "Automatic resume requested after ${intent.action}")
+            Log.i("BLE", "Automatic resume requested after ${intent.action}")
         } catch (error: ForegroundServiceStartNotAllowedException) {
             // Respect Android restrictions; no alarm, retry loop or exemption request.
-            Log.w("BatteryRelay", "Android blocked automatic resume; open the app to resume", error)
+            Log.w("BLE", "Android blocked automatic resume; open the app to resume", error)
         } catch (error: SecurityException) {
-            Log.w("BatteryRelay", "Automatic resume permission denied; open the app to resume", error)
+            Log.w("BLE", "Automatic resume permission denied; open the app to resume", error)
         }
     }
 }
