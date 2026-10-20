@@ -71,6 +71,58 @@ ShellRoot {
       wait(150);
       compare(pending("messages").length, 0, "Opening starts at the latest messages, not the oldest page");
     }
+    function test_opening_stays_at_latest_when_message_layout_finishes_later() {
+      seedHistory();
+      const list = findChild(panel, "beeperMessages");
+      verify(list.atYEnd);
+      const height = list.contentHeight;
+      list.itemAtIndex(list.count - 1).height += 120;
+      tryCompare(list, "contentHeight", height + 120);
+      tryVerify(() => list.atYEnd);
+      verify(beeperData.viewAtLatest);
+    }
+    function test_reopening_keeps_latest_after_history_and_viewport_resize() {
+      seedHistory();
+      const list = findChild(panel, "beeperMessages");
+      panel.active = false; panel.visible = false;
+      tryCompare(list, "count", 0);
+      panel.visible = true; panel.active = true;
+      tryCompare(list, "count", 30); tryCompare(list, "loading", false);
+      tryCompare(panel, "restoringView", false);
+      panel.height -= 180;
+      tryVerify(() => list.atYEnd);
+      panel.width = 800;
+      tryVerify(() => !list.finishPending && list.atYEnd);
+      verify(beeperData.viewAtLatest);
+      compare(pending("messages").length, 0);
+    }
+    function test_opening_anchor_releases_on_scroll_and_preserves_reading_position() {
+      seedHistory();
+      const list = findChild(panel, "beeperMessages");
+      mouseWheel(list, list.width / 2, list.height / 2, 0, 120);
+      tryVerify(() => !panel.historyInteracting);
+      verify(!list.atYEnd);
+      const y = list.contentY;
+      panel.active = false; panel.visible = false;
+      panel.visible = true; panel.active = true;
+      tryCompare(list, "loading", false); tryCompare(panel, "restoringView", false);
+      fuzzyCompare(list.contentY, y, 0.5);
+      list.itemAtIndex(list.count - 1).height += 120;
+      tryCompare(list, "finishPending", false); wait(20);
+      fuzzyCompare(list.contentY, y, 0.5);
+      verify(!beeperData.viewAtLatest);
+    }
+    function test_explicit_message_target_releases_the_opening_anchor() {
+      seedHistory();
+      const list = findChild(panel, "beeperMessages");
+      panel.openChat("chat-0", "message-38");
+      tryCompare(panel, "messageIndex", 8);
+      verify(!list.atYEnd);
+      const y = list.contentY;
+      list.itemAtIndex(list.count - 1).height += 120;
+      tryCompare(list, "finishPending", false); wait(20);
+      fuzzyCompare(list.contentY, y, 0.5);
+    }
     function test_first_visible_chat_is_selected_when_initial_page_arrives_without_marking_read() {
       beeperData.networkFilter = "whatsapp";
       beeperData.refreshChats(false);
@@ -460,6 +512,7 @@ ShellRoot {
     function test_history_prepend_preserves_visible_message_and_selection() {
       seedHistory();
       const list = findChild(panel, "beeperMessages");
+      panel.userHistoryScroll();
       list.positionViewAtIndex(0, ListView.Beginning);
       panel.messageIndex = 1;
       compare(waitRequest("messages").params.cursor, "history-30");
@@ -504,6 +557,7 @@ ShellRoot {
     function test_history_failure_and_nonadvancing_cursor_stop_automatic_retries() {
       seedHistory();
       const list = findChild(panel, "beeperMessages");
+      panel.userHistoryScroll();
       list.positionViewAtIndex(0, ListView.Beginning); waitRequest("messages");
       beeperData.respond("messages", null, {message: "offline"});
       wait(350); compare(pending("messages").length, 0); verify(beeperData.messagesPaginationBlocked);

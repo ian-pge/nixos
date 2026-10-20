@@ -620,7 +620,12 @@ FocusScope {
         const item = messageList.itemAtIndex(index);
         if (item) messageList.contentY = item.y + (saved.offset || 0);
       } else messageList.contentY = saved.contentY || messageList.originY;
-    } else messageList.positionViewAtEnd();
+    } else {
+      // Keep the end anchor through delayed bubble and viewport resizing.
+      // Wheel, scrollbar and message navigation release it explicitly.
+      pinLatest = true;
+      messageList.positionViewAtEnd();
+    }
     displayedChatID = beeperData.currentChatID;
     Qt.callLater(() => { restoringView = false; updateView(); schedulePagination(); });
   }

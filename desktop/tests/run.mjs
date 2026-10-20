@@ -52,7 +52,7 @@ try {
   }
   for (const file of ['tst_AcceleratedScroll.qml', 'tst_KeyedListModel.qml', 'tst_BeeperData.qml', 'tst_BeeperChatPreviews.qml', 'tst_BeeperNavigation.qml', 'tst_BeeperConnections.qml', 'tst_BeeperComposer.qml', 'tst_BeeperPanel.qml', 'tst_BeeperSidebar.qml', 'tst_BeeperArrivals.qml', 'tst_BeeperReactions.qml', 'tst_BeeperSendDraft.qml', 'tst_BeeperKeyboard.qml', 'tst_BeeperVim.qml', 'tst_BeeperLowPriority.qml', 'tst_BeeperUnreadOrder.qml', 'tst_BeeperSearch.qml', 'tst_BeeperPagination.qml', 'tst_BeeperQuotes.qml', 'tst_BeeperMedia.qml', 'tst_BeeperPeople.qml', 'tst_BeeperVideo.qml', 'tst_BeeperBubble.qml',
     'tst_Icon.qml', 'tst_DimmingPolicy.qml', 'tst_PanelBackdrop.qml', 'tst_BeeperAttachmentPicker.qml', 'tst_BeeperHistory.qml', 'tst_MessengerController.qml', 'tst_LauncherControllers.qml', 'tst_NetworkControllers.qml',
-    'tst_UpdateControllers.qml', 'tst_CompactCapsules.qml', 'tst_FeatureControllers.qml', 'tst_BatteryRelayData.qml', 'tst_CollectorLifecycle.qml',
+    'tst_UpdateControllers.qml', 'tst_CompactCapsules.qml', 'tst_FeatureControllers.qml', 'tst_BatteryRelayData.qml', 'tst_FastPairBatteryData.qml', 'tst_CollectorLifecycle.qml',
     'tst_ShellCoordinator.qml', 'tst_SystemData.qml', 'tst_UsageController.qml', 'tst_StorageController.qml',
     'tst_WeatherData.qml', 'tst_NotificationData.qml', 'tst_NotificationPopup.qml', 'tst_WorkspaceSwitcher.qml',
     '../pill-test.qml', '../selection-test.qml'])

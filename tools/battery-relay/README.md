@@ -23,18 +23,43 @@ signing is not set up.
 - `receiver/`: Rust BLE central using BlueZ D-Bus. It finds the explicitly selected
   public installation UUID, subscribes and emits NDJSON for Quickshell.
   No pairing agent, bond/trust changes, adapter-power or audio-profile commands.
-- [PROTOCOL.md](PROTOCOL.md): versioned 12-byte protocol and shared test vector.
+- [PROTOCOL.md](PROTOCOL.md): phone/Fitbit 12-byte frames and the independent Fast Pair output,
+  with shared Android/Rust test vectors.
 
-`packages/battery-relay.nix` packages only the receiver sources, never Android
-signing material. Home Manager installs it and passes the public UUID configured
-at `programs.quickshell.phoneBatteryServiceUuid` to the Quickshell service.
-The shared power controller starts exactly one receiver for all monitors.
-The phone widget has no Bluetooth-battery/USB fallback. Fitbit uses the same BLE
-receiver and appears immediately after the phone dial, with a watch icon and
-a dated Google Health tooltip. Its unknown power state never appears green.
-Other battery widgets
-keep their own existing providers. Apply this wiring with the normal rebuild;
-building individual packages does not activate the running desktop.
+### Pixel Buds : lecture directe Fast Pair
+
+Le PC lit maintenant les annonces chiffrées **Battery All The Time (BATT)**,
+indépendamment du téléphone, de l’application BLE et d’une connexion audio.
+La lecture du boîtier fermé a été validée sur le matériel réel.
+
+La procédure complète est dans **[pairing/README.md](pairing/README.md)** :
+analyse de Google Play Services, format des annonces, clés, appairage PC,
+déchiffrement, résultats, erreurs rencontrées et commandes pour reproduire
+l’installation. Ne pas refaire l’appairage si la clé existe.
+
+- `battery-relay-receiver` : téléphone/Fitbit, via le service BLE de l’application.
+- `fast-pair-battery` : boîtier/gauche/droite, par observation des annonces BLE.
+  Il ne se connecte pas aux écouteurs et ne provisionne aucune clé.
+- `pairing/` : helper manuel d’appairage, jamais lancé par la barre.
+- Clé privée : `~/.local/state/battery-relay/pixel-buds.account-key`, mode
+  `0600`, dossier `0700`, persisté par la configuration NixOS. La configuration
+  ne contient que son chemin, jamais sa valeur.
+- La barre affiche le pourcentage du boîtier ; l’infobulle contient les trois
+  niveaux. Un élément sous 20 % rend le cadran rouge. Pas de repli vers la
+  batterie Bluetooth globale, l’ancien lecteur RFCOMM ou une valeur mémorisée.
+- Les sources téléphone/Fitbit et écouteurs ont des processus et des fraîcheurs
+  indépendants, chacun partagé par tous les écrans.
+
+Android **0.5.0** retire l’ancien adaptateur Google Widget, sa carte, sa permission
+et sa caractéristique GATT. Une migration libère uniquement le host 4421 de BLE
+et ses préférences. Les réglages du relais, l’autorisation Google et le Fitbit
+sont conservés. L’ancienne technique savait parfois lire les trois lignes,
+mais Google les retirait en arrière-plan : elle n’est plus une source active.
+
+Le packaging `packages/battery-relay.nix` ne prend que les sources Rust.
+Les clés et signatures Android restent hors du Nix store et du dépôt.
+Inspecter la barre réelle avec `qs ipc -c top-bar call topbar batteryStatus` :
+la source des écouteurs doit être `fast-pair`.
 
 ## Development environments
 

@@ -89,6 +89,7 @@ ShellRoot {
     }
     function test_reading_older_messages_does_not_jump_or_animate_new_arrivals() {
       load(Array.from({length: 40}, (_, index) => message(index))); settle(); wait(160);
+      panel.userHistoryScroll();
       history().positionViewAtIndex(8, ListView.Beginning); wait(20);
       verify(!history().atYEnd);
       const y = history().contentY;

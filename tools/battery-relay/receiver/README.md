@@ -1,5 +1,11 @@
 # Battery Relay receiver
 
+This crate builds two independent runtime commands. `battery-relay-receiver`
+serves phone/Fitbit; `fast-pair-battery` observes the Pixel Buds' encrypted
+advertisements without connecting. The latter reads a private Account Key from
+a runtime file and does not need the phone. The manual pairing tool is separate:
+[complete pairing and decoding procedure](../pairing/README.md).
+
 Foreground Linux BLE central, using BlueZ D-Bus through
 [BlueR](https://github.com/bluez/bluer). It reads and subscribes to the Android
 application's GATT server. No native pairing, encryption requirement, pairing
@@ -56,6 +62,26 @@ acknowledged by the Bluetooth stack, not by the final widget.
 See [../PROTOCOL.md](../PROTOCOL.md) for the canonical 12-byte payload. The
 characteristic UUID is `d973f2e0-b19e-4f19-9a67-6c414c65f802`; the primary
 service UUID is installation-specific. This build accepts phone and Fitbit snapshots.
+Version 0.4 removes the former Google-widget characteristic. Earbuds are served
+only by the independent `fast-pair-battery` process. Its continuous LE discovery
+uses live BlueZ signals, not cached initial device properties. An account-key
+filter match is required before decoding; unrelated devices are ignored.
+
+```sh
+tools/battery-relay/receiver/target/debug/fast-pair-battery \
+  --key-file "$HOME/.local/state/battery-relay/pixel-buds.account-key" --check
+tools/battery-relay/receiver/target/debug/fast-pair-battery \
+  --key-file "$HOME/.local/state/battery-relay/pixel-buds.account-key" --duration 30
+```
+
+Omit `--duration` for the supervised reader used by Quickshell. It emits changed
+values immediately, unchanged observations at most every 30 seconds, and clears
+stale components after 180 seconds using a clock that includes suspend. It has
+no phone-session requirement, connection/pairing code or native battery fallback.
+Exit 78 denotes an invalid/missing private key file; the view does not restart
+that configuration in a loop. Runtime failures use the normal restart delay.
+The Account Key must be a user-owned regular 16-byte file with private permissions,
+outside the Nix store; it is never printed or passed as a command-line value.
 
 Stdout is NDJSON; diagnostics go to stderr:
 

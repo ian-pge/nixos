@@ -13,20 +13,22 @@ Item {
   property string badgeText: ""
   property string label: ""
   property string actionHint: ""
+  property string tooltipOverride: ""
   property var value: null
   property color accent: Theme.foreground
   property bool interactive: false
   property bool forceHovered: false
   property bool muted: false
   property bool charging: false
+  property bool attention: false
   readonly property bool known: typeof value === "number" && isFinite(value)
   readonly property real fraction: known ? Math.max(0, Math.min(100, value)) / 100 : 0
-  readonly property string tooltipText: (known ? Math.round(value) + "%" : "—")
-    + (actionHint ? "\n" + actionHint : "")
+  readonly property string tooltipText: tooltipOverride || ((known ? Math.round(value) + "%" : "—")
+    + (actionHint ? "\n" + actionHint : ""))
   property string accessibleText: label + " · "
     + (known ? Math.round(value) + "%" : "Unavailable")
     + (charging ? " · Charging" : muted ? " · Muted" : "")
-  readonly property color indicatorColor: (known || charging) && !muted ? accent : Theme.inactive
+  readonly property color indicatorColor: (known || charging || attention) && !muted ? accent : Theme.inactive
   property real displayedFraction: fraction
   Behavior on displayedFraction {
     enabled: root.known

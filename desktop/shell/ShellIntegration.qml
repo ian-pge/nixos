@@ -31,7 +31,9 @@ Scope {
         configured: relay.configured, connected: relay.connected,
         receiverRunning: relay.transport !== null,
         phoneAgeMs: relay.snapshot === null ? null : relay.now - relay.snapshot.receivedAt,
-        phone: power.phoneBatteries, fitbit: power.fitbitBatteries
+        phone: power.phoneBatteries, fitbit: power.fitbitBatteries,
+        earbuds: power.earbudBatteries, earbudDataConnected: power.earbudDataConnected,
+        earbudSource: power.earbudsData.available ? "fast-pair" : null
       });
     }
     function toggleBeeper() { root.messenger.toggle(); }

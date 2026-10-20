@@ -3,6 +3,9 @@
 use serde::Serialize;
 use std::{fmt, time::Duration};
 
+pub mod fast_pair;
+pub mod output;
+
 pub const SNAPSHOT_UUID: bluer::Uuid =
     bluer::Uuid::from_u128(0xd973f2e0_b19e_4f19_9a67_6c414c65f802);
 pub const PACKET_LEN: usize = 12;
@@ -99,6 +102,22 @@ pub enum Event {
         #[serde(rename = "receivedAt")]
         received_at: u64,
     },
+    Earbuds {
+        available: bool,
+        case: EarbudLevel,
+        left: EarbudLevel,
+        right: EarbudLevel,
+        #[serde(rename = "observedAt")]
+        observed_at: Option<u64>,
+        #[serde(rename = "receivedAt")]
+        received_at: u64,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct EarbudLevel {
+    pub percent: Option<u8>,
+    pub charging: Option<bool>,
 }
 
 /// `connected` means an authorized app has actually sent a packet, not merely
@@ -188,7 +207,6 @@ mod tests {
     use super::*;
 
     const VECTOR: [u8; 12] = [1, 1, 73, 7, 0, 0, 1, 0x8b, 0xcf, 0xe5, 0x68, 0];
-
     #[test]
     fn link_recovery_is_limited_to_our_connected_private_unpaired_device() {
         for flags in 0..64 {

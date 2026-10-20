@@ -16,6 +16,11 @@
     default = null;
     description = "Public installation UUID displayed by the Battery Relay Android app; not a secret or authentication key.";
   };
+  options.programs.quickshell.earbudsAccountKeyFile = lib.mkOption {
+    type = lib.types.str;
+    default = "${config.xdg.stateHome}/battery-relay/pixel-buds.account-key";
+    description = "Runtime path to the private Fast Pair Account Key (0600). This is a string, never a Nix path or the key contents.";
+  };
 
   config = {
     home.packages = with localPackages; [
@@ -69,7 +74,8 @@
           "QS_PANEL_DIM_AMOUNT=${toString config.wayland.windowManager.hyprland.settings.config.decoration.dim_special}"
         ]
         ++ lib.optional (config.programs.quickshell.phoneBatteryServiceUuid != null)
-        "QS_PHONE_BATTERY_SERVICE_UUID=${config.programs.quickshell.phoneBatteryServiceUuid}";
+        "QS_PHONE_BATTERY_SERVICE_UUID=${config.programs.quickshell.phoneBatteryServiceUuid}"
+        ++ ["QS_EARBUDS_ACCOUNT_KEY_FILE=${config.programs.quickshell.earbudsAccountKeyFile}"];
     };
   };
 }

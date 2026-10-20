@@ -14,6 +14,9 @@ Scope {
   property string phoneName: "Phone"
   readonly property var phoneRelay: relay
   BatteryRelayData { id: relay; enabled: root.enabled }
+  readonly property var earbudsData: earbuds
+  FastPairBatteryData { id: earbuds; enabled: root.enabled }
+  readonly property bool earbudDataConnected: earbuds.available
   readonly property var laptopBattery: batteryReading("Laptop", battery?.isPresent === true,
     battery?.ready ? battery.percentage : null,
     battery?.isPresent && battery.ready ? !onBattery
@@ -38,14 +41,19 @@ Scope {
         : power && power.state !== UPowerDeviceState.Unknown ? power.percentage : null;
       return batteryReading(device.name || device.deviceName || "Mouse", device.connected, level, pluggedIn, 1);
     }).filter(device => device.available)
-  // BlueZ currently exposes a single level for Pixel Buds, not left/right/case.
-  // Keep a connected device visible while its first battery report is pending.
-  readonly property var earbudBatteries: bluetoothDevices
-    .filter(device => device.connected && (/pixel\s+buds/i.test(device.deviceName || "")
-      || /pixel\s+buds/i.test(device.name || "")))
-    .slice().sort((left, right) => left.address.localeCompare(right.address))
-    .map(device => batteryReading(device.name || device.deviceName || "Pixel Buds", device.connected,
-      device.batteryAvailable ? device.battery : null, bluetoothPower(device), 1))
+  // Direct Fast Pair BATT is independent of phone and audio connections.
+  // The dial always represents the case. A low bud warns even if it is full.
+  readonly property var earbudBatteries: earbuds.available
+    ? [earbudReading("Pixel Buds", earbuds.snapshot)] : []
+  function earbudReading(name, values) {
+    const text = value => value.percent === null ? "—" : value.percent + "%";
+    return Object.assign(batteryReading(name, true, values.case.percent,
+      values.case.charging === true ? true : null, 100, 20, values.case.charging), {
+        warning: [values.case, values.left, values.right].some(value => value.percent !== null && value.percent < 20),
+        tooltip: "Boîtier : " + text(values.case)
+          + "\nGauche : " + text(values.left) + "\nDroite : " + text(values.right)
+      });
+  }
   // Battery Relay is the phone's only provider, including its power state.
   readonly property var phoneBatteries: relay.connected
     ? [batteryReading(phoneName, true, relay.percent, relay.pluggedIn, 100, 40, relay.charging)] : []

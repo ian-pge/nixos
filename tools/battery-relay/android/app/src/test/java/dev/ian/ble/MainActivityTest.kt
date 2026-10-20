@@ -59,6 +59,7 @@ class MainActivityTest {
         application.getSharedPreferences("relay", Context.MODE_PRIVATE).edit().clear()
             .putBoolean(RelayService.KEY_ENABLED, true).putString(RelayService.KEY_ADDRESS, "AA:BB:CC:DD:EE:FF").commit()
         FitbitRepository::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
+        application.getSharedPreferences("google_battery_widget", Context.MODE_PRIVATE).edit().clear().commit()
         // A local fake binder, without starting the real BLE/foreground service.
         val service = RelayService()
         shadowOf(application).setComponentNameAndServiceForBindService(ComponentName(application, RelayService::class.java), service.LocalBinder())

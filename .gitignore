@@ -4,3 +4,5 @@
 .direnv/
 result
 target/
+*.account-key
+pc-account-key.bin

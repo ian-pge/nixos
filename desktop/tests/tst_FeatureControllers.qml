@@ -56,6 +56,7 @@ ShellRoot {
       media.players = []; feedback = []; mediaActions = []; sampledBrightness = -1;
       power.battery = null; power.onBattery = true; power.powerDevices = []; power.bluetoothDevices = [];
       power.phoneRelay.invalidate(); power.phoneRelay.now = Date.now(); power.phoneName = "Pixel 8 Pro";
+      power.earbudsData.invalidate(); power.earbudsData.now = Date.now();
       telemetry.systemFresh = true; telemetry.usbDevices = []; telemetry.hidppBatteries = [];
     }
     function test_brightness_values_belong_to_each_monitor() {
@@ -292,16 +293,20 @@ ShellRoot {
       power.battery = {ready: true, isPresent: true, percentage: null};
       power.bluetoothDevices = [
         {icon: "input-keyboard", address: "KEYBOARD", connected: true, batteryAvailable: false},
-        {icon: "input-mouse", address: "MOUSE", connected: true, batteryAvailable: false},
-        {name: "Pixel Buds", address: "BUDS", connected: true, batteryAvailable: false}
+        {icon: "input-mouse", address: "MOUSE", connected: true, batteryAvailable: false}
       ];
       verify(phoneSample(null, null, null));
+      const relay = power.earbudsData, unknown = {percent:null,charging:null};
+      verify(relay.accept({event:"earbuds",available:true,observedAt:relay.now,receivedAt:relay.now,
+        case:unknown,left:{percent:100,charging:null},right:unknown}));
       compare(power.batteries.length, 5);
       for (const reading of power.batteries) {
         verify(reading.available); compare(reading.percent, null); verify(reading.pluggedIn !== true);
       }
       power.bluetoothDevices = power.bluetoothDevices.map(device => Object.assign({}, device, {connected: false}));
       power.phoneRelay.invalidate();
+      compare(power.accessoryBatteries.length, 1, "Earbuds are independent of the phone");
+      power.earbudsData.invalidate();
       compare(power.accessoryBatteries.length, 0);
       compare(power.batteries.length, 1, "The integrated battery stays visible");
     }
@@ -394,34 +399,100 @@ ShellRoot {
       power.powerDevices = [Object.assign({}, report, {state: UPowerDeviceState.FullyCharged, isPresent: false})];
       compare(power.mouseBatteries.length, 0);
     }
-    function test_pixel_buds_battery_tracks_connection_and_missing_reports() {
+    function test_native_bluetooth_cannot_create_an_earbud_reading() {
       const buds = {name: "Ian's Pixel Buds Pro 2", deviceName: "Pixel Buds Pro 2",
         address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: true, battery: 0.73};
       const keyboard = {icon: "input-keyboard", address: "KEYBOARD", dbusPath: "/keyboard",
         connected: true, batteryAvailable: true, battery: 0.45};
       power.bluetoothDevices = [keyboard, buds];
       compare(power.keyboardBatteries.length, 1);
-      compare(power.earbudBatteries.length, 1); compare(power.accessoryBatteries.length, 2);
-      compare(power.earbudBatteries[0].name, buds.name);
-      compare(power.earbudBatteries[0].percent, 73); verify(!power.earbudBatteries[0].pluggedIn);
-      power.bluetoothDevices = [Object.assign({}, buds, {battery: 0})];
-      compare(power.earbudBatteries[0].percent, 0);
-      for (const report of [{batteryAvailable: false}, {battery: NaN}, {battery: null}, {battery: -1}, {battery: 1.01}]) {
+      compare(power.earbudBatteries.length, 0); compare(power.accessoryBatteries.length, 1);
+      for (const report of [{battery: 0}, {battery: 1}, {batteryAvailable: false}, {battery: NaN},
+          {battery: null}, {battery: -1}, {battery: 1.01}, {connected: false}, {name: "My earbuds"}]) {
         power.bluetoothDevices = [Object.assign({}, buds, report)];
-        compare(power.earbudBatteries.length, 1); compare(power.earbudBatteries[0].percent, null);
+        compare(power.earbudBatteries.length, 0);
+        verify(!power.earbudDataConnected);
       }
-      power.bluetoothDevices = [Object.assign({}, buds, {connected: false})];
-      compare(power.earbudBatteries.length, 0); compare(power.accessoryBatteries.length, 0);
-      power.bluetoothDevices = [Object.assign({}, buds, {name: "My earbuds"})];
-      compare(power.earbudBatteries.length, 1, "The original name survives an alias change");
-      power.bluetoothDevices = [Object.assign({}, buds, {name: "Another headset", deviceName: "Other headset"})];
+      compare(power.accessoryBatteries.length, 0);
+    }
+    function test_earbud_dial_uses_case_and_warns_for_any_component() {
+      const source = power.earbudsData;
+      const event = {event: "earbuds", available: true, observedAt: source.now, receivedAt: source.now,
+        left: {percent: 73, charging: false}, right: {percent: 42, charging: true},
+        case: {percent: null, charging: null}
+      };
+      verify(source.accept(event));
+      compare(power.earbudBatteries.length, 1);
+      compare(power.earbudBatteries[0].percent, null);
+      compare(power.earbudBatteries[0].tooltip, "Boîtier : —\nGauche : 73%\nDroite : 42%");
+      verify(!power.earbudBatteries[0].warning);
+      compare(power.earbudBatteries[0].pluggedIn, null);
+      event.case = {percent: 80, charging: true};
+      for (const component of ["left", "right", "case"]) {
+        const original = event[component];
+        event[component] = {percent: 19, charging: false}; verify(source.accept(event));
+        verify(power.earbudBatteries[0].warning, component + " below threshold");
+        event[component] = original;
+      }
+      event.left = {percent: 20, charging: false}; verify(source.accept(event));
+      verify(!power.earbudBatteries[0].warning, "Exactly 20 is not below 20");
+      compare(power.earbudBatteries[0].percent, 80); verify(power.earbudBatteries[0].pluggedIn);
+      event.case = {percent: null, charging: null};
+      event.right = {percent: 0, charging: true}; verify(source.accept(event));
+      verify(power.earbudBatteries[0].warning, "A low bud warns even when charging and case level is unknown");
+      source.invalidate();
       compare(power.earbudBatteries.length, 0);
+      verify(!power.earbudDataConnected);
+    }
+    function test_earbuds_withdrawal_never_falls_back_to_connected_audio_devices() {
+      const first = {name:"Pixel Buds", address:"AA:BB:CC:DD:EE:FF", connected:true, batteryAvailable:true, battery:0.5};
+      const second = {name:"Pixel Buds", address:"11:22:33:44:55:66", connected:true, batteryAvailable:true, battery:0.7};
+      power.bluetoothDevices = [first, second];
+      verify(phoneSample(90));
+      const source = power.earbudsData, unknown = {percent: null, charging: null};
+      const event = {event: "earbuds", available: true, observedAt: source.now, receivedAt: source.now,
+        case: {percent: 85, charging: false},
+        left: unknown, right: unknown};
+      verify(source.accept(event));
+      compare(power.earbudBatteries.length, 1); compare(power.earbudBatteries[0].percent, 85);
+      verify(source.accept(Object.assign({}, event, {available: false, observedAt: null, case: unknown})));
+      compare(power.earbudBatteries.length, 0); verify(!power.earbudDataConnected);
+      verify(power.phoneRelay.connected, "Withdrawing earbuds does not stop the phone");
+      verify(source.accept(event));
+      source.now += source.staleAfterMs;
+      verify(phoneSample(90));
+      compare(power.earbudBatteries.length, 0, "Phone recovery cannot revive expired earbuds");
     }
     function phoneSample(level, pluggedIn = false, charging = false) {
       const relay = power.phoneRelay;
       relay.accept({event: "connection", connected: true});
       return relay.accept({event: "battery", device: "phone", percent: level, pluggedIn, charging,
         updatedAt: relay.now + 2000, receivedAt: relay.now});
+    }
+    function test_fast_pair_case_dial_is_independent_of_phone_and_audio() {
+      const source = power.earbudsData;
+      const unknown = {percent: null, charging: null};
+      const event = {event: "earbuds", available: true, case: {percent: 85, charging: true},
+        left: {percent: 100, charging: false}, right: {percent: 100, charging: false},
+        observedAt: source.now - 60000, receivedAt: source.now};
+      verify(source.accept(event));
+      compare(power.bluetoothDevices.length, 0);
+      compare(power.earbudBatteries.length, 1);
+      compare(power.earbudBatteries[0].percent, 85);
+      compare(power.earbudBatteries[0].tooltip, "Boîtier : 85%\nGauche : 100%\nDroite : 100%");
+      verify(power.earbudBatteries[0].pluggedIn); verify(!power.earbudBatteries[0].warning);
+      verify(power.earbudDataConnected);
+      verify(!power.phoneRelay.connected);
+      phoneSample(90); power.phoneRelay.invalidate();
+      compare(power.earbudBatteries.length, 1, "Phone disconnect does not clear direct Fast Pair data");
+      event.left = {percent: 19, charging: false}; verify(source.accept(event));
+      verify(power.earbudBatteries[0].warning, "A low bud warns even when the case is charging");
+      event.left = {percent: 20, charging: false}; verify(source.accept(event));
+      verify(!power.earbudBatteries[0].warning);
+      event.case = unknown; verify(source.accept(event));
+      compare(power.earbudBatteries[0].percent, null);
+      compare(power.earbudBatteries[0].tooltip, "Boîtier : —\nGauche : 20%\nDroite : 100%");
+      source.invalidate(); compare(power.earbudBatteries.length, 0);
     }
     function test_phone_battery_uses_only_precise_relay_values() {
       power.bluetoothDevices = [{address: "OLD-PHONE", icon: "phone", connected: true, batteryAvailable: true, battery: 0.8}];
@@ -484,11 +555,20 @@ ShellRoot {
     function test_pixel_buds_full_battery_is_not_assumed_to_be_charging() {
       power.bluetoothDevices = [{name: "Pixel Buds Pro", address: "BUDS", dbusPath: "/buds",
         connected: true, batteryAvailable: true, battery: 1}];
+      verify(phoneSample(90));
+      const source = power.earbudsData;
+      const event = {event:"earbuds",available:true,observedAt:source.now,receivedAt:source.now,
+        case:{percent:100,charging:false},left:{percent:100,charging:false},right:{percent:100,charging:false}
+      };
+      verify(source.accept(event));
       compare(power.earbudBatteries[0].percent, 100); verify(!power.earbudBatteries[0].pluggedIn);
       power.powerDevices = [{ready: true, isPresent: true, nativePath: "/buds", state: UPowerDeviceState.Charging}];
+      compare(power.earbudBatteries[0].pluggedIn, null, "A generic bud report cannot power the case");
+      event.case.charging = true; verify(source.accept(event));
       verify(power.earbudBatteries[0].pluggedIn);
       power.powerDevices = [];
-      verify(!power.earbudBatteries[0].pluggedIn);
+      verify(power.earbudBatteries[0].pluggedIn);
+      event.case.charging = false; verify(source.accept(event));
       power.powerDevices = [{ready: true, isPresent: true, nativePath: "/buds", state: UPowerDeviceState.FullyCharged}];
       compare(power.earbudBatteries[0].pluggedIn, null, "Full alone does not confirm the case is powered");
     }

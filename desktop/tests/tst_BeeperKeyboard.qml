@@ -427,13 +427,14 @@ ShellRoot {
     function preparedVoice() {
       return {path: "/tmp/fictional-voice.ogg", srcURL: "file:///tmp/fictional-voice.ogg", type: "voice-note"};
     }
-    function test_ctrl_d_records_and_finishes_without_scrolling_or_sending_data() {
+    function test_ctrl_d_records_and_finishes_without_navigating_or_sending_data() {
       return [{tag: "navigation", compose: false}, {tag: "composer", compose: true}];
     }
-    function test_ctrl_d_records_and_finishes_without_scrolling_or_sending(data) {
+    function test_ctrl_d_records_and_finishes_without_navigating_or_sending(data) {
       beeperData.deferRecording = true; beeperData.draftText = "Keep my caption";
       if (data.compose) panel.compose();
-      const chatY = panel.chatList.contentY, messageY = findChild(panel, "beeperMessages").contentY;
+      const history = findChild(panel, "beeperMessages");
+      const chatY = panel.chatList.contentY, messageY = history.contentY, atLatest = history.atYEnd;
       keyClick(Qt.Key_D, Qt.ControlModifier); tryCompare(panel, "preparingRecording", true);
       compare(pending("prepareRecording").length, 1); compare(fixture.recordStarts, 0);
       beeperData.respond("prepareRecording", preparedVoice());
@@ -441,7 +442,10 @@ ShellRoot {
       keyClick(Qt.Key_D, Qt.ControlModifier); tryCompare(panel, "recording", false);
       compare(fixture.recordStops, 1); compare(beeperData.draftAttachment.path, preparedVoice().path);
       compare(beeperData.draftText, "Keep my caption"); compare(pending("send").length, 0);
-      compare(panel.chatList.contentY, chatY); compare(findChild(panel, "beeperMessages").contentY, messageY);
+      compare(panel.chatList.contentY, chatY);
+      // The recording/attachment controls resize the history viewport.
+      if (atLatest) tryVerify(() => history.atYEnd);
+      else compare(history.contentY, messageY);
     }
     function test_enter_finishes_voice_then_sends_on_second_press_data() {
       const cases = [];

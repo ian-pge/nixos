@@ -21,8 +21,8 @@ android {
         applicationId = "dev.ian.ble"
         minSdk = 31
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.3.3"
+        versionCode = 11
+        versionName = "0.5.0"
     }
 
     compileOptions {

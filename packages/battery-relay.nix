@@ -6,7 +6,7 @@
 }:
 rustPlatform.buildRustPackage {
   pname = "battery-relay-receiver";
-  version = "0.2.1";
+  version = "0.4.0";
   src = lib.fileset.toSource {
     root = ../tools/battery-relay/receiver;
     fileset = lib.fileset.unions [
@@ -19,7 +19,7 @@ rustPlatform.buildRustPackage {
   nativeBuildInputs = [pkg-config];
   buildInputs = [dbus];
   meta = {
-    description = "Phone and Fitbit battery telemetry relayed over BLE for Quickshell";
+    description = "Phone/Fitbit BLE relay and independent, connection-free Pixel Buds Fast Pair battery reader";
     mainProgram = "battery-relay-receiver";
     platforms = lib.platforms.linux;
   };

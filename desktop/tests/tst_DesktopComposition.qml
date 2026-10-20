@@ -272,10 +272,12 @@ ShellRoot {
         keyboards: services.power.bluetoothDevices, brightness: services.brightness.values,
         phoneName: services.power.phoneName, phoneSnapshot: services.power.phoneRelay.snapshot,
         phoneConnected: services.power.phoneRelay.reportedConnected,
+        earbudsSnapshot: services.power.earbudsData.snapshot,
         weather: services.calendar.weather.snapshot,
         claude: services.usage.claude.snapshot, codex: services.usage.codex.snapshot
       };
       services.power.phoneRelay.invalidate();
+      services.power.earbudsData.invalidate();
       services.system.cpuUsage = 23; services.system.memoryUsage = 51;
       services.system.gpuText = "17%"; services.system.diskUsage = 42;
       services.system.telemetry.acceptSystem({cpu: 23, memory: 51});
@@ -313,6 +315,7 @@ ShellRoot {
         services.power.phoneRelay.invalidate();
         services.power.phoneRelay.reportedConnected = previous.phoneConnected;
         services.power.phoneRelay.snapshot = previous.phoneSnapshot;
+        services.power.earbudsData.snapshot = previous.earbudsSnapshot;
         services.brightness.values = previous.brightness;
         services.calendar.weather.snapshot = previous.weather;
         services.usage.claude.snapshot = previous.claude; services.usage.codex.snapshot = previous.codex;
@@ -461,6 +464,15 @@ ShellRoot {
       verify(relay.accept({event: "battery", device: "phone", percent, pluggedIn, charging,
         updatedAt: time + 2000, receivedAt: time}));
     }
+    function earbudSample(percent, charging = false) {
+      const source = app.services.power.earbudsData, time = Date.now();
+      // A missing case value may coexist with known earbuds. An entirely
+      // unknown provider is unavailable and must not produce a dial.
+      const budLevel = percent === null ? 100 : percent;
+      verify(source.accept({event:"earbuds",available:true,observedAt:time,receivedAt:time,
+        case:{percent,charging},left:{percent:budLevel,charging},right:{percent:budLevel,charging}
+      }));
+    }
     function test_phone_battery_shares_the_accessory_dial_and_connection_states() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
       const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;
@@ -497,7 +509,7 @@ ShellRoot {
         tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") === null);
       } finally { restore(); }
     }
-    function test_fitbit_follows_phone_and_shows_dated_cloud_reading() {
+    function test_fitbit_follows_phone_and_shows_only_the_percentage() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
       const bar = app.bars[0], restore = fictionalReadings(bar), relay = app.services.power.phoneRelay;
       try {
@@ -512,7 +524,7 @@ ShellRoot {
         tryVerify(() => dial.x > phone.x);
         compare(dial.parent, phone.parent); compare(dial.width, phone.width); compare(dial.height, phone.height);
         compare(dial.iconName, "watch"); compare(dial.value, 42); compare(dial.lowThreshold, 20);
-        verify(dial.tooltipText.includes("Google Health")); verify(dial.tooltipText.includes("Charge inconnue"));
+        compare(dial.tooltipText, "42%"); compare(dial.actionHint, "");
         verify(!dial.charging); verify(!dial.interactive);
         verify(relay.accept(Object.assign({}, report, {percent: 19})));
         compare(dial.accent.toString(), "#ed8796");
@@ -523,26 +535,61 @@ ShellRoot {
         verify(findChild(bar.contentItem, "phoneBatteryPill") !== null);
       } finally { relay.invalidate(); restore(); }
     }
+    function test_one_earbud_dial_shows_case_and_warns_for_low_buds() {
+      const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;
+      try {
+        relaySample(90);
+        const source = power.earbudsData, time = Date.now();
+        const event = {event:"earbuds", available:true, observedAt:time, receivedAt:time,
+          left:{percent:73, charging:false}, right:{percent:42, charging:true}, case:{percent:80, charging:false}
+        };
+        verify(source.accept(event));
+        tryVerify(() => findChild(bar.contentItem, "earbudBatteryPill") !== null);
+        const dial = findChild(bar.contentItem, "earbudBatteryPill");
+        verify(findChild(bar.contentItem, "earbudBatteryPill1") === null);
+        compare(dial.iconName,"headphones"); compare(dial.value,80);
+        compare(dial.tooltipText,"Boîtier : 80%\nGauche : 73%\nDroite : 42%");
+        verify(!dial.charging); verify(!dial.interactive); verify(!dial.warning);
+        event.left = {percent:19, charging:false}; verify(source.accept(event));
+        compare(dial.value,80); verify(dial.warning); compare(dial.indicatorColor.toString(),"#ed8796");
+        verify(findChild(bar.contentItem,"batteryBlock").warning);
+        event.case = {percent:80, charging:true}; verify(source.accept(event));
+        verify(dial.charging); compare(dial.indicatorColor.toString(),"#ed8796");
+        event.case = {percent:null, charging:null}; verify(source.accept(event));
+        verify(!dial.known); compare(dial.indicatorColor.toString(),"#ed8796");
+        event.left = {percent:20, charging:false}; verify(source.accept(event));
+        verify(!dial.warning);
+        event.right = {percent:18, charging:false}; verify(source.accept(event));
+        compare(dial.tooltipText,"Boîtier : —\nGauche : 20%\nDroite : 18%"); verify(dial.warning);
+        power.bluetoothDevices = [{name:"Pixel Buds Pro 2", address:"AUDIO", connected:true, batteryAvailable:true, battery:1}];
+        const unknown = {percent:null,charging:null};
+        verify(source.accept({event:"earbuds",available:false,observedAt:null,receivedAt:time,
+          case:unknown,left:unknown,right:unknown}));
+        tryVerify(() => findChild(bar.contentItem, "earbudBatteryPill") === null);
+        verify(findChild(bar.contentItem, "phoneBatteryPill") !== null);
+      } finally { power.phoneRelay.invalidate(); restore(); }
+    }
     function test_all_battery_widgets_share_unknown_powered_and_low_states() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
       const bar = app.bars[0], restore = fictionalReadings(bar), power = app.services.power;
       const previousPowerDevices = power.powerDevices;
       const accessories = [
         {icon: "input-keyboard", address: "KEYBOARD", dbusPath: "/keyboard", connected: true, batteryAvailable: false},
-        {icon: "input-mouse", address: "MOUSE", dbusPath: "/mouse", name: "Test mouse", connected: true, batteryAvailable: false},
-        {name: "Pixel Buds", address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: false}
+        {icon: "input-mouse", address: "MOUSE", dbusPath: "/mouse", name: "Test mouse", connected: true, batteryAvailable: false}
       ];
       const dialNames = ["batteryPill", "keyboardBatteryPill", "mouseBatteryPill", "earbudBatteryPill", "phoneBatteryPill"];
       try {
         power.powerDevices = [];
         power.battery = {ready: true, isPresent: true, percentage: null}; power.onBattery = true;
         power.bluetoothDevices = accessories; relaySample(null, null, null);
+        earbudSample(null, null);
         tryVerify(() => dialNames.every(name => findChild(bar.contentItem, name) !== null));
         const dials = dialNames.map(name => findChild(bar.contentItem, name));
         const block = findChild(bar.contentItem, "batteryBlock");
         compare(power.batteries.length, 5); verify(!block.warning); verify(!block.pluggedIn);
         for (const dial of dials) {
-          verify(dial.visible); verify(!dial.known); compare(dial.tooltipText, "—");
+          verify(dial.visible); verify(!dial.known);
+          compare(dial.tooltipText, dial.objectName === "earbudBatteryPill" ? "Boîtier : —\nGauche : 100%\nDroite : 100%" : "—");
           compare(dial.indicatorColor.toString(), dials[0].indicatorColor.toString());
           compare(dial.width, dials[0].width); compare(dial.height, dials[0].height);
         }
@@ -550,9 +597,11 @@ ShellRoot {
         power.powerDevices = accessories.map(device => ({ready: true, isPresent: true,
           nativePath: device.dbusPath, state: UPowerDeviceState.Charging}));
         relaySample(null, true, false);
+        earbudSample(null, true);
         verify(block.pluggedIn); verify(!block.warning);
         for (const dial of dials) {
-          verify(dial.pluggedIn); verify(!dial.known); compare(dial.tooltipText, "—");
+          verify(dial.pluggedIn); verify(!dial.known);
+          compare(dial.tooltipText, dial.objectName === "earbudBatteryPill" ? "Boîtier : —\nGauche : 100%\nDroite : 100%" : "—");
           compare(dial.indicatorColor.toString(), "#a6da95");
           verify(dial.accessibleText.includes("Powered")); verify(!dial.accessibleText.includes("Charging"));
         }
@@ -561,9 +610,13 @@ ShellRoot {
           power.battery = {ready: true, isPresent: true, percentage: level / 100};
           power.bluetoothDevices = accessories.map(device => Object.assign({}, device, {batteryAvailable: true, battery: level / 100}));
           relaySample(level);
+          earbudSample(level);
           compare(block.warning, level < 40); verify(!block.pluggedIn);
           for (const dial of dials) {
-            verify(dial.known); compare(dial.tooltipText, level + "%"); verify(!dial.pluggedIn);
+            verify(dial.known);
+            compare(dial.tooltipText, dial.objectName === "earbudBatteryPill"
+              ? "Boîtier : " + level + "%\nGauche : " + level + "%\nDroite : " + level + "%" : level + "%");
+            verify(!dial.pluggedIn);
             const threshold = dial.objectName === "phoneBatteryPill" ? 40 : 20;
             compare(dial.lowThreshold, threshold);
             compare(dial.indicatorColor.toString(), level < threshold ? "#ed8796" : "#f4dbd6");
@@ -571,6 +624,8 @@ ShellRoot {
         }
         power.bluetoothDevices = accessories.map(device => Object.assign({}, device, {connected: false}));
         power.phoneRelay.invalidate();
+        verify(findChild(bar.contentItem, "earbudBatteryPill") !== null, "Phone shutdown does not hide Fast Pair");
+        power.earbudsData.invalidate();
         tryVerify(() => dialNames.slice(1).every(name => findChild(bar.contentItem, name) === null));
         compare(power.batteries.length, 1); verify(findChild(bar.contentItem, "batteryPill").visible);
       } finally { power.powerDevices = previousPowerDevices; restore(); }

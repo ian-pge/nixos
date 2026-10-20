@@ -1,17 +1,23 @@
 [package]
 name = "battery-relay-receiver"
-version = "0.2.1"
+version = "0.4.0"
 edition = "2024"
 publish = false
 
 [dependencies]
 anyhow = "1"
+aes = "0.8"
 bluer = { version = "=0.17.4", features = ["bluetoothd"] }
+dbus = "0.9"
+dbus-tokio = "0.7"
 futures = "0.3"
+hkdf = "0.12"
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 tokio = { version = "1", features = ["macros", "rt", "signal", "sync", "time"] }
+zeroize = "1"
 
 [profile.release]
 lto = "thin"

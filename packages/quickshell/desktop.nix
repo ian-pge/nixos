@@ -55,6 +55,8 @@ in
       --replace-fail '"quickshell-system-stats"' '"${quickshellSystemStats}/bin/quickshell-system-stats"'
     substituteInPlace "$out/features/power/BatteryRelayData.qml" \
       --replace-fail '"battery-relay-receiver"' '"${batteryRelayReceiver}/bin/battery-relay-receiver"'
+    substituteInPlace "$out/features/power/FastPairBatteryData.qml" \
+      --replace-fail '"fast-pair-battery"' '"${batteryRelayReceiver}/bin/fast-pair-battery"'
     substituteInPlace "$out/features/storage/StorageController.qml" \
       --replace-fail '["systemctl",' '["${systemd}/bin/systemctl",' \
       --replace-fail '["cat",' '["${coreutils}/bin/cat",'

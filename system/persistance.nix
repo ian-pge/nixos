@@ -80,6 +80,10 @@
         ".local/share/DaVinciResolve"
         ".config/chezmoi"
         ".local/state/wireplumber"
+        {
+          directory = ".local/state/battery-relay";
+          mode = "0700";
+        }
         ".config/gcloud"
         ".config/Antigravity"
         ".config/discord"

@@ -329,7 +329,7 @@ PanelWindow {
       objectName: "batteryBlock"
       circularContent: true
       readonly property bool warning: services.power.batteries.some(device =>
-          !device.pluggedIn && device.percent !== null && device.percent < device.lowThreshold)
+          device.warning === true || !device.pluggedIn && device.percent !== null && device.percent < device.lowThreshold)
       readonly property bool pluggedIn: services.power.batteries.some(device => device.pluggedIn === true)
       visible: services.power.batteries.length > 0
       accent: warning ? Theme.error : pluggedIn ? Theme.batteryPluggedIn : Theme.sideBattery
@@ -378,6 +378,9 @@ PanelWindow {
             label: (device?.name || "Pixel Buds") + " battery"
             value: device?.percent ?? null
             pluggedIn: device?.pluggedIn === true
+            warning: device?.warning === true
+            tooltipOverride: device?.tooltip || ""
+            accessibleText: label + " · " + tooltipText.replace(/\n/g, " · ") + (pluggedIn ? " · Powered" : "")
           }
         }
         Repeater {
@@ -405,9 +408,6 @@ PanelWindow {
             lowThreshold: device?.lowThreshold ?? 20
             // The cloud API has no explicit plugged/charging state.
             pluggedIn: false
-            actionHint: device?.updatedAt
-              ? "Google Health · " + Qt.formatDateTime(new Date(device.updatedAt), "dd/MM hh:mm") + "\nCharge inconnue"
-              : ""
           }
         }
       }

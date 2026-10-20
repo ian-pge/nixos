@@ -92,3 +92,28 @@ Stdout is newline-delimited JSON; diagnostics go to stderr.
 Unknown percentages and power states are JSON null. A consumer must invalidate
 live readings on a disconnected event or receiver exit, without silently falling
 back to a cached or coarse native Bluetooth percentage.
+
+## Sortie indépendante Fast Pair
+
+Depuis Android 0.5.0 / récepteur 0.4, les écouteurs ne font plus partie du service
+GATT du téléphone. La caractéristique expérimentale du widget Google a été retirée.
+Le lecteur `fast-pair-battery` observe directement les annonces BATT, avec la clé
+privée propre au PC. Voir [le protocole et l’appairage](pairing/README.md).
+
+Sa sortie NDJSON est indépendante :
+
+```json
+{"event":"earbuds","available":true,"case":{"percent":85,"charging":false},"left":{"percent":73,"charging":false},"right":{"percent":19,"charging":true},"observedAt":1700000000000,"receivedAt":1700000000123}
+{"event":"earbuds","available":false,"case":{"percent":null,"charging":null},"left":{"percent":null,"charging":null},"right":{"percent":null,"charging":null},"observedAt":null,"receivedAt":1700000001000}
+```
+
+`observedAt` est la dernière observation BlueZ correspondante sur le PC, pas une
+date fournie par l’accessoire. `receivedAt` date l’émission de cet état vers la vue.
+Aucune mesure n’est persistée. Les rapports du boîtier et des écouteurs en usage
+expirent séparément après 180 secondes, suspension comprise. Des observations
+identiques rafraîchissent la présence ; une variation de pourcentage n’est pas
+nécessaire. EOF, erreur, arrêt du Bluetooth ou du processus masquent cette source,
+sans affecter téléphone/Fitbit.
+
+La sortie n’inclut ni Account Key, ni adresse Bluetooth ni contenu radio brut.
+La barre ne lit jamais le fichier de clé ; seul le processus Rust l’ouvre.

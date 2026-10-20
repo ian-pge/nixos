@@ -121,7 +121,10 @@ class RelayService : Service() {
         }
         override fun onCharacteristicReadRequest(device: BluetoothDevice, requestId: Int, offset: Int,
                                                  value: BluetoothGattCharacteristic) = dispatch {
-            val payload = queue.phoneSnapshot?.encode(System.currentTimeMillis())
+            val payload = when (value.uuid) {
+                BatterySnapshot.BATTERY_UUID -> queue.phoneSnapshot?.encode(System.currentTimeMillis())
+                else -> null
+            }
             val result = when {
                 !approved(device) -> BluetoothGatt.GATT_INSUFFICIENT_AUTHORIZATION
                 value.uuid != BatterySnapshot.BATTERY_UUID -> BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED
@@ -131,7 +134,8 @@ class RelayService : Service() {
             }
             // Unencrypted by explicit owner choice; this address can be spoofed.
             server?.sendResponse(device, requestId, result, offset, if (result == 0) payload else null)
-            if (result == 0) publish(state.copy(status = "Connecté — batterie lue par le PC", lastSentMs = System.currentTimeMillis()))
+            if (result == 0 && value.uuid == BatterySnapshot.BATTERY_UUID)
+                publish(state.copy(status = "Connecté — batterie lue par le PC", lastSentMs = System.currentTimeMillis()))
         }
         override fun onDescriptorReadRequest(device: BluetoothDevice, requestId: Int, offset: Int,
                                              descriptor: BluetoothGattDescriptor) = dispatch {
@@ -182,6 +186,7 @@ class RelayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        InstallationCleanup.releaseRetiredWidget(this)
         notifications.createNotificationChannel(NotificationChannel(CHANNEL, "Relais de batterie", NotificationManager.IMPORTANCE_LOW))
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)

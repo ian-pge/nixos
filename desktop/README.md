@@ -29,15 +29,31 @@ Set `programs.quickshell.phoneBatteryServiceUuid` to the public UUID displayed
 by its Android app. One packaged receiver is shared by all bars; its exact
 percentage and power flags replace the old native Bluetooth/USB phone reading.
 Disconnect, process exit or a stale stream removes the unavailable phone dial,
-with no fallback. The optional Fitbit dial uses the same BLE stream; its Google
-Health last-sync time is shown in the tooltip, charging stays unknown, and
-readings older than six hours are hidden. See Battery Relay's owner setup before
+with no fallback. The optional Fitbit dial uses the same BLE stream; its tooltip
+shows only the percentage. Charging stays unknown, and Google Health readings
+older than six hours are hidden. See Battery Relay's owner setup before
 enabling Fitbit: it requires the 0.2 receiver and a Google OAuth registration.
-Other batteries retain their existing sources and visuals.
+Other batteries retain their existing sources and visuals, except the Pixel Buds
+widget described below.
 Receiver 0.2.1 also recovers lost GATT services on the selected unpaired private
 LE link; Bluetooth operations have deadlines so a failed client can be restarted.
 After activating the packages, inspect the actual bar without another Bluetooth
 subscriber using `qs ipc -c top-bar call topbar batteryStatus`.
+
+One headphones dial shows the **case** level, read directly from encrypted Fast
+Pair BATT advertisements by `FastPairBatteryData` / `fast-pair-battery`.
+The tooltip shows case, left and right. Any known component below 20% makes it
+red, even if the case is charging. Unknown remains `—`, never a substituted
+global Bluetooth percentage. The phone and an audio connection are unnecessary.
+
+The private Account Key lives outside Git/Nix, at the runtime path configured by
+`programs.quickshell.earbudsAccountKeyFile`. Its state directory is persisted.
+One reader serves every monitor, independently of the phone/Fitbit receiver.
+Case and in-use bud data expire separately after 180 seconds without observations;
+an unchanged battery percentage does not cause expiry. There is no Google-widget,
+RFCOMM or native Bluetooth fallback. See the complete
+[pairing, reverse-engineering and recovery README](../tools/battery-relay/pairing/README.md).
+Rebuild normally to activate the receiver, QML and persistence declarations together.
 
 ## Build, preview and test
 

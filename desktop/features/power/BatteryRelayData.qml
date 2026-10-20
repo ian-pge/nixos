@@ -35,7 +35,6 @@ Scope {
   readonly property bool fitbitAvailable: connected && fitbitFresh && fitbitSnapshot?.percent !== null
   readonly property var fitbitPercent: fitbitAvailable ? (fitbitSnapshot?.percent ?? null) : null
   readonly property var fitbitUpdatedAt: fitbitAvailable ? (fitbitSnapshot?.updatedAt ?? null) : null
-
   function invalidate() { reportedConnected = false; snapshot = null; fitbitSnapshot = null; }
   function timestamp(value) { return Number.isSafeInteger(value) && value > 0; }
   function nullableBoolean(value) { return value === null || typeof value === "boolean"; }

@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        InstallationCleanup.releaseRetiredWidget(this)
         val root = column(this).apply { setBackgroundColor(CRUST) }
         toolbar = row(this).apply { setPadding(dp(24), dp(16), dp(24), dp(16)) }
         toolbarTitle = text(this, getString(R.string.app_name), 25f, TEXT, true)

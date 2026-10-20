@@ -5,8 +5,10 @@ import "../ui/Theme.js" as Theme
 BarDial {
   property bool pluggedIn: false
   property real lowThreshold: 20
+  property bool warning: false
+  attention: warning
   charging: pluggedIn
-  accent: pluggedIn ? Theme.batteryPluggedIn
+  accent: warning ? Theme.error : pluggedIn ? Theme.batteryPluggedIn
     : known && value < lowThreshold ? Theme.error : Theme.sideBattery
   accessibleText: label + " · " + (known ? Math.round(value) + "%" : "Unavailable")
     + (pluggedIn ? " · Powered" : "")

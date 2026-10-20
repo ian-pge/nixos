@@ -102,6 +102,7 @@ class RelayGlyph(private val name: String, private val tint: Int) : Drawable() {
         when (name) {
             "phone" -> { canvas.drawRoundRect(6f, 2f, 18f, 22f, 3f, 3f, paint); line(10f, 18.5f, 14f, 18.5f) }
             "watch" -> { canvas.drawRoundRect(6f, 6f, 18f, 18f, 4f, 4f, paint); line(9f, 6f, 9f, 2f, 15f, 2f, 15f, 6f); line(9f, 18f, 9f, 22f, 15f, 22f, 15f, 18f); line(12f, 9f, 12f, 12f, 14f, 13f) }
+            "headphones" -> { canvas.drawArc(RectF(3f, 3f, 21f, 21f), 180f, 180f, false, paint); canvas.drawRoundRect(3f, 11f, 7f, 20f, 2f, 2f, paint); canvas.drawRoundRect(17f, 11f, 21f, 20f, 2f, 2f, paint) }
             "monitor" -> { canvas.drawRoundRect(2f, 3f, 22f, 17f, 2f, 2f, paint); line(12f, 17f, 12f, 21f); line(8f, 21f, 16f, 21f) }
             "back" -> { line(15f, 5f, 8f, 12f, 15f, 19f) }
             "chevron" -> { line(9f, 6f, 15f, 12f, 9f, 18f) }
