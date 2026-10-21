@@ -125,17 +125,23 @@ ShellRoot {
         const first = list.itemAtIndex(0), last = list.itemAtIndex(1), incoming = list.itemAtIndex(2);
         verify(!findChild(incoming, "beeperMessageReadReceipt").visible);
         compare(first.readReceipt, ""); compare(last.readReceipt, "");
-        beeperData.messages = fixture.format.mergeMessages(beeperData.messages, [Object.assign({}, beeperData.messages[1], {seen: {self: true, camille: true}})]);
+        beeperData.messages = fixture.format.mergeMessages(beeperData.messages, [Object.assign({}, beeperData.messages[0], {seen: {self: true, camille: true}})]);
         tryCompare(first, "readReceipt", "Read by Camille");
+        verify(findChild(first, "beeperMessageReadReceipt").visible);
+        compare(last.readReceipt, "");
+        beeperData.messages = fixture.format.mergeMessages(beeperData.messages, [Object.assign({}, beeperData.messages[1], {seen: {self: true, camille: true}})]);
+        tryCompare(first, "readReceipt", "");
         tryCompare(last, "readReceipt", "Read by Camille");
         compare(list.itemAtIndex(0), first, "Updating receipts must reuse the existing bubbles");
-        verify(findChild(first, "beeperMessageReadReceipt").visible);
+        verify(!findChild(first, "beeperMessageReadReceipt").visible);
+        verify(findChild(last, "beeperMessageReadReceipt").visible);
         beeperData.messages = fixture.format.mergeMessages(beeperData.messages, [
-          {id: "receipt-older", isSender: true, text: "Older page", timestamp: "2026-09-25T09:00:00Z"}
+          {id: "receipt-older", isSender: true, text: "Older page", timestamp: "2026-09-25T09:00:00Z", seen: {camille: true}}
         ]);
-        wait(20); compare(list.itemAtIndex(0).readReceipt, "Read by Camille");
+        wait(20); compare(list.itemAtIndex(0).readReceipt, "");
+        compare(last.readReceipt, "Read by Camille");
         beeperData.replaceChats(chats);
-        tryCompare(first, "readReceipt", "", 1000);
+        tryCompare(first, "readReceipt", "Read by Camille", 1000);
       } finally { beeperData.replaceChats(chats); beeperData.messages = messages; }
     }
     function test_ime_enter_does_not_send() {

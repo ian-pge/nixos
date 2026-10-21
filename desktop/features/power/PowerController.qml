@@ -7,6 +7,8 @@ Scope {
   id: root
   property bool enabled: true
   property var telemetry: null
+  property var audio: null
+  property string earbudsBluetoothAddress: Quickshell.env("QS_EARBUDS_BLUETOOTH_ADDRESS") || ""
   property var battery: enabled ? UPower.displayDevice : null
   property bool onBattery: enabled ? UPower.onBattery : true
   property var powerDevices: enabled ? UPower.devices.values : []
@@ -17,6 +19,13 @@ Scope {
   readonly property var earbudsData: earbuds
   FastPairBatteryData { id: earbuds; enabled: root.enabled }
   readonly property bool earbudDataConnected: earbuds.available
+  readonly property bool earbudAudioConnected: {
+    const address = earbudsBluetoothAddress.toUpperCase();
+    return /^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(address)
+      && (audio?.bluetoothOutputAddresses ?? []).includes(address)
+      && bluetoothDevices.some(device => device.connected === true
+        && String(device.address || "").toUpperCase() === address);
+  }
   readonly property var laptopBattery: batteryReading("Laptop", battery?.isPresent === true,
     battery?.ready ? battery.percentage : null,
     battery?.isPresent && battery.ready ? !onBattery
@@ -36,7 +45,7 @@ Scope {
     .slice().sort((left, right) => left.address.localeCompare(right.address))
     .map(device => {
       const power = mousePowerDevice(device);
-      const pluggedIn = mouseExternalPower(power, device.connected);
+      const pluggedIn = mouseExternalPower(power, device);
       const level = device.connected && device.batteryAvailable && percent(device.battery, 1) !== null ? device.battery
         : power && power.state !== UPowerDeviceState.Unknown ? power.percentage : null;
       return batteryReading(device.name || device.deviceName || "Mouse", device.connected, level, pluggedIn, 1);
@@ -49,6 +58,7 @@ Scope {
     const text = value => value.percent === null ? "—" : value.percent + "%";
     return Object.assign(batteryReading(name, true, values.case.percent,
       values.case.charging === true ? true : null, 100, 20, values.case.charging), {
+        audioConnected: root.earbudAudioConnected,
         warning: [values.case, values.left, values.right].some(value => value.percent !== null && value.percent < 20),
         tooltip: "Boîtier : " + text(values.case)
           + "\nGauche : " + text(values.left) + "\nDroite : " + text(values.right)
@@ -95,20 +105,27 @@ Scope {
     }
   }
 
-  function mouseExternalPower(power, connected) {
-    if (!power?.ready || !power.isPresent) return null;
-    const hidpp = power.type === UPowerDeviceType.Mouse && /^hidpp_battery_/.test(power.nativePath || "");
-    if (!connected && !hidpp) return null;
-    // The kernel HID++ status distinguishes "charge complete" from 100% on
-    // battery. UPower loses this distinction; use the existing fresh telemetry.
-    if (hidpp && telemetry?.systemFresh) {
-      const raw = (telemetry.hidppBatteries ?? []).find(reading => reading.nativePath === power.nativePath);
+  function mouseExternalPower(power, device) {
+    const hidpp = power?.ready && power.isPresent && power.type === UPowerDeviceType.Mouse
+      && /^hidpp_battery_/.test(power.nativePath || "");
+    // Some HID++ batteries report online=0 while Charging; UPower removes
+    // their object although sysfs still reports charge correctly. Resolve the
+    // live kernel reading by exact Bluetooth address, independently of UPower.
+    if (telemetry?.systemFresh) {
+      const address = String(device.address || "").toUpperCase();
+      const readings = telemetry.hidppBatteries ?? [];
+      const matches = readings.filter(reading => reading.address && reading.address === address);
+      if (matches.length > 1) return null;
+      const raw = matches.length === 1 ? matches[0] : hidpp
+        ? readings.find(reading => reading.nativePath === power.nativePath
+          && (!reading.address || reading.address === address)) : null;
       if (raw) {
         if (raw.status === "Charging" || raw.status === "Full") return true;
         if (raw.status === "Discharging") return false;
         return null;
       }
     }
+    if (!device.connected && !hidpp) return null;
     return externalPower(power);
   }
   function mousePowerDevice(device) {

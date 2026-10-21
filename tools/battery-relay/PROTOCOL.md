@@ -1,119 +1,128 @@
-# Battery Relay v1
+# Battery Relay v2 — passive advertisements
 
-This is a data-only Bluetooth Low Energy GATT service. It does not register,
-connect or modify A2DP/HFP profiles. The phone is the peripheral/GATT
-server; the PC is the central/client. Existing Bluetooth audio
-pairings are separate and must be tested independently on the phone.
+Android BLE 0.6.0 and receiver 0.6.0 replace the connected GATT transport.
+There is no v1 fallback, characteristic, CCCD, subscription, peer-address filter,
+pairing agent, connection recovery or active discovery in the runtime readers.
 
-Service UUID: a random **public installation identifier**, generated once and
-stored in the Android app's preferences. The PC selects it with `--service UUID`.
-It remains stable when the phone rotates its BLE address; it is not a secret.
-Battery characteristic UUID: `d973f2e0-b19e-4f19-9a67-6c414c65f802`.
+The phone broadcasts non-connectable, non-scannable **legacy** BLE advertisements
+at Android's INTERVAL_HIGH (1600 × 0.625 ms ≈ 1 second), TX_POWER_LOW. This is
+ordinary repeated advertising, not the separate BLE Periodic Advertising feature.
+The Bluetooth controller repeats the data; the app has no heartbeat timer.
+Android's AdvertisingSet API updates the data in place when battery/cloud state
+changes. API writes are serialized/coalesced and confirmed asynchronously.
+An Android success callback proves radio configuration, **not PC reception**.
 
-The characteristic supports **read + indications**, with an ordinary read/write
-CCCD. No link encryption, native pairing, bond or trust flag is required. This is
-an explicit owner-approved privacy/security tradeoff, not a fallback on error.
-The Android app filters requests by the configured PC address; that address and
-the public service identifier can be observed/spoofed and are not authentication.
-Nearby devices may intercept or impersonate this exchange. Do not use it for
-credentials, commands or sensitive account data. An advertisement contains only
-the public service UUID, never a battery value or device name. The stable UUID
-can itself allow tracking by nearby observers.
+## Identification and size
 
-## Wire format
+One Service Data AD structure (type 0x21):
+length/type (2 bytes), installation UUID (16 bytes, little-endian on air), payload
+(12 bytes). Total: **30 bytes**, within the 31-byte legacy limit. No device name,
+TxPower AD, separate UUID list or scan-response data is included. Android omits
+the Flags AD for these non-connectable advertisements.
 
-Each read/indication contains exactly 12 bytes; all multibyte numbers are big-endian.
-It fits the default 20-byte ATT payload without depending on MTU negotiation.
+The existing random public installation UUID is retained across upgrades.
+The PC selects that exact ServiceData UUID, never a MAC or display name.
+The UUID is not a secret; nearby devices can observe, track or impersonate these
+unencrypted announcements. Never put Google credentials or control commands here.
 
-| Offset | Size | Meaning |
+## Payload
+
+Multi-byte integers are big-endian. Dates are unsigned Unix **seconds**, converted
+to milliseconds in the PC JSON output. Precision is one second, valid through
+2106; milliseconds are floored, not rounded forward.
+
+| Offset | Bytes | Value |
 | --- | --- | --- |
-| 0 | 1 | Protocol version: `1` |
-| 1 | 1 | Device kind: `1` phone, `2` Fitbit |
-| 2 | 1 | Percentage: `0`–`100`; `255` means unknown |
-| 3 | 1 | Flags below |
-| 4 | 8 | Source timestamp: positive Unix milliseconds, at most 2^53−1 |
+| 0 | 1 | Version 2 |
+| 1 | 1 | Phone percentage 0–100, or 255 unknown |
+| 2 | 1 | Phone charge flags |
+| 3 | 1 | Fitbit percentage 0–100, or 255 absent/unknown |
+| 4 | 4 | Phone battery observation date, nonzero |
+| 8 | 4 | Fitbit's original Google lastSyncTime; 0 iff absent |
 
-Flags: bit 0 = plugged state known; bit 1 = plugged; bit 2 = charging state
-known; bit 3 = charging. Bits 4–7 are reserved and must be zero. A true plugged
-or charging bit without its corresponding known bit is invalid. The source must
-not infer plugged/charging from a percentage of 100. A full battery may still
-be plugged in without actively charging.
+Flags: bit 0 = plugged state known, bit 1 = plugged, bit 2 = charging state known,
+bit 3 = charging. All other bits zero. A true value without its known bit is invalid.
+Full/plugged/not charging are separate. Fitbit does not provide charging information.
 
-Reject malformed lengths, unsupported versions/kinds, percentages outside the
-defined range, invalid flags and invalid timestamps. Do not turn missing data
-into zero or false. The Android sender serializes indications and coalesces
-battery changes. ATT confirms delivery to the PC's Bluetooth stack, not output
-to the final widget. The receiver separately emits successfully parsed values.
+Phone source time changes only on a meaningful battery update or a fresh Android
+battery observation after process start. Repeating the radio payload or refreshing
+Fitbit must not change it. Fitbit's date is never replaced by a fetch/report date.
+The PC hides Fitbit after six hours without source sync, even if Android's cloud
+timer is delayed. Revocation/absence is an explicit percent=255/date=0, in the same
+atomic packet as the phone, not a separate one-shot withdrawal.
 
-Shared test vector: phone at 73%, plugged in but not charging, source timestamp
-1700000000000 = `01 01 49 07 00 00 01 8b cf e5 68 00`.
+Shared Android/Rust vector:
+phone 73%, plugged but not charging, phone date 1700000000000 ms;
+Fitbit 42%, sync date 1699999100000 ms:
+`02 49 07 2a 65 53 f1 00 65 53 ed 7c`.
 
-## Freshness and reconnection
+## Passive receiver and UI output
 
-Send a current phone snapshot after connection and after meaningful battery
-changes. While connected, send a liveness snapshot every 60 seconds as scheduling
-allows, without a wake lock or exact alarm. Receiver-side phone liveness expires
-after 180 seconds without a phone snapshot. Device disconnection, blocking or
-adapter shutdown invalidates the session immediately. BlueZ's generic Connected
-property alone is insufficient because another Bluetooth profile may keep it true.
-Screen-off scheduling and reconnection must be validated on the actual Pixel.
+Both executables use the same `observer.rs` transport:
+BlueZ AdvertisementMonitor, no StartDiscovery or GATT operations. A raw
+UUID+version prefilter and a payload-version prefilter handle hardware and
+BlueZ 5.87 software matching respectively (its software matcher strips UUIDs).
+Exact ServiceData UUID selection and strict v2 decoding follow this coarse filter.
 
-The source timestamp is not the packet reception time. Google Health's Fitbit
-reading preserves `lastSyncTime`; forwarding it again never creates a new
-measurement. A Fitbit packet cannot start or keep the phone session alive.
-The Android sender prioritizes phone snapshots and shares a single outstanding
-indication slot between both sources. Reads still return the current phone.
+A live DeviceFound establishes presence before any cached property can be used.
+DeviceLost removes that address (requested absence timeout: 180 seconds).
+Advertising-address rotation does not invalidate a newer present address.
+Malformed matching payloads are rejected; unknown values are never zero.
+Adapter-off/removal, daemon replacement, monitor release, output failure and
+process exit invalidate data. After a suspended observation loop of ≥180 seconds,
+a new monitor must establish presence again.
 
-Version 0.2 of the applications implements kind 2. Fitbit packets are sent only
-after this optional provider has supplied data; no fake device is advertised.
-Fitbit's power fields are always unknown because the API does not supply them.
-When its consent is removed, device disappears or last sync is too old, a kind-2
-packet with percentage 255 and flags 0 withdraws the previous Fitbit reading.
-Its timestamp is the withdrawal time, **not** a fresh battery measurement.
-Consumers hide that source. A connection/EOF loss clears both sources.
-
-The receiver must be updated to 0.2 before enabling the optional Fitbit provider;
-the earlier phone-only receiver rejected kind 2. The wire layout remains v1.
-PC consumers independently enforce a 6-hour Fitbit source-age limit and the
-180-second phone/session liveness limit. The app fetches Google every 15 minutes
-while enabled; BLE heartbeats can carry the same cloud timestamp in between.
-
-## Receiver output
-
-Stdout is newline-delimited JSON; diagnostics go to stderr.
+One atomic NDJSON event supplies both sources:
 
 ```json
-{"event":"connection","connected":true}
-{"event":"battery","device":"phone","percent":73,"pluggedIn":true,"charging":false,"updatedAt":1700000000000,"receivedAt":1700000000123}
-{"event":"battery","device":"fitbit","percent":42,"pluggedIn":null,"charging":null,"updatedAt":1699999100000,"receivedAt":1700000000124}
-{"event":"connection","connected":false}
+{"event":"relay","mode":"passive","available":true,"phone":{"percent":73,"pluggedIn":true,"charging":false,"updatedAt":1700000000000},"fitbit":{"percent":42,"updatedAt":1699999100000},"observedAt":1700000001234,"receivedAt":1700000001234}
+{"event":"relay","mode":"passive","available":false,"phone":null,"fitbit":null,"observedAt":null,"receivedAt":1700000002000}
 ```
 
-Unknown percentages and power states are JSON null. A consumer must invalidate
-live readings on a disconnected event or receiver exit, without silently falling
-back to a cached or coarse native Bluetooth percentage.
+`fitbit:null` withdraws Fitbit while retaining a present phone. `observedAt` is the
+last matching content/DeviceFound observation on the PC. `receivedAt` is when the
+helper reports its monitor state to the UI, every 30 seconds or on value changes.
+Those status reports do not invent new radio observations or source timestamps.
+An unchanged battery remains visible while the monitor still reports presence.
+The UI expires a silent/dead helper after 180 seconds and hides data immediately
+on EOF or explicit unavailable. The existing UI property `connected` now means
+valid passive presence, **not an ACL/GATT link**. It accepts only `relay/passive`
+events; the old `connection`/`battery` event sequence is removed.
 
 ## Sortie indépendante Fast Pair
 
-Depuis Android 0.5.0 / récepteur 0.4, les écouteurs ne font plus partie du service
-GATT du téléphone. La caractéristique expérimentale du widget Google a été retirée.
+Les écouteurs sont indépendants du téléphone. L’ancien lecteur Google Widget
+et son transport ont été retirés.
 Le lecteur `fast-pair-battery` observe directement les annonces BATT, avec la clé
 privée propre au PC. Voir [le protocole et l’appairage](pairing/README.md).
 
 Sa sortie NDJSON est indépendante :
 
 ```json
-{"event":"earbuds","available":true,"case":{"percent":85,"charging":false},"left":{"percent":73,"charging":false},"right":{"percent":19,"charging":true},"observedAt":1700000000000,"receivedAt":1700000000123}
-{"event":"earbuds","available":false,"case":{"percent":null,"charging":null},"left":{"percent":null,"charging":null},"right":{"percent":null,"charging":null},"observedAt":null,"receivedAt":1700000001000}
+{"event":"earbuds","mode":"passive","available":true,"case":{"percent":85,"charging":false},"left":{"percent":73,"charging":false},"right":{"percent":19,"charging":true},"observedAt":1700000000000,"receivedAt":1700000000123}
+{"event":"earbuds","mode":"passive","available":false,"case":{"percent":null,"charging":null},"left":{"percent":null,"charging":null},"right":{"percent":null,"charging":null},"observedAt":null,"receivedAt":1700000001000}
 ```
 
 `observedAt` est la dernière observation BlueZ correspondante sur le PC, pas une
 date fournie par l’accessoire. `receivedAt` date l’émission de cet état vers la vue.
-Aucune mesure n’est persistée. Les rapports du boîtier et des écouteurs en usage
-expirent séparément après 180 secondes, suspension comprise. Des observations
-identiques rafraîchissent la présence ; une variation de pourcentage n’est pas
-nécessaire. EOF, erreur, arrêt du Bluetooth ou du processus masquent cette source,
-sans affecter téléphone/Fitbit.
+Aucune mesure n’est persistée. Depuis le récepteur 0.5.0, `mode: "passive"`
+est obligatoire : BlueZ AdvertisementMonitor établit la présence avec DeviceFound
+et la retire avec DeviceLost (délai d'absence demandé : 180 secondes). Les sources
+boîtier/écouteurs sont suivies indépendamment ; une adresse perdue ne retire pas
+une autre source encore présente. Les propriétés en cache sans DeviceFound ne
+peuvent pas créer une présence.
+
+Le lecteur rapporte cet état toutes les 30 secondes même si les valeurs n'ont
+pas changé : `receivedAt` avance, **pas `observedAt`**. Ce rapport ne prétend pas
+être une nouvelle mesure radio. BlueZ peut dédupliquer les valeurs ServiceData
+tout en surveillant la présence ; attendre une variation de pourcentage serait
+incorrect. La vue expire un lecteur silencieux après 180 secondes. Le lecteur
+recrée sa session après une suspension de sa boucle supérieure au délai de perte
+du moniteur, pour ne pas réaffirmer une ancienne présence au réveil.
+
+EOF, libération du moniteur, arrêt du Bluetooth ou remplacement de bluetoothd
+masquent cette source sans affecter téléphone/Fitbit. Aucun StartDiscovery,
+scan périodique ou repli vers l'ancien lecteur actif n'est utilisé.
 
 La sortie n’inclut ni Account Key, ni adresse Bluetooth ni contenu radio brut.
 La barre ne lit jamais le fichier de clé ; seul le processus Rust l’ouvre.

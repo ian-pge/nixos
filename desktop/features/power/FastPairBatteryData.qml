@@ -21,7 +21,7 @@ Scope {
   readonly property bool configured: keyFile.startsWith("/") && !keyFile.startsWith("/nix/store/")
   readonly property bool fresh: snapshot !== null
     && now - snapshot.receivedAt < staleAfterMs && snapshot.receivedAt <= now + 5000
-    && now - snapshot.observedAt < staleAfterMs && snapshot.observedAt <= now + 5000
+    && snapshot.observedAt <= now + 5000
   readonly property bool available: fresh
 
   function invalidate() { snapshot = null; }
@@ -36,12 +36,12 @@ Scope {
       invalidate(); return false;
     }
     const parts = [report.case, report.left, report.right];
-    if (report.event !== "earbuds" || typeof report.available !== "boolean"
+    if (report.event !== "earbuds" || report.mode !== "passive" || typeof report.available !== "boolean"
         || !parts.every(level) || !timestamp(report.receivedAt)
         || report.receivedAt > now + 5000 || now - report.receivedAt >= staleAfterMs
         || (report.available
           ? !timestamp(report.observedAt) || report.observedAt > now + 5000
-            || now - report.observedAt >= staleAfterMs || !parts.some(value => value.percent !== null)
+            || report.observedAt > report.receivedAt + 5000 || !parts.some(value => value.percent !== null)
           : report.observedAt !== null || parts.some(value => value.percent !== null || value.charging !== null))) {
       invalidate(); return false;
     }
@@ -49,7 +49,7 @@ Scope {
       case: {percent: report.case.percent, charging: report.case.charging},
       left: {percent: report.left.percent, charging: report.left.charging},
       right: {percent: report.right.percent, charging: report.right.charging},
-      observedAt: report.observedAt, receivedAt: report.receivedAt
+      mode: report.mode, observedAt: report.observedAt, receivedAt: report.receivedAt
     } : null;
     return true;
   }

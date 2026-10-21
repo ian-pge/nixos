@@ -69,5 +69,52 @@ ShellRoot {
         tryVerify(() => list.contentY > 2000);
       } finally { list.interactive = true; }
     }
+    function wheelEvent(angle, pixels, phase = Qt.NoScrollPhase, device = PointerDevice.Mouse) {
+      return {angleDelta: Qt.point(0, angle), pixelDelta: Qt.point(0, pixels),
+        phase: phase, device: {type: device}, accepted: false};
+    }
+    function test_wayland_mouse_pixels_do_not_cancel_the_wheel_animation() {
+      // Actual Wayland packets carry -120 angle units AND -15 pixels per
+      // notch. QtTest.mouseWheel only supplies angles and missed this failure.
+      for (let i = 0; i < 8; ++i) {
+        const event = wheelEvent(-120, -15, Qt.NoScrollPhase, PointerDevice.TouchPad);
+        wheel.handleWheel(event);
+        verify(event.accepted);
+        verify(wheel.driving);
+        wait(30);
+      }
+      tryCompare(wheel, "driving", false, 700);
+      fuzzyCompare(list.contentY, 2000 + 8 * wheel.step, 0.1);
+    }
+    function test_high_resolution_mouse_preserves_fractional_notches() {
+      for (let i = 0; i < 16; ++i) {
+        wheel.handleWheel(wheelEvent(-15, -2));
+        wait(8);
+      }
+      tryCompare(wheel, "driving", false, 700);
+      fuzzyCompare(list.contentY, 2000 + 2 * wheel.step, 0.1);
+    }
+    function test_touchpad_and_pixel_only_gestures_keep_the_native_path() {
+      for (const event of [wheelEvent(-120, -15, Qt.ScrollUpdate),
+        wheelEvent(-120, -15, Qt.ScrollUpdate, PointerDevice.TouchPad),
+        wheelEvent(0, -15)]) {
+        wheel.handleWheel(event);
+        verify(!event.accepted);
+        verify(!wheel.driving);
+        compare(list.contentY, 2000);
+      }
+    }
+    function test_empty_and_horizontal_packets_keep_pending_vertical_travel() {
+      wheel.handleWheel(wheelEvent(-120, -15));
+      const target = wheel.destination;
+      for (const event of [wheelEvent(0, 0),
+        {angleDelta: Qt.point(120, 0), pixelDelta: Qt.point(15, 0), accepted: false}]) {
+        wheel.handleWheel(event);
+        verify(!event.accepted); verify(wheel.driving);
+        compare(wheel.destination, target);
+      }
+      tryCompare(wheel, "driving", false, 700);
+      fuzzyCompare(list.contentY, target, 0.1);
+    }
   }
 }

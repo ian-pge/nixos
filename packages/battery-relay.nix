@@ -6,7 +6,7 @@
 }:
 rustPlatform.buildRustPackage {
   pname = "battery-relay-receiver";
-  version = "0.4.0";
+  version = "0.6.0";
   src = lib.fileset.toSource {
     root = ../tools/battery-relay/receiver;
     fileset = lib.fileset.unions [

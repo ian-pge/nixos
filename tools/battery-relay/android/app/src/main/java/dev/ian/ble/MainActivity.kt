@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.ForegroundServiceStartNotAllowedException
-import android.bluetooth.BluetoothAdapter
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
@@ -12,19 +11,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.widget.Button
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -58,7 +54,6 @@ import dev.ian.ble.RelayUi.text
 import java.security.MessageDigest
 import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 
 @SuppressLint("SetTextI18n")
 class MainActivity : ComponentActivity() {
@@ -108,7 +103,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var fitbitChoose: Button
     private lateinit var fitbitRefresh: ImageButton
     private lateinit var googleDisconnect: Button
-    private lateinit var pcSummary: TextView
     private lateinit var autoStartSummary: TextView
     private val relayObserver: (RelayState) -> Unit = { lastRelay = it; render() }
     private val fitbitObserver: (FitbitState) -> Unit = { render() }
@@ -127,7 +121,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        InstallationCleanup.releaseRetiredWidget(this)
         val root = column(this).apply { setBackgroundColor(CRUST) }
         toolbar = row(this).apply { setPadding(dp(24), dp(16), dp(24), dp(16)) }
         toolbarTitle = text(this, getString(R.string.app_name), 25f, TEXT, true)
@@ -189,10 +182,7 @@ class MainActivity : ComponentActivity() {
         connectionCard.addView(space(this, 18))
         relayButton = button(this, "Activer le relais") {
             if (lastRelay.running) startService(Intent(this, RelayService::class.java).setAction(RelayService.ACTION_STOP))
-            else withPermissions {
-                val address = preferences.getString(RelayService.KEY_ADDRESS, null)
-                if (address == null) configurePc(startAfterSave = true) else startRelay(address)
-            }
+            else withPermissions { startRelay() }
         }
         connectionCard.addView(relayButton)
         root.addView(connectionCard)
@@ -243,7 +233,9 @@ class MainActivity : ComponentActivity() {
         root.addView(text(this, "Une fois configuré, le relais s’occupe du reste.", 15f, MUTED))
         root.addView(space(this, 24)); root.addView(section("CONNEXION"))
         val pc = card(this)
-        pcSummary = settingsRow(pc, "monitor", "Ordinateur enregistré", "") { configurePc() }
+        settingsRow(pc, "monitor", "Réception sur le PC", "Écoute passive · sans adresse ni appairage") {
+            info("Réception passive", "Le téléphone diffuse ses batteries à proximité. Le PC reconnaît ce téléphone grâce à son identifiant public.\n\nIl n’y a aucune connexion à maintenir, et le téléphone ne peut pas confirmer qu’un PC reçoit ses annonces.")
+        }
         settingsRow(pc, "copy", "Identifiant du téléphone", "Copier l’identifiant public utilisé par le récepteur PC") {
             copy("BLE", RelayService.serviceUuid(preferences).toString())
         }
@@ -255,7 +247,7 @@ class MainActivity : ComponentActivity() {
         val google = card(this)
         settingsRow(google, "watch", "Accès Google", "Configuration initiale et autorisation des appareils") { googleSetup() }
         settingsRow(google, "refresh", "Fréquence & fraîcheur", "Google : 15 min · aucune mesure inventée") {
-            info("Des mesures datées", "Téléphone : envoi à chaque changement de batterie et signal de présence environ toutes les 60 secondes.\n\nFitbit : lecture de Google Health toutes les 15 minutes quand le relais fonctionne. Le bracelet doit d’abord se synchroniser avec Google Health ; ce n’est pas une lecture BLE directe du bracelet.\n\nL’heure d’origine est conservée. Après 6 heures sans synchronisation, le widget Fitbit est masqué sur le PC. Son état de charge n’est pas fourni par cette API.")
+            info("Des mesures datées", "Téléphone : annonce actualisée à chaque changement de batterie, répétée par le Bluetooth environ chaque seconde, sans réveil périodique de l’application.\n\nFitbit : lecture de Google Health toutes les 15 minutes quand le relais fonctionne. Le bracelet doit d’abord se synchroniser avec Google Health ; ce n’est pas une lecture BLE directe du bracelet.\n\nL’heure d’origine est conservée. Après 6 heures sans synchronisation, le widget Fitbit est masqué sur le PC. Son état de charge n’est pas fourni par cette API.")
         }
         googleDisconnect = button(this, "Dissocier le Fitbit", RED, true) {
             AlertDialog.Builder(this).setTitle("Dissocier le Fitbit ?")
@@ -268,7 +260,7 @@ class MainActivity : ComponentActivity() {
         privacy.addView(text(this, "Seulement les batteries", 18f, TEXT, true)); privacy.addView(space(this, 10))
         privacy.addView(text(this, "Ni sommeil, ni activité, ni rythme cardiaque. L’accès Google est limité aux paramètres et appareils associés. Aucun jeton Google n’est envoyé au PC.", 13f, MUTED))
         privacy.addView(space(this, 14))
-        privacy.addView(text(this, "Le lien BLE est sans appairage et sans chiffrement. L’adresse du PC est un filtre, pas une authentification : les échanges peuvent être interceptés ou imités à proximité.", 13f, MUTED))
+        privacy.addView(text(this, "La diffusion BLE est sans connexion, sans appairage et sans chiffrement. L’identifiant public permet au PC de sélectionner ce téléphone ; les annonces peuvent être lues ou imitées à proximité.", 13f, MUTED))
         root.addView(privacy)
         val version = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
         root.addView(text(this, "${getString(R.string.app_name)}  ·  $version", 12f, MUTED).apply { gravity = Gravity.CENTER })
@@ -324,11 +316,10 @@ class MainActivity : ComponentActivity() {
         phoneGauge.setBattery(battery?.percent, accent)
         phoneCharge.text = when { battery?.charging == true -> "En charge"; battery?.plugged == true -> "Branché"; battery?.plugged == false -> "Sur batterie"; else -> "État inconnu" }
         phoneDetail.text = when { battery?.plugged == true && battery.charging == false -> "Charge inactive ou batterie pleine"; battery?.charging == true -> "Alimentation externe détectée"; else -> "Niveau exact fourni par Android" }
-        connectionTitle.text = when { state.connected -> "Connecté au PC"; state.running -> "En attente du PC"; else -> "Relais en pause" }
-        connectionDot.background = background(this, if (state.connected) GREEN else if (state.running) YELLOW else MUTED, 10)
-        connectionDetail.text = if (state.connected && state.lastSentMs != null) "BLE · dernier envoi à ${time(state.lastSentMs)}" else state.status
+        connectionTitle.text = when { state.broadcasting -> "Diffusion active"; state.running -> "Démarrage de la diffusion"; else -> "Relais en pause" }
+        connectionDot.background = background(this, if (state.broadcasting) GREEN else if (state.running) YELLOW else MUTED, 10)
+        connectionDetail.text = if (state.broadcasting && state.lastPublishedMs != null) "BLE · données actualisées à ${time(state.lastPublishedMs)}\nRéception sur le PC non acquittée" else state.status
         relayButton.text = if (state.running) "Mettre le relais en pause" else "Activer le relais"
-        pcSummary.text = preferences.getString(RelayService.KEY_ADDRESS, null) ?: "Aucun ordinateur configuré"
         autoStartSummary.text = if (preferences.getBoolean(RelayService.KEY_ENABLED, false)) "Activée · après déverrouillage du téléphone" else "En pause avec le relais"
         val f = fitbit.state
         val reading = f.selected
@@ -406,39 +397,14 @@ class MainActivity : ComponentActivity() {
             .setNegativeButton("Fermer", null).setNeutralButton("Copier les valeurs") { _, _ -> copy("Configuration Google", details) }
             .setPositiveButton("Google Cloud") { _, _ -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.cloud.google.com/auth/clients"))) }.show()
     }
-    private fun configurePc(startAfterSave: Boolean = false) {
-        if (lastRelay.running) {
-            info("Ordinateur enregistré", "${preferences.getString(RelayService.KEY_ADDRESS, "")}\n\nLe relais est actif. Mettez-le en pause depuis l’accueil avant de modifier cette adresse. Aucun changement n’est nécessaire pour une utilisation quotidienne.")
-            return
-        }
-        val input = EditText(this).apply {
-            setSingleLine(); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
-            hint = "AA:BB:CC:DD:EE:FF"; typeface = Typeface.MONOSPACE
-            setText(preferences.getString(RelayService.KEY_ADDRESS, "")); setPadding(dp(24), dp(16), dp(24), dp(16))
-        }
-        val dialog = AlertDialog.Builder(this).setTitle("Adresse Bluetooth du PC")
-            .setMessage("À renseigner une seule fois. Aucun appairage système n’est nécessaire.")
-            .setView(input).setNegativeButton("Annuler", null).setPositiveButton("Enregistrer", null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val address = input.text.toString().trim().uppercase(Locale.ROOT)
-                if (!BluetoothAdapter.checkBluetoothAddress(address)) input.error = "Format attendu : AA:BB:CC:DD:EE:FF"
-                else {
-                    preferences.edit().putString(RelayService.KEY_ADDRESS, address).apply(); dialog.dismiss(); render()
-                    if (startAfterSave) startRelay(address)
-                }
-            }
-        }
-        dialog.show()
-    }
     private fun withPermissions(action: () -> Unit) {
         val required = listOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
         val missing = required.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isEmpty()) action() else { afterPermission = action; bluetoothAuthorization.launch(missing.toTypedArray()) }
     }
-    private fun startRelay(address: String) {
+    private fun startRelay() {
         try {
-            startForegroundService(Intent(this, RelayService::class.java).setAction(RelayService.ACTION_START).putExtra(RelayService.EXTRA_ADDRESS, address))
+            startForegroundService(Intent(this, RelayService::class.java).setAction(RelayService.ACTION_START))
         } catch (_: ForegroundServiceStartNotAllowedException) { info("Démarrage bloqué", "Revenez dans l’application pour activer le relais.") }
         catch (_: SecurityException) { info("Autorisation nécessaire", "Autorisez les appareils à proximité dans les paramètres Android.") }
     }

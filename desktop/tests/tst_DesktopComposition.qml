@@ -60,6 +60,11 @@ ShellRoot {
     property int refreshCalls: 0
     function refresh(force) { ++refreshCalls; }
   }
+  QtObject {
+    id: previewBluetoothAdapter
+    property bool enabled: false
+    property bool discovering: false
+  }
   Component.onCompleted: {
     // Reloading during QtTest execution destroys its active test runner.
     Quickshell.watchFiles = false;
@@ -69,6 +74,8 @@ ShellRoot {
     const component = Qt.createComponent("file://" + Quickshell.shellDir + "/../shell.qml");
     if (component.status !== Component.Ready) { console.error(component.errorString()); Qt.exit(1); return; }
     app = component.createObject(fixture, {servicesEnabled: false});
+    // Keep this layout fixture independent of transient native BlueZ objects.
+    app.services.bluetooth.nativeDevices = [];
   }
   TestResult { id: results }
   TestCase {
@@ -111,8 +118,7 @@ ShellRoot {
         app.coordinator.messenger.hide();
         app.coordinator.close(app.coordinator.mode);
         tryCompare(backdrop, "opacity", 0, 1000);
-        tryCompare(findChild(bar.contentItem, "leftBarModules"), "opacity", 1, 1000);
-        tryCompare(findChild(bar.contentItem, "rightBarModules"), "opacity", 1, 1000);
+        tryCompare(findChild(bar.contentItem, "topLeftBarModules"), "opacity", 1, 1000);
         compare(backdrop.y, 0);
         compare(backdrop.width, bar.contentItem.width);
         compare(backdrop.height, bar.contentItem.height);
@@ -130,8 +136,7 @@ ShellRoot {
             targetMonitor: app.coordinator.targetMonitor, monitor: bar.monitorName});
           verify(backdrop.shown);
           tryCompare(backdrop, "opacity", backdrop.dimAmount, 1000);
-          compare(findChild(bar.contentItem, "leftBarModules").opacity, 1);
-          compare(findChild(bar.contentItem, "rightBarModules").opacity, 1);
+          compare(findChild(bar.contentItem, "topLeftBarModules").opacity, 1);
         }
         fixture.stage = "backdrop excludes other monitors";
         app.coordinator.targetMonitor = "other-preview-monitor";
@@ -328,52 +333,80 @@ ShellRoot {
       try {
         app.coordinator.close(app.coordinator.mode);
         wait(450);
-        fixture.stage = "bar geometry: " + JSON.stringify({exclusive: bar.exclusiveZone,
+        fixture.stage = "bar geometry: " + JSON.stringify({top: bar.reservedTop,
           capsuleTop: bar.capsuleTopInset, capsuleY: bar.capsule.y,
           messengerTop: bar.capsule.messengerHost.barTop});
-        compare(bar.exclusiveZone, 52);
-        compare(bar.capsuleTopInset, 10);
+        compare(bar.reservedTop, 58);
+        compare(bar.capsuleTopInset, 13);
         compare(bar.capsule.y, bar.capsuleTopInset);
         compare(bar.capsule.messengerHost.barTop, bar.capsuleTopInset);
-        compare(bar.capsule.messengerHost.workAreaTop, bar.exclusiveZone);
-        const blocks = ["calendarBlock", "systemBlock", "batteryBlock", "connectivityBlock", "levelsBlock", "usageBlock"]
+        compare(bar.capsule.messengerHost.workAreaTop, bar.reservedTop);
+        const notch = findChild(bar.contentItem, "calendarNotch");
+        compare(notch.mapToItem(bar.contentItem, 0, notch.height).y, bar.height);
+        compare(notch.height, bar.blockHeight);
+        compare(notch.corner, bar.capsule.radius);
+        verify(notch.attachedToBottom); verify(!notch.attachedToTop);
+        fuzzyCompare(notch.mapToItem(bar.contentItem, notch.width / 2, 0).x, bar.width / 2, 0.5);
+        fuzzyCompare(bar.capsule.mapToItem(bar.contentItem, bar.capsule.width / 2, 0).x, bar.width / 2, 0.5);
+        compare(bar.capsule.height, 45);
+        compare(bar.capsule.y + bar.capsule.height, bar.reservedTop);
+        const blocks = ["systemBlock", "batteryBlock", "connectivityBlock", "levelsBlock", "usageBlock"]
           .map(name => findChild(bar.contentItem, name));
         for (const block of blocks) {
           fixture.stage = "block geometry: " + (block ? block.objectName + " " + block.width + "x" + block.height : "missing");
-          verify(block !== null); verify(block.visible); compare(block.height, 42);
-          compare(block.mapToItem(bar.contentItem, 0, 0).y, bar.barTopInset);
+          verify(block !== null); verify(block.visible);
+          compare(block.height, 45);
+          compare(bar.capsule.height, block.height, "All compact widgets share one row");
+          compare(block.mapToItem(bar.contentItem, 0, 0).y, 13);
         }
-        const cellGroups = [["timePill", "datePill", "weatherPill"],
-          ["systemPill", "gpuPill", "vramPill", "memoryPill"], ["batteryPill", "keyboardBatteryPill"],
+        const cellGroups = [["systemPill", "memoryPill", "gpuPill", "vramPill"], ["batteryPill", "keyboardBatteryPill"],
           ["bluetoothPill", "wifiPill", "microphonePill", "doNotDisturbPill"],
-          ["volumePill", "brightnessPill"], ["gptUsageDial", "claudeFiveHourDial", "claudeWeeklyDial"]];
+          ["brightnessPill", "volumePill"], ["gptUsageDial", "claudeFiveHourDial", "claudeWeeklyDial"]];
         for (let group = 0; group < cellGroups.length; ++group) {
           const block = blocks[group];
-          for (const name of cellGroups[group]) {
+          for (const [index, name] of cellGroups[group].entries()) {
             const cell = findChild(block, name);
             fixture.stage = "single-row alignment: " + name;
             verify(cell !== null && cell.visible);
             const center = cell.mapToItem(block, cell.width / 2, cell.height / 2);
-            compare(center.y, block.height / 2);
+            fixture.stage += " " + JSON.stringify({center, blockWidth: block.width, blockHeight: block.height});
+            if (block.objectName === "usageBlock") {
+              const countdown = findChild(block, name + "Countdown");
+              fixture.stage = "quota grid " + name + ": " + JSON.stringify({center,
+                caption: countdown.mapToItem(block, 0, 0), bottom: cell.mapToItem(block, 0, cell.height), index});
+              verify(countdown !== null && countdown.visible);
+              const caption = countdown.mapToItem(block, 0, 0);
+              verify(caption.x >= cell.mapToItem(block, cell.width, 0).x);
+              fuzzyCompare(caption.y + countdown.height / 2, center.y, 0.5);
+              compare(cell.scale, 1);
+              compare(cell.width, findChild(bar.contentItem, "systemPill").width);
+              if (index === 0) fuzzyCompare(center.x, 22.5, 0.5);
+              else {
+                const previous = findChild(block, cellGroups[group][index - 1]).parent;
+                verify(cell.mapToItem(block, 0, 0).x >=
+                  previous.mapToItem(block, previous.width, 0).x + fixture.theme.barSize(4));
+              }
+              fuzzyCompare(center.y, 22.5, 0.01);
+              continue;
+            }
+            compare(center.x, 22.5 + index * 45);
+            compare(center.y, 22.5);
           }
         }
+        fixture.stage = "group accents and live readings";
         compare(findChild(bar.contentItem, "volumePill").accent.toString(), "#eed49f");
         compare(findChild(bar.contentItem, "brightnessPill").accent.toString(), "#eed49f");
         for (const name of ["storageBlock", "storagePill"])
           compare(findChild(bar.contentItem, name).accent.toString(), "#c6a0f6");
         for (const name of ["systemBlock", "systemPill", "memoryPill", "gpuPill", "vramPill"])
           compare(findChild(bar.contentItem, name).accent.toString(), "#91d7e3");
-        const expected = [[servicesText("timeText"), servicesText("dateText"), "19°"]];
-        function servicesText(name) { return app.services.calendar[name]; }
-        for (let i = 0; i < expected.length; ++i)
-          for (const value of expected[i]) {
-            fixture.stage = "reading " + value + ": " + visibleText(blocks[i]);
-            verify(visibleText(blocks[i]).includes(value), "Missing visible reading: " + value);
-          }
+        for (const value of [app.services.calendar.timeText, notch.dateText, "19°"])
+          verify(visibleText(notch).includes(value), "Missing visible reading: " + value);
         for (const [name, value] of [["systemPill", 23], ["gpuPill", 17], ["vramPill", 25], ["memoryPill", 51],
             ["batteryPill", 63], ["keyboardBatteryPill", 84],
             ["volumePill", 65], ["brightnessPill", 80], ["storagePill", 42]]) {
           const cell = findChild(bar.contentItem, name);
+          fixture.stage = "dial reading: " + name;
           verify(cell !== null && cell.visible);
           compare(cell.value, value);
           compare(cell.fraction, value / 100);
@@ -381,18 +414,30 @@ ShellRoot {
           verify(findChild(cell, "dialIcon") !== null);
           verify(!visibleText(cell).includes("%"), "The percentage stays in the tooltip");
         }
-        const surfaces = blocks.concat([bar.capsule,
+        const surfaces = blocks.concat([notch, bar.capsule,
           findChild(bar.contentItem, "storageBlock"), findChild(bar.contentItem, "updatesPill")]);
         verifyNonOverlappingSurfaces(bar, surfaces);
-        for (const [rowName, names] of [
-            ["leftBarModules", ["calendarBlock", "connectivityBlock", "updatesPill", "storageBlock"]],
-            ["rightBarModules", ["usageBlock", "batteryBlock", "levelsBlock", "systemBlock"]]]) {
-          const row = findChild(bar.contentItem, rowName);
-          const children = Array.from(row.children).filter(item => item.visible && item.width > 0);
-          compare(children.map(item => item.objectName).join(","), names.join(","));
-          for (let i = 1; i < children.length; ++i)
-            compare(children[i].x - children[i - 1].x - children[i - 1].width, row.spacing);
-        }
+        const row = findChild(bar.contentItem, "topLeftBarModules");
+        const children = Array.from(row.children).filter(item => item.visible && item.width > 0);
+        compare(children.map(item => item.objectName).join(","),
+          "batteryBlock,usageBlock");
+        for (let i = 1; i < children.length; ++i)
+          compare(children[i].x - children[i - 1].x - children[i - 1].width, row.spacing);
+        compare(row.mapToItem(bar.contentItem, 0, 0).x, 10);
+        compare(row.y, 13);
+        compare(row.spacing, row.y, "Group gaps match the top margin");
+        const right = findChild(bar.contentItem, "topRightBarModules");
+        compare(Array.from(right.children).filter(item => item.visible && item.width > 0)
+          .map(item => item.objectName).join(","), "updatesStorageRow,connectivityBlock,levelsBlock,systemBlock");
+        fuzzyCompare(right.mapToItem(bar.contentItem, right.width, 0).x, bar.width - 10, 0.5);
+        compare(right.y, row.y);
+        compare(right.spacing, row.spacing);
+        const updates = findChild(right, "updatesPill"), storage = findChild(right, "storageBlock");
+        compare(updates.parent, storage.parent);
+        compare(updates.y, storage.y);
+        compare(storage.x - updates.x - updates.width, row.y);
+        compare(storage.parent.height, 45);
+        compare(row.y + row.height, bar.reservedTop);
         app.services.system.cpuUsage = 100; app.services.system.memoryUsage = 100;
         app.services.system.gpuText = "100%"; app.services.system.diskUsage = 100;
         app.services.system.telemetry.acceptSystem({cpu: 100, memory: 100});
@@ -400,11 +445,35 @@ ShellRoot {
         for (const mode of ["workspaces", "system", "calendar"]) {
           app.coordinator.open(mode, bar.monitorName);
           wait(450);
-          compare(bar.exclusiveZone, 52);
+          compare(bar.reservedTop, 58);
           if (mode !== "workspaces") compare(bar.capsule.width, 340);
           verifyNonOverlappingSurfaces(bar, surfaces);
         }
       } finally { app.coordinator.close(app.coordinator.mode); restore(); }
+    }
+    function test_top_batteries_extend_horizontally_on_one_row() {
+      tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
+      const bar = app.bars[0], restore = fictionalReadings(bar);
+      const battery = findChild(bar.contentItem, "batteryBlock");
+      try {
+        app.coordinator.close(app.coordinator.mode);
+        app.coordinator.messenger.hide();
+        wait(450);
+        compare(battery.height, 45);
+        const keyboards = app.services.power.bluetoothDevices;
+        app.services.power.bluetoothDevices = Array.from({length: 5}, (_, index) =>
+          Object.assign({}, keyboards[0], {address: "00:00:00:00:00:0" + index}));
+        tryCompare(battery, "width", 270);
+        compare(battery.height, 45);
+        compare(bar.reservedTop, 58);
+        wait(20);
+        verifyNonOverlappingSurfaces(bar, [findChild(bar.contentItem, "topLeftBarModules"),
+          findChild(bar.contentItem, "topRightBarModules"), findChild(bar.contentItem, "calendarNotch"), bar.capsule]);
+        app.services.power.bluetoothDevices = [];
+        tryCompare(battery, "height", 45);
+        tryCompare(battery, "width", 45);
+        tryCompare(bar, "reservedTop", 58);
+      } finally { restore(); }
     }
     function test_system_dials_keep_unknown_distinct_from_zero() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
@@ -443,7 +512,7 @@ ShellRoot {
         power.bluetoothDevices = keyboards.concat([mouse]);
         tryVerify(() => findChild(bar.contentItem, "mouseBatteryPill") !== null);
         const dial = findChild(bar.contentItem, "mouseBatteryPill"), keyboard = findChild(bar.contentItem, "keyboardBatteryPill");
-        tryVerify(() => dial.x > keyboard.x);
+        tryVerify(() => dial.y > keyboard.y || dial.y === keyboard.y && dial.x > keyboard.x);
         compare(dial.parent, keyboard.parent); compare(dial.width, keyboard.width); compare(dial.height, keyboard.height);
         compare(dial.iconName, "mouse"); compare(dial.value, 35); compare(dial.tooltipText, "35%");
         compare(dial.accent.toString(), keyboard.accent.toString());
@@ -460,16 +529,16 @@ ShellRoot {
     }
     function relaySample(percent, pluggedIn = false, charging = false) {
       const relay = app.services.power.phoneRelay, time = Date.now();
-      relay.accept({event: "connection", connected: true});
-      verify(relay.accept({event: "battery", device: "phone", percent, pluggedIn, charging,
-        updatedAt: time + 2000, receivedAt: time}));
+      verify(relay.accept({event: "relay", mode: "passive", available: true,
+        phone: {percent, pluggedIn, charging, updatedAt: time + 2000}, fitbit: null,
+        observedAt: time, receivedAt: time}));
     }
     function earbudSample(percent, charging = false) {
       const source = app.services.power.earbudsData, time = Date.now();
       // A missing case value may coexist with known earbuds. An entirely
       // unknown provider is unavailable and must not produce a dial.
       const budLevel = percent === null ? 100 : percent;
-      verify(source.accept({event:"earbuds",available:true,observedAt:time,receivedAt:time,
+      verify(source.accept({event:"earbuds",mode:"passive",available:true,observedAt:time,receivedAt:time,
         case:{percent,charging},left:{percent:budLevel,charging},right:{percent:budLevel,charging}
       }));
     }
@@ -483,7 +552,7 @@ ShellRoot {
         const dial = findChild(bar.contentItem, "phoneBatteryPill");
         const keyboard = findChild(bar.contentItem, "keyboardBatteryPill");
         const block = findChild(bar.contentItem, "batteryBlock");
-        tryVerify(() => dial.x > keyboard.x);
+        tryVerify(() => dial.y > keyboard.y || dial.y === keyboard.y && dial.x > keyboard.x);
         compare(dial.parent, keyboard.parent); compare(dial.width, keyboard.width); compare(dial.height, keyboard.height);
         compare(dial.iconName, "smartphone"); compare(dial.value, 95); compare(dial.tooltipText, "95%");
         compare(dial.lowThreshold, 40); verify(!dial.interactive); compare(dial.actionHint, "");
@@ -499,7 +568,7 @@ ShellRoot {
         relaySample(null, null, null);
         verify(!dial.pluggedIn); verify(!dial.known); verify(!block.warning);
         relaySample(0); verify(dial.known); compare(dial.tooltipText, "0%");
-        power.phoneRelay.accept({event: "connection", connected: false});
+        power.phoneRelay.accept({event: "relay", mode: "passive", available: false});
         tryVerify(() => findChild(bar.contentItem, "phoneBatteryPill") === null);
         verify(keyboard.visible); verify(!block.pluggedIn); verify(!block.warning);
         relaySample(96);
@@ -515,8 +584,8 @@ ShellRoot {
       try {
         relaySample(80);
         const sync = Date.now() - 15 * 60000;
-        const report = {event: "battery", device: "fitbit", percent: 42, pluggedIn: null, charging: null,
-          updatedAt: sync, receivedAt: Date.now()};
+        const report = {event: "relay", mode: "passive", available: true, phone: relay.snapshot.phone,
+          fitbit: {percent: 42, updatedAt: sync}, observedAt: Date.now(), receivedAt: Date.now()};
         verify(relay.accept(report));
         tryVerify(() => findChild(bar.contentItem, "fitbitBatteryPill") !== null);
         const dial = findChild(bar.contentItem, "fitbitBatteryPill");
@@ -526,11 +595,11 @@ ShellRoot {
         compare(dial.iconName, "watch"); compare(dial.value, 42); compare(dial.lowThreshold, 20);
         compare(dial.tooltipText, "42%"); compare(dial.actionHint, "");
         verify(!dial.charging); verify(!dial.interactive);
-        verify(relay.accept(Object.assign({}, report, {percent: 19})));
+        verify(relay.accept(Object.assign({}, report, {fitbit: {percent: 19, updatedAt: sync}})));
         compare(dial.accent.toString(), "#ed8796");
-        verify(relay.accept(Object.assign({}, report, {percent: 100})));
+        verify(relay.accept(Object.assign({}, report, {fitbit: {percent: 100, updatedAt: sync}})));
         verify(!dial.charging); compare(dial.accent.toString(), "#f4dbd6");
-        relay.accept(Object.assign({}, report, {percent: null}));
+        relay.accept(Object.assign({}, report, {fitbit: null}));
         tryVerify(() => findChild(bar.contentItem, "fitbitBatteryPill") === null);
         verify(findChild(bar.contentItem, "phoneBatteryPill") !== null);
       } finally { relay.invalidate(); restore(); }
@@ -540,7 +609,7 @@ ShellRoot {
       try {
         relaySample(90);
         const source = power.earbudsData, time = Date.now();
-        const event = {event:"earbuds", available:true, observedAt:time, receivedAt:time,
+        const event = {event:"earbuds", mode:"passive", available:true, observedAt:time, receivedAt:time,
           left:{percent:73, charging:false}, right:{percent:42, charging:true}, case:{percent:80, charging:false}
         };
         verify(source.accept(event));
@@ -563,7 +632,7 @@ ShellRoot {
         compare(dial.tooltipText,"Boîtier : —\nGauche : 20%\nDroite : 18%"); verify(dial.warning);
         power.bluetoothDevices = [{name:"Pixel Buds Pro 2", address:"AUDIO", connected:true, batteryAvailable:true, battery:1}];
         const unknown = {percent:null,charging:null};
-        verify(source.accept({event:"earbuds",available:false,observedAt:null,receivedAt:time,
+        verify(source.accept({event:"earbuds",mode:"passive",available:false,observedAt:null,receivedAt:time,
           case:unknown,left:unknown,right:unknown}));
         tryVerify(() => findChild(bar.contentItem, "earbudBatteryPill") === null);
         verify(findChild(bar.contentItem, "phoneBatteryPill") !== null);
@@ -704,6 +773,7 @@ ShellRoot {
         const tooltip = findChild(renderedDial, "dialTooltip");
         tryCompare(tooltip, "opened", true, 1500);
         compare(tooltip.text, "42%");
+        verify(tooltip.y >= renderedDial.height, "Top widgets show their tooltips below the dial");
         const tooltipShape = findChild(tooltip.background, "dialTooltipGlassShape");
         verify(tooltipShape !== null, "Tooltips outside the capsules need their own compositor geometry");
         verify(tooltipShape.visible && tooltipShape.width > 0 && tooltipShape.height > 0);
@@ -724,7 +794,7 @@ ShellRoot {
           tooltipCapture.running = true;
           tryCompare(fixture, "tooltipCaptureExit", 0, 3000);
         }
-        compare(bar.exclusiveZone, 52);
+        compare(bar.reservedTop, 58);
       } finally {
         mouseMove(bar.contentItem, bar.contentItem.width / 2, 100);
         previewAudio.muted = false;
@@ -741,10 +811,11 @@ ShellRoot {
         verify(block !== null && first !== null && last !== null);
         const firstCenter = first.mapToItem(block, first.width / 2, first.height / 2);
         const lastCenter = last.mapToItem(block, last.width / 2, last.height / 2);
-        compare(firstCenter.x, block.height / 2);
-        compare(firstCenter.y, block.height / 2);
-        compare(lastCenter.x, block.width - block.height / 2);
-        compare(lastCenter.y, block.height / 2);
+        fixture.stage += " " + JSON.stringify({firstCenter, lastCenter, width: block.width, height: block.height});
+        compare(firstCenter.x, 22.5);
+        compare(firstCenter.y, 22.5);
+        compare(lastCenter.x, block.width - 22.5);
+        compare(lastCenter.y, block.height - 22.5);
         if (first === last) compare(block.width, block.height);
       }
       try {
@@ -753,7 +824,7 @@ ShellRoot {
         verifyEnds("systemBlock", "systemPill", "vramPill");
         verifyEnds("connectivityBlock", "bluetoothPill", "doNotDisturbPill");
         verifyEnds("batteryBlock", "batteryPill", "keyboardBatteryPill");
-        verifyEnds("levelsBlock", "volumePill", "brightnessPill");
+        verifyEnds("levelsBlock", "brightnessPill", "volumePill");
         const keyboards = app.services.power.bluetoothDevices;
         app.services.power.bluetoothDevices = [];
         wait(50);
@@ -770,7 +841,6 @@ ShellRoot {
       try {
         wait(50);
         for (const [name, iconName] of [
-            ["timePill", "barCellIcon"], ["datePill", "barCellIcon"], ["weatherPill", "barCellIcon"],
             ["updatesPill", "pill-icon"], ["bluetoothPill", "barCellIcon"], ["wifiPill", "barCellIcon"],
             ["microphonePill", "barCellIcon"], ["doNotDisturbPill", "barCellIcon"],
             ["storagePill", "dialIcon"], ["batteryPill", "dialIcon"], ["keyboardBatteryPill", "dialIcon"],
@@ -782,8 +852,7 @@ ShellRoot {
           compare(icon.width, fixture.theme.barIconSize, name);
           compare(icon.height, fixture.theme.barIconSize, name);
         }
-        for (const [name, outlineName] of [["calendarBlock", "barBlockOutline"],
-            ["updatesPill", "pill-outline"]]) {
+        for (const [name, outlineName] of [["updatesPill", "pill-outline"]]) {
           const block = findChild(bar.contentItem, name), outline = findChild(block, outlineName);
           verify(outline.visible);
           fuzzyCompare(outline.x, fixture.theme.barOutlineInset(), 0.001);
@@ -810,42 +879,33 @@ ShellRoot {
           fuzzyCompare(ring.border.width, fixture.theme.barOutlineWidth, 0.001);
         }
         for (const name of ["timePill", "datePill", "weatherPill"]) {
-          const cell = findChild(bar.contentItem, name), label = findChild(cell, "barCellLabel");
+          const cell = findChild(bar.contentItem, name), label = findChild(cell, "notchLabel");
           fixture.stage = "calendar label " + name + ": " + label.font.pixelSize;
-          compare(label.font.pixelSize, 17);
-          verify(label.font.bold);
-          verify(!findChild(cell, "barCellOutline").visible);
+          compare(label.font.pixelSize, name === "timePill" ? 18 : name === "weatherPill" ? 15 : 14);
+          compare(label.font.bold, name === "timePill");
+          verify(findChild(cell, "barCellOutline") === null);
         }
       } finally { restore(); }
     }
     function test_calendar_has_one_hover_and_click_target_including_padding() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
-      const bar = app.bars[0], block = findChild(bar.contentItem, "calendarBlock");
+      const bar = app.bars[0], block = findChild(bar.contentItem, "calendarNotch");
       const cells = ["timePill", "datePill", "weatherPill"].map(name => findChild(block, name));
       try {
         app.coordinator.close(app.coordinator.mode);
-        verify(block.interactive);
-        for (const cell of cells) verify(!cell.interactive);
-        mouseMove(block, 1, block.height / 2);
+        mouseMove(block, block.corner + 8, block.height / 2);
         tryCompare(block, "hovered", true);
-        const highlight = findChild(block, "barBlockSelection");
-        const background = findChild(block, "barBlockBackground");
-        compare(highlight.x, fixture.theme.barSelectionInset());
-        compare(highlight.y, fixture.theme.barSelectionInset());
-        compare(highlight.width, block.width - 2 * fixture.theme.barSelectionInset());
-        compare(highlight.height, block.height - 2 * fixture.theme.barSelectionInset());
-        compare(highlight.radius, highlight.height / 2);
-        tryCompare(highlight, "color", Qt.alpha(block.accent, fixture.theme.barSelectionOpacity));
-        compare(block.accent, fixture.theme.pink);
-        compare(block.accent.toString(), "#f5bde6");
-        compare(background.transform.length, 0);
-        for (const cell of cells) verify(!cell.hovered);
-        mouseClick(block, 1, block.height / 2);
+        verify(findChild(block, "barBlockOutline") === null, "The notch has no border");
+        compare(block.accent, fixture.theme.electricCyan);
+        compare(block.accent.toString(), "#00f5ff");
+        compare(findChild(block, "timePill").color, block.accent);
+        compare(findChild(findChild(block, "timePill"), "notchLabel").color.toString(), "#000000");
+        mouseClick(block, block.corner + 8, block.height / 2);
         compare(app.coordinator.mode, "calendar");
         app.coordinator.close("calendar");
         for (const cell of cells) {
           mouseMove(cell, cell.width / 2, cell.height / 2);
-          verify(block.hovered); verify(!cell.hovered);
+          verify(block.hovered);
           mouseClick(cell);
           compare(app.coordinator.mode, "calendar");
           app.coordinator.close("calendar");
@@ -853,6 +913,19 @@ ShellRoot {
         mouseMove(bar.contentItem, bar.contentItem.width / 2, 100);
         tryCompare(block, "hovered", false);
       } finally { app.coordinator.close(app.coordinator.mode); }
+    }
+    function test_workspaces_and_bottom_calendar_are_centered_on_each_screen() {
+      app.coordinator.close(app.coordinator.mode);
+      app.coordinator.messenger.hide();
+      wait(450);
+      for (const bar of app.bars) {
+        const notch = findChild(bar.contentItem, "calendarNotch");
+        fuzzyCompare(bar.capsule.mapToItem(bar.contentItem, bar.capsule.width / 2, 0).x,
+          bar.width / 2, 0.5);
+        fuzzyCompare(notch.mapToItem(bar.contentItem, notch.width / 2, 0).x, bar.width / 2, 0.5);
+        compare(notch.mapToItem(bar.contentItem, 0, notch.height).y, bar.height);
+        compare(bar.reservedTop, 58, "The bottom notch adds no reserved space");
+      }
     }
     function test_connectivity_selects_individual_circles() {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
@@ -881,7 +954,8 @@ ShellRoot {
       tryVerify(() => app.bars.length > 0 && app.bars[0].monitorName !== "");
       const bar = app.bars[0], services = app.services;
       const previous = {devices: services.network.devices, wifiEnabled: services.network.wifiEnabled,
-        bluetooth: services.bluetooth.nativeDevices, dnd: services.notifications.doNotDisturb,
+        bluetooth: services.bluetooth.nativeDevices, bluetoothAdapter: services.bluetooth.adapter,
+        dnd: services.notifications.doNotDisturb,
         microphoneAvailable: previewAudio.microphoneAvailable, microphoneMuted: previewAudio.microphoneMuted};
       function check(name, dimmed, iconName) {
         fixture.stage = "connectivity state " + name + ": " + iconName + ", dimmed=" + dimmed;
@@ -906,12 +980,18 @@ ShellRoot {
       try {
         app.coordinator.close(app.coordinator.mode);
         bar.services = Object.assign({}, services, {audio: previewAudio});
+        services.bluetooth.adapter = previewBluetoothAdapter;
+        previewBluetoothAdapter.enabled = false;
         services.bluetooth.nativeDevices = [];
         check("bluetoothPill", true, "bluetooth-off");
+        previewBluetoothAdapter.enabled = true;
+        check("bluetoothPill", false, "bluetooth");
         services.bluetooth.nativeDevices = [{address: "00:00:00:00:00:02", name: "Preview",
           connected: true, paired: true}];
-        check("bluetoothPill", false, "bluetooth-connected");
+        check("bluetoothPill", false, "bluetooth");
         services.bluetooth.nativeDevices = [];
+        check("bluetoothPill", false, "bluetooth");
+        previewBluetoothAdapter.enabled = false;
         check("bluetoothPill", true, "bluetooth-off");
 
         services.network.wifiEnabled = false; services.network.devices = [];
@@ -947,6 +1027,7 @@ ShellRoot {
       } finally {
         services.network.devices = previous.devices; services.network.wifiEnabled = previous.wifiEnabled;
         services.bluetooth.nativeDevices = previous.bluetooth;
+        services.bluetooth.adapter = previous.bluetoothAdapter;
         services.notifications.doNotDisturb = previous.dnd;
         previewAudio.microphoneAvailable = previous.microphoneAvailable;
         previewAudio.microphoneMuted = previous.microphoneMuted;
@@ -1076,15 +1157,15 @@ ShellRoot {
           compare(view.implicitHeight, bar.blockHeight);
           compare(capsule.targetHeight, bar.blockHeight);
           tryCompare(capsule, "height", bar.blockHeight, 1000);
-          compare(capsule.y, bar.barTopInset);
-          compare(capsule.radius, 21);
+          compare(capsule.y, bar.capsuleTopInset);
+          compare(capsule.radius, 22.5);
           verify(capsule.width <= 340);
         }
-        compare(findChild(capsule, "voiceDictationIndicator").implicitHeight, 42);
+        compare(findChild(capsule, "voiceDictationIndicator").implicitHeight, 45);
         compare(capsule.panelWidth, 340, "Keep the detailed panels within the compact width limit");
         for (const mode of ["calendar", "system", "storage", "audio"]) {
           app.coordinator.open(mode, bar.monitorName);
-          verify(capsule.targetHeight > 42);
+          verify(capsule.targetHeight > 45);
           compare(capsule.maximumWidth, 340);
         }
       } finally { app.coordinator.close(app.coordinator.mode); }
@@ -1273,7 +1354,7 @@ ShellRoot {
           presented: host.presented, active: host.active, bubbleVisible: bubble.visible,
           hostVisible: host.visible, frameVisible: bar.barContent.visible, windowVisible: bar.visible,
           handoff: capsule.chatHandoff, drawBackground: capsule.drawBackground});
-        verify(capsule.targetHeight > 36);
+        verify(capsule.targetHeight > 45);
         compare(bubble.capsuleWidth, capsule.targetWidth);
         compare(bubble.capsuleHeight, capsule.targetHeight);
         compare(capsule.height, bubble.surfaceItem.height);
@@ -1349,14 +1430,18 @@ ShellRoot {
           app.coordinator.open(mode, bar.monitorName);
           for (let frame = 0; frame < 8; frame++) {
             wait(16);
-            fixture.stage = "compact transition to " + mode + ", frame " + frame;
+            fixture.stage = "compact transition to " + mode + ", frame " + frame
+              + ": " + JSON.stringify({height: capsule.height, top: capsule.y, targetTop: bar.capsuleTopInset});
             compare(capsule.height, bar.blockHeight);
+            compare(capsule.y, bar.capsuleTopInset, "The capsule stays aligned with the bar throughout the morph");
             if (Math.abs(capsule.width - initialWidth) > 1) sawWidthChange = true;
             for (const name of ["workspaces", "bluetooth"]) {
               const view = capsule.contentViews[name];
               const center = view.mapToItem(capsule, view.width / 2, view.height / 2);
-              fuzzyCompare(center.y, bar.blockHeight / 2, 0.01, name + " must not rise or fall");
-              compare(view.transform[0].yScale, 1, name + " keeps its height during a width-only transition");
+              fixture.stage = "compact transition " + mode + " / " + name + ", frame " + frame
+                + ": " + JSON.stringify({centerY: center.y, height: capsule.height, width: view.width,
+                  natural: Math.min(view.implicitWidth, capsule.maximumWidth), zoom: [view.transform[0].xScale, view.transform[0].yScale]});
+              fuzzyCompare(center.y, capsule.height / 2, 0.01, name + " follows the center of the morphing surface");
               fuzzyCompare(view.width, Math.min(view.implicitWidth, capsule.maximumWidth), 0.01,
                 name + " keeps its layout while the transform follows the moving edges");
               verifyBoundedContentScale(view, capsule);
@@ -1372,6 +1457,65 @@ ShellRoot {
         compare(capsule.contentViews.bluetooth.transform[0].xScale, 1);
         compare(capsule.contentViews.bluetooth.transform[0].yScale, 1);
       } finally {
+        app.coordinator.close(app.coordinator.mode);
+      }
+    }
+    function test_special_workspace_addition_preserves_existing_buttons_through_reversals() {
+      tryVerify(() => app.bars.length > 0);
+      const bar = app.bars[0], capsule = bar.capsule;
+      const widget = capsule.contentViews.workspaces;
+      const slot = findChild(widget, "specialWorkspaceSlot");
+      const reveal = findChild(widget, "specialWorkspaceReveal");
+      const animation = findChild(widget, "specialWorkspaceTransition");
+      try {
+        app.coordinator.messenger.hide();
+        tryCompare(capsule.messengerHost, "presented", false, 1000);
+        app.coordinator.open("workspaces", bar.monitorName);
+        widget.setSpecialWorkspace("", false);
+        wait(450);
+        compare(animation.duration, 220, "The special slot uses the common morph timing");
+        const first = findChild(widget, "workspace-" + widget.workspaceIds[0]);
+        const last = findChild(widget, "workspace-" + widget.workspaceIds[widget.workspaceCount - 1]);
+        const buttonWidth = first.width;
+        // Include reversal in both directions and a change of label width.
+        for (const step of [
+          {name: "Chat", frames: 18}, {name: "", frames: 18},
+          {name: "Terminal", frames: 5}, {name: "", frames: 3},
+          {name: "Chat", frames: 18}, {name: "Terminal", frames: 18},
+          {name: "", frames: 18}
+        ]) {
+          const beforeWidth = capsule.width, beforeLayout = widget.width;
+          const beforeAlpha = slot.opacity;
+          const beforePosition = first.mapToItem(bar.contentItem, 0, 0).x;
+          widget.setSpecialWorkspace(step.name ? "special:" + step.name : "");
+          fixture.stage = "special workspace immediate change: " + step.name;
+          fuzzyCompare(capsule.width, beforeWidth, 0.01);
+          fuzzyCompare(widget.width, beforeLayout, 0.01, "No instantaneous layout resize");
+          fuzzyCompare(slot.opacity, beforeAlpha, 0.001, "Interrupted fades resume from the displayed alpha");
+          fuzzyCompare(first.mapToItem(bar.contentItem, 0, 0).x, beforePosition, 0.01);
+          const growing = capsule.targetWidth > beforeWidth;
+          let previousWidth = beforeWidth;
+          for (let frame = 0; frame < step.frames; frame++) {
+            wait(16);
+            fixture.stage = "special workspace " + step.name + ", frame " + frame;
+            const left = first.mapToItem(capsule, 0, 0).x;
+            const right = first.mapToItem(capsule, first.width, 0).x;
+            fuzzyCompare(right - left, buttonWidth, 0.01, "Existing buttons must not compress or stretch");
+            fuzzyCompare(widget.width, capsule.width, 0.01, "Slot layout and surface share the same motion");
+            verify(growing ? capsule.width >= previousWidth - 0.01 : capsule.width <= previousWidth + 0.01,
+              "The capsule must approach its new size monotonically");
+            previousWidth = capsule.width;
+            fuzzyCompare(reveal.mapToItem(widget, 0, 0).x,
+              last.mapToItem(widget, last.width, 0).x, 0.01, "Reveal the bubble outside the existing row");
+          }
+          if (step.frames === 18) {
+            compare(capsule.width, capsule.targetWidth);
+            compare(slot.opacity, step.name ? 1 : 0);
+            compare(reveal.visible, step.name !== "");
+          }
+        }
+      } finally {
+        widget.setSpecialWorkspace("", false);
         app.coordinator.close(app.coordinator.mode);
       }
     }
@@ -1444,7 +1588,8 @@ ShellRoot {
         for (let frame = 0; frame < 20; frame++) {
           wait(16);
           capsule.transitionProgress = frame / 19;
-          if (Math.abs(capsule.width - capsule.targetWidth) > 0.1) sawResize = true;
+          if (Math.abs(capsule.width - capsule.targetWidth) > 0.1
+              || Math.abs(capsule.height - capsule.targetHeight) > 0.1) sawResize = true;
           for (const mode of capsule.contentModes) {
             const view = capsule.contentViews[mode];
             const center = view.mapToItem(capsule, view.width / 2, view.height / 2);
@@ -1644,7 +1789,7 @@ ShellRoot {
         // A temporary wrapper preserves the production layout while providing
         // a QML-owned capture root; restore every child before disposing it.
         children = Array.from(bar.contentItem.children);
-        capture = Qt.createQmlObject("import QtQuick; Item { width: parent.width; height: 60 }", bar.contentItem);
+        capture = Qt.createQmlObject("import QtQuick; Item { width: parent.width; height: parent.height }", bar.contentItem);
         for (const child of children) child.parent = capture;
         wait(50);
         let finished = false, saved = false;

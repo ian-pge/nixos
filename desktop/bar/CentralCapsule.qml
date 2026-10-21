@@ -112,7 +112,9 @@ Rectangle {
     : root.brightnessOverlayActive ? brightnessIndicator.implicitWidth
     : workspaceSwitcher.implicitWidth
   readonly property real maximumWidth: Math.min(panelWidth, parent ? parent.width : panelWidth)
-  readonly property real targetWidth: Math.min(preferredWidth, maximumWidth)
+  readonly property real workspaceMaximumWidth: parent ? parent.width : workspaceSwitcher.implicitWidth
+  readonly property real targetWidth: Math.min(preferredWidth,
+    targetMode === "workspaces" ? workspaceMaximumWidth : maximumWidth)
   readonly property real targetHeight: root.notificationActive
     ? notificationPopup.implicitHeight : root.dictationOverlayActive
     ? voiceDictationIndicator.implicitHeight
@@ -231,7 +233,11 @@ Rectangle {
   }
 
   function naturalContentWidth(mode) {
-    return Math.min(contentViews[mode].implicitWidth, maximumWidth);
+    // A special workspace adds a slot to an already visible row. Follow that
+    // slot's shared morph instead of instantly compressing all existing glyphs.
+    return Math.min(mode === "workspaces" ? workspaceSwitcher.presentedImplicitWidth
+      : contentViews[mode].implicitWidth,
+      mode === "workspaces" ? workspaceMaximumWidth : maximumWidth);
   }
 
   function contentLayoutWidth(mode) {
@@ -339,8 +345,8 @@ Rectangle {
 
   WorkspaceSwitcher {
     id: workspaceSwitcher
-    // Preserve the fractional inset shared with the dial outlines; rounded
-    // center anchors can otherwise shift the row by a fraction of a pixel.
+    // Center every view arithmetically: anchor rounding causes small jumps
+    // while the compact workspace row grows into a taller panel.
     x: (parent.width - width) / 2
     y: (parent.height - height) / 2
     width: root.contentLayoutWidth("workspaces")
@@ -356,8 +362,8 @@ Rectangle {
     id: volumeIndicator
     controller: root.services.audio
     onAdjustRequested: delta => { root.services.audio.setVolume(delta); root.coordinator.showVolume(root.monitorName); }
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("volume")
     height: implicitHeight
     transform: MorphScale { surface: root; content: volumeIndicator }
@@ -370,8 +376,8 @@ Rectangle {
     id: audioSelector
     controller: root.services.audio
     onCloseRequested: root.coordinator.close("audio")
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("audio")
     height: implicitHeight
     transform: MorphScale { surface: root; content: audioSelector }
@@ -383,8 +389,8 @@ Rectangle {
     id: brightnessIndicator
     controller: root.services.brightness
     onChangeRequested: delta => root.services.brightness.change(delta, root.monitorName)
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("brightness")
     height: implicitHeight
     transform: MorphScale { surface: root; content: brightnessIndicator }
@@ -397,8 +403,8 @@ Rectangle {
   VoiceDictationIndicator {
     id: voiceDictationIndicator
     controller: root.services.dictation
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("dictation")
     height: implicitHeight
     transform: MorphScale { surface: root; content: voiceDictationIndicator }
@@ -410,8 +416,8 @@ Rectangle {
   NowPlayingIndicator {
     id: nowPlayingIndicator
     controller: root.services.media
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("media")
     height: implicitHeight
     transform: MorphScale { surface: root; content: nowPlayingIndicator }
@@ -424,8 +430,8 @@ Rectangle {
     controller: root.services.network
     spinnerFrame: root.services.spinner.frame
     onCloseRequested: root.coordinator.close("wifi")
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("wifi")
     height: implicitHeight
     transform: MorphScale { surface: root; content: wifiSelector }
@@ -438,8 +444,8 @@ Rectangle {
     controller: root.services.bluetooth
     spinnerFrame: root.services.spinner.frame
     onCloseRequested: root.coordinator.close("bluetooth")
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("bluetooth")
     height: implicitHeight
     transform: MorphScale { surface: root; content: bluetoothSelector }
@@ -467,8 +473,8 @@ Rectangle {
     auth: root.services.auth
     spinnerFrame: root.services.spinner.frame
     onCloseRequested: root.coordinator.close("updates")
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("updates")
     height: implicitHeight
     transform: MorphScale { surface: root; content: updateSelector }
@@ -480,8 +486,8 @@ Rectangle {
     id: systemPanel
     telemetry: root.services.system.telemetry
     onCloseRequested: root.coordinator.close("system")
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("system")
     implicitWidth: root.maximumWidth
     height: implicitHeight
@@ -496,8 +502,8 @@ Rectangle {
     objectName: "storagePanel"
     controller: root.services.storage
     onCloseRequested: root.coordinator.close("storage")
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("storage")
     implicitWidth: root.maximumWidth
     height: implicitHeight
@@ -511,8 +517,8 @@ Rectangle {
     id: calendarPanel
     controller: root.services.calendar
     onCloseRequested: root.coordinator.close("calendar")
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("calendar")
     implicitWidth: root.maximumWidth
     height: implicitHeight
@@ -535,8 +541,8 @@ Rectangle {
     objectName: "barNotification"
     visible: root.services.notifications.presented !== null
     maximumWidth: root.maximumWidth
-    anchors.centerIn: parent
-    anchors.alignWhenCentered: false
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2
     width: root.contentLayoutWidth("notification")
     height: implicitHeight
     notificationData: root.services.notifications

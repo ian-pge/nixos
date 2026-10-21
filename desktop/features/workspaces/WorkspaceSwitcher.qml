@@ -1,6 +1,7 @@
 import Quickshell.Hyprland
 import QtQuick
 import "../../ui/Theme.js" as Theme
+import "../../ui/Morph.js" as Morph
 import "../../ui"
 
 Item {
@@ -30,43 +31,34 @@ Item {
   property bool specialWorkspaceInitialized: false
   property real specialTransitionProgress: 1
   property real specialTransitionStartOpacity: 0
+  property real specialTransitionStartWidth: 0
   readonly property bool specialWorkspaceVisible: activeSpecialWorkspace !== ""
   readonly property bool specialSlotRendered: presentedSpecialWorkspace !== ""
   readonly property string specialSlotName: presentedSpecialWorkspace.startsWith("special:")
     ? presentedSpecialWorkspace.slice(8) : presentedSpecialWorkspace
   readonly property real specialSlotWidth: Math.max(workspaceButtonHeight,
     specialLabel.implicitWidth + Theme.barSize(12))
-  // Match the other capsules' inset without independently rounding the inner
-  // height: both semicircles must share the same center at the outer edges.
+  readonly property real presentedSpecialWidth: specialTransitionStartWidth
+    + ((specialTransitionTargetVisible ? specialSlotWidth : 0) - specialTransitionStartWidth)
+      * Morph.easeOut(specialTransitionProgress)
+  // Share the visible ring inset, not the larger hit area's inset. The pink
+  // capsule and inactive hover circles then match the neighbouring dials.
   readonly property real contentInset: Theme.barOutlineInset()
   readonly property real workspaceButtonHeight: implicitHeight - 2 * contentInset
+  readonly property real inactiveButtonWidth: workspaceButtonHeight
   readonly property real activeButtonWidth: workspaceButtonHeight + Theme.barSize(32)
   readonly property real naturalContentWidth: {
     let total = 0;
     for (const workspaceId of workspaceIds) {
-      total += workspaceId === activeWorkspaceId ? activeButtonWidth : workspaceButtonHeight;
+      total += workspaceId === activeWorkspaceId ? activeButtonWidth : inactiveButtonWidth;
     }
     return total;
   }
 
-  function clamp01(value) {
-    return Math.max(0, Math.min(1, value));
-  }
-
-  function smoothSegment(start, end, value) {
-    const progress = clamp01((value - start) / (end - start));
-    return progress * progress * (3 - 2 * progress);
-  }
-
   function specialSlotOpacity() {
-    if (specialTransitionTargetVisible) {
-      const entryProgress = smoothSegment(0.18, 0.78,
-        specialTransitionProgress);
-      return specialTransitionStartOpacity
-        + (1 - specialTransitionStartOpacity) * entryProgress;
-    }
-    return specialTransitionStartOpacity
-      * (1 - smoothSegment(0, 0.48, specialTransitionProgress));
+    return specialTransitionTargetVisible
+      ? Morph.incoming(specialTransitionStartOpacity, specialTransitionProgress)
+      : Morph.outgoing(specialTransitionStartOpacity, specialTransitionProgress);
   }
 
   function setSpecialWorkspace(workspaceName, animate = true) {
@@ -86,20 +78,15 @@ Item {
       return;
     }
 
-    if (targetVisible && specialTransitionTargetVisible
-        && activeSpecialWorkspace !== "") {
-      activeSpecialWorkspace = workspaceName;
-      presentedSpecialWorkspace = workspaceName;
-      return;
-    }
-
     const currentOpacity = specialSlotOpacity();
+    const currentWidth = presentedSpecialWidth;
     specialTransition.stop();
     activeSpecialWorkspace = workspaceName;
     if (targetVisible)
       presentedSpecialWorkspace = workspaceName;
     specialTransitionTargetVisible = targetVisible;
     specialTransitionStartOpacity = currentOpacity;
+    specialTransitionStartWidth = currentWidth;
     specialTransitionProgress = 0;
     specialTransition.restart();
   }
@@ -128,8 +115,11 @@ Item {
   readonly property real baseImplicitWidth: naturalContentWidth + 2 * contentInset
   // Workspace capsule geometry only; expanded panels choose their own width.
   readonly property real expandedImplicitWidth: baseImplicitWidth + specialSlotWidth
+  // The outer capsule needs the destination immediately, but its visible row
+  // must keep its current layout until the new slot has grown into place.
+  readonly property real presentedImplicitWidth: baseImplicitWidth + presentedSpecialWidth
   implicitWidth: specialWorkspaceVisible ? expandedImplicitWidth : baseImplicitWidth
-  implicitHeight: Theme.barSize(36)
+  implicitHeight: Theme.barWorkspaceHeight
 
   Component.onCompleted: Qt.callLater(() => syncSpecialWorkspace(false))
 
@@ -141,11 +131,12 @@ Item {
 
   NumberAnimation {
     id: specialTransition
+    objectName: "specialWorkspaceTransition"
     target: root
     property: "specialTransitionProgress"
     from: 0
     to: 1
-    duration: 360
+    duration: Morph.duration
     easing.type: Easing.Linear
     onFinished: {
       if (!root.specialTransitionTargetVisible)
@@ -168,7 +159,7 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    radius: Theme.barSize(18)
+    radius: height / 2
     color: root.backgroundColor
 
     Item {
@@ -183,8 +174,8 @@ Item {
         // Keep fractional-sized circles centered without anchor rounding offsets.
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
-        spacing: (workspaceArea.width - root.naturalContentWidth - 2 * root.contentInset)
-          / Math.max(1, root.workspaceCount - 1)
+        spacing: Math.max(0, (workspaceArea.width - root.naturalContentWidth - 2 * root.contentInset)
+          / Math.max(1, root.workspaceCount - 1))
 
       Repeater {
         model: root.workspaceIds
@@ -200,7 +191,7 @@ Item {
             && workspace.toplevels.values.length > 0
           readonly property bool hovered: pointer.containsMouse
 
-          width: active ? root.activeButtonWidth : root.workspaceButtonHeight
+          width: active ? root.activeButtonWidth : root.inactiveButtonWidth
           height: root.workspaceButtonHeight
 
           Behavior on width {
@@ -211,6 +202,7 @@ Item {
           }
 
           Rectangle {
+            objectName: "workspaceHighlight"
             anchors.fill: parent
             radius: height / 2
             color: workspaceButton.active ? Theme.action
@@ -222,6 +214,7 @@ Item {
 
             // Keep the workspace characters, independently of the UI icon set.
             Text {
+              objectName: "workspaceGlyph"
               // Keep the glyph centered at fractional sizes, including the
               // final frame, without rounded center-anchor offsets.
               x: (parent.width - width) / 2
@@ -265,38 +258,49 @@ Item {
     }
     }
 
-    Rectangle {
-      id: specialSlot
-      objectName: "specialWorkspaceSlot"
+    Item {
+      id: specialReveal
+      objectName: "specialWorkspaceReveal"
       visible: root.specialSlotRendered
-      opacity: root.specialSlotOpacity()
-      anchors.right: parent.right
-      anchors.rightMargin: root.contentInset
+      // Reveal only the added space, never paint over an existing workspace.
+      x: root.baseImplicitWidth - root.contentInset
       y: (parent.height - height) / 2
-      width: root.specialSlotWidth
+      width: root.presentedSpecialWidth
       height: root.workspaceButtonHeight
-      radius: height / 2
-      color: Theme.action
+      clip: true
 
-      Text {
-        id: specialLabel
-        objectName: "specialWorkspaceLabel"
+      Rectangle {
+        id: specialSlot
+        objectName: "specialWorkspaceSlot"
+        opacity: root.specialSlotOpacity()
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
-        text: root.specialSlotName
-        color: Theme.background
-        font.family: "Ubuntu Nerd Font"
-        font.pixelSize: Theme.barSize(13)
-        font.bold: true
-        font.weight: Font.Black
-      }
+        width: root.specialSlotWidth
+        height: root.workspaceButtonHeight
+        radius: height / 2
+        color: Theme.action
+        transform: MorphScale { surface: specialReveal; content: specialSlot }
 
-      MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        enabled: root.specialWorkspaceVisible
-        onClicked: root.toggleSpecialWorkspace(root.specialSlotName)
+        Text {
+          id: specialLabel
+          objectName: "specialWorkspaceLabel"
+          x: (parent.width - width) / 2
+          y: (parent.height - height) / 2
+          text: root.specialSlotName
+          color: Theme.background
+          font.family: "Ubuntu Nerd Font"
+          font.pixelSize: Theme.barSize(13)
+          font.bold: true
+          font.weight: Font.Black
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          enabled: root.specialWorkspaceVisible
+          onClicked: root.toggleSpecialWorkspace(root.specialSlotName)
+        }
       }
     }
 

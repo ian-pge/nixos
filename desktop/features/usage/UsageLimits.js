@@ -2,7 +2,7 @@
 
 // Subscription limits come from each official CLI, already signed in with the
 // user's own account: Claude Code's stream-json control protocol and Codex's
-// app-server JSON-RPC. No credential file or private endpoint is read here.
+// app-server JSON-RPC. The Claude helper adds its dedicated reset-status read.
 // Both interfaces are marked experimental upstream, so every field is
 // validated: an unexpected shape becomes an explicit error, never a guess.
 
@@ -130,6 +130,8 @@ function claudeResetCount(status, now) {
       return null;
     var expiresAt = isoTime(grant.ends_at);
     if (expiresAt !== null && expiresAt <= now) continue;
+    var startsAt = isoTime(grant.starts_at);
+    if (startsAt !== null && startsAt > now) continue;
     count += remaining;
   }
   return count;
@@ -158,6 +160,7 @@ function claudeSnapshot(usage, plan) {
     plan: text(plan) || claudePlan(usage.subscription_type),
     limits: rows,
     resetCredits: claudeResetCount(limits.cedar_ember, now),
+    resetCreditsUnavailable: usage.reset_credits_unavailable === true,
     notes: [claudeResetCredits(limits.cedar_ember, now)],
     blocked: rows.some(function(row) { return row.reached; })
   });
@@ -296,6 +299,27 @@ function clockText(date) {
 // Rounded down: 100 % only appears once the limit is actually reached.
 function percentText(percent) {
   return finite(percent) === null ? "—" : Math.floor(percent) + " %";
+}
+
+// Rounded days from 24 hours onward, otherwise hours/minutes. A passed timestamp
+// waits for a fresh reading; it does not imply the allowance was replenished.
+function resetCountdown(resetsAt, now) {
+  if (finite(resetsAt) === null || finite(now) === null) return "—";
+  var remaining = resetsAt - now;
+  if (remaining <= 0) return "Màj…";
+  if (remaining >= 86400000) return Math.round(remaining / 86400000) + " j";
+  // Stay below 24 h even during the last partial minute before that boundary.
+  var minutes = Math.min(1439, Math.ceil(remaining / 60000));
+  var hours = Math.floor(minutes / 60);
+  var rest = minutes % 60;
+  return hours ? hours + "h" + pad(rest) : rest + " min";
+}
+
+function quotaResetText(row, now) {
+  // Show only an actual upcoming reset, without a placeholder or status label.
+  if (!isObject(row) || finite(row.resetsAt) === null || finite(now) === null || row.resetsAt <= now)
+    return "";
+  return resetCountdown(row.resetsAt, now);
 }
 
 // Rolling windows read best as a delay, longer ones as a local date.

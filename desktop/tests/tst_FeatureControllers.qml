@@ -12,6 +12,7 @@ ShellRoot {
   property var system: null
   property var media: null
   property var power: null
+  property var audio: null
   property var feedback: []
   property var mediaActions: []
   property int sampledBrightness: -1
@@ -34,7 +35,8 @@ ShellRoot {
     calendar = create("calendar/CalendarController", {enabled: false, weather: fakeWeather});
     system = create("system/SystemController", {enabled: false});
     media = create("audio/MediaController", {enabled: false});
-    power = create("power/PowerController", {enabled: false, telemetry: telemetry});
+    audio = create("audio/AudioController", {enabled: false});
+    power = create("power/PowerController", {enabled: false, telemetry: telemetry, audio: audio});
     brightness.feedbackRequested.connect(monitor => feedback = feedback.concat([monitor]));
     media.feedbackRequested.connect(monitor => feedback = feedback.concat([monitor]));
     system.brightnessSample.connect(value => sampledBrightness = value);
@@ -55,6 +57,8 @@ ShellRoot {
       system.topRequested = false; system.telemetry.invalidateSystem(); system.telemetry.invalidateGpu();
       media.players = []; feedback = []; mediaActions = []; sampledBrightness = -1;
       power.battery = null; power.onBattery = true; power.powerDevices = []; power.bluetoothDevices = [];
+      audio.nodes = [];
+      power.earbudsBluetoothAddress = "44:10:30:25:8F:4F";
       power.phoneRelay.invalidate(); power.phoneRelay.now = Date.now(); power.phoneName = "Pixel 8 Pro";
       power.earbudsData.invalidate(); power.earbudsData.now = Date.now();
       telemetry.systemFresh = true; telemetry.usbDevices = []; telemetry.hidppBatteries = [];
@@ -297,7 +301,7 @@ ShellRoot {
       ];
       verify(phoneSample(null, null, null));
       const relay = power.earbudsData, unknown = {percent:null,charging:null};
-      verify(relay.accept({event:"earbuds",available:true,observedAt:relay.now,receivedAt:relay.now,
+      verify(relay.accept({event:"earbuds",mode:"passive",available:true,observedAt:relay.now,receivedAt:relay.now,
         case:unknown,left:{percent:100,charging:null},right:unknown}));
       compare(power.batteries.length, 5);
       for (const reading of power.batteries) {
@@ -399,6 +403,75 @@ ShellRoot {
       power.powerDevices = [Object.assign({}, report, {state: UPowerDeviceState.FullyCharged, isPresent: false})];
       compare(power.mouseBatteries.length, 0);
     }
+    function test_mouse_charging_does_not_depend_on_upower_presence() {
+      const mouse = {icon: "input-mouse", address: "D6:6A:7C:2D:56:19", deviceName: "MX Anywhere 3S",
+        connected: true, batteryAvailable: true, battery: .9};
+      const raw = {nativePath: "hidpp_battery_10", address: mouse.address, status: "Discharging"};
+      const up = {type: UPowerDeviceType.Mouse, ready: true, isPresent: true, model: mouse.deviceName,
+        nativePath: raw.nativePath, percentage: .9, state: UPowerDeviceState.Discharging};
+      power.bluetoothDevices = [mouse]; power.powerDevices = [up]; telemetry.hidppBatteries = [raw];
+      compare(power.mouseBatteries[0].pluggedIn, false);
+      // Real kernel transition: Charging + online=0 removes the UPower object.
+      power.powerDevices = [];
+      telemetry.hidppBatteries = [Object.assign({}, raw, {status: "Charging"})];
+      compare(power.mouseBatteries[0].percent, 90); compare(power.mouseBatteries[0].pluggedIn, true);
+      // Unplug adds UPower back; an old UPower Charging value cannot override sysfs.
+      telemetry.hidppBatteries = [raw];
+      power.powerDevices = [Object.assign({}, up, {state: UPowerDeviceState.Charging})];
+      compare(power.mouseBatteries[0].pluggedIn, false);
+      power.powerDevices = []; telemetry.hidppBatteries = [Object.assign({}, raw, {status: "Full"})];
+      compare(power.mouseBatteries[0].pluggedIn, true);
+      telemetry.systemFresh = false; compare(power.mouseBatteries[0].pluggedIn, null);
+      telemetry.systemFresh = true; telemetry.hidppBatteries = [];
+      compare(power.mouseBatteries[0].pluggedIn, null);
+    }
+    function test_mouse_hidpp_identity_is_exact_even_with_identical_models() {
+      const mouse = {icon: "input-mouse", address: "D6:6A:7C:2D:56:19", deviceName: "MX Anywhere 3S",
+        connected: true, batteryAvailable: true, battery: .9};
+      const other = Object.assign({}, mouse, {address: "D6:6A:7C:2D:56:20"});
+      const raw = {nativePath: "hidpp_battery_10", address: mouse.address, status: "Charging"};
+      power.bluetoothDevices = [mouse, other]; power.powerDevices = []; telemetry.hidppBatteries = [raw];
+      compare(power.mouseBatteries[0].pluggedIn, true); compare(power.mouseBatteries[1].pluggedIn, null);
+      telemetry.hidppBatteries = [raw, Object.assign({}, raw, {nativePath: "hidpp_battery_11"})];
+      compare(power.mouseBatteries[0].pluggedIn, null, "Ambiguous duplicate native sources are not guessed");
+      telemetry.hidppBatteries = [Object.assign({}, raw, {status: "Unknown"})];
+      compare(power.mouseBatteries[0].pluggedIn, null);
+      telemetry.hidppBatteries = [Object.assign({}, raw, {nativePath: "hidpp_battery_11"})];
+      compare(power.mouseBatteries[0].pluggedIn, true, "A kernel index change does not change the mouse identity");
+    }
+    function test_earbud_check_requires_its_connected_pc_audio_output() {
+      const address = "44:10:30:25:8F:4F";
+      const peer = {address, connected: true, name: "Renamed Buds"};
+      const sink = {isSink: true, isStream: false, audio: {}, ready: true,
+        properties: {"device.api": "bluez5", "api.bluez5.address": address.toLowerCase()}};
+      const source = power.earbudsData, unknown = {percent: null, charging: null};
+      const event = {event: "earbuds", mode: "passive", available: true,
+        case: {percent: 85, charging: false}, left: unknown, right: unknown,
+        observedAt: source.now, receivedAt: source.now};
+      source.accept(event);
+      verify(!power.earbudBatteries[0].audioConnected, "Passive battery reports alone do not show the check");
+      power.bluetoothDevices = [peer]; verify(!power.earbudAudioConnected);
+      audio.nodes = [sink]; verify(power.earbudAudioConnected);
+      verify(power.earbudBatteries[0].audioConnected);
+      compare(power.earbudBatteries[0].percent, 85);
+      // No playing/default-sink requirement: paused but connected still counts.
+      compare(audio.bluetoothOutputAddresses, [address]);
+      for (const wrong of [Object.assign({}, sink, {ready: false}),
+          Object.assign({}, sink, {isSink: false}), Object.assign({}, sink, {isStream: true}),
+          Object.assign({}, sink, {audio: null}),
+          Object.assign({}, sink, {properties: {"device.api": "alsa", "api.bluez5.address": address}}),
+          Object.assign({}, sink, {properties: {"device.api": "bluez5", "api.bluez5.address": "44:10:30:25:8F:50"}})]) {
+        audio.nodes = [wrong]; verify(!power.earbudAudioConnected);
+      }
+      audio.nodes = [sink]; power.bluetoothDevices = [Object.assign({}, peer, {connected: false})];
+      verify(!power.earbudAudioConnected, "A lingering PipeWire output is not a live connection");
+      power.bluetoothDevices = [peer]; verify(power.earbudAudioConnected);
+      for (const invalid of ["", "other", "44:10:30:25:8F:50"]) {
+        power.earbudsBluetoothAddress = invalid; verify(!power.earbudAudioConnected);
+      }
+      power.earbudsBluetoothAddress = address.toLowerCase(); verify(power.earbudAudioConnected);
+      source.invalidate(); compare(power.earbudBatteries.length, 0, "Audio must not become a battery fallback");
+    }
     function test_native_bluetooth_cannot_create_an_earbud_reading() {
       const buds = {name: "Ian's Pixel Buds Pro 2", deviceName: "Pixel Buds Pro 2",
         address: "BUDS", dbusPath: "/buds", connected: true, batteryAvailable: true, battery: 0.73};
@@ -417,7 +490,7 @@ ShellRoot {
     }
     function test_earbud_dial_uses_case_and_warns_for_any_component() {
       const source = power.earbudsData;
-      const event = {event: "earbuds", available: true, observedAt: source.now, receivedAt: source.now,
+      const event = {event: "earbuds", mode: "passive", available: true, observedAt: source.now, receivedAt: source.now,
         left: {percent: 73, charging: false}, right: {percent: 42, charging: true},
         case: {percent: null, charging: null}
       };
@@ -450,7 +523,7 @@ ShellRoot {
       power.bluetoothDevices = [first, second];
       verify(phoneSample(90));
       const source = power.earbudsData, unknown = {percent: null, charging: null};
-      const event = {event: "earbuds", available: true, observedAt: source.now, receivedAt: source.now,
+      const event = {event: "earbuds", mode: "passive", available: true, observedAt: source.now, receivedAt: source.now,
         case: {percent: 85, charging: false},
         left: unknown, right: unknown};
       verify(source.accept(event));
@@ -465,14 +538,14 @@ ShellRoot {
     }
     function phoneSample(level, pluggedIn = false, charging = false) {
       const relay = power.phoneRelay;
-      relay.accept({event: "connection", connected: true});
-      return relay.accept({event: "battery", device: "phone", percent: level, pluggedIn, charging,
-        updatedAt: relay.now + 2000, receivedAt: relay.now});
+      return relay.accept({event: "relay", mode: "passive", available: true,
+        phone: {percent: level, pluggedIn, charging, updatedAt: relay.now + 2000}, fitbit: null,
+        observedAt: relay.now, receivedAt: relay.now});
     }
     function test_fast_pair_case_dial_is_independent_of_phone_and_audio() {
       const source = power.earbudsData;
       const unknown = {percent: null, charging: null};
-      const event = {event: "earbuds", available: true, case: {percent: 85, charging: true},
+      const event = {event: "earbuds", mode: "passive", available: true, case: {percent: 85, charging: true},
         left: {percent: 100, charging: false}, right: {percent: 100, charging: false},
         observedAt: source.now - 60000, receivedAt: source.now};
       verify(source.accept(event));
@@ -514,10 +587,10 @@ ShellRoot {
       power.powerDevices = [{ready: true, isPresent: true, nativePath: "/phone", state: UPowerDeviceState.Charging}];
       telemetry.usbDevices = [{vendorId: "phone-vendor", serial: "phone-usb"}];
       verify(phoneSample(73, true, true));
-      power.phoneRelay.accept({event: "connection", connected: false});
+      power.phoneRelay.accept({event: "relay", mode: "passive", available: false});
       compare(power.phoneBatteries.length, 0); compare(power.accessoryBatteries.length, 0);
-      power.phoneRelay.accept({event: "connection", connected: true});
-      compare(power.phoneBatteries.length, 0, "A connection report is not a measurement");
+      verify(!power.phoneRelay.accept({event: "connection", connected: true}));
+      compare(power.phoneBatteries.length, 0, "Retired connection events cannot establish passive presence");
       verify(phoneSample(74, false, false)); compare(power.phoneBatteries[0].percent, 74);
     }
     function test_phone_unknown_and_charge_states_come_from_the_relay() {
@@ -539,16 +612,16 @@ ShellRoot {
     function test_fitbit_uses_dated_cloud_values_and_never_guesses_charging() {
       verify(phoneSample(80));
       const relay = power.phoneRelay;
-      const value = {event: "battery", device: "fitbit", percent: 100, pluggedIn: null, charging: null,
-        updatedAt: relay.now - 60000, receivedAt: relay.now};
+      const value = {event: "relay", mode: "passive", available: true, phone: relay.snapshot.phone,
+        fitbit: {percent: 100, updatedAt: relay.now - 60000}, observedAt: relay.now, receivedAt: relay.now};
       verify(relay.accept(value)); compare(power.fitbitBatteries.length, 1);
       compare(power.fitbitBatteries[0].percent, 100); compare(power.fitbitBatteries[0].pluggedIn, null);
       compare(power.fitbitBatteries[0].charging, null); compare(power.fitbitBatteries[0].lowThreshold, 20);
-      compare(power.fitbitBatteries[0].updatedAt, value.updatedAt);
+      compare(power.fitbitBatteries[0].updatedAt, value.fitbit.updatedAt);
       compare(power.accessoryBatteries.length, 2);
-      verify(relay.accept(Object.assign({}, value, {percent: 0})));
+      verify(relay.accept(Object.assign({}, value, {fitbit: {percent: 0, updatedAt: value.fitbit.updatedAt}})));
       compare(power.fitbitBatteries[0].percent, 0);
-      verify(relay.accept(Object.assign({}, value, {percent: null})));
+      verify(relay.accept(Object.assign({}, value, {fitbit: null})));
       compare(power.fitbitBatteries.length, 0); compare(power.phoneBatteries.length, 1);
       verify(relay.accept(value)); relay.invalidate(); compare(power.fitbitBatteries.length, 0);
     }
@@ -557,7 +630,7 @@ ShellRoot {
         connected: true, batteryAvailable: true, battery: 1}];
       verify(phoneSample(90));
       const source = power.earbudsData;
-      const event = {event:"earbuds",available:true,observedAt:source.now,receivedAt:source.now,
+      const event = {event:"earbuds",mode:"passive",available:true,observedAt:source.now,receivedAt:source.now,
         case:{percent:100,charging:false},left:{percent:100,charging:false},right:{percent:100,charging:false}
       };
       verify(source.accept(event));

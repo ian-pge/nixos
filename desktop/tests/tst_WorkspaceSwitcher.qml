@@ -113,7 +113,7 @@ ShellRoot {
     }
     function button(widget, id) { return findChild(widget, "workspace-" + id); }
     function label(widget, id) { return button(widget, id).children[0].children[0]; }
-    function slotHeight() { return root.theme.barSize(36) - 2 * root.theme.barOutlineInset(); }
+    function slotHeight() { return 28 * root.theme.barScale; }
     function activeWidth() { return slotHeight() + root.theme.barSize(32); }
     function baseWidth(count = 5) { return (count - 1) * slotHeight() + activeWidth() + 2 * root.theme.barOutlineInset(); }
     function setWorkspace(monitor, workspace) {
@@ -137,10 +137,10 @@ ShellRoot {
         compare(item.active, id === activeId);
         tryCompare(item, "width", id === activeId ? activeWidth() : slotHeight());
         compare(item.height, slotHeight());
-        compare(label(widget, id).font.pixelSize, 19, "Keep the original glyph size");
+        compare(label(widget, id).font.pixelSize, root.theme.barSize(16), "Workspace glyphs follow the shared bar scale");
         fuzzyCompare(item.mapToItem(widget, 0, item.height / 2).y, widget.height / 2, 0.01);
         compare(item.children[0].radius, item.height / 2);
-        if (!item.active) compare(item.width, item.height, "Inactive workspaces must be circles");
+        if (!item.active) compare(item.width, item.height, "Inactive hover targets must remain circular");
       }
     }
     function test_each_monitor_has_its_own_pacman() {
@@ -176,12 +176,12 @@ ShellRoot {
       verifyActive(root.first, 1);
       verifyActive(root.second, 6);
     }
-    function test_outer_insets_match_the_other_capsules_and_curves_are_concentric() {
+    function test_compact_outer_insets_and_curves_are_concentric() {
       const inset = root.theme.barOutlineInset();
       for (const widget of [root.first, root.second]) {
-        // Also exercise ten slots constrained to the central capsule's width.
+        // Ten slots keep their natural width independently of the panel limit.
         if (widget === root.second) widget.monitors = [secondMonitor];
-        widget.width = Qt.binding(() => Math.min(widget.implicitWidth, 340));
+        widget.width = Qt.binding(() => widget.implicitWidth);
         try {
           for (const id of [widget.workspaceIds[0], widget.workspaceIds[widget.workspaceCount - 1]]) {
             setWorkspace(widget.monitor, {id: id});
@@ -207,6 +207,24 @@ ShellRoot {
       compare(label(root.second, 7).text, "󰮯");
       compare(label(root.second, 6).text, "󰊠");
       compare(root.second.expandedImplicitWidth, baseWidth() + slotHeight());
+    }
+    function test_hover_is_circular_and_matches_the_shared_ring_margin() {
+      const widget = root.first;
+      compare(widget.contentInset, root.theme.barOutlineInset());
+      const active = button(widget, 1), pink = findChild(active, "workspaceHighlight");
+      compare(pink.height, 28 * root.theme.barScale);
+      compare(pink.width - pink.height, root.theme.barSize(32));
+      for (const id of [2, 3]) {
+        const item = button(widget, id), highlight = findChild(item, "workspaceHighlight");
+        mouseMove(item, item.width / 2, item.height / 2);
+        tryCompare(item, "hovered", true);
+        compare(highlight.width, highlight.height);
+        compare(highlight.height, pink.height);
+        compare(highlight.radius, highlight.height / 2);
+        fuzzyCompare(highlight.mapToItem(widget, 0, 0).y, widget.contentInset, 0.01);
+        fuzzyCompare(widget.height - highlight.mapToItem(widget, 0, highlight.height).y,
+          widget.contentInset, 0.01);
+      }
     }
     function test_pacman_stays_centered_through_animation() {
       for (const workspace of [workspaceThree, workspaceOne]) {
@@ -308,21 +326,22 @@ ShellRoot {
       for (const name of ["A", "Chat", "Terminal"]) {
         widget.setSpecialWorkspace("special:" + name, false);
         compare(text.text, name);
-        compare(text.font.pixelSize, 15);
-        tryCompare(slot, "width", Math.max(slotHeight(), text.implicitWidth + 14));
+        compare(text.font.pixelSize, root.theme.barSize(13));
+        tryCompare(slot, "width", Math.max(slotHeight(), text.implicitWidth + root.theme.barSize(12)));
         compare(slot.height, slotHeight());
         fuzzyCompare(slot.mapToItem(widget, 0, slot.height / 2).y, widget.height / 2, 0.01);
         compare(slot.radius, slot.height / 2);
         compare(widget.implicitWidth, widget.baseImplicitWidth + slot.width);
-        verify(text.width <= slot.width - 14);
+        verify(text.width <= slot.width - root.theme.barSize(12));
         const previousEnd = previous.mapToItem(widget, previous.width, 0).x;
         const lastStart = last.mapToItem(widget, 0, 0).x;
         const lastEnd = last.mapToItem(widget, last.width, 0).x;
         const specialStart = slot.mapToItem(widget, 0, 0).x;
         fuzzyCompare(specialStart - lastEnd, lastStart - previousEnd, 0.01);
         fuzzyCompare(widget.width - specialStart - slot.width, root.theme.barOutlineInset(), 0.01);
-        fuzzyCompare(slot.y, root.theme.barOutlineInset(), 0.01);
-        fuzzyCompare(widget.height - slot.y - slot.height, root.theme.barOutlineInset(), 0.01);
+        const specialTop = slot.mapToItem(widget, 0, 0).y;
+        fuzzyCompare(specialTop, root.theme.barOutlineInset(), 0.01);
+        fuzzyCompare(widget.height - specialTop - slot.height, root.theme.barOutlineInset(), 0.01);
         fuzzyCompare(specialStart + slot.width - slot.radius, widget.width - widget.height / 2, 0.01);
       }
     }

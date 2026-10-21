@@ -49,11 +49,21 @@ global Bluetooth percentage. The phone and an audio connection are unnecessary.
 The private Account Key lives outside Git/Nix, at the runtime path configured by
 `programs.quickshell.earbudsAccountKeyFile`. Its state directory is persisted.
 One reader serves every monitor, independently of the phone/Fitbit receiver.
-Case and in-use bud data expire separately after 180 seconds without observations;
-an unchanged battery percentage does not cause expiry. There is no Google-widget,
+The earbuds' small check badge is independent of battery reception: it requires
+the configured `programs.quickshell.earbudsBluetoothAddress` to be connected in
+BlueZ and to have a ready Bluetooth audio output in PipeWire. Paused/non-default
+outputs still count as connected. The badge shares `DialBadge` with quota counters;
+it does not start playback, change the output or become a battery fallback.
+Receiver 0.6.0 uses a shared BlueZ AdvertisementMonitor transport for both the
+phone/Fitbit advertisements and the earbuds, with no GATT connection, active
+discovery session or active-scan fallback. DeviceFound/Lost manage each source's
+presence (180-second loss timeout). Status reports do not advance the last content
+observation timestamp; unchanged percentages stay visible while monitored.
+A silent reader still expires in the view after 180 seconds. There is no Google-widget,
 RFCOMM or native Bluetooth fallback. See the complete
 [pairing, reverse-engineering and recovery README](../tools/battery-relay/pairing/README.md).
-Rebuild normally to activate the receiver, QML and persistence declarations together.
+Rebuild normally to activate the receiver, QML and BlueZ's required experimental
+D-Bus interface together (`system/bluetooth.nix`; no KernelExperimental setting).
 
 ## Build, preview and test
 
@@ -241,13 +251,39 @@ real recording or account.
 
 ## Plan limits
 
+The bar uses a shared 125% scale: 40 px dials and 45 px single-row groups.
+The top widgets share one line, with workspaces centered on each screen and the
+other groups split between its left and right edges. Date, time and weather form
+a centered black notch attached to the bottom edge, sharing the upper groups'
+height and corner radius, over windows without reserving space. Its compact
+clock pill uses electric cyan (`#00f5ff`).
+The reserved top strip is 58 px high.
+Icons, outlines, spacing, workspace pills and countdown text scale together.
+
 The bar shows three logo dials: GPT/Codex's main quota, Claude's five-hour quota
 and its all-model weekly quota. Rings show remaining allowance; hover for the exact
-percentage. The dials are hover-only and keep the normal pointer. Reset times
+percentage. A single row pairs each dial with its automatic reset countdown
+on its right, updated every minute: rounded days from 24 hours onward, hours and
+minutes below 24 hours (`4h05`), in a 20 px font without automatic shrinking.
+Missing or elapsed reset dates leave the countdown blank; it appears automatically
+when the provider supplies a future reset date.
+The widget contracts to its visible contents, with no reserved space for absent countdowns.
+The dials are hover-only and keep the normal pointer. Exact reset dates
 and freshness remain in the accessible label. Top-right badges show available
-reset credits once per provider, only when greater than zero; unknown counts stay hidden.
-One shared controller reads the signed-in official CLIs at startup and every five minutes;
-it neither reads credential files nor submits prompts or consumes reset credits.
+reset credits once per provider when greater than zero. Like the earbuds' check,
+these compact badges overlay the dial without adding width or moving neighbours
+and countdowns. A failed Claude reset read
+shows `?`, with an explanatory hover message, rather than silently hiding the badge.
+Badges have their own space beside the dial, clear of both the logo and countdown,
+and remain within the rounded widget background.
+One shared controller reads the signed-in official CLIs at startup and every five minutes.
+It submits no prompts and consumes no reset credits. After Claude Code refreshes
+its authentication, a small [helper](../tools/quickshell/usage/claude-usage.mjs)
+reads its OAuth access token and requests the dedicated reset status. Credentials
+are never printed or modified; failed reset reads preserve the quota reading.
+Reset readings are cached privately for five minutes, keyed by a hash of the
+access token. A 429 response pauses further reset reads using `Retry-After`
+(15 minutes by default); stale counts are not displayed as fresh.
 The experimental protocol handling and failure policy are documented under
 [usage limits](docs/DESIGN_GUIDE.md#limites-dutilisation).
 

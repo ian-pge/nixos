@@ -17,12 +17,33 @@ USB identity to detect when it is plugged into this computer, including through
 a hub. Bluetooth battery percentages alone do not report charging for Agar BLE.
 Missing USB entries are skipped; unplugging removes the device on the next sample.
 
-`hidppBatteries` contains the raw `status` and `nativePath` of HID++ battery
-entries in `/sys/class/power_supply`. This preserves the distinction between
+`hidppBatteries` contains the raw `status`, `nativePath` and optional Bluetooth
+`address` of HID++ battery entries in `/sys/class/power_supply`. This preserves the distinction between
 "Full" (charge complete) and "Discharging" at 100% that UPower can erase.
-Missing or invalid status files are skipped. The battery UI matches the exact
-native path and only uses fresh samples; it never treats HID++ `online` as an
-indication that a charger is connected.
+Missing or invalid status files are skipped. `address` is the normalized MAC
+from `serial_number` only when it has a valid six-octet colon-separated format;
+USB receiver serial numbers and missing values remain null. The battery UI first
+matches that exact address, without depending on a UPower object. For devices
+without an address, an existing unambiguously matched UPower native path can
+still identify the reading. Duplicate address matches are not guessed.
+Only fresh telemetry is used; HID++ `online` is never interpreted as charger state.
+
+Observed on the MX Anywhere 3S / Linux 6.18.57 on 2026-10-21: plugging in at
+12:34:10 produced sysfs `Charging` with `online=0`, and UPower removed its mouse
+object. Unplugging at 12:34:17 produced `Discharging`/`online=1`, recreating it.
+The old UI required that transient UPower object before using the correct raw
+status, hiding charging and briefly showing an old charging sample on unplug.
+Matching by the live kernel Bluetooth address removes that dependency. It needs
+no additional daemon, Bluetooth query, permissions, USB-presence heuristic or
+cached charging flag. The existing one-second telemetry loop is unchanged.
+
+The actual bar was verified after activation: mouse 90% with `pluggedIn=true`
+while UPower had no mouse entry; then `pluggedIn=false` at 12:40:20 and `true`
+again at 12:40:32 during the owner's physical unplug/replug test. Bluetooth
+discovery stayed off and the passive phone/Fitbit/earbud readers recovered after
+the bar reload. Rust tests, Clippy, QML SystemData (11) / feature controllers
+(37), and Nix collector/desktop builds passed. No mouse pairing or Bluetooth
+configuration was changed by this correction.
 
 The additive `system` object supplies `cpuName`, `cpuFrequencyMHz`,
 `cpuTemperatureC`, `memoryUsedBytes`, `memoryTotalBytes`, `swapUsedBytes` and

@@ -30,9 +30,19 @@ Scope {
       return JSON.stringify({
         configured: relay.configured, connected: relay.connected,
         receiverRunning: relay.transport !== null,
-        phoneAgeMs: relay.snapshot === null ? null : relay.now - relay.snapshot.receivedAt,
+        phoneAgeMs: relay.snapshot === null ? null : relay.now - relay.snapshot.observedAt,
+        phoneReportAgeMs: relay.snapshot === null ? null : relay.now - relay.snapshot.receivedAt,
+        phoneMode: relay.snapshot?.mode ?? null,
         phone: power.phoneBatteries, fitbit: power.fitbitBatteries,
+        mouse: power.mouseBatteries, keyboard: power.keyboardBatteries,
         earbuds: power.earbudBatteries, earbudDataConnected: power.earbudDataConnected,
+        earbudAudioConnected: power.earbudAudioConnected,
+        earbudReceiverRunning: power.earbudsData.transport !== null,
+        earbudAgeMs: power.earbudsData.snapshot === null ? null
+          : power.earbudsData.now - power.earbudsData.snapshot.observedAt,
+        earbudMode: power.earbudsData.snapshot?.mode ?? null,
+        earbudReportAgeMs: power.earbudsData.snapshot === null ? null
+          : power.earbudsData.now - power.earbudsData.snapshot.receivedAt,
         earbudSource: power.earbudsData.available ? "fast-pair" : null
       });
     }

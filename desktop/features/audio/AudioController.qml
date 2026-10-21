@@ -15,9 +15,15 @@ Scope {
   readonly property bool microphoneAvailable: microphoneSource !== null
     && microphoneSource.ready && microphone !== null
   readonly property bool microphoneMuted: microphoneAvailable && microphone.muted
-  readonly property var devices: enabled ? Pipewire.nodes.values.filter(node =>
-    !node.isStream && node.audio !== null) : []
+  property var nodes: enabled ? Pipewire.nodes.values : []
+  readonly property var devices: nodes.filter(node => !node.isStream && node.audio !== null)
   readonly property var outputs: devices.filter(node => node.isSink)
+  // A real audio endpoint, not a nearby advertisement or a remembered pairing.
+  readonly property var bluetoothOutputAddresses: outputs
+    .filter(node => node.ready && node.properties?.["device.api"] === "bluez5")
+    .map(node => String(node.properties?.["api.bluez5.address"] || "").toUpperCase())
+    .filter((address, index, values) => /^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(address)
+      && values.indexOf(address) === index)
   readonly property var inputs: devices.filter(node => !node.isSink
     && !audioAvailability.unavailableNames[node.name])
   AudioAvailability {
@@ -79,8 +85,11 @@ Scope {
     active: root.enabled
     sourceComponent: Component {
       PwObjectTracker {
+        // Observe outputs even with the selector closed: the connection badge
+        // must also work for a connected Bluetooth output that is not default.
         objects: root.selectorVisible ? root.devices
-          : [root.sink, root.microphoneSource].filter(node => node !== null)
+          : [root.sink, root.microphoneSource].concat(root.outputs)
+              .filter((node, index, values) => node !== null && values.indexOf(node) === index)
       }
     }
   }

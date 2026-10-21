@@ -54,6 +54,15 @@ ShellRoot {
       root.data.acceptSystem({cpu: 0, memory: 0}, 106000);
       compare(root.data.usbDevices.length, 0);
     }
+    function test_hidpp_bluetooth_address_is_normalized_or_left_unknown() {
+      const raw = {nativePath: "hidpp_battery_10", status: "Charging", address: "d6:6a:7c:2d:56:19"};
+      verify(root.data.acceptSystem({cpu: 0, memory: 0, hidppBatteries: [raw]}, 100000));
+      compare(root.data.hidppBatteries[0].address, "D6:6A:7C:2D:56:19");
+      for (const bad of [null, "", "12345678", "GG:6A:7C:2D:56:19", 42]) {
+        root.data.acceptSystem({cpu: 0, memory: 0, hidppBatteries: [Object.assign({}, raw, {address: bad})]}, 100000);
+        compare(root.data.hidppBatteries[0].address, null);
+      }
+    }
     function test_sleeping_gpu_is_not_zero_percent() {
       verify(root.data.acceptGpu({gpu: {name: "Test", poweredOn: false, usage: 87}}, 100000));
       verify(root.data.gpuFresh);
@@ -61,7 +70,7 @@ ShellRoot {
       verify(!root.data.gpu.poweredOn);
     }
     function test_hidpp_status_is_validated_expires_and_clears_on_failure() {
-      const full = {nativePath: "hidpp_battery_0", status: "Full"};
+      const full = {nativePath: "hidpp_battery_0", status: "Full", address: null};
       verify(root.data.acceptSystem({cpu: 0, memory: 0, hidppBatteries: [null, full,
         {nativePath: "BAT0", status: "Full"}, {nativePath: "hidpp_battery_1", status: "invalid"}]}, 100000));
       compare(root.data.hidppBatteries, [full]); verify(root.data.systemFresh);

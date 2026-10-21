@@ -91,10 +91,16 @@ for (const status of [null, undefined, {}, {eligible: false}])
 for (const status of [null, undefined, {}, {eligible: false}])
   assert.equal(limits.claudeResetCount(status, resetNow), null);
 assert.equal(claude.snapshot.resetCredits, null);
+assert.equal(limits.claudeSnapshot({...usage, reset_credits_unavailable: true}, "")
+  .snapshot.resetCreditsUnavailable, true);
 const resetGrants = {eligible: true, grants: [
   {resets_left: 1, ends_at: "2026-10-15T00:00:00Z"},
   {resets_left: 2, ends_at: "2026-09-29T00:00:00Z"}]};
 assert.equal(limits.claudeResetCount(resetGrants, resetNow), 1);
+assert.equal(limits.claudeResetCount({grants: [
+  {resets_left: 1, starts_at: "2026-10-01T00:00:00Z"},
+  {resets_left: 2, starts_at: "2026-09-30T00:00:00Z"}]}, resetNow), 2,
+  "Future reset grants are not yet available");
 assert.equal(limits.claudeResetCount({grants: []}, resetNow), 0);
 assert.equal(limits.claudeResetCount({grants: [{resets_left: 2}, {resets_left: 1}]}, resetNow), 3);
 assert.equal(limits.claudeResetCount({grants: [{resets_left: null}]}, resetNow), null);
@@ -205,6 +211,28 @@ assert.equal(limits.percentText(99.6), "99 %");
 assert.equal(limits.percentText(100), "100 %");
 assert.equal(limits.percentText(null), "—");
 assert.equal(limits.resetText(null, now), "");
+assert.equal(limits.resetCountdown(null, now), "—");
+assert.equal(limits.resetCountdown(undefined, now), "—");
+assert.equal(limits.resetCountdown(now + day, NaN), "—");
+assert.equal(limits.resetCountdown(now - 1, now), "Màj…");
+assert.equal(limits.resetCountdown(now, now), "Màj…");
+assert.equal(limits.resetCountdown(now + 1, now), "1 min");
+assert.equal(limits.resetCountdown(now + 59 * 60000, now), "59 min");
+assert.equal(limits.resetCountdown(now + hour, now), "1h00");
+assert.equal(limits.resetCountdown(now + 4 * hour + 5 * 60000, now), "4h05");
+assert.equal(limits.resetCountdown(now + day, now), "1 j");
+assert.equal(limits.resetCountdown(now + 2 * day + 4 * hour + 8 * 60000, now), "2 j");
+assert.equal(limits.resetCountdown(now + day - 1, now), "23h59");
+assert.equal(limits.resetCountdown(now + 36 * hour - 1, now), "1 j");
+assert.equal(limits.resetCountdown(now + 36 * hour, now), "2 j");
+assert.equal(limits.resetCountdown(now + 6 * day + 23 * hour, now), "7 j");
+assert.equal(limits.quotaResetText({window: "five_hour", percent: 0, resetsAt: null}, now), "");
+assert.equal(limits.quotaResetText({window: "five_hour", percent: 1, resetsAt: null}, now), "");
+assert.equal(limits.quotaResetText({window: "five_hour", percent: 0}, now), "");
+assert.equal(limits.quotaResetText({window: "seven_day", percent: 0, resetsAt: null}, now), "");
+assert.equal(limits.quotaResetText(null, now), "");
+assert.equal(limits.quotaResetText({resetsAt: now}, now), "");
+assert.equal(limits.quotaResetText({window: "five_hour", percent: 0, resetsAt: now + hour}, now), "1h00");
 assert.equal(limits.resetText(now - 1, now), "Réinitialisée");
 assert.equal(limits.resetText(now + 20000, now), "Réinitialisation dans 1 min");
 assert.equal(limits.resetText(now + 12 * 60000, now), "Réinitialisation dans 12 min");

@@ -105,6 +105,19 @@ fn usb_devices(root: &Path) -> Vec<Value> {
     devices
 }
 
+fn bluetooth_address(serial: &str) -> Option<String> {
+    let serial = serial.trim();
+    (serial.len() == 17
+        && serial.bytes().enumerate().all(|(index, byte)| {
+            if index % 3 == 2 {
+                byte == b':'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        }))
+    .then(|| serial.to_ascii_uppercase())
+}
+
 fn hidpp_batteries(root: &Path) -> Vec<Value> {
     let Ok(entries) = fs::read_dir(root) else {
         return Vec::new();
@@ -121,7 +134,13 @@ fn hidpp_batteries(root: &Path) -> Vec<Value> {
             if !["Charging", "Discharging", "Full", "Not charging", "Unknown"].contains(&status) {
                 return None;
             }
-            Some(json!({"nativePath": name, "status": status}))
+            // A charging HID++ battery may have online=0 and disappear from
+            // UPower. Its sysfs status remains valid. Match its Bluetooth MAC
+            // directly instead of relying on UPower's transient nativePath.
+            let address = fs::read_to_string(entry.path().join("serial_number"))
+                .ok()
+                .and_then(|serial| bluetooth_address(&serial));
+            Some(json!({"nativePath": name, "status": status, "address": address}))
         })
         .collect();
     batteries.sort_by_cached_key(Value::to_string);
@@ -312,18 +331,52 @@ mod tests {
             fs::write(mouse.join("status"), format!("{status}\n")).unwrap();
             assert_eq!(
                 sampler.sample(Duration::from_secs(1))["hidppBatteries"],
-                json!([{"nativePath":"hidpp_battery_0", "status":status}])
+                json!([{"nativePath":"hidpp_battery_0", "status":status, "address":null}])
             );
         }
         let laptop = temp.path().join("power_supply/BAT0");
         fs::create_dir(&laptop).unwrap();
         fs::write(laptop.join("status"), "Charging\n").unwrap();
         fs::write(mouse.join("status"), "invalid\n").unwrap();
-        assert_eq!(sampler.sample(Duration::from_secs(2))["hidppBatteries"], json!([]));
+        assert_eq!(
+            sampler.sample(Duration::from_secs(2))["hidppBatteries"],
+            json!([])
+        );
         fs::remove_file(mouse.join("status")).unwrap();
         let missing = sampler.sample(Duration::from_secs(3));
         assert_eq!(missing["hidppBatteries"], json!([]));
         assert!(missing["error"].is_null());
+    }
+    #[test]
+    fn hidpp_address_survives_charging_offline_state_without_guessing_serials() {
+        let (temp, mut sampler) = fixture();
+        let mouse = temp.path().join("power_supply/hidpp_battery_10");
+        fs::create_dir_all(&mouse).unwrap();
+        fs::write(mouse.join("status"), "Charging\n").unwrap();
+        fs::write(mouse.join("online"), "0\n").unwrap();
+        fs::write(mouse.join("serial_number"), "d6:6a:7c:2d:56:19\n").unwrap();
+        assert_eq!(
+            sampler.sample(Duration::ZERO)["hidppBatteries"],
+            json!([
+                {"nativePath":"hidpp_battery_10", "status":"Charging", "address":"D6:6A:7C:2D:56:19"}
+            ])
+        );
+        for invalid in [
+            "",
+            "12345678",
+            "D6-6A-7C-2D-56-19",
+            "GG:6A:7C:2D:56:19",
+            "d6:6a:7c:2d:56:19:00",
+        ] {
+            assert_eq!(bluetooth_address(invalid), None);
+        }
+        fs::write(mouse.join("serial_number"), "receiver-serial\n").unwrap();
+        assert!(sampler.sample(Duration::from_secs(1))["hidppBatteries"][0]["address"].is_null());
+        fs::remove_dir_all(&mouse).unwrap();
+        assert_eq!(
+            sampler.sample(Duration::from_secs(2))["hidppBatteries"],
+            json!([])
+        );
     }
     #[test]
     fn disk_is_cached_and_retried_on_failure() {

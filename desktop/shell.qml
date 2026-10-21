@@ -117,7 +117,7 @@ ShellRoot {
     enabled: desktop.servicesEnabled
     active: panels.mode === "storage"
   }
-  PowerController { id: powerFeature; enabled: desktop.servicesEnabled; telemetry: systemFeature.telemetry }
+  PowerController { id: powerFeature; enabled: desktop.servicesEnabled; telemetry: systemFeature.telemetry; audio: audioFeature }
   NotificationData {
     id: notificationsFeature
     suppressNativeBeeper: messageData.connected && !messageData.demo

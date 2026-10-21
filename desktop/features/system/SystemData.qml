@@ -88,7 +88,10 @@ Scope {
     usbDevices = Array.isArray(report.usbDevices) ? report.usbDevices : [];
     hidppBatteries = Array.isArray(report.hidppBatteries) ? report.hidppBatteries.filter(reading => reading
       && typeof reading.nativePath === "string" && /^hidpp_battery_[0-9]+$/.test(reading.nativePath)
-      && ["Charging", "Discharging", "Full", "Not charging", "Unknown"].includes(reading.status)) : [];
+      && ["Charging", "Discharging", "Full", "Not charging", "Unknown"].includes(reading.status))
+      .map(reading => ({nativePath: reading.nativePath, status: reading.status,
+        address: typeof reading.address === "string" && /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(reading.address)
+          ? reading.address.toUpperCase() : null})) : [];
     acceptTop(report.top, false, time);
     return true;
   }

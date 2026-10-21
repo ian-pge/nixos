@@ -8,10 +8,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.bluetooth.*
-import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseData
-import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.AdvertisingSet
+import android.bluetooth.le.AdvertisingSetCallback
+import android.bluetooth.le.AdvertisingSetParameters
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -25,42 +27,33 @@ import java.util.UUID
 
 data class RelayState(
     val running: Boolean = false,
-    val connected: Boolean = false,
+    val broadcasting: Boolean = false,
     val status: String = "Relais arrêté",
     val battery: BatterySnapshot? = null,
-    val lastSentMs: Long? = null,
+    val lastPublishedMs: Long? = null,
 )
 
-/** Unpaired BLE peripheral. Address filtering is a convenience, not authentication. */
+/** Non-connectable broadcaster. No GATT server, peer, pairing or app heartbeat. */
 @SuppressLint("MissingPermission")
 class RelayService : Service() {
     inner class LocalBinder : Binder() { val service: RelayService get() = this@RelayService }
     private val handler = Handler(Looper.getMainLooper())
     private val observers = mutableSetOf<(RelayState) -> Unit>()
-    private val queue = SnapshotQueue()
-    private var server: BluetoothGattServer? = null
-    private var characteristic: BluetoothGattCharacteristic? = null
-    private var subscriber: BluetoothDevice? = null
-    private var advertising: AdvertiseCallback? = null
+    private val updates = AdvertisementUpdates()
+    private var advertising: AdvertisingSetCallback? = null
+    private var advertisingSet: AdvertisingSet? = null
     private var enabled = false
     private var foreground = false
     private var generation = 0
-    private var address: String? = null
+    private var phoneTimeMs = 0L
     private var state = RelayState()
     private val preferences by lazy { getSharedPreferences(PREFERENCES, MODE_PRIVATE) }
     private val manager by lazy { getSystemService(BluetoothManager::class.java) }
     private val notifications by lazy { getSystemService(NotificationManager::class.java) }
     private val fitbit by lazy { FitbitRepository.get(this) }
-    private val fitbitObserver: (FitbitState) -> Unit = { updateFitbit(); sendNext() }
-    private val heartbeat = Runnable { updateFitbit(); queue.refresh(); sendNext() }
-    private val sendTimeout = Runnable {
-        val device = subscriber
-        subscriber = null
-        queue.resetConnection()
-        if (device != null) try { server?.cancelConnection(device) } catch (_: SecurityException) { }
-        status("PC déconnecté — en attente")
-        startAdvertising()
-    }
+    private val fitbitObserver: (FitbitState) -> Unit = { refreshAdvertisement() }
+    // A deadline for an API operation only; no recurring wakeup/heartbeat.
+    private val operationTimeout = Runnable { stopRelay("Le Bluetooth n’a pas confirmé la diffusion. Réactivez le relais.", disable = false) }
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -69,124 +62,28 @@ class RelayService : Service() {
                 intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1),
                 intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1),
                 intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1),
-                intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN),
-            )
-            queue.update(snapshot)
+                intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN))
+            if (snapshot == state.battery) return
+            phoneTimeMs = System.currentTimeMillis()
             publish(state.copy(battery = snapshot))
-            sendNext()
+            refreshAdvertisement()
         }
     }
-
     private val bluetoothReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (!enabled) return
-            when (intent.action) {
-                BluetoothAdapter.ACTION_STATE_CHANGED -> when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
-                    BluetoothAdapter.STATE_ON -> openServer()
-                    BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> {
-                        closeServer()
-                        status("Bluetooth désactivé — en attente")
-                    }
+            if (!enabled || intent.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+            when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
+                BluetoothAdapter.STATE_ON -> { refreshAdvertisement(); startAdvertising() }
+                BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> {
+                    closeAdvertising()
+                    publish(state.copy(broadcasting = false, status = "Bluetooth désactivé — en attente"))
                 }
             }
         }
     }
 
-    private fun approved(device: BluetoothDevice): Boolean = try {
-        enabled && device.address == address
-    } catch (_: SecurityException) { false }
-
-    // Binder callbacks are serialized onto the main looper. Closed-server
-    // callbacks cannot mutate a later session, even for the same PC.
-    private fun callback(epoch: Int) = object : BluetoothGattServerCallback() {
-        private fun dispatch(block: () -> Unit) { handler.post { if (enabled && generation == epoch) block() } }
-        override fun onServiceAdded(result: Int, service: BluetoothGattService) = dispatch {
-            if (result != BluetoothGatt.GATT_SUCCESS) stopRelay("Création du service BLE impossible ($result)")
-            else startAdvertising()
-        }
-        override fun onConnectionStateChange(device: BluetoothDevice, result: Int, newState: Int) = dispatch {
-            Log.d("BLE", "BLE server connection result=$result state=$newState approvedAddress=${device.address == address}")
-            // Android can report links also used by other apps (e.g. Fitbit).
-            // Ignore those; never disconnect another device to enforce our ACL.
-            if (device.address != address) return@dispatch
-            if (newState == BluetoothProfile.STATE_CONNECTED) status("PC connecté — en attente de lecture")
-            if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                subscriber = null
-                queue.resetConnection()
-                handler.removeCallbacks(heartbeat)
-                handler.removeCallbacks(sendTimeout)
-                status("PC déconnecté — en attente")
-                startAdvertising()
-            }
-        }
-        override fun onCharacteristicReadRequest(device: BluetoothDevice, requestId: Int, offset: Int,
-                                                 value: BluetoothGattCharacteristic) = dispatch {
-            val payload = when (value.uuid) {
-                BatterySnapshot.BATTERY_UUID -> queue.phoneSnapshot?.encode(System.currentTimeMillis())
-                else -> null
-            }
-            val result = when {
-                !approved(device) -> BluetoothGatt.GATT_INSUFFICIENT_AUTHORIZATION
-                value.uuid != BatterySnapshot.BATTERY_UUID -> BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED
-                offset != 0 -> BluetoothGatt.GATT_INVALID_OFFSET
-                payload == null -> BluetoothGatt.GATT_FAILURE
-                else -> BluetoothGatt.GATT_SUCCESS
-            }
-            // Unencrypted by explicit owner choice; this address can be spoofed.
-            server?.sendResponse(device, requestId, result, offset, if (result == 0) payload else null)
-            if (result == 0 && value.uuid == BatterySnapshot.BATTERY_UUID)
-                publish(state.copy(status = "Connecté — batterie lue par le PC", lastSentMs = System.currentTimeMillis()))
-        }
-        override fun onDescriptorReadRequest(device: BluetoothDevice, requestId: Int, offset: Int,
-                                             descriptor: BluetoothGattDescriptor) = dispatch {
-            val result = when {
-                !approved(device) -> BluetoothGatt.GATT_INSUFFICIENT_AUTHORIZATION
-                descriptor.uuid != CCCD -> BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED
-                offset != 0 -> BluetoothGatt.GATT_INVALID_OFFSET
-                else -> BluetoothGatt.GATT_SUCCESS
-            }
-            server?.sendResponse(device, requestId, result, offset, if (result != 0) null else
-                if (subscriber?.address == device.address) BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
-                else BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)
-        }
-        override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor,
-                                              preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray) = dispatch {
-            val enable = value.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
-            val disable = value.contentEquals(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)
-            val result = when {
-                !approved(device) -> BluetoothGatt.GATT_INSUFFICIENT_AUTHORIZATION
-                descriptor.uuid != CCCD || preparedWrite || !responseNeeded -> BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED
-                offset != 0 -> BluetoothGatt.GATT_INVALID_OFFSET
-                !enable && !disable -> BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED
-                else -> BluetoothGatt.GATT_SUCCESS
-            }
-            // Only this descriptor is writable; no pairing or encryption required.
-            if (responseNeeded) server?.sendResponse(device, requestId, result, offset, null)
-            if (result == 0) {
-                subscriber = if (enable) device else null
-                queue.resetConnection()
-                handler.removeCallbacks(heartbeat)
-                handler.removeCallbacks(sendTimeout)
-                if (enable) { stopAdvertising(); updateFitbit(); status("Connecté — abonnement du PC actif"); sendNext() }
-                else { status("PC non abonné — en attente"); startAdvertising() }
-            }
-        }
-        override fun onNotificationSent(device: BluetoothDevice, result: Int) = dispatch {
-            if (subscriber?.address != device.address) return@dispatch
-            handler.removeCallbacks(sendTimeout)
-            if (result != BluetoothGatt.GATT_SUCCESS) { sendTimeout.run(); return@dispatch }
-            val sent = queue.acknowledge() ?: return@dispatch
-            if (sent.kind == BatterySnapshot.PHONE)
-                publish(state.copy(status = "Connecté — batterie transmise", lastSentMs = System.currentTimeMillis()))
-            handler.removeCallbacks(heartbeat)
-            handler.postDelayed(heartbeat, HEARTBEAT_MS)
-            sendNext()
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
-        InstallationCleanup.releaseRetiredWidget(this)
         notifications.createNotificationChannel(NotificationChannel(CHANNEL, "Relais de batterie", NotificationManager.IMPORTANCE_LOW))
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
@@ -201,162 +98,134 @@ class RelayService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) { stopRelay("Relais arrêté"); return START_NOT_STICKY }
         when (intent?.action) {
-            ACTION_START -> Unit // Only an explicit user action may enable a stopped relay.
+            ACTION_START -> Unit
             ACTION_RESUME, null -> if (!preferences.getBoolean(KEY_ENABLED, false)) {
-                stopSelf(startId)
-                return START_NOT_STICKY
+                stopSelf(startId); return START_NOT_STICKY
             }
-            else -> {
-                if (!enabled) stopSelf(startId)
-                return if (enabled) START_STICKY else START_NOT_STICKY
-            }
+            else -> { if (!enabled) stopSelf(startId); return if (enabled) START_STICKY else START_NOT_STICKY }
         }
         if (!hasPermissions(this)) { stopRelay("Autorisation Appareils à proximité nécessaire"); return START_NOT_STICKY }
-        val requested = intent?.getStringExtra(EXTRA_ADDRESS) ?: preferences.getString(KEY_ADDRESS, null)
-        if (requested == null || !BluetoothAdapter.checkBluetoothAddress(requested)) {
-            stopRelay("Enregistrez l’adresse Bluetooth du PC dans l’application"); return START_NOT_STICKY
-        }
-        if (enabled && address == requested) return START_STICKY
-        closeServer()
-        address = requested
+        if (enabled) return START_STICKY
         enabled = true
-        preferences.edit().putString(KEY_ADDRESS, requested).putBoolean(KEY_ENABLED, true).apply()
+        preferences.edit().putBoolean(KEY_ENABLED, true).apply()
         try {
-            // Mandatory for a foreground service even without POST_NOTIFICATIONS.
-            // Android 13+ keeps the service in Active apps, not the notification drawer.
-            startForeground(NOTIFICATION_ID, notification("Démarrage du relais BLE…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            // Required Android service bookkeeping; no POST_NOTIFICATIONS request.
+            startForeground(NOTIFICATION_ID, notification("Démarrage de la diffusion BLE…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
             foreground = true
+            publish(state.copy(running = true, status = "Démarrage de la diffusion BLE…", lastPublishedMs = null))
             fitbit.setRelayActive(true)
-            publish(state.copy(running = true, status = "Démarrage du relais BLE…", lastSentMs = null))
-            openServer()
+            refreshAdvertisement()
         } catch (_: ForegroundServiceStartNotAllowedException) {
             stopRelay("Démarrage bloqué par Android — ouvrez l’application", disable = false)
         } catch (_: SecurityException) { stopRelay("Autorisation Bluetooth retirée") }
         return if (enabled) START_STICKY else START_NOT_STICKY
     }
 
-    private fun openServer() {
-        closeServer()
-        if (!enabled || !hasPermissions(this)) return
+    private fun refreshAdvertisement() {
+        val phone = state.battery ?: return
+        val reading = fitbit.state.takeIf { it.enabled && !it.consentNeeded }?.selected
+            ?.takeIf { it.percent != null && it.isFresh(System.currentTimeMillis()) }
+        updates.desired = BatteryAdvertisement(phone, phoneTimeMs, reading?.percent, reading?.lastSyncMs)
+        if (!enabled) return
+        if (advertising == null) startAdvertising() else updateAdvertising()
+    }
+    private fun data(value: BatteryAdvertisement): AdvertiseData = AdvertiseData.Builder()
+        .addServiceData(ParcelUuid(serviceUuid(preferences)), value.encode())
+        .setIncludeDeviceName(false).setIncludeTxPowerLevel(false).build()
+
+    private fun startAdvertising() {
+        if (!enabled || advertising != null || updates.desired == null) return
         try {
             val adapter = manager.adapter
             if (adapter == null) { stopRelay("Bluetooth indisponible"); return }
-            if (!adapter.isEnabled) { status("Bluetooth désactivé — en attente"); return }
-            if (!adapter.isMultipleAdvertisementSupported) { stopRelay("Mode périphérique BLE indisponible"); return }
-            val value = BluetoothGattCharacteristic(BatterySnapshot.BATTERY_UUID,
-                BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_INDICATE,
-                BluetoothGattCharacteristic.PERMISSION_READ)
-            value.addDescriptor(BluetoothGattDescriptor(CCCD,
-                BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE))
-            characteristic = value
-            val service = BluetoothGattService(serviceUuid(preferences), BluetoothGattService.SERVICE_TYPE_PRIMARY)
-            service.addCharacteristic(value)
-            server = manager.openGattServer(this, callback(generation))
-            if (server?.addService(service) != true) stopRelay("Impossible de démarrer le service BLE")
-        } catch (_: SecurityException) { stopRelay("Autorisation Bluetooth retirée") }
-    }
-    private fun startAdvertising() {
-        if (!enabled || server == null || advertising != null) return
-        val epoch = generation
-        val callback = object : AdvertiseCallback() {
-            override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
-                handler.post { if (generation == epoch && enabled) status("Relais BLE actif — en attente du PC") }
+            if (!adapter.isEnabled) { publish(state.copy(status = "Bluetooth désactivé — en attente")); return }
+            val advertiser = adapter.bluetoothLeAdvertiser
+            if (advertiser == null) { stopRelay("Annonceur BLE indisponible"); return }
+            updates.reset()
+            val first = updates.next() ?: return
+            val epoch = generation
+            val callback = object : AdvertisingSetCallback() {
+                private fun current() = enabled && generation == epoch && advertising === this
+                override fun onAdvertisingSetStarted(set: AdvertisingSet?, txPower: Int, result: Int) {
+                    if (!current()) {
+                        // A late successful start must not leak a broadcaster after Stop.
+                        if (result == ADVERTISE_SUCCESS) try { advertiser.stopAdvertisingSet(this) } catch (_: RuntimeException) { }
+                        return
+                    }
+                    handler.removeCallbacks(operationTimeout)
+                    if (result != ADVERTISE_SUCCESS || set == null) { stopRelay("Diffusion BLE impossible ($result)", disable = false); return }
+                    advertisingSet = set
+                    acceptedUpdate()
+                }
+                override fun onAdvertisingDataSet(set: AdvertisingSet, result: Int) {
+                    if (!current()) return
+                    handler.removeCallbacks(operationTimeout)
+                    if (result != ADVERTISE_SUCCESS) { stopRelay("Actualisation BLE impossible ($result)", disable = false); return }
+                    acceptedUpdate()
+                }
+                override fun onAdvertisingSetStopped(set: AdvertisingSet) {
+                    if (current()) stopRelay("Diffusion interrompue par Android — réactivez le relais", disable = false)
+                }
             }
-            override fun onStartFailure(errorCode: Int) {
-                handler.post { if (generation == epoch && enabled) stopRelay("Annonce BLE impossible ($errorCode)") }
-            }
-        }
-        try {
-            val advertiser = manager.adapter?.bluetoothLeAdvertiser ?: run { stopRelay("Annonceur BLE indisponible"); return }
             advertising = callback
-            advertiser.startAdvertising(AdvertiseSettings.Builder()
-                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_LOW).setConnectable(true).setTimeout(0).build(),
-                AdvertiseData.Builder().addServiceUuid(ParcelUuid(serviceUuid(preferences)))
-                    .setIncludeDeviceName(false).build(), callback)
+            handler.postDelayed(operationTimeout, 20_000L)
+            advertiser.startAdvertisingSet(parameters(), data(first), null, null, null, callback, handler)
         } catch (_: SecurityException) { stopRelay("Autorisation Bluetooth retirée") }
-          catch (_: IllegalStateException) { stopRelay("Bluetooth indisponible") }
+          catch (error: RuntimeException) { Log.w("BLE", "Advertising start failed", error); stopRelay("Diffusion BLE indisponible", disable = false) }
     }
-    private fun stopAdvertising() {
-        val previous = advertising
-        advertising = null
-        if (previous != null) try { manager.adapter?.bluetoothLeAdvertiser?.stopAdvertising(previous) }
-        catch (_: SecurityException) { } catch (_: IllegalStateException) { }
+    private fun acceptedUpdate() {
+        if (updates.accepted() == null) return
+        publish(state.copy(broadcasting = true, status = "Diffusion BLE active — réception passive sur le PC",
+            lastPublishedMs = System.currentTimeMillis()))
+        updateAdvertising()
     }
-    private fun sendNext() {
-        val device = subscriber ?: return
-        val value = characteristic ?: return
-        val gatt = server ?: return
-        if (!approved(device)) { sendTimeout.run(); return }
-        val snapshot = queue.next() ?: return
+    private fun updateAdvertising() {
+        val set = advertisingSet ?: return
+        val next = updates.next() ?: return
         try {
-            val bytes = snapshot.encode(System.currentTimeMillis())
-            val accepted = if (Build.VERSION.SDK_INT >= 33) {
-                gatt.notifyCharacteristicChanged(device, value, true, bytes) == BluetoothStatusCodes.SUCCESS
-            } else {
-                @Suppress("DEPRECATION")
-                value.value = bytes
-                @Suppress("DEPRECATION")
-                gatt.notifyCharacteristicChanged(device, value, true)
-            }
-            if (!accepted) { sendTimeout.run(); return }
-            handler.postDelayed(sendTimeout, 20_000L)
+            handler.postDelayed(operationTimeout, 20_000L)
+            set.setAdvertisingData(data(next))
         } catch (_: SecurityException) { stopRelay("Autorisation Bluetooth retirée") }
+          catch (_: RuntimeException) { stopRelay("Actualisation BLE indisponible", disable = false) }
     }
-    private fun updateFitbit() {
-        val reading = fitbit.state.takeIf { it.enabled && !it.consentNeeded }?.selected
-        val now = System.currentTimeMillis()
-        if (reading != null && reading.percent != null && reading.isFresh(now)) {
-            queue.update(BatteryPacket(BatterySnapshot(reading.percent, null, null), BatterySnapshot.FITBIT, reading.lastSyncMs))
-        } else if (queue.fitbitPacket?.snapshot?.percent != null) {
-            // All-unknown Fitbit packet withdraws an earlier reading. No Fitbit
-            // packets are sent at all before this optional provider is used.
-            queue.update(BatteryPacket(BatterySnapshot(null, null, null), BatterySnapshot.FITBIT, now))
-        }
-    }
-    private fun closeServer() {
+    private fun closeAdvertising() {
         generation++
-        handler.removeCallbacks(heartbeat)
-        handler.removeCallbacks(sendTimeout)
-        stopAdvertising()
-        subscriber = null
-        characteristic = null
-        queue.resetConnection()
-        try { server?.close() } catch (_: SecurityException) { }
-        server = null
+        handler.removeCallbacks(operationTimeout)
+        val callback = advertising
+        advertising = null
+        advertisingSet = null
+        updates.reset()
+        if (callback != null) try { manager.adapter?.bluetoothLeAdvertiser?.stopAdvertisingSet(callback) } catch (_: RuntimeException) { }
     }
     private fun stopRelay(message: String, disable: Boolean = true) {
         enabled = false
         fitbit.setRelayActive(false)
         if (disable) preferences.edit().putBoolean(KEY_ENABLED, false).apply()
-        closeServer()
+        closeAdvertising()
         foreground = false
         stopForeground(STOP_FOREGROUND_REMOVE)
-        publish(state.copy(running = false, status = message))
+        publish(state.copy(running = false, broadcasting = false, status = message))
         stopSelf()
     }
-    private fun status(message: String) = publish(state.copy(status = message))
     private fun publish(value: RelayState) {
         val changed = value.status != state.status
         if (changed) Log.d("BLE", value.status)
-        state = value.copy(connected = enabled && subscriber != null)
+        state = value
         observers.toList().forEach { it(state) }
-        if (foreground && changed && notifications.areNotificationsEnabled())
-            notifications.notify(NOTIFICATION_ID, notification(value.status))
+        if (foreground && changed && notifications.areNotificationsEnabled()) notifications.notify(NOTIFICATION_ID, notification(value.status))
     }
     private fun notification(message: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, RelayService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_battery)
-            .setContentTitle("BLE").setContentText(message).setContentIntent(open)
-            .setOngoing(true).setOnlyAlertOnce(true)
+            .setContentTitle("BLE").setContentText(message).setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true)
             .addAction(Notification.Action.Builder(null, "Arrêter", stop).build()).build()
     }
     override fun onDestroy() {
         enabled = false
         fitbit.removeObserver(fitbitObserver)
         fitbit.setRelayActive(false)
-        closeServer()
+        closeAdvertising()
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(bluetoothReceiver)
         observers.clear()
@@ -366,24 +235,19 @@ class RelayService : Service() {
         const val ACTION_START = "dev.ian.ble.START"
         const val ACTION_RESUME = "dev.ian.ble.RESUME"
         const val ACTION_STOP = "dev.ian.ble.STOP"
-        const val EXTRA_ADDRESS = "address"
         const val PREFERENCES = "relay"
-        const val KEY_ADDRESS = "pc_address"
         const val KEY_ENABLED = "enabled"
         fun hasPermissions(context: Context) = listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE)
             .all { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
-        // Public installation identifier: lets the PC find this phone despite
-        // rotating BLE addresses. This is NOT a secret or an authentication key.
         fun serviceUuid(preferences: SharedPreferences): UUID {
             val saved = preferences.getString("service_uuid", null)
             if (saved != null) return UUID.fromString(saved)
-            val value = UUID.randomUUID()
-            preferences.edit().putString("service_uuid", value.toString()).apply()
-            return value
+            return UUID.randomUUID().also { preferences.edit().putString("service_uuid", it.toString()).apply() }
         }
+        internal fun parameters(): AdvertisingSetParameters = AdvertisingSetParameters.Builder()
+            .setLegacyMode(true).setConnectable(false).setScannable(false)
+            .setInterval(AdvertisingSetParameters.INTERVAL_HIGH).setTxPowerLevel(AdvertisingSetParameters.TX_POWER_LOW).build()
         private const val CHANNEL = "battery_relay"
         private const val NOTIFICATION_ID = 1
-        private const val HEARTBEAT_MS = 60_000L
-        private val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }

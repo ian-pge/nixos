@@ -127,15 +127,17 @@ ShellRoot {
       profiles = fixture.format.messageReaders({isSender: true, seen: true}, chat, beeperData.accounts);
       compare(profiles[0].title, "Peer Name"); compare(profiles[0].imgURL, chat.imgURL);
     }
-    function test_telegram_cumulative_receipts_carry_photos_without_marking_newer_messages() {
+    function test_telegram_latest_receipt_keeps_the_peer_photo() {
       const chat = Object.assign({}, beeperData.currentChat, {type: "single"});
       const rows = [
-        {id: "older", isSender: true, timestamp: "2026-09-26T13:00:00Z"},
+        {id: "older", isSender: true, timestamp: "2026-09-26T13:00:00Z", seen: {camille: true}},
         {id: "marker", isSender: true, timestamp: "2026-09-26T14:00:00Z", seen: {camille: true}},
         {id: "newer", isSender: true, timestamp: "2026-09-26T15:00:00Z"}
       ];
       const profiles = fixture.format.readReceiptReaders(rows, chat, beeperData.accounts);
-      compare(profiles.older[0].id, "camille"); compare(profiles.older[0].imgURL, profiles.marker[0].imgURL);
+      compare(profiles.older.length, 0);
+      compare(profiles.marker[0].id, "camille");
+      compare(profiles.marker[0].imgURL, chat.participants.items.find(person => person.id === "camille").imgURL);
       compare(profiles.newer.length, 0);
     }
     function test_reactions_deduplicate_only_the_same_person_and_key_and_keep_custom_images_separate() {

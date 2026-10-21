@@ -11,7 +11,8 @@ Scope {
   property bool active: false
   // No prompt is sent: get_usage reads plan limits without inference, the
   // session is not saved, and neither MCP servers nor hooks are started.
-  property list<string> claudeCommand: ["claude", "-p", "--input-format", "stream-json",
+  // The helper adds the reset-status read after the CLI has refreshed auth.
+  property list<string> claudeCommand: ["node", Qt.resolvedUrl("../../../tools/quickshell/usage/claude-usage.mjs").toString().replace(/^file:\/\//, ""), "claude", "-p", "--input-format", "stream-json",
     "--output-format", "stream-json", "--verbose", "--no-session-persistence",
     "--strict-mcp-config", "--settings", "{\"disableAllHooks\":true}"]
   property list<string> codexCommand: ["codex", "app-server"]

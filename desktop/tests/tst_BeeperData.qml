@@ -204,12 +204,12 @@ ShellRoot {
         compare(fixture.format.readReceiptLabel({isSender: true}, chat, []), "", network);
       }
     }
-    function test_telegram_private_receipt_covers_only_earlier_sent_messages() {
+    function test_telegram_private_receipt_marks_only_the_last_confirmed_message() {
       const chat = {network: "Telegram", type: "single", participants: {items: [
         {id: "self", isSelf: true}, {id: "lea", fullName: "Léa", isSelf: false}
       ]}};
       const rows = [
-        {id: "earlier", isSender: true, senderID: "self", timestamp: "2026-09-25T10:00:00Z", seen: {self: true}},
+        {id: "earlier", isSender: true, senderID: "self", timestamp: "2026-09-25T10:00:00Z", seen: {self: true, lea: true}},
         {id: "received", senderID: "lea", timestamp: "2026-09-25T10:01:00Z", seen: {self: true}},
         {id: "pending", isSender: true, timestamp: "2026-09-25T10:02:00Z", sendStatus: {status: "PENDING"}},
         {id: "failed", isSender: true, timestamp: "2026-09-25T10:03:00Z", sendStatus: {status: "FAIL_PERMANENT"}},
@@ -220,13 +220,29 @@ ShellRoot {
       ];
       const before = JSON.stringify(rows);
       const labels = fixture.format.readReceiptLabels(rows, chat, []);
-      compare(labels.earlier, "Read by Léa"); compare(labels.marker, "Read by Léa");
+      compare(labels.earlier, ""); compare(labels.marker, "Read by Léa");
       for (const id of ["received", "pending", "failed", "same-time", "newer", "undated"]) compare(labels[id], "", id);
       compare(JSON.stringify(rows), before, "Derived receipts must not change the API snapshots");
       chat.type = "group";
-      compare(fixture.format.readReceiptLabels(rows, chat, []).earlier, "", "Group receipts remain per message");
+      compare(fixture.format.readReceiptLabels(rows, chat, []).earlier, "Read by Léa", "Group receipts remain per message");
       chat.type = "single"; chat.network = "WhatsApp";
-      compare(fixture.format.readReceiptLabels(rows, chat, []).earlier, "", "Other networks keep their existing receipt semantics");
+      compare(fixture.format.readReceiptLabels(rows, chat, []).earlier, "Read by Léa", "Other networks keep their existing receipt semantics");
+    }
+    function test_telegram_receipt_uses_history_order_for_equal_or_missing_timestamps() {
+      const chat = {type: "single", title: "Léa", accountID: "telegram-account"};
+      const accounts = [{id: "telegram-account", network: "Telegram"}];
+      for (const timestamp of ["2026-09-25T10:00:00Z", undefined]) {
+        const rows = [
+          {id: "first", isSender: true, timestamp: timestamp, seen: true},
+          {id: "last", isSender: true, timestamp: timestamp, seen: "2026-09-25T10:05:00Z"},
+          {id: "unread", isSender: true, timestamp: timestamp},
+          {id: "pending", isSender: true, timestamp: timestamp, seen: true, sendStatus: {status: "PENDING"}},
+          {id: "failed", isSender: true, timestamp: timestamp, seen: true, sendStatus: {status: "FAIL_PERMANENT"}}
+        ];
+        const labels = fixture.format.readReceiptLabels(rows, chat, accounts);
+        compare(labels.last, "Read by Léa");
+        for (const id of ["first", "unread", "pending", "failed"]) compare(labels[id], "", id);
+      }
     }
     function test_group_colors_follow_identity_and_survive_history_loading() {
       beeperData.selectChat("studio"); wait(20);

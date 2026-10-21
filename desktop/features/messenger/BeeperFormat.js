@@ -199,30 +199,24 @@ function readReceiptLabel(message, chat, accounts) { return readersLabel(message
 function readReceiptReaders(messages, chat, accounts) {
   const readers = {};
   const account = (accounts || []).find(account => (account.id || account.accountID) === chat?.accountID);
-  const cumulative = chat?.type === "single" && networkBadge(chat.network || account?.network).key === "telegram";
-  let latestReadTime = -Infinity, latestReaders = [];
+  const latestOnly = chat?.type === "single" && networkBadge(chat.network || account?.network).key === "telegram";
+  let latestMessage = null, latestReaders = emptyReaders;
   function sent(message) {
     const status = message.sendStatus?.status || "";
     return message.isSender && status !== "PENDING" && !status.startsWith("FAIL");
   }
-  function sentTime(message) { return message.timestamp ? new Date(message.timestamp).getTime() : NaN; }
   for (const message of messages) {
     const people = messageReaders(message, chat, accounts);
-    readers[message.id] = people;
-    const timestamp = sentTime(message);
-    if (cumulative && sent(message) && people.length && timestamp > latestReadTime) {
-      latestReadTime = timestamp; latestReaders = people;
+    readers[message.id] = latestOnly ? emptyReaders : people;
+    if (latestOnly && sent(message) && people.length) {
+      latestMessage = message; latestReaders = people;
     }
   }
-  // Telegram private-chat receipts mark history read through a message. Beeper
-  // attaches the peer to that one message, not each earlier outgoing message.
-  // Do not infer group readers, later messages, equal-time ordering, or delivery.
-  if (latestReaders.length) {
-    for (const message of messages) {
-      if (sent(message) && !readers[message.id].length && sentTime(message) < latestReadTime)
-        readers[message.id] = latestReaders;
-    }
-  }
+  // Telegram private-chat receipts mark history read through a message. Show
+  // the peer once, at the latest confirmed message in chronological history
+  // order (including messages sharing a timestamp), even if older snapshots
+  // retain their receipts or an earlier page is loaded.
+  if (latestMessage) readers[latestMessage.id] = latestReaders;
   return readers;
 }
 function readReceiptLabels(messages, chat, accounts) {

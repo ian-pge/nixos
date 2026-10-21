@@ -21,6 +21,11 @@
     default = "${config.xdg.stateHome}/battery-relay/pixel-buds.account-key";
     description = "Runtime path to the private Fast Pair Account Key (0600). This is a string, never a Nix path or the key contents.";
   };
+  options.programs.quickshell.earbudsBluetoothAddress = lib.mkOption {
+    type = lib.types.nullOr (lib.types.strMatching "([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}");
+    default = null;
+    description = "Public Bluetooth address of the earbuds, used only to identify their PC audio connection badge.";
+  };
 
   config = {
     home.packages = with localPackages; [
@@ -42,6 +47,7 @@
       # Choose "macchiato" for opaque dark backgrounds, or "liquid-glass".
       backgroundStyle = "macchiato";
       phoneBatteryServiceUuid = "e167a6ba-8246-4729-8ae6-4f1ecde39e1c";
+      earbudsBluetoothAddress = "44:10:30:25:8F:4F";
       package = localPackages.quickshellRuntime;
 
       configs.top-bar = localPackages.quickshellDesktop;
@@ -75,7 +81,9 @@
         ]
         ++ lib.optional (config.programs.quickshell.phoneBatteryServiceUuid != null)
         "QS_PHONE_BATTERY_SERVICE_UUID=${config.programs.quickshell.phoneBatteryServiceUuid}"
-        ++ ["QS_EARBUDS_ACCOUNT_KEY_FILE=${config.programs.quickshell.earbudsAccountKeyFile}"];
+        ++ ["QS_EARBUDS_ACCOUNT_KEY_FILE=${config.programs.quickshell.earbudsAccountKeyFile}"]
+        ++ lib.optional (config.programs.quickshell.earbudsBluetoothAddress != null)
+        "QS_EARBUDS_BLUETOOTH_ADDRESS=${config.programs.quickshell.earbudsBluetoothAddress}";
     };
   };
 }

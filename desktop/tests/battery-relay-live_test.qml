@@ -27,8 +27,9 @@ ShellRoot {
       stableSince = Date.now();
       console.log("Battery Relay live reading: " + JSON.stringify(sample));
     }
-    if (power.phoneRelay.updatedAt !== lastPhoneTimestamp) {
-      lastPhoneTimestamp = power.phoneRelay.updatedAt; phoneSamples++;
+    // Count monitor reports, not invented changes to the phone measurement date.
+    if (power.phoneRelay.snapshot.receivedAt !== lastPhoneTimestamp) {
+      lastPhoneTimestamp = power.phoneRelay.snapshot.receivedAt; phoneSamples++;
     }
     if (Date.now() - stableSince < soakMs || (soakMs > 0 && phoneSamples < minPhoneSamples)
         || (requireFitbit && power.fitbitBatteries.length !== 1)

@@ -3,7 +3,6 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
 
-import "../features/calendar/Calendar.js" as Calendar
 import "../ui/Theme.js" as Theme
 import "../shell"
 import "../ui"
@@ -22,9 +21,10 @@ PanelWindow {
 
   property bool entered: false
   readonly property bool beeperActive: messengerSurface.active
-  readonly property int barTopInset: 10
+  readonly property int barTopInset: Theme.barTopInset
   readonly property int blockHeight: Theme.barSize(36)
   readonly property int capsuleTopInset: barTopInset
+  readonly property int reservedTop: Theme.barGroupHeight + barTopInset
   readonly property var hyprlandMonitor: Hyprland.monitorFor(window.screen)
     ?? Hyprland.monitors.values.find(monitor => monitor.name === window.modelData.name)
     ?? null
@@ -54,8 +54,8 @@ PanelWindow {
   // Keep the top inset inside the same stable surface.
   implicitHeight: screen.height
   color: "transparent"
-  exclusionMode: ExclusionMode.Normal
-  exclusiveZone: blockHeight + barTopInset
+  // Render against the full screen; an empty surface reserves the top edge.
+  exclusionMode: ExclusionMode.Ignore
   // Raise this monitor's entire bar while a central widget is open. Keep it
   // above fullscreen through the closing morph, then return to the normal layer.
   WlrLayershell.layer: fullscreenActive
@@ -71,13 +71,25 @@ PanelWindow {
   }
 
   mask: Region {
-    Region { item: leftModules }
-    Region { item: centerMorph.visible ? centerMorph : null }
+    Region { item: topModules }
     Region { item: rightModules }
+    Region { item: calendarNotch }
+    Region { item: centerMorph.visible ? centerMorph : null }
     Region { item: messengerSurface.presented ? messengerSurface.surfaceItem : null }
   }
 
   Component.onCompleted: entered = true
+
+  PanelWindow {
+    screen: window.screen
+    anchors { top: true; left: true; right: true }
+    implicitHeight: window.reservedTop
+    exclusiveZone: window.reservedTop
+    exclusionMode: ExclusionMode.Normal
+    color: "transparent"
+    mask: Region {}
+    WlrLayershell.namespace: "quickshell-top-reserve"
+  }
 
   Timer {
     id: fullscreenHideDelay
@@ -108,58 +120,98 @@ PanelWindow {
     z: 1
   }
 
-  Row {
-    id: leftModules
+  CalendarNotch {
+    id: calendarNotch
+    objectName: "calendarNotch"
     parent: contentFrame
-    objectName: "leftBarModules"
     z: 2
-    anchors.left: parent.left
-    y: window.barTopInset
-    spacing: Theme.barSize(10)
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: parent.bottom
+    attachedToTop: false
+    attachedToBottom: true
+    controller: services.calendar
+    forceHovered: coordinator.isOpen("calendar", window.monitorName)
+    onClicked: coordinator.toggle("calendar", window.monitorName)
     opacity: window.entered ? 1 : 0
-    transform: Translate {
-      y: window.entered ? 0 : -10
-      Behavior on y {
-        NumberAnimation {
-          duration: 420
-          easing.type: Easing.OutCubic
-        }
-      }
+    Behavior on opacity { NumberAnimation { duration: 240 } }
+  }
+
+  CentralCapsule {
+    id: centerMorph
+    parent: contentFrame
+    services: window.services
+    coordinator: window.coordinator
+    messengerHost: messengerSurface
+    monitorName: window.monitorName
+    monitor: window.hyprlandMonitor
+    entered: window.entered
+    barTopInset: window.capsuleTopInset
+    onOverlayVisibleChanged: {
+      if (overlayVisible) fullscreenHideDelay.stop();
+      else if (window.fullscreenActive) fullscreenHideDelay.restart();
     }
+  }
+
+  MessengerHost {
+    id: messengerSurface
+    parent: contentFrame
+    anchors.fill: parent
+    controller: window.messenger
+    panelWindow: window
+    monitorName: window.monitorName
+    windowFocused: window.contentItem.Window.active
+    keyboardSelectorActive: window.keyboardSelectorActive
+    dictating: services.dictation.active
+      && window.monitorName === coordinator.dictationTargetMonitor
+    transcribing: services.dictation.transcribing
+    barTop: window.capsuleTopInset
+    workAreaTop: window.reservedTop
+    sourceWidth: presented ? centerMorph.targetWidth : centerMorph.width
+    sourceHeight: presented ? centerMorph.targetHeight : centerMorph.height
+    onAboutToOpen: centerMorph.captureChatSource()
+    onReturnFocusRequested: window.restoreCenterFocus()
+  }
+
+  Row {
+    id: rightModules
+    objectName: "topRightBarModules"
+    parent: contentFrame
+    z: 2
+    anchors.right: parent.right
+    y: window.barTopInset
+    spacing: window.barTopInset
+    opacity: window.entered ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 240 } }
 
-    BarBlock {
-      id: calendarBlock
-      objectName: "calendarBlock"
-      outlined: true
-      readonly property var forecast: services.calendar.weather.days[Calendar.dateKey(services.calendar.today)]
-      readonly property string weatherIcon: Calendar.weatherIcon(forecast?.code)
-      accent: Theme.pink
-      forceHovered: coordinator.isOpen("calendar", window.monitorName)
-      interactive: true
-      onLeftClicked: coordinator.toggle("calendar", window.monitorName)
-      Row {
-        spacing: Theme.barSize(2)
-        BarCell {
-          objectName: "timePill"
-          textPixelSize: 17
-          iconName: "clock"
-          text: services.calendar.timeText
-          accent: calendarBlock.accent
-        }
-        BarCell {
-          objectName: "datePill"
-          textPixelSize: 17
-          iconName: "calendar-days"
-          text: services.calendar.dateText
-          accent: calendarBlock.accent
-        }
-        BarCell {
-          objectName: "weatherPill"
-          textPixelSize: 17
-          iconName: calendarBlock.weatherIcon
-          text: services.calendar.weather.temperatureText
-          accent: calendarBlock.accent
+    Row {
+      objectName: "updatesStorageRow"
+      spacing: window.barTopInset
+      Pill {
+        objectName: "updatesPill"
+        outlined: true
+        iconOnly: true
+        iconName: services.updates.displayedIcon
+        accent: Theme.sideUpdates
+        forceHovered: coordinator.isOpen("updates", window.monitorName)
+        interactive: true
+        onLeftClicked: coordinator.toggle("updates", window.monitorName)
+        onRightClicked: services.updates.forceStatus()
+      }
+
+      BarBlock {
+        objectName: "storageBlock"
+        circularContent: true
+        accent: Theme.sideSystem
+        forceHovered: coordinator.isOpen("storage", window.monitorName)
+        BarDial {
+          objectName: "storagePill"
+          iconName: "hard-drive"
+          label: "Storage used"
+          value: services.system.diskUsage
+          accent: Theme.sideSystem
+          forceHovered: coordinator.isOpen("storage", window.monitorName)
+          interactive: true
+          onLeftClicked: coordinator.toggle("storage", window.monitorName)
         }
       }
     }
@@ -176,8 +228,8 @@ PanelWindow {
           outlined: true
           iconOnly: true
           circular: true
-          iconName: services.bluetooth.connected ? "bluetooth-connected" : "bluetooth-off"
-          dimmed: !services.bluetooth.connected
+          iconName: services.bluetooth.powered ? "bluetooth" : "bluetooth-off"
+          dimmed: !services.bluetooth.powered
           accent: connectivityBlock.accent
           forceHovered: coordinator.isOpen("bluetooth", window.monitorName)
           interactive: true
@@ -233,186 +285,6 @@ PanelWindow {
       }
     }
 
-    Pill {
-      objectName: "updatesPill"
-      outlined: true
-      y: (window.blockHeight - height) / 2
-      iconOnly: true
-      iconName: services.updates.displayedIcon
-      accent: Theme.sideUpdates
-      forceHovered: coordinator.isOpen("updates", window.monitorName)
-      interactive: true
-      onLeftClicked: coordinator.toggle("updates", window.monitorName)
-      onRightClicked: services.updates.forceStatus()
-    }
-
-    BarBlock {
-      objectName: "storageBlock"
-      circularContent: true
-      accent: Theme.sideSystem
-      forceHovered: coordinator.isOpen("storage", window.monitorName)
-      BarDial {
-        objectName: "storagePill"
-        iconName: "hard-drive"
-        label: "Storage used"
-        value: services.system.diskUsage
-        accent: Theme.sideSystem
-        forceHovered: coordinator.isOpen("storage", window.monitorName)
-        interactive: true
-        onLeftClicked: coordinator.toggle("storage", window.monitorName)
-      }
-    }
-  }
-
-  CentralCapsule {
-    id: centerMorph
-    parent: contentFrame
-    services: window.services
-    coordinator: window.coordinator
-    messengerHost: messengerSurface
-    monitorName: window.monitorName
-    monitor: window.hyprlandMonitor
-    entered: window.entered
-    barTopInset: window.capsuleTopInset
-    onOverlayVisibleChanged: {
-      if (overlayVisible) fullscreenHideDelay.stop();
-      else if (window.fullscreenActive) fullscreenHideDelay.restart();
-    }
-  }
-
-  MessengerHost {
-    id: messengerSurface
-    parent: contentFrame
-    anchors.fill: parent
-    controller: window.messenger
-    panelWindow: window
-    monitorName: window.monitorName
-    windowFocused: window.contentItem.Window.active
-    keyboardSelectorActive: window.keyboardSelectorActive
-    dictating: services.dictation.active
-      && window.monitorName === coordinator.dictationTargetMonitor
-    transcribing: services.dictation.transcribing
-    barTop: window.capsuleTopInset
-    workAreaTop: window.exclusiveZone
-    sourceWidth: presented ? centerMorph.targetWidth : centerMorph.width
-    sourceHeight: presented ? centerMorph.targetHeight : centerMorph.height
-    onAboutToOpen: centerMorph.captureChatSource()
-    onReturnFocusRequested: window.restoreCenterFocus()
-  }
-
-  Row {
-    id: rightModules
-    parent: contentFrame
-    objectName: "rightBarModules"
-    z: 2
-    anchors.right: parent.right
-    y: window.barTopInset
-    spacing: Theme.barSize(10)
-    opacity: window.entered ? 1 : 0
-    transform: Translate {
-      y: window.entered ? 0 : -10
-      Behavior on y {
-        NumberAnimation {
-          duration: 420
-          easing.type: Easing.OutCubic
-        }
-      }
-    }
-    Behavior on opacity { NumberAnimation { duration: 240 } }
-
-    UsageBlock {
-      controller: services.usage
-    }
-
-    BarBlock {
-      id: batteryBlock
-      objectName: "batteryBlock"
-      circularContent: true
-      readonly property bool warning: services.power.batteries.some(device =>
-          device.warning === true || !device.pluggedIn && device.percent !== null && device.percent < device.lowThreshold)
-      readonly property bool pluggedIn: services.power.batteries.some(device => device.pluggedIn === true)
-      visible: services.power.batteries.length > 0
-      accent: warning ? Theme.error : pluggedIn ? Theme.batteryPluggedIn : Theme.sideBattery
-
-      Row {
-        spacing: Theme.barSize(4)
-        BatteryDial {
-          objectName: "batteryPill"
-          visible: services.power.batteryAvailable
-          iconName: "laptop"
-          label: "Laptop battery"
-          value: services.power.batteryPercent
-          pluggedIn: services.power.batteryPluggedIn
-        }
-        Repeater {
-          model: services.power.keyboardBatteries.length
-          delegate: BatteryDial {
-            required property int index
-            readonly property var device: services.power.keyboardBatteries[index] ?? null
-            objectName: index === 0 ? "keyboardBatteryPill" : "keyboardBatteryPill" + index
-            iconName: "keyboard"
-            label: "Keyboard battery" + (services.power.keyboardBatteries.length > 1 ? " " + (index + 1) : "")
-            value: device?.percent ?? null
-            pluggedIn: device?.pluggedIn === true
-          }
-        }
-        Repeater {
-          model: services.power.mouseBatteries.length
-          delegate: BatteryDial {
-            required property int index
-            readonly property var device: services.power.mouseBatteries[index] ?? null
-            objectName: index === 0 ? "mouseBatteryPill" : "mouseBatteryPill" + index
-            iconName: "mouse"
-            label: (device?.name || "Mouse") + " battery"
-            value: device?.percent ?? null
-            pluggedIn: device?.pluggedIn === true
-          }
-        }
-        Repeater {
-          model: services.power.earbudBatteries.length
-          delegate: BatteryDial {
-            required property int index
-            readonly property var device: services.power.earbudBatteries[index] ?? null
-            objectName: index === 0 ? "earbudBatteryPill" : "earbudBatteryPill" + index
-            iconName: "headphones"
-            label: (device?.name || "Pixel Buds") + " battery"
-            value: device?.percent ?? null
-            pluggedIn: device?.pluggedIn === true
-            warning: device?.warning === true
-            tooltipOverride: device?.tooltip || ""
-            accessibleText: label + " · " + tooltipText.replace(/\n/g, " · ") + (pluggedIn ? " · Powered" : "")
-          }
-        }
-        Repeater {
-          model: services.power.phoneBatteries.length
-          delegate: BatteryDial {
-            required property int index
-            readonly property var device: services.power.phoneBatteries[index] ?? null
-            objectName: index === 0 ? "phoneBatteryPill" : "phoneBatteryPill" + index
-            iconName: "smartphone"
-            label: (device?.name || "Phone") + " battery"
-            value: device?.percent ?? null
-            lowThreshold: device?.lowThreshold ?? 40
-            pluggedIn: device?.pluggedIn === true
-          }
-        }
-        Repeater {
-          model: services.power.fitbitBatteries.length
-          delegate: BatteryDial {
-            required property int index
-            readonly property var device: services.power.fitbitBatteries[index] ?? null
-            objectName: index === 0 ? "fitbitBatteryPill" : "fitbitBatteryPill" + index
-            iconName: "watch"
-            label: "Fitbit battery"
-            value: device?.percent ?? null
-            lowThreshold: device?.lowThreshold ?? 20
-            // The cloud API has no explicit plugged/charging state.
-            pluggedIn: false
-          }
-        }
-      }
-    }
-
     BarBlock {
       id: levelsBlock
       objectName: "levelsBlock"
@@ -420,6 +292,18 @@ PanelWindow {
       accent: Theme.sideVolume
       Row {
         spacing: Theme.barSize(4)
+        BarDial {
+          objectName: "brightnessPill"
+          iconName: services.brightness.icon(window.monitorName)
+          label: "Brightness"
+          value: services.brightness.value(window.monitorName)
+          accent: levelsBlock.accent
+          forceHovered: coordinator.isOpen("brightness", window.monitorName)
+          interactive: true
+          onLeftClicked: coordinator.showBrightness(window.monitorName, false)
+          onWheelUp: services.brightness.change(5, window.monitorName)
+          onWheelDown: services.brightness.change(-5, window.monitorName)
+        }
         BarDial {
           objectName: "volumePill"
           iconName: services.audio.icon()
@@ -439,18 +323,6 @@ PanelWindow {
             services.audio.setVolume(-services.audio.volumeStep);
             coordinator.showVolume(window.monitorName);
           }
-        }
-        BarDial {
-          objectName: "brightnessPill"
-          iconName: services.brightness.icon(window.monitorName)
-          label: "Brightness"
-          value: services.brightness.value(window.monitorName)
-          accent: levelsBlock.accent
-          forceHovered: coordinator.isOpen("brightness", window.monitorName)
-          interactive: true
-          onLeftClicked: coordinator.showBrightness(window.monitorName, false)
-          onWheelUp: services.brightness.change(5, window.monitorName)
-          onWheelDown: services.brightness.change(-5, window.monitorName)
         }
       }
     }
@@ -507,7 +379,103 @@ PanelWindow {
         }
       }
     }
-
   }
 
+  Row {
+    id: topModules
+    objectName: "topLeftBarModules"
+    parent: contentFrame
+    z: 2
+    anchors.left: parent.left
+    y: window.barTopInset
+    spacing: window.barTopInset
+    opacity: window.entered ? 1 : 0
+    Behavior on opacity { NumberAnimation { duration: 240 } }
+
+    BarBlock {
+      id: batteryBlock
+      objectName: "batteryBlock"
+      circularContent: true
+      readonly property bool warning: services.power.batteries.some(device =>
+          device.warning === true || !device.pluggedIn && device.percent !== null && device.percent < device.lowThreshold)
+      readonly property bool pluggedIn: services.power.batteries.some(device => device.pluggedIn === true)
+      visible: services.power.batteries.length > 0
+      accent: warning ? Theme.error : pluggedIn ? Theme.batteryPluggedIn : Theme.sideBattery
+
+      Row {
+        spacing: Theme.barSize(4)
+        BatteryDial {
+          objectName: "batteryPill"
+          visible: services.power.batteryAvailable
+          iconName: "laptop"
+          label: "Laptop battery"
+          value: services.power.batteryPercent
+          pluggedIn: services.power.batteryPluggedIn
+        }
+        Repeater {
+          model: services.power.keyboardBatteries.length
+          delegate: BatteryDial {
+            required property int index
+            readonly property var device: services.power.keyboardBatteries[index] ?? null
+            objectName: index === 0 ? "keyboardBatteryPill" : "keyboardBatteryPill" + index
+            iconName: "keyboard"
+            label: "Keyboard battery" + (services.power.keyboardBatteries.length > 1 ? " " + (index + 1) : "")
+            value: device?.percent ?? null
+            pluggedIn: device?.pluggedIn === true
+          }
+        }
+        Repeater {
+          model: services.power.mouseBatteries.length
+          delegate: BatteryDial {
+            required property int index
+            readonly property var device: services.power.mouseBatteries[index] ?? null
+            objectName: index === 0 ? "mouseBatteryPill" : "mouseBatteryPill" + index
+            iconName: "mouse"
+            label: (device?.name || "Mouse") + " battery"
+            value: device?.percent ?? null
+            pluggedIn: device?.pluggedIn === true
+          }
+        }
+        Repeater {
+          model: services.power.earbudBatteries.length
+          delegate: EarbudBatteryWidget {
+            required property int index
+            reading: services.power.earbudBatteries[index] ?? null
+            dialName: index === 0 ? "earbudBatteryPill" : "earbudBatteryPill" + index
+          }
+        }
+        Repeater {
+          model: services.power.phoneBatteries.length
+          delegate: BatteryDial {
+            required property int index
+            readonly property var device: services.power.phoneBatteries[index] ?? null
+            objectName: index === 0 ? "phoneBatteryPill" : "phoneBatteryPill" + index
+            iconName: "smartphone"
+            label: (device?.name || "Phone") + " battery"
+            value: device?.percent ?? null
+            lowThreshold: device?.lowThreshold ?? 40
+            pluggedIn: device?.pluggedIn === true
+          }
+        }
+        Repeater {
+          model: services.power.fitbitBatteries.length
+          delegate: BatteryDial {
+            required property int index
+            readonly property var device: services.power.fitbitBatteries[index] ?? null
+            objectName: index === 0 ? "fitbitBatteryPill" : "fitbitBatteryPill" + index
+            iconName: "watch"
+            label: "Fitbit battery"
+            value: device?.percent ?? null
+            lowThreshold: device?.lowThreshold ?? 20
+            // The cloud API has no explicit plugged/charging state.
+            pluggedIn: false
+          }
+        }
+      }
+    }
+
+    UsageBlock {
+      controller: services.usage
+    }
+  }
 }

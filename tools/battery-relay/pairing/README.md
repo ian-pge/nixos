@@ -33,6 +33,11 @@ tous les écrans. Celui-ci lance `fast-pair-battery`, séparément du récepteur
 téléphone/Fitbit. Fermer BLE sur le téléphone ou perdre sa connexion ne doit pas
 faire disparaître la batterie des écouteurs.
 
+Depuis le récepteur **0.5.0**, le lecteur utilise le moniteur passif BlueZ,
+pas une session StartDiscovery permanente. L'ancien scan a été retiré après
+avoir reproduit une interférence avec la reconnexion de la souris. Le décodage
+et l'appairage décrits ici restent identiques ; ne pas générer une autre clé.
+
 Le cadran affiche uniquement le boîtier. Son infobulle contient les trois
 pourcentages. Un élément strictement sous 20 % rend le cadran rouge, même si le
 boîtier est plein ou en charge. Inconnu reste `null`/`—`, jamais zéro ni une
@@ -46,11 +51,11 @@ mais Google retirait les lignes des accessoires en arrière-plan. Il ne constitu
 donc pas une source continue indépendante. Ce lecteur, son écran, sa permission
 et sa caractéristique GATT ont été retirés.
 
-BLE Android 0.5.0 conserve uniquement téléphone/Fitbit. Une migration
-[`InstallationCleanup`](../android/app/src/main/java/dev/ian/ble/InstallationCleanup.kt)
-supprime **le seul host 4421 appartenant à BLE** et ses préférences historiques,
+BLE Android 0.5.0 a conservé uniquement téléphone/Fitbit et supprimé
+**le seul host 4421 appartenant à BLE** et ses préférences historiques,
 sans toucher aux widgets d’autres applications, au compte Fitbit ou aux réglages
-du téléphone. Ce n’est pas un fournisseur de secours.
+du téléphone. Cette migration étant terminée, son code et son test dédié ont été
+retirés en 0.6.1. Aucun lecteur de widget ni chemin de secours ne subsiste.
 Sur le téléphone de cette installation, l’ancien host et le fichier de
 préférences ont été vérifiés absents après la mise à jour. L’ancienne autorisation
 de liaison, encore listée par Android, a aussi été retirée uniquement pour BLE :
@@ -359,24 +364,41 @@ nix build --no-link .#batteryRelayReceiver .#quickshellDesktop
 qs ipc -c top-bar call topbar batteryStatus
 ```
 
-Le résultat IPC doit donner `earbudSource: "fast-pair"`. Ni l’ancien lecteur
+Le résultat IPC doit donner `earbudSource: "fast-pair"` et `earbudMode: "passive"`. Ni l’ancien lecteur
 RFCOMM ni le widget Android ne servent de secours. L’application Android n’a
 pas besoin de fonctionner pour les écouteurs ; elle reste nécessaire au téléphone
 et au Fitbit.
 
-Le récepteur traite les événements BlueZ `ServiceData` en direct, sans réinjecter
-le cache initial. Il ne conserve pas les pourcentages sur disque. Les valeurs
-inchangées restent vivantes tant que des observations arrivent ; la sortie est
-rafraîchie au plus toutes les 30 secondes sur réception, ou immédiatement lors
-d’un changement. **Une absence de variation du pourcentage n’est pas une panne.**
+Le récepteur enregistre un moniteur `or_patterns` sur le champ AD 0x16,
+préfixes `2c fe 10` (UUID FE2C puis version BATT) ou `10`. Le second couvre le
+filtrage logiciel de BlueZ 5.87, dont `match_service()` compare le contenu après
+retrait de l'UUID, contrairement au filtrage noyau/contrôleur. Ce préfiltre est
+volontairement large : le lecteur sélectionne ensuite strictement UUID FE2C,
+vérifie le filtre
+de clé et déchiffre comme auparavant. Un DeviceFound vivant est obligatoire
+avant de lire les propriétés de cette adresse ; parcourir l'ancien cache BlueZ
+ne suffit jamais à créer une présence. Aucun pourcentage n'est conservé sur disque.
 
-Après 180 secondes sans observation correspondante, les données expirent.
-Les rapports du boîtier et des écouteurs en usage expirent séparément.
-Entre rapports encore frais, le dernier niveau connu de chaque écouteur est
-retenu. Un rapport de boîtier qui omet les écouteurs ne renouvelle pas la durée
-de vie de leurs anciennes mesures.
-Le temps monotone `CLOCK_BOOTTIME` inclut la suspension ; la vue vérifie aussi
-les horodatages et efface les valeurs sur EOF, erreur ou arrêt.
+DeviceLost retire la source concernée (délai demandé : 180 secondes), sans
+retirer une autre source encore présente. L'état est rapporté toutes les
+30 secondes : `receivedAt` avance, pas la date `observedAt` d'un contenu inchangé.
+**Une absence de variation du pourcentage n’est pas une panne.** La vue expire
+un lecteur silencieux après 180 secondes et l'efface sur EOF/arrêt. Après une
+suspension de sa boucle, le lecteur recrée un moniteur pour obtenir une présence
+actuelle avant de publier à nouveau.
+
+L'API est expérimentale dans BlueZ 5.87 : `system/bluetooth.nix` expose les
+interfaces D-Bus avec `settings.General.Experimental = true`, sans activer
+KernelExperimental. L'absence d'API donne une erreur explicite ; il n'existe
+aucun repli vers un scan actif. Voir [le test de coexistence](../receiver/README.md),
+qui vérifie aussi `Discovering: false` et la reconnexion de la souris.
+Le profil expérimental de mesure de distance `rap`, inutile aux moniteurs, reste
+exclu avec `hardware.bluetooth.disabledPlugins = ["rap"]`. Son exclusion seule
+n'avait pas réparé l'ancien relais GATT du téléphone : les erreurs d'authentification
+persistaient. Depuis Android/récepteur 0.6.0, le téléphone émet lui aussi des
+annonces non connectables ; les deux lecteurs partagent `observer.rs`, sans GATT
+ni scan actif. Cela ne modifie ni le protocole BATT ni la clé des écouteurs.
+Ne pas ajouter d'appairage ou d'agent d'acceptation automatique pour lire des batteries.
 
 BlueZ expose un dictionnaire de ServiceData, pas un paquet HCI brut ni
 l’horodatage de mesure interne des écouteurs. `observedAt` représente la dernière

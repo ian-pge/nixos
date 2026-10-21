@@ -50,19 +50,28 @@ Item {
     glide.stop(); flickable.contentY += delta;
     if (wasDriving) animateTo(target, remaining);
   }
+  function handleWheel(event) {
+    // Horizontal/empty packets must not interrupt an in-flight vertical step.
+    if (!event.angleDelta.y && !event.pixelDelta.y) {
+      event.accepted = false; return;
+    }
+    scrolled();
+    // Wayland mouse wheels can provide BOTH angleDelta and pixelDelta. Pixels
+    // alone do not identify a touchpad, and Qt may label the shared Wayland
+    // pointer as TouchPad even for a wheel. Native gestures have scroll phases.
+    const touchpad = (event.phase ?? Qt.NoScrollPhase) !== Qt.NoScrollPhase;
+    if (touchpad || !event.angleDelta.y) {
+      reset(); event.accepted = false; return;
+    }
+    scroll(event.angleDelta.y / 120, Date.now());
+    event.accepted = true;
+  }
   NumberAnimation { id: glide; target: root.flickable; property: "contentY"; easing.type: Easing.OutCubic }
   WheelHandler {
     target: null
     acceptedModifiers: Qt.NoModifier
     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-    onWheel: event => {
-      root.scrolled();
-      if (event.pixelDelta.y || !event.angleDelta.y) {
-        root.reset(); event.accepted = false; return;
-      }
-      root.scroll(event.angleDelta.y / 120, Date.now());
-      event.accepted = true;
-    }
+    onWheel: event => root.handleWheel(event)
   }
   Connections {
     target: root.flickable

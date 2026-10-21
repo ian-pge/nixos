@@ -43,9 +43,8 @@ Scope {
     }
   }
   onAdapterChanged: stopDiscovery()
-  readonly property bool connected: nativeDevices
-    .some(device => device.connected)
-
+  // Adapter power is independent of connections, including passive BLE data.
+  readonly property bool powered: adapter?.enabled === true
 
   readonly property var currentDevices: filteredDevices()
 

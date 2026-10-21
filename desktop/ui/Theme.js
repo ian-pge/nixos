@@ -1,9 +1,14 @@
 .pragma library
 
 // Shared sizing for the compact bar, independently of expanded panels.
-var barScale = 7 / 6;
+var barScale = 1.15;
 function barSize(value) { return Math.round(value * barScale); }
-var barIconSize = barSize(14);
+// Scale glyphs together with their circles, backgrounds and spacing.
+var barIconSize = barSize(16);
+// Every compact group and the workspaces share one row.
+var barGroupHeight = barSize(36);
+var barWorkspaceHeight = barGroupHeight;
+var barTopInset = barSize(10);
 // Match the outer edge of a dial (radius 13 + half its 2 px stroke).
 var barOutlineWidth = 2 * barScale;
 function barOutlineInset() { return (barSize(36) - 28 * barScale) / 2; }
@@ -14,6 +19,7 @@ function barSelectionInset() { return (barSize(36) - barSize(32)) / 2; }
 // Semantic palette: pink is interaction, yellow is persistent/live state.
 var action = "#ff33cc";
 var state = "#ffcc33";
+var electricCyan = "#00f5ff";
 var error = "#ed8796";
 
 var foreground = "#cad3f5";

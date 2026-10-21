@@ -14,12 +14,9 @@ use std::{
     io::Read,
     os::unix::fs::{MetadataExt, OpenOptionsExt},
     path::Path,
-    time::Duration,
 };
 use zeroize::Zeroizing;
 
-pub const STALE_AFTER: Duration = Duration::from_secs(180);
-pub const REFRESH_AFTER: Duration = Duration::from_secs(30);
 pub const SERVICE: &str = "0000fe2c-0000-1000-8000-00805f9b34fb";
 
 /// Deliberately no Debug/Serialize implementation. Never put this in Nix/Git,
@@ -173,13 +170,6 @@ pub struct Reading {
     pub case_advertisement: bool,
 }
 
-#[derive(Clone, Copy)]
-struct Timed {
-    reading: Reading,
-    heard: Duration,
-    wall: u64,
-}
-
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Levels {
     pub case: EarbudLevel,
@@ -195,6 +185,7 @@ impl Levels {
     }
     pub fn event(self, received_at: u64) -> crate::Event {
         crate::Event::Earbuds {
+            mode: "passive",
             available: self.available(),
             case: self.case,
             left: self.left,
@@ -205,51 +196,6 @@ impl Levels {
                 None
             },
             received_at,
-        }
-    }
-}
-
-/// Case reports and in-use bud reports have separate liveness. A bud-only
-/// packet (case byte 0xff) must neither erase nor refresh the case's battery.
-#[derive(Default)]
-pub struct State {
-    case: Option<Timed>,
-    buds: Option<Timed>,
-}
-impl State {
-    pub fn receive(&mut self, reading: Reading, heard: Duration, wall: u64) {
-        let timed = Some(Timed {
-            reading,
-            heard,
-            wall,
-        });
-        if reading.case_advertisement {
-            self.case = timed;
-        } else {
-            self.buds = timed;
-        }
-    }
-    pub fn levels(&self, now: Duration) -> Levels {
-        let fresh =
-            |value: Option<Timed>| value.filter(|v| now.saturating_sub(v.heard) < STALE_AFTER);
-        let case = fresh(self.case);
-        let buds = fresh(self.buds);
-        // Choose the newest known value per bud across the two independently
-        // fresh report kinds. A case report may omit the in-use buds; that must
-        // not erase a still-live bud report or renew its original lifetime.
-        let ear = |part: fn(Reading) -> EarbudLevel| {
-            case.into_iter()
-                .chain(buds)
-                .filter(|sample| part(sample.reading).percent.is_some())
-                .max_by_key(|sample| sample.heard)
-                .map(|sample| part(sample.reading))
-                .unwrap_or_default()
-        };
-        Levels {
-            case: case.map(|v| v.reading.case).unwrap_or_default(),
-            left: ear(|reading| reading.left),
-            right: ear(|reading| reading.right),
-            observed_at: case.into_iter().chain(buds).map(|v| v.wall).max(),
         }
     }
 }
@@ -339,69 +285,6 @@ mod tests {
         data[2..6].fill(0);
         assert!(key().decode(&data).is_none());
     }
-    #[test]
-    fn identical_observations_refresh_liveness_not_percentage_changes() {
-        let reading = key().decode(&packet([0, 100, 100, 100], 10, 4)).unwrap();
-        let mut state = State::default();
-        state.receive(reading, Duration::ZERO, 1000);
-        state.receive(reading, Duration::from_secs(179), 180000);
-        assert!(state.levels(Duration::from_secs(358)).available());
-        assert!(!state.levels(Duration::from_secs(359)).available());
-    }
-    #[test]
-    fn bud_only_frames_cannot_refresh_or_erase_case() {
-        let mut state = State::default();
-        state.receive(
-            key().decode(&packet([0, 100, 100, 85], 10, 4)).unwrap(),
-            Duration::ZERO,
-            1000,
-        );
-        state.receive(
-            key().decode(&packet([0, 19, 80, 255], 9, 4)).unwrap(),
-            Duration::from_secs(170),
-            171000,
-        );
-        let levels = state.levels(Duration::from_secs(179));
-        assert_eq!(levels.case.percent, Some(85));
-        assert_eq!(levels.left.percent, Some(19));
-        let levels = state.levels(Duration::from_secs(180));
-        assert_eq!(levels.case.percent, None);
-        assert_eq!(levels.left.percent, Some(19));
-        assert!(!state.levels(Duration::from_secs(350)).available());
-    }
-    #[test]
-    fn fresh_case_updates_docked_buds_without_extending_old_bud_reports() {
-        let mut state = State::default();
-        state.receive(
-            key().decode(&packet([0, 19, 80, 255], 9, 4)).unwrap(),
-            Duration::ZERO,
-            1000,
-        );
-        state.receive(
-            key().decode(&packet([0, 100, 100, 85], 10, 4)).unwrap(),
-            Duration::from_secs(10),
-            11000,
-        );
-        assert_eq!(
-            state.levels(Duration::from_secs(11)).left.percent,
-            Some(100)
-        );
-        state.receive(
-            key().decode(&packet([0, 255, 255, 84], 10, 4)).unwrap(),
-            Duration::from_secs(170),
-            171000,
-        );
-        assert_eq!(
-            state.levels(Duration::from_secs(171)).left.percent,
-            Some(19)
-        );
-        assert_eq!(state.levels(Duration::from_secs(180)).left.percent, None);
-        assert_eq!(
-            state.levels(Duration::from_secs(180)).case.percent,
-            Some(84)
-        );
-    }
-
     #[test]
     fn key_loader_rejects_public_files_wrong_lengths_and_symlinks() {
         use std::os::unix::fs::PermissionsExt;

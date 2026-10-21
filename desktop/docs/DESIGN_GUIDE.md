@@ -37,7 +37,10 @@ moniteur, si celui-ci existe encore.
 
 ### Une surface Wayland stable
 
-Le `PanelWindow` garde la hauteur du moniteur et une zone exclusive fixe.
+Le `PanelWindow` de rendu garde toute la surface du moniteur. Une surface
+transparente sans région d'entrée réserve une hauteur fixe : une rangée de
+widgets et la marge supérieure. Le rendu ignore cette réserve pour positionner
+les groupes sur l'écran physique, sans boucle de redimensionnement.
 Animer sa hauteur provoquait des déplacements des modules latéraux lors des
 recalculs layer-shell. Seuls les éléments internes changent de taille.
 Le masque d'entrée suit les capsules et le panneau réellement présenté ;
@@ -69,39 +72,61 @@ sur les côtés ; `barContent` conserve les marges visuelles de 10 px.
 Liquid Glass reste inchangé : son rendu analytique élimine les pixels hors des
 régions de verre, donc ce voile non réfractif est désactivé dans ce mode.
 
-Les indicateurs latéraux sont regroupés dans des blocs sur une seule ligne ; stockage
-et mises à jour restent des capsules autonomes. Un seul `GlassShape` appartient
+Les indicateurs forment une seule rangée en haut, y compris à l'intérieur
+des groupes : batteries et quotas GPT/Claude à gauche ; mises à jour, stockage,
+connectivité, luminosité, son et système à droite. Les batteries ajoutent des cadrans horizontalement. La luminosité
+précède le son. Les mises à jour et le stockage restent deux capsules autonomes
+côte à côte, avec le même espacement que les autres groupes et la marge supérieure
+(`barTopInset`, 12 px à l'échelle actuelle). Un seul `GlassShape` appartient
 à chaque bloc, les cellules internes gardant leurs propres zones de clic et de
-molette. Le bloc heure/date/météo est une seule cible de survol et de clic ;
-ses cellules sont uniquement visuelles. Bluetooth, Wi-Fi, micro et notifications
+molette. Date, heure et météo occupent une encoche centrée au bord inférieur de
+chaque écran, sans contour ni espace réservé dans Hyprland. Elle peut recouvrir
+les fenêtres. Son fond reprend les épaules concaves de l'encoche haute, retournées
+verticalement ; le texte reste droit. L'encoche partage la hauteur et l'échelle
+des autres widgets, y compris pour ses textes et sa pastille. La date française et la météo encadrent une
+pastille d'heure cyan électrique (`#00f5ff`), avec texte noir sur cyan et fond
+noir pur autour. L'heure est exactement centrée dans l'encoche, avec deux zones
+latérales de largeur égale pour la date et la météo. Sa pastille a des extrémités
+en demi-cercles. Elle est une seule cible de survol et de clic ouvrant
+le calendrier ; ses cellules sont uniquement visuelles. Bluetooth, Wi-Fi, micro et notifications
 gardent chacun leur sélection circulaire, sans teinter tout le bloc réseau.
 Le volume et la luminosité partagent leur fond, mais seule la sélection du
 cadran concerné s'allume pendant un réglage ou l'ouverture de son panneau,
 uniquement sur l'écran ciblé. Le fond du bloc commun reste inchangé.
-Heure/date/météo et mises à jour ont un liseré permanent de leur
+Les mises à jour ont un liseré permanent de leur
 couleur autour de la capsule entière, en retrait du fond avec la même marge et
 la même épaisseur que les cadrans. Il réutilise la région de verre du fond,
 sans contour autour de chaque icône. Les icônes et logos des blocs partagent
 la taille `barIconSize` de `Theme.js`.
-Les pastilles de workspace utilisent cette même marge de liseré sur les quatre
+Les pastilles de workspace ont une marge compacte sur les quatre
 côtés, y compris pour le workspace spécial. Leur hauteur intérieure est déduite
 de la hauteur de la capsule moins deux marges, sans arrondi indépendant : les
 demi-cercles intérieur et extérieur restent ainsi concentriques aux extrémités.
-Le texte heure/date/météo est en 17 px gras. La connectivité garde son fond
+La capsule calendrier utilise une typographie compacte avec l'heure en gras. La connectivité garde son fond
 commun sans liseré global : chaque icône a un cercle complet, de même diamètre
 et épaisseur que les cadrans, sans région de verre supplémentaire.
 Les cercles et icônes de connectivité gardent leur bleu, atténué à 45 % quand
-Bluetooth est déconnecté, le réseau hors connexion, le micro coupé/indisponible
+Bluetooth est éteint, le réseau hors connexion, le micro coupé/indisponible
 ou le mode Ne pas déranger actif. Une connexion Ethernet reste pleinement
-colorée. Les icônes barrées et les zones de clic restent présentes ; le survol
+colorée. L'icône Bluetooth de la barre dépend uniquement de l'alimentation de
+l'adaptateur : normale s'il est activé, barrée s'il est éteint ou absent. Le nombre
+d'appareils connectés et les annonces BLE passives n'interviennent pas.
+Les icônes barrées et les zones de clic restent présentes ; le survol
 conserve son accent normal pour que ces commandes restent faciles à trouver.
-Les sélections du calendrier et des capsules autonomes sont en retrait du bord,
+Les sélections des capsules autonomes sont en retrait du bord,
 avec la même marge que les cadrans. Toutes utilisent le même voile d'accent,
 défini dans `Theme.js`, par-dessus le fond existant ; le survol ne remplace pas
 le matériau du bloc. Les accents propres à chaque catégorie sont conservés.
-Le centre et les capsules autonomes sont centrés verticalement dans
-la hauteur des blocs. `Bar.capsuleTopInset` fournit la même origine au centre
-et à la messagerie, tandis que la zone réservée couvre toute la barre.
+Il n'y a plus de largeur réservée sur les côtés. La réserve supérieure reste fixe
+quand les périphériques changent. `Theme.barGroupHeight` définit la hauteur de
+référence, partagée par les workspaces et le notch calendrier du bas. Les courbes
+du notch reprennent le rayon des capsules du haut, avec des épaules concaves au
+raccord de l'écran. Les workspaces et panneaux
+centraux sont centrés sur l'écran physique, indépendamment de la largeur des groupes latéraux.
+Les infobulles s'ouvrent sous les cadrans. `Bar.capsuleTopInset` fournit la même
+origine verticale aux panneaux centraux et à la messagerie, y compris pendant
+leurs transitions. Chaque capsule conserve sa propre région d'entrée ; les
+espaces entre elles restent traversables aux clics.
 Les marges latérales sont de 10 pixels logiques sur chaque écran, comme les
 marges extérieures des fenêtres Hyprland en mosaïque.
 
@@ -111,8 +136,8 @@ la partie remplie part de midi et grandit dans le sens horaire avec la valeur.
 La VRAM est le rapport mémoire graphique utilisée / totale, distinct de la
 charge du GPU. Les compteurs CPU/GPU/VRAM/RAM utilisent les mesures numériques fraîches ; un GPU
 éteint ou une mesure périmée reste inconnu, sans afficher un faux zéro. Les
-blocs de cadrans ont les mêmes marges horizontales et verticales : leurs
-extrémités sont concentriques aux cadrans, et un cadran seul a un fond rond.
+blocs de cadrans ont les mêmes marges horizontales et verticales ; les coins
+restent arrondis autour de la grille, et un cadran seul a un fond rond.
 Une mesure absente reste distincte
 de zéro (piste pointillée et icône atténuée), et chaque batterie conserve sa
 propre couleur d'état. Le survol affiche seulement le pourcentage (`42%`), ou
@@ -123,6 +148,18 @@ de la barre. Sans cette géométrie, le compositeur Liquid Glass élimine ses pi
 même si Qt indique `visible` et `opened`. Vérifier aussi le rendu avec le plugin
 chargé dans le compositeur de test, pas seulement l'état QML.
 
+Le cadran des Pixel Buds porte une petite coche lorsque leur connexion audio
+au PC est établie : adresse Bluetooth configurée, appareil connecté et sortie
+audio Bluetooth présente dans PipeWire. Il ne suffit pas de recevoir une annonce
+de batterie. La coche reste présente en pause, même si une autre sortie est celle
+par défaut ; elle n'indique pas qu'un morceau joue. `DialBadge` est partagé avec
+les compteurs de quota : tous utilisent une petite bulle compacte en surimpression
+en haut à droite du cadran. Aucun badge n'ajoute de largeur : les espaces, les
+comptes à rebours et les widgets voisins ne bougent pas selon sa présence.
+La coche ne modifie ni le pourcentage du boîtier ni les alertes de batterie.
+Les propriétés PipeWire des sorties sont suivies par le tracker natif existant,
+sans commande périodique, découverte Bluetooth ou modification du routage audio.
+
 Le plafond des widgets centraux vient de `CentralCapsule.panelWidth`, borné par
 la largeur de la fenêtre. Il reste indépendant du nombre de workspaces : les
 boutons d'un écran ne doivent pas rétrécir les panneaux détaillés.
@@ -130,9 +167,9 @@ Mesurer le contenu à sa largeur cible, pas à
 sa largeur animée : sinon les retours à la ligne font gonfler puis rétrécir les
 notifications et panneaux pendant leur ouverture.
 
-Les capsules centrales sur une seule ligne suivent `Theme.barSize`, comme la
-barre : hauteur de 42 px à l'échelle actuelle, avec contenu, marges et largeur
-utile agrandis. Volume, luminosité, musique, dictée et Bluetooth suivent cette
+Les capsules centrales sur une seule ligne, hors workspaces compacts, suivent `Theme.barSize`, comme la
+barre : hauteur de 41 px à l'échelle actuelle (115 %), avec contenu, marges et largeur
+utile proportionnés. Volume, luminosité, musique, dictée et Bluetooth suivent cette
 règle ; Wi-Fi et updates ne l'appliquent qu'à leur état compact. Le speed test,
 les listes détaillées, le calendrier, le système, le stockage, les lanceurs et
 les notifications conservent leur échelle, sous le plafond central défini par `CentralCapsule.panelWidth`.
@@ -166,6 +203,11 @@ le fond poursuit sa transformation avec les fondus, sans réduire davantage le c
 Le centrage suit la surface sans glissement ajouté. Lors d'une interruption,
 conserver les largeurs de mise en page visibles et reprendre les rapports
 depuis la géométrie réellement affichée, sans seconde horloge d'animation.
+L'ajout d'un workspace spécial conserve la largeur affichée des boutons existants.
+Seule la place du nouveau bouton grandit, avec la durée, la décélération et les
+fondus communs ; son contenu utilise `MorphScale` et reste découpé dans cette place.
+La capsule vise la largeur finale, tandis que la rangée suit la largeur présentée,
+y compris lorsqu'on inverse le mouvement avant sa fin.
 Lors d'une séquence rapide de modes, capturer les opacités
 courantes au lieu de faire disparaître brutalement les couches intermédiaires.
 Un passage entre deux panneaux ne doit pas afficher les workspaces entre eux.
@@ -391,7 +433,11 @@ un rafraîchissement.
 
 `AcceleratedScroll` conserve le nom historique, sans multiplicateur de cadence.
 La molette accumule une distance avec durée bornée ; le pavé tactile garde ses
-deltas natifs. Ne pas ajouter de `Behavior on contentY` en concurrence avec
+deltas natifs. Sous Wayland, une molette peut fournir simultanément un angle
+et des pixels, avec même un périphérique Qt typé `TouchPad` : reconnaître le
+geste natif par ses phases, pas par les pixels ou ce type. Les événements vides ou
+horizontaux ne doivent pas couper un mouvement vertical en cours.
+Ne pas ajouter de `Behavior on contentY` en concurrence avec
 Flickable, ni restaurer une ancre au milieu d'un geste.
 Voir l'[avertissement Qt sur les hauteurs variables](https://doc.qt.io/qt-6/qml-qtquick-controls-scrollbar.html#varying-delegate-sizes).
 
@@ -540,6 +586,10 @@ la largeur dépasse sa hauteur de `barSize(32)`, pour garder de l'espace autour
 du Pac-Man. La hauteur commune est `barSize(28)`, proche du
 diamètre extérieur des cadrans latéraux, sans agrandir les glyphes. La largeur
 du groupe suit ces dimensions, sans modifier celle des panneaux centraux.
+La marge du rose et des survols est `barOutlineInset()` comme celle des cercles
+voisins. Une pastille inactive a toujours une largeur égale à sa hauteur.
+La rangée des dix workspaces garde sa largeur naturelle ; le plafond de 340 px
+des panneaux détaillés ne doit pas lui imposer des espacements négatifs.
 La capsule spéciale épouse son texte avec une marge de `barSize(6)` de chaque
 côté, sans changer sa typographie ni ajouter d'espace après le dernier bouton.
 `workspace-policy.lua` adapte les règles aux sorties actives : le portable seul
@@ -739,9 +789,22 @@ position physique certifiée. Fournisseurs, couverture et protocole de cache :
 
 ## Limites d'utilisation
 
-Seules les CLI officielles déjà authentifiées accèdent aux comptes. Ne pas
-réutiliser leurs fichiers de credentials ni des endpoints privés : les CLI
-possèdent le renouvellement et la compatibilité de leur authentification.
+Les CLI officielles déjà authentifiées lisent les quotas et possèdent le
+renouvellement de leur authentification. Exception pour les resets Claude :
+`get_usage` ne transmet pas l'option `cedar_ember`. Après sa réponse, le helper
+`tools/quickshell/usage/claude-usage.mjs` lit le jeton d'accès OAuth local et
+effectue uniquement un GET sur l'URL fixe HTTPS
+`/api/oauth/usage?cedar_ember=1&skip_spend=1`, avec la version de la CLI dans le
+User-Agent. Il refuse les redirections, borne la lecture à cinq secondes et
+ne renouvelle ni ne modifie les credentials. Aucun jeton ne passe dans les
+arguments, les logs ou les données QML. Un échec conserve les quotas et laisse
+le nombre de resets inconnu ; il ne déclenche pas de nouvelle tentative immédiate.
+Une réponse valide est conservée cinq minutes dans un cache privé (0600), lié
+à une empreinte du jeton, sans y écrire de credentials. Les redémarrages de la
+barre réutilisent ce cache. Une réponse 429 impose une pause selon `Retry-After`
+(quinze minutes par défaut, bornée entre une minute et une heure). Les données
+expirées ne servent pas de solde actuel. Les erreurs de cache n'empêchent pas
+une lecture réseau réussie d'être affichée.
 Les protocoles restent expérimentaux et chaque champ doit être validé.
 Une absence de valeur n'est pas zéro ; conserver une dernière lecture avec
 son erreur plutôt que présenter un résultat frais inventé.
@@ -755,19 +818,28 @@ Les crédits de réinitialisation ne sont jamais consommés ; pour Claude,
 un statut de grants absent reste inconnu et renvoie à la page d'usage.
 Le compteur de resets est conservé séparément dans `snapshot.resetCredits` :
 un entier positif ou nul, et `null` si la source ne le fournit pas. Les grants
-Claude expirés sont exclus. Un badge sur Codex et un à droite du duo Claude
-apparaissent uniquement pour un nombre strictement positif ; zéro et inconnu
-restent distincts dans les données mais n'affichent rien. Ces badges opaques
+Claude expirés ou pas encore actifs sont exclus. Un badge sur Codex et un sur la ligne Claude semaine
+affichent les nombres strictement positifs. Une lecture Claude en échec affiche
+`?` et une infobulle explicite ; un zéro confirmé n'affiche rien. Ces badges opaques
 restent dans les bornes de rendu du bloc, sans région de verre superposée.
+Leur largeur est réservée à côté du cadran : ils ne recouvrent ni le logo ni le
+compte à rebours, même lorsque celui-ci est absent.
 Ils sont informatifs et ne déclenchent aucune réinitialisation.
 
 Les quotas sont trois cadrans permanents : un quota principal Codex (la semaine
 si elle existe), puis les fenêtres Claude de cinq heures et hebdomadaire tous
 modèles, identifiées par les données du protocole et non leur libellé traduit.
-Les cadrans montrent le pourcentage restant. Les deux logos Claude sont centrés,
-sans sous-titre : cinq heures à gauche, semaine à droite. Le survol affiche
-uniquement le pourcentage restant. Le prochain reset et les erreurs de lecture
-restent dans le libellé d'accessibilité. Une fenêtre
+Les cadrans montrent le pourcentage restant. Une seule rangée présente
+GPT/Codex, Claude cinq heures puis Claude semaine, avec à droite de chaque logo
+le compte à rebours du reset automatique : jours arrondis au plus proche dès
+24 heures, heures et minutes uniquement en dessous de 24 heures (`4h05`). Le texte
+fait 20 px, sans réduction automatique. L'horloge partagée le recalcule chaque
+minute. Sans date future de reset, aucun texte n'est affiché. Le compte à rebours
+apparaît automatiquement dès que le fournisseur donne une échéance future. Chaque
+cellule ajuste sa largeur au texte visible ; sans compte à rebours, elle ne réserve
+que la largeur du cadran. Le fond du widget suit ces dimensions.
+Le survol affiche uniquement le pourcentage restant. La date exacte du prochain
+reset et les erreurs de lecture restent dans le libellé d'accessibilité. Une fenêtre
 expirée reste inconnue jusqu'à confirmation du serveur. Aucun panneau central
 `usage` n'est instancié. Ces jauges sont
 consultables au survol uniquement : aucune action au clic et curseur normal.

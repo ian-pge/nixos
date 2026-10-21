@@ -13,6 +13,7 @@
   quickshellBeeper,
   batteryRelayReceiver,
   claude-code,
+  nodejs,
   codex,
   systemd,
 }: let
@@ -69,7 +70,8 @@ in
         'property var command: ["${attachmentPicker}/bin/quickshell-beeper-pick-file"]'
     # The same CLI builds as the user's profile, so they share its sign-in state.
     substituteInPlace "$out/features/usage/UsageController.qml" \
-      --replace-fail 'claudeCommand: ["claude",' 'claudeCommand: ["${claude-code}/bin/claude",' \
+      --replace-fail 'claudeCommand: ["node", Qt.resolvedUrl("../../../tools/quickshell/usage/claude-usage.mjs").toString().replace(/^file:\/\//, ""), "claude",' \
+        'claudeCommand: ["${nodejs}/bin/node", "${../../tools/quickshell/usage/claude-usage.mjs}", "${claude-code}/bin/claude",' \
       --replace-fail 'codexCommand: ["codex",' 'codexCommand: ["${codex}/bin/codex",'
     substituteInPlace "$out/features/audio/AudioAvailability.qml" \
       --replace-fail '"pw-dump"' '"${pipewire}/bin/pw-dump"'

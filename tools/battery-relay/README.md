@@ -1,30 +1,34 @@
-# Battery Relay
+# BLE — Battery Relay 0.6.0
 
-The Android app is named **BLE**, with application ID **`dev.ian.ble`**.
-The PC helper and wire protocol retain their Battery Relay names and UUIDs.
+Android app **BLE**, application ID **`dev.ian.ble`**. Both PC battery readers now
+use **passive BLE advertisement monitoring**. Phone and Fitbit share one
+non-connectable announcement; Pixel Buds are read directly from their own BATT
+announcements. No GATT connection, pairing or continuous active scan is used
+for battery reception.
 
-Local application for sending the Pixel's battery to this PC over a
-dedicated Bluetooth Low Energy data service, independently of audio profiles.
-No root, Android Studio, hosted relay, KDE Connect or Play Store publication is
-required. The phone's battery remains fully local. Version 0.2 adds an optional
-Fitbit provider via Google Health, requiring Internet and explicit Google OAuth
-consent. The owner has now connected Google successfully; long-term Fitbit
-freshness and accuracy still need device-level validation. Production Android
-signing is not set up.
+No root, Shizuku, KDE Connect, Android Studio, hosted relay or Play Store
+publication is required. Phone data is local; Fitbit uses Google Health with
+the owner's existing authorization. Production signing is not set up.
 
 ## Components
 
-- `android/`: Kotlin app, battery change receiver and foreground `connectedDevice`
-  service. It exposes a BLE GATT server, with low-power advertising while waiting
-  for the PC and indications while subscribed. No scanning or wake lock.
-  The native Macchiato UI separates the dashboard from settings. Google Identity
-  Services manages optional account authorization; only settings/device metadata
-  is requested, never activity, sleep or heart-rate data.
-- `receiver/`: Rust BLE central using BlueZ D-Bus. It finds the explicitly selected
-  public installation UUID, subscribes and emits NDJSON for Quickshell.
-  No pairing agent, bond/trust changes, adapter-power or audio-profile commands.
-- [PROTOCOL.md](PROTOCOL.md): phone/Fitbit 12-byte frames and the independent Fast Pair output,
-  with shared Android/Rust test vectors.
+- `android/`: Kotlin application and standard foreground connectedDevice service.
+  Battery changes update a non-connectable/non-scannable legacy advertisement.
+  Android's controller repeats it approximately once a second, without an app
+  heartbeat timer or wake lock. No PC address setup.
+- `receiver/`: two Rust executables sharing `observer.rs`, the BlueZ
+  AdvertisementMonitor lifecycle. One instance per source serves all screens.
+- [PROTOCOL.md](PROTOCOL.md): v2 packet, source dates, passive presence semantics
+  and independent Fast Pair output.
+- [receiver/README.md](receiver/README.md): build, operation and live checks.
+
+Android **0.6.1** uses the same v2 protocol as receiver **0.6.0**. Both sides must
+support passive advertisements (0.6.0 or newer). The old GATT transport
+and connection/battery JSON events are removed, not kept as fallbacks.
+The existing public UUID, Google authorization, signature and auto-start
+preference survive an in-place update. The obsolete PC-address preference was
+removed by 0.6.0. The UI says **Diffusion active**, not “connected to PC”:
+announcements have no receipt acknowledgement.
 
 ### Pixel Buds : lecture directe Fast Pair
 
@@ -37,9 +41,11 @@ analyse de Google Play Services, format des annonces, clés, appairage PC,
 déchiffrement, résultats, erreurs rencontrées et commandes pour reproduire
 l’installation. Ne pas refaire l’appairage si la clé existe.
 
-- `battery-relay-receiver` : téléphone/Fitbit, via le service BLE de l’application.
+- `battery-relay-receiver` : téléphone/Fitbit, via les annonces non connectables de l’application.
 - `fast-pair-battery` : boîtier/gauche/droite, par observation des annonces BLE.
-  Il ne se connecte pas aux écouteurs et ne provisionne aucune clé.
+  Depuis le récepteur 0.5.0, il utilise AdvertisementMonitor en mode passif,
+  sans StartDiscovery permanent. Il ne se connecte pas aux écouteurs et ne
+  provisionne aucune clé.
 - `pairing/` : helper manuel d’appairage, jamais lancé par la barre.
 - Clé privée : `~/.local/state/battery-relay/pixel-buds.account-key`, mode
   `0600`, dossier `0700`, persisté par la configuration NixOS. La configuration
@@ -50,16 +56,31 @@ l’installation. Ne pas refaire l’appairage si la clé existe.
 - Les sources téléphone/Fitbit et écouteurs ont des processus et des fraîcheurs
   indépendants, chacun partagé par tous les écrans.
 
-Android **0.5.0** retire l’ancien adaptateur Google Widget, sa carte, sa permission
-et sa caractéristique GATT. Une migration libère uniquement le host 4421 de BLE
-et ses préférences. Les réglages du relais, l’autorisation Google et le Fitbit
-sont conservés. L’ancienne technique savait parfois lire les trois lignes,
-mais Google les retirait en arrière-plan : elle n’est plus une source active.
+Android **0.5.0** a retiré l’adaptateur Google Widget, sa carte, sa permission
+et sa caractéristique GATT, puis libéré uniquement le host 4421 de BLE et ses
+préférences. Après cette migration, **0.6.1** retire aussi son code de nettoyage,
+ses appels et son test dédié, ainsi que le nettoyage de l’ancienne adresse PC.
+Les tests d’absence des permissions inutiles restent dans la suite actuelle.
+Les réglages du relais, l’autorisation Google et le Fitbit sont conservés.
 
 Le packaging `packages/battery-relay.nix` ne prend que les sources Rust.
 Les clés et signatures Android restent hors du Nix store et du dépôt.
 Inspecter la barre réelle avec `qs ipc -c top-bar call topbar batteryStatus` :
 la source des écouteurs doit être `fast-pair`.
+
+Le moniteur passif nécessite `hardware.bluetooth.settings.General.Experimental = true`
+sur BlueZ 5.87, déclaré dans `system/bluetooth.nix`. Cela expose l'API D-Bus ;
+`KernelExperimental` reste désactivé. L'ancien scan actif a été retiré après
+avoir isolé son interférence avec la reconnexion de la MX Anywhere 3S : deux
+cycles arrêt/allumage réussissaient avec le lecteur des écouteurs seul désactivé,
+alors que la barre et le relais téléphone/Fitbit continuaient à fonctionner.
+Le déchiffrement et la clé d'appairage ne changent pas.
+Le profil expérimental de mesure de distance RAP est explicitement exclu avec
+`disabledPlugins = ["rap"]` : il n'est pas nécessaire aux moniteurs. Son exclusion
+seule n’avait pas corrigé l’ancien relais GATT ; le relais 0.6.0 ne se connecte plus.
+Après un changement de ces options, faire
+le rebuild puis `sudo systemctl restart bluetooth` ; NixOS conserve sinon le
+daemon en cours pour éviter de déconnecter automatiquement clavier/souris.
 
 ## Development environments
 
@@ -123,8 +144,8 @@ step, never a side effect of entering the development shell or running tests.
 2. Check `adb devices` and install the APK with `adb install -r` (same signing
    identity preserves app settings). Never uninstall another app to bypass a
    signing conflict. Alternatively transfer and install the APK manually.
-3. In Settings, configure this PC's Bluetooth address and activate the relay
-   from the dashboard. Copy the public installation identifier from Settings; start the receiver
+3. Activate the relay from the dashboard; no PC address or pairing is needed.
+   Copy the public installation identifier from Settings; start the receiver
    with `--service UUID` (see `receiver/README.md`). No native pairing is needed.
    Existing Fitbit/phone and other Bluetooth associations must not be changed.
 4. Check phone percentage, USB plug/unplug, full/not-charging distinctions,
@@ -137,12 +158,12 @@ step, never a side effect of entering the development shell or running tests.
 The USB connection is only for installation/debugging. The app should continue
 to function after USB debugging is disabled. Initial activation is explicit:
 once enabled, the relay resumes after Android reboot (first unlock) and after
-an app update, using the saved PC address and installation identifier. The
+an app update, using the saved installation identifier. The
 standard `BOOT_COMPLETED` / `MY_PACKAGE_REPLACED` receiver starts the existing
 `connectedDevice` foreground service; no pairing, wake lock, alarm or battery
 optimization exemption is added. If Bluetooth is off, the service waits for it.
 The app's Stop button disables this automatic resume too (as does the notification's
-Stop action on Android 12). Missing Bluetooth permissions/configuration prevent resume. Android
+Stop action on Android 12). Missing Bluetooth permissions prevent resume. Android
 force-stop or restricted battery settings can prevent delivery; reopen and
 activate the app in that case. No restart loop bypasses these system decisions.
 
@@ -154,45 +175,14 @@ Android 12 still displays the foreground notification. This is standard platform
 behavior, not a hidden-service workaround; background operation and boot resume
 use the same foreground service.
 
-## Shell integration and remaining validation
+## Privacy
 
 Current mode is deliberately **unencrypted and unpaired**, as explicitly chosen
 by the owner after the encrypted prototype failed. The public installation ID
-and PC-address filter are not authentication. Nearby devices can observe,
+is not authentication. Nearby devices can observe,
 track or imitate the exchange; only battery telemetry belongs on this service.
 
-Device test, 2026-10-20 (Pixel 8 Pro / Android 17, BlueZ 5.87, Linux 6.18.56):
-the PC received 95%, plugged and actively charging over BLE; the phone's native
-battery reading independently matched. The LE link was not paired, bonded or
-trusted. Receiver stop/restart and recovery after an actual BLE disconnect were
-tested without a pairing prompt (the next reading was 96%, charging). Long-term
-Doze behavior and power consumption still need long-term testing.
-
-Autostart update, 2026-10-20: JVM tests, lint and APK build passed; installing the
-update on the Pixel resumed the opted-in foreground relay through
-`MY_PACKAGE_REPLACED`, without opening its activity. Pressing Stop persisted
-`enabled=false`; another APK update then logged a skipped resume and left the
-service stopped. The relay was then reactivated through its button; the PC's
-existing receiver resubscribed and received 99%, plugged and charging. The same
-startup receiver is registered for `BOOT_COMPLETED`. A subsequent owner-triggered
-phone reboot did resume the foreground service automatically (`RESUME` observed
-over ADB); the owner confirmed the PC widget reappeared without manual activation.
-Reconnection was not immediate; no precise latency guarantee has been established.
-
-`desktop/features/power/BatteryRelayData.qml` consumes the receiver's NDJSON.
-EOF, disconnect, malformed data and expired heartbeats clear the reading. The
-phone dial follows the existing accessory visibility policy and keeps its 40%
-low-battery threshold. No stale green dial, invented zero or old source is used.
-Controller/transport tests use fake streams; the opt-in hardware fixture is
-`desktop/tests/battery-relay-live_test.qml`.
-
 ## Fitbit / Google Health: owner setup
-
-First rebuild the PC configuration normally so it runs receiver **0.2** and the
-new Fitbit-aware widget, **before enabling Fitbit in the phone app**. Receiver
-0.1 deliberately rejected the previously reserved Fitbit packet kind. The new
-Android app sends only phone packets while Fitbit has never been configured, so
-installing its UI update alone does not interrupt the existing phone provider.
 
 This integration uses the official [Google Health API](https://developers.google.com/health/setup)
 and Android's [AuthorizationClient](https://developer.android.com/identity/authorization).
@@ -230,8 +220,8 @@ Refresh policy: one cloud fetch on authorization/start, then every **15 minutes*
 while the relay is active (best effort under Android scheduling), plus explicit
 manual refresh. Google only exposes the last synchronization with its own app;
 this is not a continuous, direct Bluetooth battery feed from the Fitbit. Source
-`lastSyncTime` is retained end-to-end. Readings older than **6 hours** are marked
-old in the app and hidden on the PC. Repeated BLE heartbeats do not renew that
+`lastSyncTime` is retained end-to-end, floored to one-second wire precision. Readings older than **6 hours** are marked
+old in the app and hidden on the PC. Repeated BLE advertisements do not renew that
 age. The API does not provide an explicit charging state, so both power fields
 remain null even at 100%.
 
@@ -247,128 +237,28 @@ Long-term Fitbit freshness/accuracy still needs real-device validation. Local
 tests exercise synthetic API responses and BLE/QML delivery; they do not prove
 every field or metric will be present on this account.
 
-## 0.2 verification (2026-10-20)
+## Validation of the passive replacement
 
-- 33 Android JVM tests pass, including native-rendered UI fixtures at normal and
-  large text sizes, Google SDK cancellation/revocation races, API pagination,
-  malformed/unknown values, retained sync time and the shared indication queue.
-- Offline APK build and lint pass (0 errors; dependency/style warnings remain).
-- Rust: 17 tests, Clippy with warnings denied, and formatting pass.
-- Quickshell: 15 relay-data tests, 32 feature-controller tests, wiring checks and
-  the isolated real desktop/Bar composition suite pass, including the Fitbit dial.
-- Receiver 0.2 and the desktop package build with Nix, without activating the
-  desktop configuration. The live bar is deliberately left on its installed
-  receiver until the owner's normal rebuild.
-- APK 0.2 was installed over the existing app with the same key; permissions,
-  PC address, installation UUID and enabled preference were retained. Android
-  resumed the service after replacement and the PC resubscribed successfully.
-- An opt-in hardware test with the packaged 0.2 receiver and real power
-  controller received the phone at 100%, plugged in and not actively charging,
-  then verified invalidation on stopping its source. Its temporary helper
-  exited; the original bar-owned receiver was left running. The updated activity
-  also launched successfully on the Pixel without unlocking it.
+Cleanup follow-up (Android 0.6.1): the completed migration class, its dedicated
+test and old-widget fixture setup are removed. Permission guards now live with
+the current application tests. The receiver no longer enables Tokio `test-util`.
+Both QML readers stop on exit 78 and resume after reconfiguration; temporary
+runtime errors still retry. Validation: 44 Android tests, lint/APK build, 26 Rust
+tests, Clippy, phone QML (15), earbud QML (11), feature controllers (37), static
+wiring checks and Nix builds passed. Android 0.6.1 (versionCode 14) was installed
+in place on 2026-10-21 at 13:17. Before installation, the retired widget host,
+widget preferences and PC-address setting were confirmed absent. The app resumed
+advertising automatically through MY_PACKAGE_REPLACED; the actual bar received
+fresh phone data and the Fitbit reading, with passive monitoring and discovery
+off. No application data, Google authorization or installation UUID was reset.
 
-No real Google grant, Fitbit reading, health data or OAuth credential was used
-by these tests. No phone unlock, reboot, audio change or Bluetooth re-pairing
-was performed for this update.
+See [receiver validation](receiver/README.md#actual-bar-checks). Android unit/UI
+tests, lint, Rust decoding/lifecycle tests, static wiring and QML battery
+controllers are tested separately from the real devices. The full desktop
+composition suite also covers unrelated ongoing layout changes.
 
-### 0.2.1 authorization diagnostics
-
-The initial activity callback incorrectly discarded Google's result Intent
-unless Android reported `RESULT_OK`, hiding SDK errors behind a generic
-"authorization cancelled" message. It now passes every supplied result to
-`AuthorizationClient.getAuthorizationResultFromIntent`, as in the official
-Android flow. Missing results and IntentSender launch failures have separate
-messages; a cancelled activity is never treated as proof of a voluntary cancel.
-Successful authorization still requires the SDK result, the exact requested
-scope and a nonempty access token. No consent check is bypassed.
-
-The authorization log (`BLEAuth` in the renamed app) records only numeric result/status codes, booleans and bounded
-error categories, never account details, Intent extras, tokens or raw exception
-messages. Regression tests cover cancelled results containing a real SDK error,
-empty results, SDK cancellation/network failures, invalid replies and launch
-failure. A new owner-driven attempt is needed to identify the actual Google
-failure on this account; correcting diagnostics alone is not an OAuth success.
-The 0.2.1 APK passed 39 Android tests, lint and offline assembly and was installed
-over 0.2.0. The phone relay resumed and the PC resubscribed; no Google consent
-or Cloud configuration was changed by the update.
-
-### 0.3 Android identity: BLE
-
-The owner registered the Google Android client as `dev.ian.ble` and chose the
-display name **BLE**. Android's application ID, Kotlin/resource namespace,
-component/action names and visible app/notification names now match that choice.
-The signing key is unchanged, so the SHA-1 above still applies. The PC protocol,
-characteristic UUID and public installation UUID are independent of this rename.
-
-Android treats this as a new application, not an in-place package rename.
-Migration copies only the relay preferences (PC address, installation UUID and
-enabled preference) into the new private app storage before its first launch.
-Google data and Android permissions are not copied. Grant Nearby Devices to
-**BLE**, then activate the relay (0.3.3 no longer asks for notifications). Stop the old app before the
-new one starts advertising; remove it only after real reception from BLE is
-verified. This is a one-time developer-assisted migration, not a legacy provider
-or a compatibility layer built into the application.
-
-### 0.3.1 launcher identity
-
-BLE now has an original two-tone B monogram (Macchiato yellow/mauve on a dark
-background), used by the adaptive launcher icon and the app header. A separate
-monochrome layer supports Android themed icons; the notification keeps its
-purpose-built white battery glyph. Vector assets remain sharp at all sizes and
-the mark stays inside Android's 66dp safe circle. The app label comes from one
-`app_name` resource. Package ID, signing key, Google scopes and BLE security are
-unchanged. The 42 Android tests include label/launcher identity and native icon
-rendering/mask checks; lint and the offline APK build pass.
-
-Installed on the Pixel as 0.3.1. Both old and new applications were still running;
-the old one was stopped, then the packaged PC receiver/power controller received
-100%, plugged/not actively charging, from BLE alone. Only after this live check
-was `dev.ian.batteryrelay` uninstalled. Its relay settings are retained in
-`dev.ian.ble`; the one-time migration copy was removed. No Google authorization,
-permissions, Bluetooth pairing or encryption setting was changed by this update.
-
-### 0.3.2 computer icon
-
-Replaced the B monogram with a simple desktop computer: a yellow screen frame
-and mauve stand on the existing dark background. The app header and adaptive
-launcher icon share the new design, including its monochrome themed variant.
-The BLE name, notification battery glyph, relay settings and Google authorization
-are unchanged. All 42 Android tests, lint (no errors) and the offline APK build
-pass; the icon rendering test checks the screen opening, stand and safe circle.
-Installed as an in-place update on the Pixel; version 0.3.2 and the resumed
-foreground relay service were verified.
-
-### 0.3.3 notification visibility
-
-Removed the notification permission declaration and prompt; the mandatory
-foreground-service notification is still supplied to Android. On the Pixel,
-`POST_NOTIFICATION` is ignored while the foreground relay remains active.
-The 44 Android tests, lint and APK build pass, including activation without
-notification consent. Bluetooth and Google permissions/settings were preserved.
-
-### Receiver 0.2.1 recovery validation
-
-Observed a live failure where Android still had its battery GATT service and
-PC subscriber, while BlueZ's connected device no longer exposed that service.
-The former client did not recover. The receiver now bounds Bluetooth operations,
-invalidates a removed service, releases only the selected private/unpaired LE
-link when safe, and exits so Quickshell can start a fresh client. See the receiver
-README for the exact safety checks. No stale percentage is kept as a substitute
-for receiving data, and the 180-second expiry is unchanged.
-
-On the Pixel, reinstalling the unchanged 0.3.3 APK during a live test removed
-the GATT service. The new receiver detected it, released the selected LE link,
-and Quickshell restarted the helper and received both sources automatically.
-After that recovery, the controller stayed connected for 245 seconds, receiving
-five distinct phone snapshots while the percentage stayed at 100%; Fitbit
-remained available at 95%. The final Nix-packaged receiver also passed the live
-read/invalidation smoke test. Notification suppression remained enabled.
-
-Validation: 20 Rust tests, Clippy with warnings denied, 15 BatteryRelayData tests,
-32 FeatureControllers tests, wiring checks, Wayland component compilation, and
-both Nix package builds passed. Full DesktopComposition rendering was not run
-in its required nested compositor. Long-term unplugged/Doze and real out-of-range
-testing still remain; this test does not establish day-long reliability.
-No NixOS/Home Manager activation was performed: the running bar still uses
-receiver 0.2.0 until the owner's normal rebuild activates the new packages.
+The APK was installed in place on 2026-10-21, resumed automatically after the
+update and delivered both sources with the screen dozing. Earbud provisioning
+and all existing Bluetooth pairings were unchanged. Long-term power draw,
+deep idle without USB and actual reboot/distance reliability require physical
+testing; no measured autonomy claim is made.

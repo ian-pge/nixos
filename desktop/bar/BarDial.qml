@@ -135,6 +135,7 @@ Item {
     parent: root
     visible: pointer.containsMouse
     delay: 400
+    x: (root.width - width) / 2
     y: root.height + 8
     text: root.tooltipText
     contentItem: Text {

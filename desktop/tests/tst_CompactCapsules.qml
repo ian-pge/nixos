@@ -5,6 +5,7 @@ import Quickshell
 // Pure views with inert controllers: no microphone, player or hardware access.
 ShellRoot {
   id: fixture
+  property var theme: null
   property var views: []
   property var standaloneWaveform: null
   QtObject {
@@ -40,6 +41,7 @@ ShellRoot {
     return component.createObject(window.contentItem, properties);
   }
   Component.onCompleted: {
+    theme = Qt.createQmlObject('import QtQml; import "file://' + Quickshell.shellDir + '/../ui/Theme.js" as T; QtObject { property var library: T }', fixture).library;
     views = [create("audio/VolumeIndicator", {controller: audio, y: 0}),
       create("brightness/BrightnessIndicator", {controller: brightness, y: 50}),
       create("dictation/VoiceDictationIndicator", {controller: dictation, y: 100}),
@@ -59,27 +61,27 @@ ShellRoot {
     function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName); }
     function test_height_and_width_follow_the_bar() {
       for (const view of views) {
-        compare(view.implicitHeight, 42);
-        compare(view.height, 42);
+        compare(view.implicitHeight, fixture.theme.barGroupHeight);
+        compare(view.height, fixture.theme.barGroupHeight);
       }
-      compare(views[0].implicitWidth, 327);
-      compare(views[1].implicitWidth, 327);
-      compare(views[2].implicitWidth, 210);
-      compare(views[0].radius, 21);
+      compare(views[0].implicitWidth, fixture.theme.barSize(280));
+      compare(views[1].implicitWidth, fixture.theme.barSize(280));
+      compare(views[2].implicitWidth, fixture.theme.barSize(180));
+      compare(views[0].radius, fixture.theme.barSize(18));
     }
     function test_content_grows_with_the_background() {
       const icon = findChild(views[0], "volumeIndicatorIcon");
-      compare(icon.size, 20); compare(icon.x, 18);
-      compare(findChild(views[0], "volumeIndicatorTrack").height, 9);
-      compare(findChild(views[1], "brightnessIndicatorIcon").size, 20);
-      compare(findChild(views[3], "mediaLabel").font.pixelSize, 19);
-      compare(findChild(views[3], "mediaEqualizer").width, 21);
+      compare(icon.size, fixture.theme.barSize(17)); compare(icon.x, fixture.theme.barSize(15));
+      compare(findChild(views[0], "volumeIndicatorTrack").height, fixture.theme.barSize(8));
+      compare(findChild(views[1], "brightnessIndicatorIcon").size, fixture.theme.barSize(17));
+      compare(findChild(views[3], "mediaLabel").font.pixelSize, fixture.theme.barSize(16));
+      compare(findChild(views[3], "mediaEqualizer").width, fixture.theme.barSize(18));
       verify(findChild(views[3], "mediaLabel").width > 0);
     }
     function test_only_the_bar_waveform_is_scaled() {
       const waveform = findChild(views[2], "dictationWaveform");
-      compare(waveform.height, 26);
-      fuzzyCompare(waveform.barWidth, 3.5, 0.001);
+      compare(waveform.height, fixture.theme.barSize(22));
+      fuzzyCompare(waveform.barWidth, 3 * fixture.theme.barScale, 0.001);
       compare(standaloneWaveform.sizeScale, 1);
       compare(standaloneWaveform.barWidth, 3);
       compare(standaloneWaveform.implicitHeight, 22);

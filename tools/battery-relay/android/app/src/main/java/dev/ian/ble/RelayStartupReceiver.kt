@@ -1,7 +1,6 @@
 package dev.ian.ble
 
 import android.app.ForegroundServiceStartNotAllowedException
-import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -16,9 +15,8 @@ class RelayStartupReceiver : BroadcastReceiver() {
             Log.d("BLE", "Automatic resume skipped: relay disabled")
             return
         }
-        val address = preferences.getString(RelayService.KEY_ADDRESS, null)
-        if (address == null || !BluetoothAdapter.checkBluetoothAddress(address) || !RelayService.hasPermissions(context)) {
-            Log.w("BLE", "Automatic resume skipped: configuration or Bluetooth permission missing")
+        if (!RelayService.hasPermissions(context)) {
+            Log.w("BLE", "Automatic resume skipped: Bluetooth permission missing")
             return
         }
         try {

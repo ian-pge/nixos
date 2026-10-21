@@ -45,11 +45,13 @@ class MainActivityTest {
     @Test fun applicationIdentityMatchesTheGoogleAndroidClient() {
         assertEquals("dev.ian.ble", RuntimeEnvironment.getApplication().packageName)
     }
-    @Test fun appDoesNotRequestNotificationsButKeepsForegroundServicePermissions() {
+    @Test fun appKeepsForegroundServiceWithoutNotificationsWidgetsOrScanning() {
         val application = RuntimeEnvironment.getApplication()
         val requested = application.packageManager.getPackageInfo(application.packageName,
             PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty().toSet()
         assertFalse(Manifest.permission.POST_NOTIFICATIONS in requested)
+        assertFalse(Manifest.permission.BIND_APPWIDGET in requested)
+        assertFalse(Manifest.permission.BLUETOOTH_SCAN in requested)
         assertTrue(Manifest.permission.FOREGROUND_SERVICE in requested)
         assertTrue(Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE in requested)
     }
@@ -57,9 +59,8 @@ class MainActivityTest {
         val application = RuntimeEnvironment.getApplication()
         application.getSharedPreferences("fitbit", Context.MODE_PRIVATE).edit().clear().commit()
         application.getSharedPreferences("relay", Context.MODE_PRIVATE).edit().clear()
-            .putBoolean(RelayService.KEY_ENABLED, true).putString(RelayService.KEY_ADDRESS, "AA:BB:CC:DD:EE:FF").commit()
+            .putBoolean(RelayService.KEY_ENABLED, true).commit()
         FitbitRepository::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
-        application.getSharedPreferences("google_battery_widget", Context.MODE_PRIVATE).edit().clear().commit()
         // A local fake binder, without starting the real BLE/foreground service.
         val service = RelayService()
         shadowOf(application).setComponentNameAndServiceForBindService(ComponentName(application, RelayService::class.java), service.LocalBinder())
@@ -72,7 +73,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup().visible()
         val activity = controller.get()
         try {
-            val relay = RelayState(running = true, connected = true, status = "Connecté", battery = BatterySnapshot(95, true, true), lastSentMs = System.currentTimeMillis())
+            val relay = RelayState(running = true, broadcasting = true, status = "Diffusion active", battery = BatterySnapshot(95, true, true), lastPublishedMs = System.currentTimeMillis())
             MainActivity::class.java.getDeclaredField("lastRelay").apply { isAccessible = true }.set(activity, relay)
             render(activity)
             val root = activity.findViewById<ViewGroup>(android.R.id.content)
@@ -102,7 +103,7 @@ class MainActivityTest {
     @Test fun homeIsReadableAndDoesNotExposeTechnicalSetupOrAuthorizeGoogle() = fixture("home") { activity, root ->
         layout(root)
         val text = visibleText(root)
-        assertTrue(text.contains("Connecté au PC")); assertTrue(text.contains("Pixel 8 Pro"))
+        assertTrue(text.contains("Diffusion active")); assertTrue(text.contains("Pixel 8 Pro"))
         assertFalse(text.contains("Adresse Bluetooth")); assertFalse(text.contains("googlehealth.settings.readonly"))
         assertFalse(FitbitRepository.get(activity).state.enabled)
         val connect = views(root).filterIsInstance<Button>().first { it.text == "Associer mon Fitbit" }
@@ -116,10 +117,10 @@ class MainActivityTest {
     @Test fun settingsRemainActionableWhileRelayRuns() = fixture("settings") { _, root ->
         views(root).filterIsInstance<ImageButton>().first { it.contentDescription == "Ouvrir les réglages" }.performClick()
         layout(root)
-        val pc = views(root).filterIsInstance<TextView>().first { it.text == "Ordinateur enregistré" }
+        val pc = views(root).filterIsInstance<TextView>().first { it.text == "Réception sur le PC" }
         (pc.parent.parent as View).performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
-        assertTrue(dialog.findViewById<TextView>(android.R.id.message).text.contains("Mettez-le en pause"))
+        assertTrue(dialog.findViewById<TextView>(android.R.id.message).text.contains("aucune connexion"))
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         assertTrue(visibleText(root).contains("Accès Google"))
     }
@@ -153,7 +154,7 @@ class MainActivityTest {
         FitbitRepository::class.java.getDeclaredField("waitingForConsent").apply { isAccessible = true }.setBoolean(repository, true)
         activity.handleGoogleAuthorizationResult(ActivityResult(Activity.RESULT_CANCELED, response))
         assertTrue(decoded); assertTrue(repository.state.status.contains("code 10"))
-        assertTrue(visibleText(root).contains("Connecté au PC")); assertFalse(repository.state.enabled)
+        assertTrue(visibleText(root).contains("Diffusion active")); assertFalse(repository.state.enabled)
     }
 
     @Test fun failedIntentSenderLaunchIsNotReportedAsCancellation() = fixture("auth-launch-error-fixture") { activity, root ->
@@ -163,7 +164,7 @@ class MainActivityTest {
             android.content.IntentSender.SendIntentException("test launch failure"))
         activity.handleGoogleAuthorizationResult(ActivityResult(Activity.RESULT_CANCELED, data))
         assertTrue(repository.state.status.contains("Impossible d’ouvrir"))
-        assertFalse(repository.state.enabled); assertTrue(visibleText(root).contains("Connecté au PC"))
+        assertFalse(repository.state.enabled); assertTrue(visibleText(root).contains("Diffusion active"))
     }
 
     @Test fun cloudFixtureShowsSyncDateWithoutClaimingCharging() = fixture("fitbit-fixture") { activity, root ->

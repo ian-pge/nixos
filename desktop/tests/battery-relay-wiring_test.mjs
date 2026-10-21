@@ -27,6 +27,38 @@ assert.match(power, /batteryReading\(name, true, values\.case\.percent/);
 assert.match(power, /\[values\.case, values\.left, values\.right\]\.some/);
 assert.match(power, /earbudBatteries: earbuds\.available\s*\?\s*\[earbudReading\("Pixel Buds", earbuds\.snapshot\)\]\s*:\s*\[\]/);
 assert.match(power, /earbudDataConnected: earbuds\.available/);
+assert.match(power, /audioConnected: root\.earbudAudioConnected/);
+assert.match(read("bar/Bar.qml"), /delegate: EarbudBatteryWidget/);
+assert.match(read("bar/EarbudBatteryWidget.qml"), /iconName: "check"/);
+assert.match(read("features/audio/AudioController.qml"), /api\.bluez5\.address/);
 assert.doesNotMatch(read("../tools/battery-relay/receiver/src/bin/fast-pair-battery.rs"),
   /\.connect\(|\.pair\(|set_powered|set_trusted|remove_device|register_agent/);
-console.log("PASS: independent phone/Fitbit and read-only Fast Pair sources, shared across monitors");
+assert.doesNotMatch(read("../tools/battery-relay/receiver/src/bin/fast-pair-battery.rs"),
+  /discover_devices|set_discovery_filter|StartDiscovery|DiscoveryFilter|resilient_discovery/,
+  "Earbud observation must never reopen an active discovery session");
+assert.match(read("../tools/battery-relay/receiver/src/observer.rs"), /adapter\.monitor\(\)/);
+for (const file of ["../tools/battery-relay/receiver/src/main.rs", "../tools/battery-relay/receiver/src/observer.rs"])
+  assert.doesNotMatch(read(file), /discover_devices|set_discovery_filter|\.connect\(|\.disconnect\(|\.pair\(|\.notify\(|register_agent|set_powered|set_trusted|RecoveryLink/,
+    "Both battery sources must be passive, without connected transport recovery");
+const android = read("../tools/battery-relay/android/app/src/main/java/dev/ian/ble/RelayService.kt");
+assert.match(android, /setConnectable\(false\)\.setScannable\(false\)/);
+assert.doesNotMatch(android, /BluetoothGatt|SnapshotQueue|HEARTBEAT_MS|cancelConnection|EXTRA_ADDRESS|KEY_ADDRESS/);
+assert.doesNotMatch(android, /InstallationCleanup|pc_address/);
+assert.doesNotMatch(read("../tools/battery-relay/android/app/src/main/java/dev/ian/ble/MainActivity.kt"), /InstallationCleanup/);
+for (const file of [
+    "../tools/battery-relay/android/app/src/main/java/dev/ian/ble/InstallationCleanup.kt",
+    "../tools/battery-relay/android/app/src/test/java/dev/ian/ble/InstallationCleanupTest.kt"])
+  assert.equal(existsSync(new URL("../" + file, import.meta.url)), false, "Completed migration must remain retired: " + file);
+assert.doesNotMatch(read("../tools/battery-relay/receiver/Cargo.toml"), /test-util/);
+for (const file of ["features/power/BatteryRelayData.qml", "features/power/FastPairBatteryData.qml"]) {
+  assert.match(read(file), /configurationError = exitCode === 78/);
+  assert.match(read(file), /enabled && configured && !configurationError/);
+}
+assert.doesNotMatch(read("features/power/BatteryRelayData.qml"), /report\.event === "connection"|report\.event === "battery"/);
+assert.equal(existsSync(new URL("../../tools/battery-relay/receiver/src/discovery.rs", import.meta.url)), false,
+  "The retired active discovery supervisor must not remain as a fallback");
+assert.match(read("../system/bluetooth.nix"), /settings\.General\.Experimental = true/);
+assert.match(read("../system/bluetooth.nix"), /disabledPlugins\s*=\s*\[\s*"rap"\s*\]/,
+  "The unused experimental ranging profile must not interfere with the unpaired phone relay");
+assert.doesNotMatch(read("../system/bluetooth.nix"), /KernelExperimental\s*=\s*true/);
+console.log("PASS: independent phone/Fitbit and passive Fast Pair sources, with no active-scan fallback");

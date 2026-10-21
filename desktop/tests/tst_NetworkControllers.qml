@@ -13,8 +13,10 @@ ShellRoot {
   property var bluetoothView: null
   property var events: []
   property var transientObjects: []
+  property var theme: null
 
   Component.onCompleted: {
+    theme = Qt.createQmlObject('import QtQml; import "file://' + Quickshell.shellDir + '/../ui/Theme.js" as T; QtObject { property var library: T }', fixture).library;
     if (Quickshell.env("QT_QPA_PLATFORM") !== "offscreen"
         || !!Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE")) {
       Qt.callLater(() => Qt.exit(1));
@@ -51,8 +53,8 @@ ShellRoot {
   }
 
   Window { id: window; width: 420; height: 100; visible: true }
-  QtObject { id: adapterMock; property bool discovering: false }
-  QtObject { id: replacementAdapter; property bool discovering: false }
+  QtObject { id: adapterMock; property bool discovering: false; property bool enabled: true }
+  QtObject { id: replacementAdapter; property bool discovering: false; property bool enabled: true }
   QtObject {
     id: wifiDeviceMock
     property int type: DeviceType.Wifi
@@ -126,6 +128,8 @@ ShellRoot {
       bluetooth.adapter = adapterMock;
       adapterMock.discovering = false;
       replacementAdapter.discovering = false;
+      adapterMock.enabled = true;
+      replacementAdapter.enabled = true;
       bluetooth.active = true;
     }
     function wifi(name, overrides = {}) {
@@ -146,8 +150,8 @@ ShellRoot {
     function test_compact_selectors_follow_bar_size_without_enlarging_speed_test() {
       wifiView.height = Qt.binding(() => wifiView.implicitHeight);
       bluetoothView.height = Qt.binding(() => bluetoothView.implicitHeight);
-      compare(wifiView.implicitHeight, 42);
-      compare(bluetoothView.implicitHeight, 42);
+      compare(wifiView.implicitHeight, fixture.theme.barGroupHeight);
+      compare(bluetoothView.implicitHeight, fixture.theme.barGroupHeight);
       compare(findChild(wifiView, "wifiSelectorIcon").size, 20);
       compare(findChild(wifiView, "wifiSelectorLabel").font.pixelSize, 16);
       compare(findChild(bluetoothView, "bluetoothSelectorIcon").size, 20);
@@ -159,7 +163,7 @@ ShellRoot {
       compare(findChild(wifiView, "wifiSelectorIcon").size, 17);
       compare(findChild(wifiView, "wifiSelectorLabel").font.pixelSize, 14);
       network.speedTestExpanded = false;
-      compare(wifiView.implicitHeight, 42);
+      compare(wifiView.implicitHeight, fixture.theme.barGroupHeight);
     }
     function test_wifi_scan_lifecycle_and_device_replacement() {
       verify(wifiDeviceMock.scannerEnabled);
@@ -362,13 +366,26 @@ ShellRoot {
       const device = bt("Paired"); bluetooth.nativeDevices = [device];
       bluetooth.activateSelected(); device.connected = true;
       compare(bluetooth.actionDevice, null);
-      verify(bluetooth.connected);
+      verify(device.connected);
       bluetooth.activateSelected();
       compare(fixture.events.join(","), "bt-connect:Paired,bt-disconnect:Paired");
       bluetooth.active = false; device.connected = false;
       bluetooth.finishAction(false);
       compare(bluetooth.message, "");
       compare(bluetooth.action, "");
+    }
+    function test_bluetooth_power_is_independent_of_device_connections() {
+      bluetooth.nativeDevices = [];
+      verify(bluetooth.powered, "An enabled adapter with no connected device is still on");
+      const device = bt("Paired", {connected: true});
+      bluetooth.nativeDevices = [device]; verify(bluetooth.powered);
+      device.connected = false; verify(bluetooth.powered);
+      adapterMock.enabled = false; verify(!bluetooth.powered);
+      device.connected = true; verify(!bluetooth.powered, "A stale connection cannot override adapter power");
+      bluetooth.adapter = replacementAdapter; verify(bluetooth.powered);
+      replacementAdapter.enabled = false; verify(!bluetooth.powered);
+      bluetooth.adapter = null; verify(!bluetooth.powered);
+      adapterMock.enabled = true; bluetooth.adapter = adapterMock; verify(bluetooth.powered);
     }
     function test_bluetooth_late_pairing_after_close_does_not_change_new_panel() {
       const device = bt("Nearby", {paired: false}); bluetooth.nativeDevices = [device];

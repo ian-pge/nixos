@@ -26,7 +26,7 @@ ShellRoot {
       Qt.callLater(() => Qt.exit(results.failCount ? 1 : 0));
     }
     function report(overrides = {}) {
-      return Object.assign({event:"earbuds", available:true,
+      return Object.assign({event:"earbuds", mode:"passive", available:true,
         case:{percent:85,charging:false},left:{percent:100,charging:true},right:{percent:19,charging:false},
         observedAt:fixture.data.now,receivedAt:fixture.data.now},overrides);
     }
@@ -42,8 +42,8 @@ ShellRoot {
     }
     function test_bad_or_stale_readings_are_withdrawn() {
       for (const bad of [{case:{percent:101,charging:false}},{left:{percent:"19",charging:false}},
-          {right:{percent:19,charging:1}},{case:[]},{available:"yes"},{observedAt:0},
-          {receivedAt:fixture.data.now+6000},{observedAt:fixture.data.now-180000},
+          {right:{percent:19,charging:1}},{case:[]},{available:"yes"},{observedAt:0},{mode:"active"},
+          {receivedAt:fixture.data.now+6000},{observedAt:fixture.data.now+6000},
           {receivedAt:fixture.data.now-180000}]) {
         verify(fixture.data.accept(report()));
         verify(!fixture.data.accept(report(bad))); verify(!fixture.data.available);
@@ -58,6 +58,16 @@ ShellRoot {
       verify(fixture.data.available); compare(fixture.data.snapshot.case.percent,85);
       fixture.data.now += 10000;
       verify(!fixture.data.available);
+    }
+    function test_passive_presence_reports_do_not_make_old_observations_new() {
+      const observedAt = fixture.data.now - 3600000;
+      verify(fixture.data.accept(report({observedAt:observedAt})));
+      fixture.data.now += 170000;
+      verify(fixture.data.accept(report({observedAt:observedAt})));
+      verify(fixture.data.available);
+      compare(fixture.data.snapshot.observedAt, observedAt);
+      fixture.data.now += 180000;
+      verify(!fixture.data.available); // Dead helper is not a presence report.
     }
     function test_explicit_withdrawal_and_suspend_clear_readings() {
       const unknown = {percent:null,charging:null};
@@ -92,7 +102,7 @@ ShellRoot {
     }
     function test_eof_clears_data_and_process_can_restart() {
       fixture.data.command = ["node","-e",
-        'process.stdout.write(JSON.stringify({event:"earbuds",available:true,case:{percent:85,charging:false},left:{percent:100,charging:true},right:{percent:100,charging:true},observedAt:Date.now(),receivedAt:Date.now()})+"\\n");setTimeout(()=>process.exit(0),200)',"--"];
+        'process.stdout.write(JSON.stringify({event:"earbuds",mode:"passive",available:true,case:{percent:85,charging:false},left:{percent:100,charging:true},right:{percent:100,charging:true},observedAt:Date.now(),receivedAt:Date.now()})+"\\n");setTimeout(()=>process.exit(0),200)',"--"];
       fixture.data.enabled = true;
       tryVerify(() => fixture.data.available,3000);
       tryVerify(() => fixture.data.transport === null,3000);

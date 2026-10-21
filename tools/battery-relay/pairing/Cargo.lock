@@ -59,7 +59,7 @@ dependencies = [
 
 [[package]]
 name = "battery-relay-receiver"
-version = "0.4.0"
+version = "0.6.0"
 dependencies = [
  "aes",
  "anyhow",

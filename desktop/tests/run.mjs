@@ -46,6 +46,7 @@ async function qml(file, env = baseEnv) {
     env, /\d+ passed, 0 failed/);
 }
 try {
+  await run(process.execPath, [path.join(here, 'claude-usage_test.mjs')]);
   await run(process.execPath, [path.join(here, 'battery-relay-wiring_test.mjs')]);
   for (const file of ['audio-routes_test.mjs', 'calendar-navigation_test.mjs', 'capsule-content_test.mjs', 'launcher-logic_test.mjs', 'system-panel-state_test.mjs', 'usage-limits_test.mjs', 'storage-report_test.mjs', 'storage-data_test.mjs', 'workspaces_test.mjs', 'messenger-host_test.mjs', 'vim-core_test.mjs', 'pick-attachment_test.mjs']) {
     if (existsSync(path.join(here, file))) await run(process.execPath, [path.join(here, file)]);
@@ -53,7 +54,7 @@ try {
   for (const file of ['tst_AcceleratedScroll.qml', 'tst_KeyedListModel.qml', 'tst_BeeperData.qml', 'tst_BeeperChatPreviews.qml', 'tst_BeeperNavigation.qml', 'tst_BeeperConnections.qml', 'tst_BeeperComposer.qml', 'tst_BeeperPanel.qml', 'tst_BeeperSidebar.qml', 'tst_BeeperArrivals.qml', 'tst_BeeperReactions.qml', 'tst_BeeperSendDraft.qml', 'tst_BeeperKeyboard.qml', 'tst_BeeperVim.qml', 'tst_BeeperLowPriority.qml', 'tst_BeeperUnreadOrder.qml', 'tst_BeeperSearch.qml', 'tst_BeeperPagination.qml', 'tst_BeeperQuotes.qml', 'tst_BeeperMedia.qml', 'tst_BeeperPeople.qml', 'tst_BeeperVideo.qml', 'tst_BeeperBubble.qml',
     'tst_Icon.qml', 'tst_DimmingPolicy.qml', 'tst_PanelBackdrop.qml', 'tst_BeeperAttachmentPicker.qml', 'tst_BeeperHistory.qml', 'tst_MessengerController.qml', 'tst_LauncherControllers.qml', 'tst_NetworkControllers.qml',
     'tst_UpdateControllers.qml', 'tst_CompactCapsules.qml', 'tst_FeatureControllers.qml', 'tst_BatteryRelayData.qml', 'tst_FastPairBatteryData.qml', 'tst_CollectorLifecycle.qml',
-    'tst_ShellCoordinator.qml', 'tst_SystemData.qml', 'tst_UsageController.qml', 'tst_StorageController.qml',
+    'tst_ShellCoordinator.qml', 'tst_SystemData.qml', 'tst_UsageController.qml', 'tst_UsageBlock.qml', 'tst_EarbudBatteryWidget.qml', 'tst_CalendarNotch.qml', 'tst_StorageController.qml',
     'tst_WeatherData.qml', 'tst_NotificationData.qml', 'tst_NotificationPopup.qml', 'tst_WorkspaceSwitcher.qml',
     '../pill-test.qml', '../selection-test.qml'])
     await qml(file);
