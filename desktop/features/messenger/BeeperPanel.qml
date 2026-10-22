@@ -44,6 +44,7 @@ FocusScope {
   property string replyTargetID: ""
   // Tests replace the system clipboard.
   property var clipboardWriter: text => { Quickshell.clipboardText = text; }
+  property var linkOpener: url => Qt.openUrlExternally(url)
   // The message holding a mouse text selection; only one at a time.
   property Item textSelectionOwner: null
   readonly property string selectedText: textSelectionOwner?.selectedText ?? ""
@@ -462,6 +463,14 @@ FocusScope {
   function copyText(text, confirmation) {
     clipboardWriter(text);
     notice = confirmation; noticeTimer.restart();
+  }
+  // l: the first link of the selected message, in the default browser.
+  function openSelectedLink() {
+    const links = Format.messageLinks(selectedMessage);
+    notice = !links.length ? "This message has no link"
+      : linkOpener(links[0].url) === false ? "Could not open this link"
+      : links.length > 1 ? "Opened the first of " + links.length + " links" : "Link opened";
+    noticeTimer.restart();
   }
   // y: the text selected with the mouse, else the whole selected message.
   function yank() {
@@ -1010,6 +1019,8 @@ FocusScope {
     }
     else if (key === "r" && selectedMessage) { replyToSelectedMessage(); event.accepted = true; }
     else if (key === "e" && selectedMessage?.isSender) { editSelectedMessage(); event.accepted = true; }
+    // While audio plays, the l Shortcut seeks first and this key never arrives.
+    else if (key === "l" && selectedMessage) { if (!event.isAutoRepeat) openSelectedLink(); event.accepted = true; }
     else if (key === "y" && (selectedText || selectedMessage)) { if (!event.isAutoRepeat) yank(); event.accepted = true; }
     else if (/^[1-6]$/.test(key) && selectedMessage) { if (!event.isAutoRepeat) reactToSelectedMessage(quickReactions[Number(key) - 1]); event.accepted = true; }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { compose(); event.accepted = true; }

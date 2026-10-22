@@ -117,6 +117,15 @@ ShellRoot {
         verifyFinalPhotoGeometry();
       }
     }
+    function test_photo_reopening_starts_transparent_before_its_fade() {
+      showPhoto(); tryCompare(viewer, "opacity", 1);
+      viewer.active = false; viewer.visible = false;
+      compare(viewer.opacity, 0, "A hidden viewer must not keep full opacity for its next first frame");
+      viewer.active = true; viewer.visible = true;
+      compare(viewer.opacity, 0, "The deferred sync has not run yet");
+      tryCompare(viewer, "presented", true);
+      tryCompare(viewer, "opacity", 1);
+    }
     function test_photo_escape_during_decode_cancels_without_late_open_or_close() {
       media().renderEnabled = false;
       showPhoto(false); verify(viewer.waitingForPreview);

@@ -22,6 +22,7 @@ FocusScope {
   property string notice: ""
   property bool noticeFailed: false
   readonly property bool transitionRunning: transition.running
+  opacity: 0
   signal closeRequested()
   signal stepRequested(int delta)
 
@@ -34,7 +35,10 @@ FocusScope {
   }
   function syncPresentation() {
     if (!active || !visible || !attachment || width <= 0 || height <= 0) {
-      transition.stop(); closing = false; presented = false; waitingForPreview = false; stepping = false; opacity = 1;
+      // Stay transparent while hidden. A newly mapped window can paint its
+      // first frame before the deferred sync runs; opacity 1 here flashes a
+      // cached photo at full strength before the fade starts from 0.
+      transition.stop(); closing = false; presented = false; waitingForPreview = false; stepping = false; opacity = 0;
       if (!active || !visible) notice = "";
       return;
     }

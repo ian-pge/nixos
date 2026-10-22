@@ -79,6 +79,7 @@ Rectangle {
     "o     Open attachment; choose one if there are several",
     "i     Jump to the original message of a reply",
     "d     Download all attachments in the selected message",
+    "l     Open the first link in the message",
     "y     Copy the whole message text",
     Format.quickReactions(root.beeperData.currentChat).map((reaction, index) => (index + 1) + " " + reaction).join("   "),
     "Digits toggle your reaction; another digit replaces it",

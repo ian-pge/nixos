@@ -1457,6 +1457,25 @@ ShellRoot {
       compare(panel.selectedMessage.id, "message-7", "Copying keeps the message selection");
       compare(panel.navigation, "messages");
     }
+    function selectLinkMessage(text) {
+      panel.linkOpener = url => { fixture.openedUrls = fixture.openedUrls.concat([url]); return true; };
+      beeperData.messages = [{id: "link-message", chatID: "chat-a", senderName: "Contact", text: text}];
+      waitForHistory();
+      keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.selectedMessage.id, "link-message");
+    }
+    function test_l_opens_the_first_link_of_the_selected_message() {
+      selectLinkMessage("Look at https://example.test/a and www.example.test/b");
+      keyClick(Qt.Key_L);
+      compare(fixture.openedUrls, ["https://example.test/a"]);
+      compare(noticeText(), "Opened the first of 2 links");
+      compare(panel.selectedMessage.id, "link-message", "Opening keeps the message selection");
+    }
+    function test_l_on_a_message_without_link_says_so() {
+      selectLinkMessage("No address here");
+      keyClick(Qt.Key_L);
+      compare(fixture.openedUrls, []);
+      compare(noticeText(), "This message has no link");
+    }
     function test_y_on_a_message_without_text_says_so() {
       selectAttachment({type: "img", srcURL: picture("red")});
       keyClick(Qt.Key_Y);

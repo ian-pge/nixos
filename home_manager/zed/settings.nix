@@ -102,7 +102,7 @@
   markdown_preview_theme = (import ./markdown-theme.nix).name;
   markdown_preview_font_family = "Ubuntu Nerd Font";
   markdown_preview_code_font_family = "JetBrainsMono Nerd Font";
-  markdown_preview_font_size = 16;
+  markdown_preview_font_size = 18;
 
   session = {
     trust_all_worktrees = true;
@@ -211,7 +211,7 @@
     font_family = "JetBrainsMono Nerd Font";
     dock = "right";
     flexible = false;
-    font_size = 16;
+    font_size = 18;
     blinking = "on";
     show_count_badge = true;
     copy_on_select = true;
@@ -222,9 +222,15 @@
   };
 
   buffer_font_family = "JetBrainsMono Nerd Font";
-  buffer_font_size = 16;
+  buffer_font_size = 18;
 
   ui_font_family = "Ubuntu Nerd Font";
   ui_font_fallbacks = ["Hack Nerd Font"];
-  ui_font_size = 16;
+  ui_font_size = 18;
+
+  # Agent replies use the Ubuntu UI font, which looks smaller than
+  # JetBrains Mono at the same size; 20 matches the terminal visually.
+  # The message editor keeps the terminal size and font.
+  agent_ui_font_size = 20;
+  agent_buffer_font_size = 18;
 }
