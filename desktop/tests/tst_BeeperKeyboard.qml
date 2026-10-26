@@ -111,6 +111,34 @@ ShellRoot {
       console.log("BeeperKeyboard: " + results.passCount + " passed, " + results.failCount + " failed");
       Qt.callLater(() => Qt.exit(results.failCount ? 1 : 0));
     }
+    function test_q_clamps_only_shelby_in_gausst() {
+      const long = Array.from({length: 30}, (_, i) => "line " + i).join("\n");
+      const lines = index => findChild(findChild(panel, "beeperMessages").itemAtIndex(index), "messageBody").lineCount;
+      // Elsewhere q does nothing, even for Shelby.
+      beeperData.messages = [{id: "elsewhere", chatID: "chat-a", senderName: "Shelby", text: long}];
+      waitForHistory();
+      keyClick(Qt.Key_Q);
+      verify(!beeperData.shelbyCollapsed); compare(panel.notice, ""); compare(lines(0), 30);
+      beeperData.replaceChats([{id: "chat-a", title: "Gausst", accountID: "account-a", capabilities: {reaction: 2}}]);
+      beeperData.messages = [
+        {id: "shelby", chatID: "chat-a", senderName: "Shelby", text: long},
+        {id: "other", chatID: "chat-a", senderName: "Contact", text: long},
+        {id: "mine", chatID: "chat-a", isSender: true, text: long}
+      ];
+      waitForHistory();
+      verify(beeperData.canCollapseShelby);
+      keyClick(Qt.Key_Q);
+      verify(beeperData.collapseShelby); compare(panel.notice, "Shelby: 3 lines");
+      tryVerify(() => lines(0) === 3);
+      compare(lines(1), 30); compare(lines(2), 30);
+      // Message search must reach text past the third line.
+      panel.openConversationSearch(); tryVerify(() => lines(0) === 30);
+      panel.closeConversationSearch(); tryVerify(() => lines(0) === 3);
+      keyClick(Qt.Key_Q);
+      verify(!beeperData.collapseShelby); compare(panel.notice, "Shelby: full messages");
+      tryVerify(() => lines(0) === 30);
+      beeperData.shelbyCollapsed = false;
+    }
     function test_number_keys_react_to_the_selected_message_data() {
       return [
         {tag: "default", network: "WhatsApp", emoji: ["👍", "😂", "💜", "🔥", "💯", "🤡"]},

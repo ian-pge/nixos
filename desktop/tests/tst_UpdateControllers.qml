@@ -48,6 +48,7 @@ ShellRoot {
     property int generation: 0
     property var commands: []
     property var writes: []
+    property int stops: 0
     signal lineRead(string line, int generation)
     signal finished(int exitCode, int exitStatus, string output, int generation)
     function exec(command, token) {
@@ -56,12 +57,13 @@ ShellRoot {
       commands = commands.concat([command]);
     }
     function write(text) { writes = writes.concat([text]); }
+    function stop() { ++stops; }
     function emitEvent(value) { lineRead("@@QS_UPDATE@@" + JSON.stringify(value), generation); }
     function finish(code = 0, output = "", status = 0) {
       running = false;
       finished(code, status, output, generation);
     }
-    function reset() { running = false; commands = []; writes = []; }
+    function reset() { running = false; commands = []; writes = []; stops = 0; }
   }
   FakeRunner { id: operationRunner }
   FakeRunner { id: statusRunner }
@@ -110,7 +112,8 @@ ShellRoot {
       updates.checking = false; updates.checkFailed = false; updates.statusKnown = false;
       updates.rebootRequired = false; updates.phase = "idle";
       updates.operation = "update"; updates.message = ""; updates.awaitingPolkit = false;
-      updates.refreshPending = false; updates.resetSummary();
+      updates.refreshPending = false; updates.resetSummary(); updates.progress = null;
+      updates.cancelPending = false;
       updates.updates = [{name: "nixpkgs", date: "2026-09-25"}];
       fixture.events = [];
     }
@@ -159,6 +162,83 @@ ShellRoot {
       verify(view.singleLine); compare(view.implicitHeight, 42);
       fakeAgent.isActive = false; fakeAgent.flow = null;
       view.width = 480;
+    }
+    function test_build_progress_expands_into_full_view() {
+      view.height = Qt.binding(() => view.implicitHeight);
+      showView();
+      updates.startUpdate();
+      operationRunner.emitEvent({phase: "building", message: "Evaluating the NixOS configuration"});
+      verify(!view.buildMode); verify(view.singleLine);
+      const progress = {percent: 46, runningCount: 5,
+        builds: {done: 15, expected: 27},
+        downloads: {done: 128, expected: 285, bytes: 1200000000, expectedBytes: 2100000000, speed: 38000000},
+        running: [
+          {kind: "build", name: "firefox-133.0", phase: "buildPhase", log: "[1834/4210] Compiling webrender", elapsed: 252},
+          {kind: "download", name: "linux-6.18.57", bytes: 12400000, expectedBytes: 48100000, elapsed: 3},
+          {kind: "build", name: "a", elapsed: 1}, {kind: "build", name: "b", elapsed: 1},
+          {kind: "build", name: "c", elapsed: 1}]};
+      operationRunner.emitEvent({phase: "building", message: "Building the new NixOS configuration", progress});
+      compare(updates.progress.percent, 46);
+      verify(view.buildMode); verify(!view.singleLine);
+      compare(view.implicitWidth, 480);
+      const panel = findChild(view, "updateBuildProgress");
+      verify(panel.visible);
+      compare(panel.running.length, 4);
+      compare(view.implicitHeight, 40 + 80 + 24 + 4 * 40 + 10);
+      compare(findChild(view, "buildProgressStatus").text, "BUILDING · 46%");
+      compare(findChild(view, "buildProgressDownloads").value, "128 / 285 · 1.2 GB / 2.1 GB · 38 MB/s");
+      compare(findChild(view, "buildProgressBuilds").value, "15 / 27");
+      compare(panel.rowStatus(progress.running[0]), "buildPhase · 4:12");
+      compare(panel.rowDetail(progress.running[1]), "12.4 MB / 48.1 MB");
+      compare(panel.formatDuration(3725), "1:02:05");
+      compare(panel.formatBytes(999), "999 B");
+      operationRunner.emitEvent({phase: "awaitingInstall", changes: []});
+      verify(!view.buildMode);
+      operationRunner.finish(1);
+      updates.startUpdate();
+      compare(updates.progress, null);
+      view.height = 300;
+    }
+    function test_q_twice_cancels_update_as_if_never_started() {
+      showView();
+      keyClick(Qt.Key_Return); compare(updates.phase, "updating");
+      operationRunner.emitEvent({phase: "building", message: "Building the new NixOS configuration",
+        progress: {percent: 10, builds: {done: 1, expected: 10}, downloads: {}, running: []}});
+      keyClick(Qt.Key_Escape);
+      compare(fixture.events.join(","), "present,close-view");
+      compare(operationRunner.stops, 0);
+      showView();
+      keyClick(Qt.Key_Q);
+      verify(updates.cancelPending); compare(operationRunner.stops, 0);
+      compare(findChild(view, "buildProgressStatus").text, "PRESS Q AGAIN");
+      keyClick(Qt.Key_Q);
+      compare(operationRunner.stops, 1);
+      compare(updates.phase, "cancelling"); verify(!view.buildMode);
+      compare(view.phaseLabel, "CANCELLING");
+      verify(!updates.startUpdate());
+      // The interrupted installer reports an error and exits 143: both ignored.
+      operationRunner.emitEvent({phase: "error", message: "Interrupted by signal 15"});
+      operationRunner.finish(143);
+      compare(updates.phase, "idle"); compare(updates.message, "");
+      verify(!updates.operationRunning); verify(!updates.summaryReady);
+      compare(updates.progress, null); verify(!updates.rebootRequired);
+      compare(fixture.events.join(","), "present,close-view,close-update");
+      verify(updates.startUpdate());
+    }
+    function test_cancel_from_changes_but_not_after_confirmation() {
+      showView();
+      keyClick(Qt.Key_Return);
+      operationRunner.emitEvent({phase: "awaitingInstall", changes: [{name: "app", kind: "added", oldVersions: [], newVersions: ["1"]}]});
+      keyClick(Qt.Key_Q);
+      compare(view.changesStatusText, "PRESS Q AGAIN");
+      keyClick(Qt.Key_Return);
+      compare(updates.phase, "preparingAuth");
+      verify(!updates.cancellable); compare(view.changesStatusText, "1 CHANGES");
+      keyClick(Qt.Key_Q);
+      compare(operationRunner.stops, 0);
+      compare(fixture.events.join(","), "present,close-view");
+      verify(!updates.requestCancel());
+      compare(operationRunner.stops, 0);
     }
     function test_disabled_startup_is_inert() {
       compare(operationRunner.commands.length, 0);

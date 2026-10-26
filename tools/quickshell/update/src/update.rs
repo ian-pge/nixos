@@ -1,4 +1,4 @@
-use crate::{diff, process::Runner};
+use crate::{diff, process::Runner, progress::Progress};
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -281,6 +281,10 @@ fn emit(value: &Value) -> Result<()> {
     stdout.flush()?;
     Ok(())
 }
+fn emit_progress(snapshot: Value) {
+    let _ = emit(&json!({"phase":"building",
+        "message":"Building the new NixOS configuration","progress":snapshot}));
+}
 fn log(message: &str) -> Result<()> {
     writeln!(io::stdout().lock(), "{message}")?;
     Ok(())
@@ -443,19 +447,45 @@ fn install_inner(paths: &Paths, runner: &Runner, transaction: &mut Transaction) 
             )
             .context("Lockfile update failed. The previous lockfile will be restored.")?;
     }
-    event("building", "Building the new NixOS configuration")?;
+    event("building", "Evaluating the NixOS configuration")?;
     log("\n🔨 Building the new NixOS configuration...\n")?;
     remove(&transaction.result_link)?;
-    runner
-        .stream(
-            Command::new("nh")
-                .args(["os", "build", "--out-link"])
-                .arg(&transaction.result_link)
-                .args(["--diff", "never", "--no-nom"])
-                .arg(&paths.flake)
-                .current_dir(&paths.flake),
-        )
-        .context("System build failed. The previous lockfile will be restored.")?;
+    // Nix's JSON log drives the widget's counters, bars and running jobs.
+    let mut progress = Progress::default();
+    let mut report = |line: Option<&str>| {
+        if let Some(text) = line.and_then(|line| progress.handle(line)) {
+            let _ = log(&text);
+        }
+        if let Some(snapshot) = progress.due(Instant::now(), false) {
+            emit_progress(snapshot);
+        }
+    };
+    let built = runner.stream_lines(
+        Command::new("nh")
+            .args(["os", "build", "--out-link"])
+            .arg(&transaction.result_link)
+            .args([
+                "--diff",
+                "never",
+                "--no-nom",
+                "--log-format",
+                "internal-json",
+            ])
+            .arg(&paths.flake)
+            .current_dir(&paths.flake),
+        &mut report,
+    );
+    // The throttle may have held back the last state; show the finished bars.
+    if let Some(snapshot) = progress.due(Instant::now(), true) {
+        emit_progress(snapshot);
+    }
+    if let Err(error) = built {
+        let error = match progress.error() {
+            Some(detail) => error.context(detail),
+            None => error,
+        };
+        return Err(error.context("System build failed. The previous lockfile will be restored."));
+    }
     let result = transaction
         .result_link
         .canonicalize()

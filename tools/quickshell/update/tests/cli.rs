@@ -166,11 +166,23 @@ case "$name" in
   nh)
     case "${FAKE_NH_MODE:-fail}" in
       fail) exit 1 ;;
+      fail-json)
+        printf '%s\n' '@nix {"action":"msg","level":0,"msg":"\u001b[31;1merror:\u001b[0m builder for demo failed"}' >&2
+        exit 1 ;;
       sleep)
         printf '%s\n' "$$" > "$FAKE_ROOT/child-pid"
         touch "$FAKE_ROOT/building"
         exec sleep 60 ;;
       ok)
+        # Like nh: its own messages on stderr, the forwarded Nix log on stdout.
+        printf '%s\n' '> Building NixOS configuration' >&2
+        printf '%s\n' \
+          '@nix {"action":"start","id":1,"level":0,"parent":0,"text":"","type":102}' \
+          '@nix {"action":"start","id":2,"level":0,"parent":0,"text":"","type":104}' \
+          '@nix {"action":"result","fields":[0,2,1,0],"id":2,"type":105}' \
+          '@nix {"action":"start","fields":["/nix/store/8awrgywy14lppl0sqkc05j3jiagcblgi-demo-1.0.drv","",1,1],"id":3,"level":3,"parent":0,"text":"building","type":105}' \
+          '@nix {"action":"result","fields":["buildPhase"],"id":3,"type":104}' \
+          '@nix {"action":"result","fields":["compiling demo"],"id":3,"type":101}'
         while [ "$1" != --out-link ]; do shift; done
         ln -s "$FAKE_RESULT" "$2" ;;
     esac
@@ -370,5 +382,70 @@ fn eof_and_mutable_activation_helper_are_rejected() {
     assert!(
         String::from_utf8_lossy(&out.stdout).contains("immutable activation helper is unavailable")
     );
+    f.original_restored();
+}
+
+fn events(stdout: &[u8]) -> Vec<Value> {
+    String::from_utf8_lossy(stdout)
+        .lines()
+        .filter_map(|line| line.strip_prefix("@@QS_UPDATE@@"))
+        .map(|event| serde_json::from_str(event).unwrap())
+        .collect()
+}
+
+#[test]
+fn build_progress_is_reported_from_nix_json_logs() {
+    let f = Fixture::new();
+    let system = f.configure_system();
+    let out = f
+        .command(INSTALLER)
+        .env("FAKE_NH_MODE", "ok")
+        .env("FAKE_RESULT", &system)
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        f.log().contains("--no-nom --log-format internal-json"),
+        "{}",
+        f.log()
+    );
+    assert!(text.contains("> Building NixOS configuration"), "{text}");
+    assert!(!text.contains("@nix "), "{text}");
+    let events = events(&out.stdout);
+    assert_eq!(events[1]["message"], "Evaluating the NixOS configuration");
+    let last = events
+        .iter()
+        .rfind(|event| event["progress"].is_object())
+        .expect("no progress event");
+    assert_eq!(last["phase"], "building");
+    assert_eq!(last["progress"]["builds"], json!({"done":0,"expected":2}));
+    assert_eq!(last["progress"]["running"][0]["name"], "demo-1.0");
+    assert_eq!(last["progress"]["running"][0]["phase"], "buildPhase");
+    assert_eq!(last["progress"]["running"][0]["log"], "compiling demo");
+    assert!(
+        events
+            .iter()
+            .any(|event| event["phase"] == "awaitingInstall")
+    );
+}
+
+#[test]
+fn failed_build_reports_the_nix_error() {
+    let f = Fixture::new();
+    let out = f
+        .command(INSTALLER)
+        .env("FAKE_NH_MODE", "fail-json")
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let error = events(&out.stdout).pop().unwrap();
+    assert_eq!(error["phase"], "error");
+    let message = error["message"].as_str().unwrap();
+    assert!(message.starts_with("System build failed."), "{message}");
+    assert!(
+        message.contains("error: builder for demo failed"),
+        "{message}"
+    );
+    assert!(!message.contains('\u{1b}'), "{message}");
     f.original_restored();
 }

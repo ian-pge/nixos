@@ -51,9 +51,9 @@
       flavor = "macchiato";
       accent = "sapphire";
     };
-    # zathura = {
-    #   enable = true;
-    #   flavor = "macchiato";
-    # };
+    sioyek = {
+      enable = true;
+      flavor = "macchiato";
+    };
   };
 }

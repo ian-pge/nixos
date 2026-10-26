@@ -1,5 +1,6 @@
 pub mod diff;
 pub mod process;
+pub mod progress;
 pub mod update;
 
 use anyhow::Result;

@@ -28,7 +28,7 @@
           run_in_uwsm oculante ${pkgs.oculante}/bin/oculante "$1"
           ;;
         application/pdf)
-          run_in_uwsm zathura ${pkgs.zathura}/bin/zathura "$1"
+          run_in_uwsm sioyek ${config.programs.sioyek.package}/bin/sioyek "$1"
           ;;
         video/*)
           run_in_uwsm mpv ${pkgs.mpv}/bin/mpv "$1"

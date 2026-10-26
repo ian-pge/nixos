@@ -555,6 +555,12 @@ FocusScope {
     pinLatest = false; restoringView = false; historyWheelTimer.restart();
     Qt.callLater(rememberPosition);
   }
+  function toggleShelbyCollapsed() {
+    if (!beeperData.toggleShelbyCollapsed()) return;
+    notice = beeperData.shelbyCollapsed ? "Shelby: 3 lines" : "Shelby: full messages"; noticeTimer.restart();
+    // Heights change under the viewport; keep the selected message in view.
+    if (selectedMessage) Qt.callLater(() => { if (messageIndex >= 0) messageList.positionViewAtIndex(messageIndex, ListView.Contain); });
+  }
   function keepLatestVisible() {
     if (!active || !pinLatest) return;
     messageList.forceLayout(); messageList.positionViewAtEnd(); updateView();
@@ -1012,6 +1018,7 @@ FocusScope {
     else if (key === "G") { goEdge(true); event.accepted = true; }
     else if (key === "/") { openChatSearch(); event.accepted = true; }
     else if (key === "?" || event.key === Qt.Key_Question) { if (!event.isAutoRepeat) openModal("help"); event.accepted = true; }
+    else if (key === "q" && beeperData.canCollapseShelby) { if (!event.isAutoRepeat) toggleShelbyCollapsed(); event.accepted = true; }
     else if (key === "m" && beeperData.currentChatID) { if (!event.isAutoRepeat) markSelectedChatRead(); event.accepted = true; }
     else if (key === "n" && beeperData.currentChatID) {
       if (!event.isAutoRepeat) { pendingReadNavigation = null; beeperData.markChatUnread(beeperData.currentChatID); }
@@ -1110,6 +1117,8 @@ FocusScope {
             message: row; beeperData: root.beeperData
             networkAccent: root.conversationAccent
             searchQuery: messageSearch.opened ? messageSearch.query : ""
+            // Message search must be able to show matches past the third line.
+            collapsed: root.beeperData.collapseShelby && !messageSearch.opened
             selected: index === root.messageIndex
             playbackEnabled: root.active && !root.videoPreviewOpen
             viewportReady: false

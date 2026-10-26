@@ -22,6 +22,10 @@ Item {
   property real textScale: 1
   property color networkAccent: Theme.secondary
   property string searchQuery: ""
+  // Clamp Shelby's text to collapsedLines; every other sender stays whole.
+  property bool collapsed: false
+  readonly property int collapsedLines: 3
+  readonly property bool clampBody: collapsed && !outgoing && Format.isShelby(sender)
   readonly property string plainBody: Format.text(message)
   readonly property var linkedParts: Format.messageParts(message)
   readonly property bool hasLinkCards: linkedParts.length > 0
@@ -84,6 +88,7 @@ Item {
     replyQuote.forceLayout(); metadata.forceLayout(); bubble.forceLayout(); readerAvatars.forceLayout(); contents.forceLayout();
   }
   implicitHeight: contents.implicitHeight + 4
+  FontMetrics { id: collapsedMetrics; font: body.font }
   MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton; onClicked: root.selectedRequested() }
   BeeperAvatar {
     id: avatar
@@ -158,6 +163,9 @@ Item {
           text: root.plainBody
           textFormat: Text.PlainText
           wrapMode: Text.Wrap
+          maximumLineCount: root.clampBody ? root.collapsedLines : 2147483647
+          elide: root.clampBody ? Text.ElideRight : Text.ElideNone
+          clip: root.clampBody
           color: root.highlightedBody ? "transparent" : root.outgoing ? Theme.background : Theme.foreground
           font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.body * root.textScale }
           lineHeight: 1.2
@@ -171,6 +179,8 @@ Item {
             text: root.highlightedBody
             textFormat: Text.RichText
             wrapMode: body.wrapMode
+            maximumLineCount: body.maximumLineCount
+            elide: body.elide
             color: root.outgoing ? Theme.background : Theme.foreground
             font: body.font
           }
@@ -206,6 +216,9 @@ Item {
         Loader {
           id: linkedBody
           width: parent.width
+          // Mixed text and link cards cannot elide; clip to the same line budget.
+          height: root.clampBody && item ? Math.min(item.implicitHeight, collapsedMetrics.height * 1.2 * root.collapsedLines) : implicitHeight
+          clip: root.clampBody
           active: root.hasLinkCards
           sourceComponent: BeeperLinkedMessage {
             parts: root.linkedParts

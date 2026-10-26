@@ -238,10 +238,10 @@ in {
                     return { ok = false, pass_event = true }
                   end''
         {auto_consuming = true;})
-      (mkBind (mainKey "CONTROL + h") ''hl.dsp.window.resize({ x = -50, y = 0, relative = true })'' {})
-      (mkBind (mainKey "CONTROL + j") ''hl.dsp.window.resize({ x = 0, y = 50, relative = true })'' {})
-      (mkBind (mainKey "CONTROL + k") ''hl.dsp.window.resize({ x = 0, y = -50, relative = true })'' {})
-      (mkBind (mainKey "CONTROL + l") ''hl.dsp.window.resize({ x = 50, y = 0, relative = true })'' {})
+      (mkBind (mainKey "CONTROL + h") ''hl.dsp.window.resize({ x = -50, y = 0, relative = true })'' {repeating = true;})
+      (mkBind (mainKey "CONTROL + j") ''hl.dsp.window.resize({ x = 0, y = 50, relative = true })'' {repeating = true;})
+      (mkBind (mainKey "CONTROL + k") ''hl.dsp.window.resize({ x = 0, y = -50, relative = true })'' {repeating = true;})
+      (mkBind (mainKey "CONTROL + l") ''hl.dsp.window.resize({ x = 50, y = 0, relative = true })'' {repeating = true;})
     ]
     ++ workspaceBinds
     ++ specialWorkspaceBinds

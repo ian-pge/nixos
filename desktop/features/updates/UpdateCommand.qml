@@ -20,6 +20,8 @@ Scope {
   }
 
   function write(text) { process.write(text); }
+  // SIGTERM: the installer stops its builder and restores flake.lock itself.
+  function stop() { if (process.running) process.signal(15); }
 
   Process {
     id: process

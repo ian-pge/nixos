@@ -71,6 +71,7 @@ Rectangle {
     "u     Toggle unread-first sorting",
     "a     Switch between inbox and Low Priority",
     "Shift + A     Move selected conversation to / from Low Priority",
+    "q in gausst     Show Shelby's messages in 3 lines / in full",
     "Low Priority stays out of the inbox; mentions and replies may still notify",
     "",
     "SELECTED MESSAGE · outside text input",

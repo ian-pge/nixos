@@ -26,11 +26,18 @@ FocusScope {
     && updates.summaryReady
   readonly property bool progressMode: !authMode && !successMode && !cleaningMode
     && !listMode && !changesMode
-  readonly property bool singleLine: authMode || successMode || cleaningMode || progressMode
-    || (listMode ? compactStatusMode : !changesMode)
+  // Once Nix starts realising, the build expands into the full progress view.
+  readonly property bool buildMode: progressMode && updates.phase === "building"
+    && !!updates.progress
+  readonly property bool singleLine: !buildMode && (authMode || successMode
+    || cleaningMode || progressMode || (listMode ? compactStatusMode : !changesMode))
   function uiSize(value) { return singleLine ? Theme.barSize(value) : value; }
   readonly property bool updateProcessing: updates.busy
+  readonly property bool cancelHint: updates.cancelPending && updates.cancellable
+  readonly property string cancelHintText: "PRESS Q AGAIN"
   readonly property string phaseLabel: {
+    if (cancelHint) return cancelHintText;
+    if (updates.phase === "cancelling") return "CANCELLING";
     if (updates.phase === "updating") return "UPDATING";
     if (updates.phase === "building") return "BUILDING";
     if (updates.phase === "awaitingInstall") return "READY";
@@ -52,8 +59,8 @@ FocusScope {
       : availableUpdates.length > 0 ? availableUpdates.length + " AVAILABLE" : "UP TO DATE"
   readonly property string progressTitleText:
     updates.message || "NixOS update"
-  readonly property string changesStatusText:
-    updates.changes.length + " CHANGES"
+  readonly property string changesStatusText: cancelHint ? cancelHintText
+    : updates.changes.length + " CHANGES"
   readonly property string completionTitleText:
     cleaningMode || updates.operation === "clean"
       ? updates.message
@@ -65,7 +72,8 @@ FocusScope {
       ? auth.supplementaryMessage : auth.prompt
 
   implicitWidth: adaptiveWidth()
-  implicitHeight: authMode || successMode || cleaningMode || progressMode ? uiSize(36)
+  implicitHeight: buildMode ? buildView.implicitHeight
+    : authMode || successMode || cleaningMode || progressMode ? uiSize(36)
     : listMode ? (compactStatusMode ? uiSize(36) : 52 + rowCount * 30 + 10)
     : changesMode ? Math.min(750,
       50 + Math.max(1, updates.changes.length) * 34)
@@ -144,6 +152,8 @@ FocusScope {
   }
 
   function adaptiveWidth() {
+    if (buildMode)
+      return 480;
     if (authMode) {
       const authContentWidth = uiSize(16) + uiSize(20) + uiSize(10)
         + rowTitleMetrics.advanceWidth(authLabelText) + uiSize(10) + uiSize(120)
@@ -251,6 +261,10 @@ FocusScope {
       event.accepted = true;
     } else if (event.key === Qt.Key_R && listMode) {
       updates.forceStatus();
+      event.accepted = true;
+    } else if (event.key === Qt.Key_Q && updates.cancellable) {
+      // Before installation, q cancels and restores flake.lock (pressed twice).
+      updates.requestCancel();
       event.accepted = true;
     } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
       root.closeRequested();
@@ -407,7 +421,7 @@ FocusScope {
   Item {
     id: progressView
     anchors.fill: parent
-    visible: root.progressMode
+    visible: root.progressMode && !root.buildMode
 
     Icon {
 
@@ -458,6 +472,16 @@ FocusScope {
       font.pixelSize: root.uiSize(11)
       font.bold: true
     }
+  }
+
+  UpdateBuildProgress {
+    id: buildView
+    anchors.fill: parent
+    visible: root.buildMode
+    progress: updates.progress
+    title: root.progressTitleText
+    status: root.cancelHint ? root.cancelHintText : ""
+    spinnerFrame: root.spinnerFrame
   }
 
   Item {

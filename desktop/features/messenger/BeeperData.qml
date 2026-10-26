@@ -68,6 +68,10 @@ Scope {
   property bool chatsPaginationBlocked: false
   property bool messagesPaginationBlocked: false
   property alias chatTextSize: preferences.textSize
+  // q clamps Shelby's messages, only inside the gausst conversation.
+  readonly property bool canCollapseShelby: Format.isShelbyCollapseChat(currentChat)
+  property alias shelbyCollapsed: preferences.shelbyCollapsed
+  readonly property bool collapseShelby: canCollapseShelby && shelbyCollapsed
   property string oldestCursor: ""
   property string chatsCursor: ""
   property bool chatsInitialized: false
@@ -111,6 +115,12 @@ Scope {
     id: preferences
     reloadableId: "messengerPreferences"
     property int textSize: Theme.beeperFont.body
+    property bool shelbyCollapsed: false
+  }
+  function toggleShelbyCollapsed() {
+    if (!canCollapseShelby) return false;
+    shelbyCollapsed = !shelbyCollapsed;
+    return true;
   }
   function setChatTextSize(size) {
     chatTextSize = Math.max(14, Math.min(36, Math.round(size)));

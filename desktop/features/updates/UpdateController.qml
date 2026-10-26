@@ -26,9 +26,18 @@ Scope {
   property var changes: []
   property var counts: ({})
   property bool summaryReady: false
+  // Latest build snapshot from Nix's JSON log: counters, bytes, running jobs.
+  property var progress: null
   property bool awaitingPolkit: false
   readonly property bool busy: phase === "updating" || phase === "building"
     || phase === "preparingAuth" || phase === "installing" || phase === "cleaning"
+    || phase === "cancelling"
+  // Only before installation is confirmed: once authorization starts, the
+  // installer writes the boot generation and never interrupts it.
+  readonly property bool cancellable: operationRunning && operation === "update"
+    && (phase === "updating" || phase === "building" || phase === "awaitingInstall")
+  // A first q press arms cancellation; a second one within a few seconds confirms.
+  property bool cancelPending: false
 
   property bool operationRunning: false
   property int operationGeneration: 0
@@ -51,7 +60,9 @@ Scope {
     if (kind === "update" && (rebootRequired || updates.length === 0))
       return false;
     operation = kind;
+    cancelPending = false;
     resetSummary();
+    progress = null;
     phase = kind === "clean" ? "cleaning" : "updating";
     message = kind === "clean" ? "Cleaning Nix generations and store"
       : "Starting NixOS update";
@@ -64,6 +75,24 @@ Scope {
   }
 
   function startUpdate() { return beginOperation("update"); }
+
+  function requestCancel() {
+    if (!cancellable)
+      return false;
+    if (!cancelPending) {
+      cancelPending = true;
+      cancelTimer.restart();
+      return false;
+    }
+    cancelPending = false;
+    cancelTimer.stop();
+    phase = "cancelling";
+    message = "Cancelling the update";
+    resetSummary();
+    progress = null;
+    operationProcess.stop();
+    return true;
+  }
   function startClean() { return beginOperation("clean"); }
 
   // This is the only place sending the helper's installation confirmation.
@@ -101,7 +130,7 @@ Scope {
   function acceptOperationLine(line, generation) {
     if (!operationRunning || generation !== operationGeneration)
       return;
-    if (phase === "success" || phase === "error")
+    if (phase === "success" || phase === "error" || phase === "cancelling")
       return;
     const marker = "@@QS_UPDATE@@";
     if (!line.startsWith(marker))
@@ -114,6 +143,8 @@ Scope {
         return;
       phase = event.phase || phase;
       message = typeof event.message === "string" ? event.message : "";
+      if (event.progress && typeof event.progress === "object")
+        progress = event.progress;
       if (Array.isArray(event.changes)) {
         changes = event.changes;
         counts = event.counts || {};
@@ -135,6 +166,16 @@ Scope {
     if (!operationRunning || generation !== operationGeneration)
       return;
     operationRunning = false;
+    cancelPending = false;
+    if (phase === "cancelling") {
+      // The installer restored flake.lock: back to the state before the update.
+      phase = "idle";
+      message = "";
+      operation = "update";
+      awaitingPolkit = false;
+      closeRequested();
+      return;
+    }
     if (phase !== "error" && (phase !== "success" || exitCode !== 0 || exitStatus !== 0)) {
       phase = "error";
       const label = operation === "clean" ? "cleanup" : "update";
@@ -202,6 +243,11 @@ Scope {
     function onFinished(exitCode, exitStatus, output, generation) {
       root.finishStatus(exitCode, exitStatus, output, generation);
     }
+  }
+  Timer {
+    id: cancelTimer
+    interval: 3000
+    onTriggered: root.cancelPending = false
   }
   Timer {
     interval: 1800000

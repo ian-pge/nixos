@@ -8,7 +8,7 @@
       "image/svg+xml" = "oculante.desktop";
       "image/bmp" = "oculante.desktop";
       "image/webp" = "oculante.desktop";
-      "application/pdf" = "org.pwmt.zathura-pdf-mupdf.desktop";
+      "application/pdf" = "sioyek.desktop";
       "inode/directory" = "dev.zed.Zed.desktop";
       "inode/mount-point" = "dev.zed.Zed.desktop";
       "text/plain" = "dev.zed.Zed.desktop";

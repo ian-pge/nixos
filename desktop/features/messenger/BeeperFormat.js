@@ -124,6 +124,9 @@ function withOwnReactions(message, selfIDs, keys) {
     reactions.find(reaction => selfIDs.includes(reaction.participantID) && reaction.reactionKey === key)
       || {participantID: selfIDs[0], reactionKey: key, emoji: true}))});
 }
+// The q shortcut only exists in this conversation, for this sender.
+function isShelbyCollapseChat(chat) { return !!chat && chatTitle(chat).trim().toLowerCase() === "gausst"; }
+function isShelby(profile) { return /(^|\s)shelby(\s|$)/i.test(String(profile?.title || "")); }
 function senderProfile(message, chat, accounts) {
   const people = chat?.participants?.items || [];
   const account = (accounts || []).find(account => (account.id || account.accountID) === (message.accountID || chat?.accountID));
