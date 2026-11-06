@@ -27,6 +27,7 @@ FocusScope {
   readonly property color conversationAccent: conversationConnectionIssue ? Theme.error : Theme.beeperNetworkColors[Format.networkBadge(beeperData.currentChat?.network).key] || Theme.secondary
   property bool searchOpen: false
   property string searchChatID: ""
+  property var forwardSource: null
   property bool locatingSearchResult: false
   property string locatingSearchChatID: ""
   property string modal: ""
@@ -74,6 +75,8 @@ FocusScope {
   onAttachmentPickerReadyChanged: if (attachmentPickerReady) Qt.callLater(startAttachmentPicker)
   readonly property bool canNavigatePanes: active && windowFocused && !modal && !connectionSurface.visible
     && !attachmentPicker && !composer.inputMethodComposing && !searchField.inputMethodComposing
+  readonly property bool canNavigateChats: canNavigatePanes && !emojiPickerOpen
+    && !conversationSearchBar.input.inputMethodComposing
   readonly property bool canPickAttachment: canUseComposerShortcuts && composer.activeFocus
     && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !editMessageID
     && !recording && !preparingRecording && !attachmentPicker && !emojiPickerOpen && !beeperData.stagingAttachments
@@ -99,8 +102,8 @@ FocusScope {
   readonly property bool compact: width < 780
   readonly property bool recording: recorder !== null && recorder.recording
   readonly property var selectedMessage: messageIndex >= 0 && messageIndex < beeperData.messages.length ? beeperData.messages[messageIndex] : null
-  readonly property var filteredChats: Format.orderChats(beeperData.chats.filter(chat => Format.isChatInView(chat, showLowPriority)
-    && (networkFilter === "all" || Format.networkBadge(chat.network).key === networkFilter)
+  readonly property var filteredChats: Format.orderChats(beeperData.chats.filter(chat => (forwardSource ? !chat.isReadOnly
+    : Format.isChatInView(chat, showLowPriority) && (networkFilter === "all" || Format.networkBadge(chat.network).key === networkFilter))
     && (!searchField.text || (Format.chatTitle(chat) + " " + Format.preview(chat, beeperData.chatPreviews)).toLowerCase().includes(searchField.text.toLowerCase()))), unreadFirst)
   readonly property bool canCycleNetwork: active && windowFocused && !modal && !beeperData.tokenRequired
     && !composerSurface?.emojiPickerOpen
@@ -111,7 +114,7 @@ FocusScope {
     && !composerSurface?.emojiPickerOpen
     && !connectionSurface.visible
   readonly property bool canUseMessageShortcuts: active && windowFocused && !modal && !connectionSurface.visible
-    && !attachmentPicker && !emojiPickerOpen
+    && !attachmentPicker && !emojiPickerOpen && !forwardSource
     && !composer.activeFocus && !searchField.activeFocus && !tokenField.activeFocus
     && !conversationSearchBar.input.activeFocus
   readonly property bool canSeekAudio: canUseMessageShortcuts && !!beeperData.audioPlayback?.playing
@@ -152,7 +155,22 @@ FocusScope {
     closeConversationSearch(false); searchOpen = true; selectSearchChat(0);
     Qt.callLater(() => { if (active && searchOpen) searchField.forceActiveFocus(); });
   }
-  function closeChatSearch() { searchOpen = false; searchChatID = ""; searchField.text = ""; if (active) navigationFocus.forceActiveFocus(); }
+  function closeChatSearch() { searchOpen = false; forwardSource = null; searchChatID = ""; searchField.text = ""; if (active) navigationFocus.forceActiveFocus(); }
+  function forwardSelectedMessage() {
+    if (!selectedMessage || selectedMessage.isDeleted || beeperData.sending || !beeperData.connected || recording || preparingRecording) return;
+    const message = selectedMessage;
+    if (!Format.text(message).trim() && !message.attachments?.length) return;
+    closeConversationSearch(false); clearTextSelection(); gPending = false;
+    forwardSource = Object.assign({}, message, {attachments: (message.attachments || []).map(file => Object.assign({}, file))});
+    searchField.text = ""; searchOpen = true; selectSearchChat(0);
+    navigation = "chats"; navigationFocus.forceActiveFocus();
+  }
+  function cancelForward() {
+    const source = forwardSource;
+    closeChatSearch();
+    messageIndex = beeperData.messages.findIndex(message => message.id === source?.id);
+    navigation = messageIndex >= 0 ? "messages" : "chats";
+  }
   function selectSearchChat(index) {
     if (!searchOpen) return;
     searchChatID = filteredChats[index]?.id || "";
@@ -171,6 +189,14 @@ FocusScope {
   function acceptChatSearch() {
     const index = filteredChats.findIndex(chat => chat.id === searchChatID);
     if (!searchOpen || index < 0) return;
+    if (forwardSource) {
+      const chat = filteredChats[index], source = forwardSource;
+      if (!beeperData.forwardMessage(source, chat.id, error => {
+        if (!error && active) { notice = "Message forwarded to " + Format.chatTitle(chat); noticeTimer.restart(); }
+      })) return;
+      closeChatSearch(); openChat(chat.id, "");
+      return;
+    }
     chooseChat(index); closeChatSearch(); navigation = "messages";
     sidebar.revealChat(chatIndex);
   }
@@ -206,6 +232,7 @@ FocusScope {
     beeperData.selectChat(message.chatID, message.id);
   }
   function cycleNetwork(direction) {
+    if (forwardSource) return;
     const filters = ["all", "telegram", "whatsapp", "instagram", "sms"];
     closeChatSearch();
     const index = Math.max(0, filters.indexOf(networkFilter));
@@ -241,6 +268,7 @@ FocusScope {
     if (!accepted && pendingReadNavigation === navigation) pendingReadNavigation = null;
   }
   function toggleLowPriorityView() {
+    if (forwardSource) return;
     if (!active || !windowFocused || modal || recording || preparingRecording || messageSearch.opened) return;
     rememberPosition(); gPending = false;
     beeperData.showLowPriority = !showLowPriority;
@@ -256,6 +284,7 @@ FocusScope {
     beeperData.setChatLowPriority(beeperData.currentChatID, !beeperData.currentChat.isLowPriority);
   }
   function reconcilePrioritySelection() {
+    if (forwardSource) return;
     if (!active || !beeperData?.currentChat || Format.isChatInView(beeperData.currentChat, showLowPriority)) return;
     if (filteredChats.length) chooseChat(chatIndex);
     else { editMessageID = ""; messageIndex = -1; beeperData.clearSelection(); }
@@ -269,6 +298,10 @@ FocusScope {
     if (recording || preparingRecording) stopRecording();
     editMessageID = ""; beeperData.selectChat(filteredChats[chatIndex].id, "", true); messageIndex = -1;
     if (reveal) sidebar.revealChat(chatIndex);
+  }
+  function moveChatSelection(delta) {
+    if (searchOpen) cycleSearchChat(delta);
+    else { chooseChat(chatIndex + delta); focusNavigation(); }
   }
   function moveMessageSelection(delta) {
     cancelReplyNavigation();
@@ -285,6 +318,7 @@ FocusScope {
     rememberPosition();
   }
   function goEdge(last) {
+    if (forwardSource) { selectSearchChat(last ? filteredChats.length - 1 : 0); return; }
     cancelReplyNavigation();
     messageWheel.reset();
     restoringView = false;
@@ -589,7 +623,10 @@ FocusScope {
     // reach the top without requiring a scroll through all the read chats.
     if (!beeperData.loading && beeperData.hasMoreChats && !beeperData.chatsPaginationBlocked && (unreadFirst || remaining < 188))
       beeperData.refreshChats(true);
-    if (!restoringView && !pendingOpenMessageID && !beeperData.targetMessageID
+    // A prepend temporarily leaves contentY near the old top. Wait for the
+    // new rows and their anchor adjustment before deciding to fetch more.
+    if (!restoringView && !historyUpdatePending && !messageList.loading && !messageList.finishPending
+        && !pendingOpenMessageID && !beeperData.targetMessageID
         && !beeperData.loadingMessages && beeperData.hasOlderMessages
         && messageList.contentY - messageList.originY < 180)
       beeperData.loadMessages(true);
@@ -642,6 +679,10 @@ FocusScope {
       messageList.positionViewAtEnd();
     }
     displayedChatID = beeperData.currentChatID;
+    // Cached layouts are already positioned: reactivate only this viewport's
+    // media/quotes now, without waiting for another frame or rebuilding rows.
+    if (!messageList.finishPending && messageList.pendingReveal.length === 0)
+      messageList.updateViewport();
     Qt.callLater(() => { restoringView = false; updateView(); schedulePagination(); });
   }
   function updateView() {
@@ -652,7 +693,10 @@ FocusScope {
       beeperData.viewAtLatest = !restoringView && messageList.atYEnd;
     } else if (beeperData.viewOwner === root) { beeperData.viewOwner = null; beeperData.viewFocused = false; }
   }
+  function claimHistory() { if (active && beeperData) beeperData.historyOwner = root; }
+  Component.onCompleted: claimHistory()
   onActiveChanged: {
+    claimHistory();
     if (!active) { pendingReadNavigation = null; arrivalBaseline = null; messageList.clearArrivals(); }
     if (!active) { rememberPosition(); clearMessageSelection(); closeConversationSearch(false); messageWheel.reset(); messageList.cancelFlick(); historyWheelTimer.stop(); pinLatest = false; stopRecording(); beeperData.flushDraft(); modal = ""; closeChatSearch(); }
     else { reconcilePrioritySelection(); restoringView = true; Qt.callLater(ensureInitialChat); Qt.callLater(restorePosition); }
@@ -761,6 +805,7 @@ FocusScope {
       else { root.rememberPosition(); root.restoringView = true; }
     }
     function onCurrentChatIDChanged() {
+      if (root.forwardSource) root.closeChatSearch();
       root.arrivalBaseline = null; messageList.clearArrivals();
       root.arrivalReadyChatID = "";
       root.historyUpdatePending = false;
@@ -926,6 +971,11 @@ FocusScope {
     onActivated: { root.stopRecording(); if (!root.modal) root.compose(); }
   }
   Shortcut {
+    sequence: "Alt+/"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.canNavigateChats && !root.recording && !root.preparingRecording
+    onActivated: root.openChatSearch()
+  }
+  Shortcut {
     sequence: "Ctrl+/"; context: Qt.WindowShortcut; autoRepeat: false
     enabled: root.active && root.windowFocused && !root.modal && !connectionSurface.visible
       && !composerSurface?.emojiPickerOpen
@@ -941,6 +991,16 @@ FocusScope {
     sequence: "Shift+Tab"; context: Qt.WindowShortcut; autoRepeat: false
     enabled: root.canCycleNetwork
     onActivated: root.cycleNetwork(-1)
+  }
+  Shortcut {
+    sequence: "Alt+J"; context: Qt.WindowShortcut
+    enabled: root.canNavigateChats
+    onActivated: root.moveChatSelection(1)
+  }
+  Shortcut {
+    sequence: "Alt+K"; context: Qt.WindowShortcut
+    enabled: root.canNavigateChats
+    onActivated: root.moveChatSelection(-1)
   }
   Shortcut {
     sequence: "Ctrl+J"; context: Qt.WindowShortcut
@@ -975,6 +1035,7 @@ FocusScope {
     }
     if (event.key === Qt.Key_Escape) {
       if (modal) requestModalClose();
+      else if (forwardSource) cancelForward();
       else if (replyTargetID) cancelReplyNavigation();
       else if (selectedText) clearTextSelection();
       else if (messageSearch.opened) closeConversationSearch();
@@ -996,6 +1057,8 @@ FocusScope {
     } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C && selectedText) {
       copyText(selectedText, "Selection copied"); event.accepted = true;
     } else if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return;
+    else if (forwardSource && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) { if (!event.isAutoRepeat) acceptChatSearch(); event.accepted = true; }
+    else if (forwardSource && !["j", "k", "g", "G", "/", "?"].includes(key)) { event.accepted = true; }
     else if (messageSearch.opened && ["n", "N", "j", "k"].includes(key)) {
       const previous = key === "N" || key === "k" || (event.key === Qt.Key_N && (event.modifiers & Qt.ShiftModifier));
       messageSearch.move(previous ? -1 : 1); event.accepted = true;
@@ -1012,7 +1075,7 @@ FocusScope {
       }
       event.accepted = true;
     }
-    else if (key === "j" || key === "k") { chooseChat(chatIndex + (key === "j" ? 1 : -1)); focusNavigation(); event.accepted = true; }
+    else if (key === "j" || key === "k") { moveChatSelection(key === "j" ? 1 : -1); event.accepted = true; }
     else if (key === "h") { focusNavigation(); event.accepted = true; }
     else if (key === "g") { if (gPending) { goEdge(false); gPending = false; } else { gPending = true; gTimer.restart(); } event.accepted = true; }
     else if (key === "G") { goEdge(true); event.accepted = true; }
@@ -1025,12 +1088,18 @@ FocusScope {
       event.accepted = true;
     }
     else if (key === "r" && selectedMessage) { replyToSelectedMessage(); event.accepted = true; }
+    else if (key === "t" && selectedMessage) { if (!event.isAutoRepeat) forwardSelectedMessage(); event.accepted = true; }
     else if (key === "e" && selectedMessage?.isSender) { editSelectedMessage(); event.accepted = true; }
     // While audio plays, the l Shortcut seeks first and this key never arrives.
     else if (key === "l" && selectedMessage) { if (!event.isAutoRepeat) openSelectedLink(); event.accepted = true; }
     else if (key === "y" && (selectedText || selectedMessage)) { if (!event.isAutoRepeat) yank(); event.accepted = true; }
     else if (/^[1-6]$/.test(key) && selectedMessage) { if (!event.isAutoRepeat) reactToSelectedMessage(quickReactions[Number(key) - 1]); event.accepted = true; }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { compose(); event.accepted = true; }
+  }
+
+  BeeperWallpaper {
+    anchors.fill: parent
+    visible: !connectionSurface.visible
   }
 
   RowLayout {
@@ -1054,6 +1123,7 @@ FocusScope {
       unreadReady: root.beeperData.unreadCountsReady
       unreadLoading: root.beeperData.loadingUnreadCounts
       searchOpen: root.searchOpen
+      forwarding: !!root.forwardSource
       onNetworkCycleRequested: root.cycleNetwork(1)
       onSearchChanged: root.selectSearchChat(0)
       onSearchCycled: delta => root.cycleSearchChat(delta)
@@ -1088,9 +1158,12 @@ FocusScope {
           shiftViewport: delta => messageWheel.shiftOrigin(delta)
           anchors { fill: parent; bottomMargin: 12 }
           clip: true
-          // Keep the closing morph intact, but do not build histories for
-          // panels on other monitors or after this panel becomes invisible.
-          model: KeyedListModel { rows: root.visible ? root.beeperData.messages : []; immutableRows: true }
+          // Reuse the last monitor's layouts on reopen. Other hidden monitors
+          // keep no delegates; renderMedia below still unloads hidden media.
+          model: KeyedListModel {
+            rows: root.visible || root.beeperData.historyOwner === root ? root.beeperData.messages : []
+            immutableRows: true
+          }
           onLayoutReady: {
             if (root.historyUpdatePending) root.finishHistoryUpdate();
             else if (root.active && root.restoringView) root.restorePosition();
@@ -1177,7 +1250,7 @@ FocusScope {
         BeeperButton {
           objectName: "beeperRestoreSendDraft"
           text: "Restore"; accent: root.conversationAccent
-          enabled: root.active && !root.modal && !root.editMessageID && !root.recording && !root.preparingRecording && !root.beeperData.currentChat?.isReadOnly
+          enabled: root.active && !root.modal && !root.forwardSource && !root.editMessageID && !root.recording && !root.preparingRecording && !root.beeperData.currentChat?.isReadOnly
           ToolTip.visible: hovered
           ToolTip.text: "Restore a saved draft. Your current draft is kept separately. Nothing is sent automatically."
           onClicked: { root.beeperData.restoreSavedSendDraft(); root.compose(); }
@@ -1186,7 +1259,7 @@ FocusScope {
       BeeperComposer {
         id: composerSurface
         Layout.fillWidth: true
-        enabled: !connectionSurface.visible && !!root.beeperData.currentChatID && !root.beeperData.currentChat?.isReadOnly
+        enabled: !connectionSurface.visible && !root.forwardSource && !!root.beeperData.currentChatID && !root.beeperData.currentChat?.isReadOnly
         beeperData: root.beeperData
         networkAccent: root.conversationAccent
         textSize: root.beeperData.chatTextSize

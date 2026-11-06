@@ -28,6 +28,7 @@
     ./home_manager.nix
     ./chrome.nix
     ./nvidia.nix
+    ./performance.nix
     ./ddcutil.nix
     ./bluetooth.nix
     ./keyring.nix

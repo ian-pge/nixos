@@ -31,7 +31,7 @@ Item {
     x: dial.width - width - Theme.barSize(3)
     y: Theme.barSize(2)
     iconName: "check"
-    color: Theme.sideBattery
+    color: dial.indicatorColor
     Accessible.name: "Écouteurs connectés en audio au PC"
   }
 }

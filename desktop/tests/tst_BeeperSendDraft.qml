@@ -49,6 +49,82 @@ ShellRoot {
       compare(panel.composer.cursorPosition, 3); verify(panel.composer.activeFocus);
       compare(pending("read")[0].params.messageID, "incoming");
     }
+    function test_forward_preserves_both_drafts_and_late_destination_draft() {
+      type("Source draft"); beeperData.replyToMessageID = "incoming";
+      const source = {id: "incoming", text: "Forwarded text", linkedMessageID: "old-reply"};
+      verify(beeperData.forwardMessage(source, "other"));
+      panel.chooseChat(1);
+      beeperData.respond("getDraft", {text: "Destination draft", replyToMessageID: "destination-reply"});
+      compare(pending("send")[0].params.text, "Forwarded text");
+      compare(pending("send")[0].params.replyToMessageID, "");
+      verify(!beeperData.forwardMessage(source, "other"));
+      beeperData.respond("send", {});
+      compare(beeperData.draftText, "Destination draft"); compare(beeperData.replyToMessageID, "destination-reply");
+      compare(beeperData.localDrafts.first.text, "Source draft");
+      compare(beeperData.localDrafts.first.replyToMessageID, "incoming");
+      compare(pending("read").length, 0); compare(beeperData.recoverableDrafts.length, 0);
+    }
+    function forwardAlbum() {
+      beeperData.deferAttachments = true; beeperData.deferImageEdits = true;
+      verify(beeperData.forwardMessage({text: "Caption", attachments: [
+        {srcURL: "mxc://example/photo", type: "img", fileName: "photo.png", mimeType: "image/png"},
+        {srcURL: "file:///fixture/voice.ogg", isVoiceNote: true, mimeType: "audio/ogg"}
+      ]}, "other"));
+      compare(pending("send").length, 0);
+      compare(pending("download")[0].params.url, "mxc://example/photo");
+      beeperData.respond("download", {srcURL: "file:///fixture/cached-photo"});
+      compare(pending("stageAttachment")[0].params.type, "image");
+      beeperData.respond("stageAttachment", {path: "/fixture/staged-photo", type: "image", fileName: "cached-photo"});
+      compare(pending("send").length, 0);
+      compare(pending("stageAttachment")[0].params.type, "voice-note");
+    }
+    function test_forward_prepares_all_media_and_sends_in_order_without_touching_draft() {
+      type("Keep this draft"); forwardAlbum();
+      beeperData.respond("stageAttachment", {path: "/fixture/staged-voice", type: "voice-note"});
+      const first = pending("send")[0].params;
+      compare(first.chatID, "other"); compare(first.text, "Caption");
+      compare(first.attachment.fileName, "photo.png"); compare(first.attachment.mimeType, "image/png");
+      beeperData.respond("send", {});
+      const second = pending("send")[0].params;
+      compare(second.text, ""); compare(second.attachment.type, "voice-note");
+      beeperData.respond("send", {});
+      verify(!beeperData.sending); compare(beeperData.draftText, "Keep this draft");
+      compare(pending("discardAttachment").map(request => request.params.path), ["/fixture/staged-photo", "/fixture/staged-voice"]);
+    }
+    function test_forward_preparation_failure_sends_nothing_and_cleans_private_copies() {
+      forwardAlbum();
+      beeperData.respond("stageAttachment", null, {message: "File missing"});
+      verify(!beeperData.sending); compare(pending("send").length, 0);
+      compare(beeperData.lastError, "File missing");
+      compare(pending("discardAttachment")[0].params.path, "/fixture/staged-photo");
+    }
+    function test_forward_partial_failure_reports_progress_without_retrying() {
+      forwardAlbum();
+      beeperData.respond("stageAttachment", {path: "/fixture/staged-voice", type: "voice-note"});
+      beeperData.respond("send", {});
+      beeperData.respond("send", null, {message: "Sending was not confirmed. Check the conversation."});
+      verify(!beeperData.sending); compare(pending("send").length, 0);
+      verify(beeperData.lastError.includes("1 attachment(s) already forwarded"));
+      verify(beeperData.lastError.includes("Check the conversation"));
+    }
+    function test_forward_stops_if_destination_becomes_readonly_during_preparation() {
+      forwardAlbum();
+      beeperData.replaceChats([{id: "first"}, {id: "other", isReadOnly: true}]);
+      beeperData.respond("stageAttachment", {path: "/fixture/staged-voice", type: "voice-note"});
+      verify(!beeperData.sending); compare(pending("send").length, 0);
+      compare(pending("discardAttachment").length, 2);
+      compare(beeperData.lastError, "Conversation unavailable.");
+    }
+    function test_forward_rejects_empty_deleted_readonly_and_offline_messages() {
+      verify(!beeperData.forwardMessage({}, "other"));
+      verify(!beeperData.forwardMessage({text: "Deleted", isDeleted: true}, "other"));
+      verify(!beeperData.forwardMessage({text: "Hello"}, "missing"));
+      beeperData.replaceChats([{id: "first"}, {id: "other", isReadOnly: true}]);
+      verify(!beeperData.forwardMessage({text: "Hello"}, "other"));
+      beeperData.state = "offline";
+      verify(!beeperData.forwardMessage({text: "Hello"}, "first"));
+      compare(pending("send").length, 0);
+    }
     function test_identical_next_message_is_not_erased_by_the_previous_confirmation() {
       type("ok"); keyClick(Qt.Key_Return); type("ok");
       beeperData.respond("send", {});

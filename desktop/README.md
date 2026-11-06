@@ -231,6 +231,12 @@ alerts and sounds without muting every conversation, because our backend owns
 notification delivery. Configure minimized startup/quit behavior using the
 [Beeper service guide](../home_manager/beeper/README.md).
 
+Closing the messenger retains the current history's measured bubbles on the
+last active monitor, so reopening reuses them and restores the reading position.
+Hidden media are unloaded; only the viewport and its prefetch band reactivate.
+Live edits and deletions still update the retained rows. Opening on another
+monitor transfers ownership and releases the previous hidden layout.
+
 Drafts, staged attachments and pending-send recovery live in
 `~/.local/state/quickshell-beeper`. The
 [backend README](../tools/quickshell/beeper/README.md) owns credential, protocol,
@@ -277,6 +283,11 @@ shows `?`, with an explanatory hover message, rather than silently hiding the ba
 Badges have their own space beside the dial, clear of both the logo and countdown,
 and remain within the rounded widget background.
 One shared controller reads the signed-in official CLIs at startup and every five minutes.
+Until a provider returns its first reading, it retries independently every 30 seconds
+for five minutes, then once per minute while the bar is active. Failed attempts
+leave a safe error category in the Quickshell journal. Inspect the current attempt
+counts and errors without triggering another request with
+`qs ipc -c top-bar call topbar usageStatus`.
 It submits no prompts and consumes no reset credits. After Claude Code refreshes
 its authentication, a small [helper](../tools/quickshell/usage/claude-usage.mjs)
 reads its OAuth access token and requests the dedicated reset status. Credentials

@@ -12,6 +12,7 @@
     };
     nvidia = {
       modesetting.enable = true;
+      dynamicBoost.enable = true;
       powerManagement.enable = true;
       powerManagement.finegrained = false;
       open = false;

@@ -84,10 +84,14 @@ ShellRoot {
     function test_reopening_keeps_latest_after_history_and_viewport_resize() {
       seedHistory();
       const list = findChild(panel, "beeperMessages");
+      const lastRow = list.itemAtIndex(list.count - 1);
       panel.active = false; panel.visible = false;
-      tryCompare(list, "count", 0);
+      compare(list.count, 30);
+      compare(list.itemAtIndex(29), lastRow, "Closing retains the measured bubbles");
+      verify(!lastRow.renderMedia, "Hidden cached bubbles must unload their media");
       panel.visible = true; panel.active = true;
       tryCompare(list, "count", 30); tryCompare(list, "loading", false);
+      compare(list.itemAtIndex(29), lastRow, "Reopening reuses the same bubble");
       tryCompare(panel, "restoringView", false);
       panel.height -= 180;
       tryVerify(() => list.atYEnd);
@@ -111,6 +115,23 @@ ShellRoot {
       tryCompare(list, "finishPending", false); wait(20);
       fuzzyCompare(list.contentY, y, 0.5);
       verify(!beeperData.viewAtLatest);
+    }
+    function test_cached_history_keeps_edits_and_deletions_while_closed() {
+      seedHistory();
+      const list = findChild(panel, "beeperMessages"), kept = list.itemAtIndex(10);
+      const keptID = kept.message.id, removedID = beeperData.messages[0].id;
+      panel.active = false; panel.visible = false;
+      beeperData.messages = beeperData.messages.filter(row => row.id !== removedID)
+        .map(row => row.id === keptID ? Object.assign({}, row, {text: "Edited while closed"}) : row);
+      tryCompare(list, "count", 29);
+      compare(list.itemAtIndex(9), kept);
+      compare(kept.message.text, "Edited while closed");
+      verify(!kept.renderMedia);
+      panel.visible = true; panel.active = true;
+      tryCompare(panel, "restoringView", false);
+      compare(list.itemAtIndex(9), kept);
+      compare(findChild(kept, "messageBody").text, "Edited while closed");
+      compare(pending("messages").length, 0);
     }
     function test_explicit_message_target_releases_the_opening_anchor() {
       seedHistory();
@@ -541,6 +562,21 @@ ShellRoot {
       compare(waitRequest("messages").params.cursor, "history-3");
       beeperData.respond("messages", {items: messages(0, 3), oldestCursor: "history-0", hasMore: false});
       wait(250); compare(pending("messages").length, 0); verify(!beeperData.hasOlderMessages);
+    }
+    function test_prepend_does_not_fetch_again_before_the_new_rows_are_laid_out() {
+      seedHistory();
+      const list = findChild(panel, "beeperMessages");
+      panel.userHistoryScroll();
+      list.positionViewAtIndex(0, ListView.Beginning);
+      waitRequest("messages");
+      beeperData.respond("messages", {items: messages(0, 30), oldestCursor: "history-0", hasMore: true});
+      verify(list.loading, "The asynchronous prepend has not finished yet");
+      panel.paginateVisibleLists();
+      compare(pending("messages").length, 0, "Wait for the restored anchor before fetching another page");
+      tryCompare(list, "loading", false);
+      tryCompare(panel, "historyUpdatePending", false);
+      wait(200);
+      compare(pending("messages").length, 0);
     }
     function test_hidden_panel_does_not_page_and_stale_chat_responses_are_ignored() {
       panel.active = false;

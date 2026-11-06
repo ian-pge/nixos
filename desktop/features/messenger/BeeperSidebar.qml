@@ -30,6 +30,7 @@ Rectangle {
   property bool unreadReady: true
   property bool unreadLoading: false
   property bool searchOpen: false
+  property bool forwarding: false
   property alias searchInput: searchField
   property alias list: chatList
   property string visibleSelectionToFollow: ""
@@ -191,6 +192,7 @@ Rectangle {
       spacing: 10
       BeeperButton {
         id: networkSelector
+        enabled: !root.forwarding
         objectName: "beeperNetworkFilter"
         Layout.alignment: Qt.AlignVCenter
         Layout.minimumWidth: 54; Layout.maximumWidth: 54; Layout.preferredHeight: 54
@@ -251,7 +253,7 @@ Rectangle {
         visible: root.searchOpen
         Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignVCenter
         implicitWidth: 0; implicitHeight: 46
-        placeholderText: "Search conversations…"
+        placeholderText: root.forwarding ? "Forward to…" : "Search conversations…"
         color: Theme.foreground; placeholderTextColor: Theme.inactive
         font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.secondary }
         leftPadding: 12; selectByMouse: true
@@ -274,6 +276,7 @@ Rectangle {
       Item { visible: !root.searchOpen; Layout.fillWidth: true }
       Item {
         id: unreadCounter
+        visible: !root.forwarding
         objectName: "beeperUnreadConversationCount"
         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
         readonly property string text: (root.unreadFirst ? "↑ " : "") + (root.unreadReady ? root.unreadCount : root.unreadLoading ? "…" : "—") + " unread"
@@ -305,6 +308,15 @@ Rectangle {
           background: Rectangle { radius: 8; color: Theme.surfaceRaised }
         }
       }
+    }
+    Text {
+      objectName: "beeperForwardHint"
+      visible: root.forwarding
+      Layout.fillWidth: true
+      text: "Forward message · all conversations\nj / k choose · / search · Enter send · Esc cancel"
+      wrapMode: Text.Wrap
+      color: Theme.secondary
+      font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption }
     }
     ListView {
       id: chatList; objectName: "beeperChats"

@@ -16,6 +16,8 @@ Scope {
   property string error: ""
   property real updatedAt: 0
   property real lastStartedAt: 0
+  property real lastCompletedAt: 0
+  property int consecutiveFailures: 0
   // From start() until the process has exited: Process.running only turns
   // true on the next event loop iteration, too late to guard a second start.
   property bool loading: false
@@ -40,13 +42,20 @@ Scope {
   function complete(result) {
     answered = true;
     deadline.stop();
+    lastCompletedAt = Date.now();
     if (result.error) {
       error = result.error;
-      if (result.detail) console.warn(name + " usage:", result.detail);
+      consecutiveFailures += 1;
+      // Only our fixed error category, never raw CLI output, account data or
+      // credential details. Keep boot failures diagnosable after recovery.
+      console.warn(name + " usage: attempt " + run + " failed: " + error);
     } else {
       snapshot = result.snapshot;
       error = "";
       updatedAt = Date.now();
+      if (run === 1 || consecutiveFailures > 0)
+        console.info(name + " usage: reading available on attempt " + run);
+      consecutiveFailures = 0;
     }
   }
   function accept(line) {

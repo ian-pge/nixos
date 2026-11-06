@@ -115,12 +115,48 @@ ShellRoot {
         compare(history.itemAtIndex(index).message.chatID, "chat-21");
       if (!referenceSource) compare(history.createdCount, 6);
     }
+    function test_reopening_large_history_reuses_layouts_and_keeps_only_one_monitor_cached() {
+      panel.chooseChat(23); tryVerify(() => pendingMessages().length > 0);
+      beeperData.respond("messages", {items: messages("chat-23", 500), hasMore: false});
+      tryCompare(panel, "restoringView", false, 10000);
+      const history = findChild(panel, "beeperMessages");
+      const hidden = findChild(hiddenPanel, "beeperMessages");
+      panel.userHistoryScroll();
+      history.positionViewAtIndex(250, ListView.Beginning); wait(30); panel.rememberPosition();
+      const row = history.itemAtIndex(250), y = history.contentY;
+      panel.active = false; panel.visible = false; wait(30);
+      compare(history.count, 500);
+      compare(history.itemAtIndex(250), row);
+      compare(hidden.count, 0);
+      verify(!row.renderMedia);
+      const started = Date.now();
+      panel.visible = true; panel.active = true;
+      tryCompare(panel, "restoringView", false);
+      compare(history.itemAtIndex(250), row);
+      fuzzyCompare(history.contentY, y, 0.5);
+      verify(row.renderMedia);
+      compare(pendingMessages().length, 0, "Reopening does not fetch the same history again");
+      console.log("Conversation performance:", JSON.stringify({scenario: "cached-reopen", messages: 500,
+        reopenMs: Date.now() - started, retained: history.createdCount}));
+      panel.active = false; panel.visible = false;
+      hiddenPanel.visible = true; hiddenPanel.active = true;
+      tryCompare(hiddenPanel, "restoringView", false, 10000);
+      tryCompare(history, "count", 0);
+      compare(hidden.count, 500, "Only the most recently opened monitor keeps the layout");
+      hiddenPanel.active = false; hiddenPanel.visible = false;
+      panel.visible = true; panel.active = true;
+      tryCompare(panel, "restoringView", false, 10000);
+      tryCompare(hidden, "count", 0);
+    }
     function test_z_large_history_zoom_updates_the_viewport_first_and_finishes_in_batches() {
       if (referenceSource) return;
       panel.chooseChat(22); tryVerify(() => pendingMessages().length > 0);
       beeperData.respond("messages", {items: messages("chat-22", 500), hasMore: false});
       tryCompare(panel, "restoringView", false, 10000);
       const history = findChild(panel, "beeperMessages");
+      // Match actual history navigation: release the latest-message anchor
+      // before moving into the middle, otherwise zoom correctly pins the end.
+      panel.userHistoryScroll();
       history.positionViewAtIndex(250, ListView.Beginning); wait(30); panel.rememberPosition();
       const anchor = beeperData.messages[history.indexAt(1, history.contentY + 12)].id;
       fixture.lastBeat = Date.now(); fixture.longestPause = 0; fixture.measuring = true;

@@ -96,11 +96,12 @@ try {
   assert.equal(await ctl("configerrors"), "");
 
   shell = launch("qs", ["-p", path.join(here, "workspace-hotplug.qml"), "--no-color"]);
-  await until(async () => (await json("clients")).filter(client => client.title.startsWith("Workspace test ")).length === 2,
-    "two test windows");
+  await until(async () => (await json("clients")).filter(client => client.title.startsWith("Workspace test ")).length === 3,
+    "three test windows");
   const clients = await json("clients");
   const first = clients.find(client => client.title === "Workspace test A");
   const second = clients.find(client => client.title === "Workspace test B");
+  const special = clients.find(client => client.title === "Workspace test special");
   for (const [client, id] of [[first, 2], [second, 7]]) {
     assert.equal(await ctl("eval", `hl.dispatch(hl.dsp.window.move({window="address:${client.address}",workspace=${id},follow=false}))`), "ok");
   }
@@ -109,6 +110,11 @@ try {
     return windows.some(w => w.address === first.address && w.workspace.id === 2)
       && windows.some(w => w.address === second.address && w.workspace.id === 7);
   }, "test window placement");
+  assert.equal(await ctl("eval", `hl.dispatch(hl.dsp.window.move({window="address:${special.address}",workspace="special:workspace-test",follow=false}))`), "ok");
+  await until(async () => (await json("clients")).some(w =>
+    w.address === special.address && w.workspace.name === "special:workspace-test"), "special workspace placement");
+  // The Lua API exposes nil for this ID, even though IPC JSON uses a negative ID.
+  assert.equal(await ctl("eval", 'local found = false; for _, w in ipairs(hl.get_workspaces()) do if w.addressable_name == "special:workspace-test" then assert(w.id == nil); found = true end end; assert(found)'), "ok");
   assert.equal(await ctl("output", "remove", "DP-2"), "ok");
   await until(async () => {
     const windows = await json("clients");
@@ -132,16 +138,18 @@ try {
       && spaces.some(w => w.id === 7 && w.monitor === "eDP-TEST")
       && outputs.some(m => m.name === "eDP-TEST" && m.activeWorkspace.id >= 6 && m.activeWorkspace.id <= 10);
   }, "reconnection restores the per-screen ranges");
-  assert.equal((await json("clients")).length, 2);
+  assert.equal((await json("clients")).length, 3);
   assert.equal(await ctl("output", "remove", "eDP-TEST"), "ok");
   await until(async () => (await json("workspaces")).filter(w => w.id > 0).every(w => w.id <= 5), "external-only layout");
   const externalWindows = await json("clients");
   assert.ok([first, second].every(saved => externalWindows.some(w => w.address === saved.address && w.workspace.id === 2)),
     "Only the external-only layout retains the original 7-to-2 merge");
+  assert.ok(externalWindows.some(w => w.address === special.address && w.workspace.name === "special:workspace-test"),
+    "The window in the special workspace must survive all topology changes");
   assert.equal(await ctl("eval", 'assert(quickshell_workspace_target(6) == nil)'), "ok");
   assert.equal(await ctl("configerrors"), "");
-  assert.doesNotMatch(log, /ERROR|error in timer callback|stack traceback/);
-  console.log("PASS: native Hyprland hotplug, ten laptop workspaces, reconnect and external-only merge");
+  assert.doesNotMatch(log, /ERROR|Runtime error in lua|hl\.timer callback|error in timer callback|stack traceback/);
+  console.log("PASS: native Hyprland hotplug, ten laptop workspaces, reconnect, external-only merge and special workspace with nil Lua ID");
 } catch (error) {
   console.error(log);
   if (env.HYPRLAND_INSTANCE_SIGNATURE) {

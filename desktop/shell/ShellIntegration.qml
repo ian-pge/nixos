@@ -58,6 +58,18 @@ Scope {
     function toggleAudioMute() { if (root.services.audio.toggleMute()) root.coordinator.showVolume(); }
     function toggleAudio() { root.coordinator.toggle("audio"); }
     function toggleCalendar() { root.coordinator.toggle("calendar"); }
+    // Inspect the collector without refreshing it or revealing account data.
+    function usageStatus(): string {
+      const usage = root.services.usage;
+      const status = source => ({
+        available: source.snapshot !== null, loading: source.loading,
+        attempts: source.run, consecutiveFailures: source.consecutiveFailures,
+        error: source.error, lastStartedAt: source.lastStartedAt,
+        lastCompletedAt: source.lastCompletedAt, updatedAt: source.updatedAt
+      });
+      return JSON.stringify({enabled: usage.enabled, active: usage.active,
+        claude: status(usage.claude), codex: status(usage.codex)});
+    }
     function toggleUsage() { root.services.usage.refresh(true); }
     function toggleStorage() { root.coordinator.toggle("storage"); }
     function toggleMicrophoneMute() {

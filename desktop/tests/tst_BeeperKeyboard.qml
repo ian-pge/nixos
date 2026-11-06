@@ -181,8 +181,98 @@ ShellRoot {
       compare(beeperData.draftText, "Keep");
     }
     function startChatSearch(query = "chat") {
-      panel.openChatSearch(); tryCompare(panel.searchField, "activeFocus", true);
+      keyClick(Qt.Key_Slash, Qt.AltModifier); tryCompare(panel.searchField, "activeFocus", true);
       panel.searchField.text = query;
+    }
+    function test_t_selects_forward_destination_without_switching_or_sending() {
+      beeperData.draftText = "Source draft";
+      keyClick(Qt.Key_K, Qt.ControlModifier);
+      keyClick(Qt.Key_T);
+      compare(panel.forwardSource.id, "message-7"); compare(panel.navigation, "chats");
+      verify(findChild(panel, "beeperForwardHint").visible);
+      verify(!panel.searchField.activeFocus);
+      keyClick(Qt.Key_J); compare(panel.searchChatID, "chat-b");
+      compare(beeperData.currentChatID, "chat-a"); compare(pending("send").length, 0);
+      // Background edits must not change the message the user chose to forward.
+      beeperData.messages = beeperData.messages.map(message => Object.assign({}, message, {text: "Edited later"}));
+      keyClick(Qt.Key_Return);
+      compare(pending("send").length, 1);
+      compare(pending("send")[0].params.chatID, "chat-b");
+      compare(pending("send")[0].params.text, "Message 7");
+      compare(pending("send")[0].params.replyToMessageID, "");
+      compare(beeperData.currentChatID, "chat-b"); compare(panel.forwardSource, null);
+      compare(beeperData.localDrafts["chat-a"].text, "Source draft");
+      keyClick(Qt.Key_Return); compare(pending("send").length, 1);
+      beeperData.respond("send", {});
+      compare(panel.notice, "Message forwarded to Second chat");
+    }
+    function test_forward_search_and_escape_restore_source_selection_and_draft() {
+      beeperData.draftText = "Keep"; beeperData.replyToMessageID = "message-0";
+      keyClick(Qt.Key_K, Qt.ControlModifier); keyClick(Qt.Key_T);
+      keyClick(Qt.Key_Slash); tryCompare(panel.searchField, "activeFocus", true);
+      panel.searchField.text = "Second"; compare(panel.searchChatID, "chat-b");
+      keyClick(Qt.Key_Escape);
+      compare(panel.forwardSource, null); verify(!panel.searchOpen);
+      compare(panel.selectedMessage.id, "message-7"); compare(panel.navigation, "messages");
+      compare(beeperData.draftText, "Keep"); compare(beeperData.replyToMessageID, "message-0");
+      compare(pending("send").length, 0); compare(closeSpy.count, 0);
+    }
+    function test_forward_search_includes_other_networks_and_low_priority_but_not_readonly() {
+      beeperData.replaceChats([
+        {id: "chat-a", title: "First chat", network: "Telegram"},
+        {id: "chat-b", title: "Second chat", network: "WhatsApp", isLowPriority: true},
+        {id: "readonly", title: "Read only", isReadOnly: true}
+      ]);
+      beeperData.networkFilter = "telegram";
+      keyClick(Qt.Key_K, Qt.ControlModifier); keyClick(Qt.Key_T);
+      compare(panel.filteredChats.map(chat => chat.id), ["chat-a", "chat-b"]);
+      keyClick(Qt.Key_Slash); tryCompare(panel.searchField, "activeFocus", true);
+      panel.searchField.text = "No match"; keyClick(Qt.Key_Return);
+      compare(pending("send").length, 0); verify(panel.forwardSource !== null);
+      panel.searchField.text = "Second"; keyClick(Qt.Key_Return);
+      compare(pending("send")[0].params.chatID, "chat-b"); verify(!panel.searchOpen);
+    }
+    function test_forward_mouse_destination_and_panel_close_data() {
+      return [{tag: "mouse", mouse: true}, {tag: "close", mouse: false}];
+    }
+    function test_forward_mouse_destination_and_panel_close(data) {
+      keyClick(Qt.Key_K, Qt.ControlModifier); keyClick(Qt.Key_T);
+      if (data.mouse) {
+        const row = selectedChatRow("chat-b"); tryVerify(() => row !== null);
+        mouseClick(row, row.width / 2, row.height / 2);
+        compare(pending("send").length, 1); compare(pending("send")[0].params.chatID, "chat-b");
+      } else {
+        panel.active = false; compare(panel.forwardSource, null);
+        compare(pending("send").length, 0);
+      }
+    }
+    function test_t_in_composer_is_text_and_without_selection_does_nothing() {
+      keyClick(Qt.Key_T); compare(panel.forwardSource, null);
+      panel.compose(); keyClick(Qt.Key_T);
+      compare(beeperData.draftText, "t"); compare(panel.forwardSource, null);
+      compare(pending("send").length, 0);
+    }
+    function test_alt_j_k_switch_chats_while_typing_and_restore_drafts_data() {
+      return ["plain", "vim-insert", "vim-normal", "vim-visual"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_alt_j_k_switch_chats_while_typing_and_restore_drafts(data) {
+      beeperData.deferDrafts = true;
+      panel.vimEditing = data.mode !== "plain";
+      beeperData.draftText = "Keep my draft";
+      panel.compose();
+      if (["vim-normal", "vim-visual"].includes(data.mode)) keyClick(Qt.Key_Escape);
+      if (data.mode === "vim-visual") keyClick(Qt.Key_V);
+      keyClick(Qt.Key_J, Qt.AltModifier);
+      compare(beeperData.currentChatID, "chat-b"); compare(panel.navigation, "chats");
+      compare(beeperData.localDrafts["chat-a"].text, "Keep my draft");
+      keyClick(Qt.Key_J, Qt.AltModifier); compare(beeperData.currentChatID, "chat-b");
+      keyClick(Qt.Key_K, Qt.AltModifier);
+      compare(beeperData.currentChatID, "chat-a"); compare(beeperData.draftText, "Keep my draft");
+      keyClick(Qt.Key_K, Qt.AltModifier); compare(beeperData.currentChatID, "chat-a");
+      panel.compose(); keyClick(Qt.Key_Slash, Qt.AltModifier);
+      tryCompare(panel.searchField, "activeFocus", true); compare(panel.searchField.text, "");
+      compare(beeperData.draftText, "Keep my draft");
+      compare(pending("send").length, 0); compare(pending("read").length, 0);
     }
     function selectedChatRow(id) { return findChild(panel, "beeperChatRow-" + id); }
     function test_chat_search_highlights_first_match_before_accepting() {
@@ -202,6 +292,7 @@ ShellRoot {
     }
     function test_chat_search_cycles_results_and_keeps_typing_focus_data() {
       return [{tag: "tab", next: Qt.Key_Tab, previous: Qt.Key_Tab, modifiers: Qt.NoModifier, reverseModifiers: Qt.ShiftModifier},
+        {tag: "alt_j_k", next: Qt.Key_J, previous: Qt.Key_K, modifiers: Qt.AltModifier, reverseModifiers: Qt.AltModifier},
         {tag: "ctrl_j_k", next: Qt.Key_J, previous: Qt.Key_K, modifiers: Qt.ControlModifier, reverseModifiers: Qt.ControlModifier}];
     }
     function test_chat_search_cycles_results_and_keeps_typing_focus(data) {
@@ -273,6 +364,8 @@ ShellRoot {
       const selected = panel.searchChatID;
       keyClick(Qt.Key_J, Qt.ControlModifier); compare(panel.searchChatID, selected);
       keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.searchChatID, selected);
+      verify(!panel.canNavigateChats);
+      keyClick(Qt.Key_J, Qt.AltModifier); keyClick(Qt.Key_K, Qt.AltModifier);
       compare(panel.messageIndex, -1);
       compare(beeperData.currentChatID, "chat-a");
     }
@@ -597,7 +690,7 @@ ShellRoot {
       verify(scroll.contentHeight > scroll.height, "The complete shortcut list must be scrollable");
       const footer = findChild(panel, "beeperHelpFooter");
       verify(footer.visible); verify(footer.mapToItem(panel.modalSurface, 0, footer.height).y <= panel.modalSurface.height - 8);
-      for (const shortcut of ["Ctrl + s", "Ctrl + d", "h / j / k / l", "Ctrl + /", "Shift + A", "1 👍", "6 🤡", "Ctrl + 0"])
+      for (const shortcut of ["Ctrl + s", "Ctrl + d", "h / j / k / l", "Alt + j / k", "Alt + /", "Ctrl + /", "Shift + A", "1 👍", "6 🤡", "Ctrl + 0"])
         verify(help.text.includes(shortcut), "Missing shortcut: " + shortcut);
       verify(!help.text.includes("Ctrl + d / u"));
       const chat = beeperData.currentChatID, start = scroll.contentY;
@@ -1353,11 +1446,58 @@ ShellRoot {
       keyClick(Qt.Key_Escape); tryCompare(player, "playbackState", MediaPlayer.PausedState);
       verify(!beeperData.audioPlayback.playWhenReady);
     }
-    function test_another_voice_cannot_interrupt_the_current_one() {
-      startVoice(); const key = beeperData.audioPlayback.key;
-      beeperData.audioPlayback.play("another-message", {type: "audio", srcURL: "mxc://preview/another"});
-      compare(beeperData.audioPlayback.key, key); compare(pending("download").length, 0);
-      compare(beeperData.audioPlayback.player.playbackState, MediaPlayer.PlayingState);
+    function test_playing_another_voice_pauses_the_previous_and_preserves_its_position_data() {
+      return [{tag: "keyboard", click: false}, {tag: "button", click: true}];
+    }
+    function test_playing_another_voice_pauses_the_previous_and_preserves_its_position(data) {
+      const first = startVoice(30), audio = beeperData.audioPlayback, player = audio.player, firstKey = audio.key;
+      tryVerify(() => player.seekable && player.duration === 30000);
+      player.setPosition(10000);
+      beeperData.messages = beeperData.messages.concat([{
+        id: "second-voice", chatID: "chat-a", senderName: "Contact",
+        attachments: [{type: "audio", srcURL: "mxc://preview/second", duration: 2}]
+      }]);
+      waitForHistory();
+      keyClick(Qt.Key_J, Qt.ControlModifier); compare(panel.selectedMessage.id, "second-voice");
+      compare(audio.key, firstKey, "Selection alone must not interrupt playback");
+      compare(player.playbackState, MediaPlayer.PlayingState);
+      const second = findChild(findChild(panel, "beeperMessages").itemAtIndex(1), "beeperMedia");
+      if (data.click) mouseClick(findChild(second, "beeperMediaPlay"));
+      else keyClick(Qt.Key_Space);
+      compare(JSON.parse(audio.key), ["chat-a", "second-voice", 0]);
+      verify(player.playbackState !== MediaPlayer.PlayingState, "Pause immediately while the next vocal downloads");
+      verify(!first.currentAudio); verify(second.currentAudio);
+      verify(audio.pausedPositions[firstKey] >= 10000);
+      compare(findChild(first, "beeperMediaPlayer").position, audio.pausedPositions[firstKey]);
+      beeperData.respond("download", {srcURL: silentAudio()});
+      tryCompare(player, "playbackState", MediaPlayer.PlayingState);
+      keyClick(Qt.Key_K, Qt.ControlModifier); compare(panel.messageIndex, 0);
+      keyClick(Qt.Key_Space);
+      compare(audio.key, firstKey);
+      tryCompare(player, "playbackState", MediaPlayer.PlayingState);
+      tryVerify(() => player.position >= 10000 && player.position < 13000);
+      keyClick(Qt.Key_Space); tryCompare(player, "playbackState", MediaPlayer.PausedState);
+    }
+    function test_switching_voice_ignores_the_previous_download_data() {
+      return [{tag: "old-download-first", oldFirst: true}, {tag: "old-download-last", oldFirst: false}];
+    }
+    function test_switching_voice_ignores_the_previous_download(data) {
+      selectAttachment({type: "audio", srcURL: "mxc://preview/first", duration: 2});
+      const audio = beeperData.audioPlayback, player = audio.player;
+      player.audioOutput.muted = true;
+      keyClick(Qt.Key_Space);
+      audio.play("second-voice", {type: "audio", srcURL: "mxc://preview/second", duration: 30});
+      const requests = pending("download"); compare(requests.length, 2);
+      const source = Qt.resolvedUrl("fixtures/silent-audio.flac").toString();
+      if (data.oldFirst) {
+        requests[0].callback({srcURL: silentAudio()}, null);
+        compare(audio.sourceUrl, ""); verify(audio.downloading);
+      }
+      requests[1].callback({srcURL: source}, null);
+      tryCompare(player, "playbackState", MediaPlayer.PlayingState);
+      if (!data.oldFirst) requests[0].callback({srcURL: silentAudio()}, null);
+      compare(audio.key, "second-voice"); compare(audio.sourceUrl, source);
+      compare(player.source.toString(), source);
     }
     function test_pending_voice_survives_chat_changes_and_escape_prevents_late_playback_data() {
       return [{tag: "continue", cancel: false}, {tag: "escape", cancel: true}];

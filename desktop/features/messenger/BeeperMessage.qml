@@ -46,7 +46,7 @@ Item {
   readonly property real preferredContentWidth: {
     // History measures delegates while hidden. Effective visibility must not
     // change text wrapping (and therefore move the viewport on reveal).
-    let widest = Math.max(!root.hasLinkCards ? body.implicitWidth : 0, linkedBody.item?.implicitWidth || 0, senderLabel.implicitWidth, metadata.implicitWidth,
+    let widest = Math.max(!root.hasLinkCards ? body.implicitWidth : 0, linkedBody.item?.implicitWidth || 0, metadata.implicitWidth, reactions.totalWidth,
       root.message.linkedMessageID ? replyQuote.implicitWidth : 0);
     // Use intrinsic sizes, never the width assigned by this bubble. children
     // also tracks Repeater insertions/removals and late image dimensions.
@@ -85,7 +85,7 @@ Item {
     duration: 140; easing.type: Easing.OutCubic
   }
   function forceMessageLayout() {
-    replyQuote.forceLayout(); metadata.forceLayout(); bubble.forceLayout(); readerAvatars.forceLayout(); contents.forceLayout();
+    replyQuote.forceLayout(); metadata.forceLayout(); reactions.forceLayout(); bubble.forceLayout(); readerAvatars.forceLayout(); contents.forceLayout();
   }
   implicitHeight: contents.implicitHeight + 4
   FontMetrics { id: collapsedMetrics; font: body.font }
@@ -140,12 +140,50 @@ Item {
         id: bubble
         width: parent.width - 28
         x: 14; y: 6; spacing: 3
-        Text {
-          id: senderLabel
-          objectName: "beeperSenderName"
-          width: parent.width; text: root.sender.title; textFormat: Text.PlainText
-          elide: Text.ElideRight; color: root.contentAccent
-          font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.label * root.textScale; weight: Font.DemiBold }
+        Item {
+          id: metadata
+          objectName: "beeperMessageMeta"
+          width: parent.width
+          // Measure unelided labels so hiding or resizing a delegate does not
+          // change its preferred bubble width. The timestamp keeps its space.
+          implicitWidth: senderLabel.implicitWidth + timeLabel.implicitWidth + sendStatus.implicitWidth
+            + (timeLabel.text || sendStatus.text ? 12 : 0) + (timeLabel.text && sendStatus.text ? 8 : 0)
+          implicitHeight: Math.max(senderLabel.implicitHeight, messageDetails.implicitHeight)
+          function forceLayout() { messageDetails.forceLayout(); }
+          Text {
+            id: senderLabel
+            objectName: "beeperSenderName"
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(0, parent.width - messageDetails.width - (messageDetails.width > 0 ? 12 : 0))
+            text: root.sender.title; textFormat: Text.PlainText
+            elide: Text.ElideRight; color: root.contentAccent
+            font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.label * root.textScale; weight: Font.DemiBold }
+          }
+          Row {
+            id: messageDetails
+            anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+            layoutDirection: Qt.RightToLeft
+            spacing: 8
+            Text {
+              id: timeLabel
+              objectName: "beeperMessageTime"
+              visible: !!text
+              text: Format.time(root.message.timestamp)
+              color: root.outgoing ? Theme.background : Theme.inactive
+              font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption * root.textScale }
+            }
+            Text {
+              id: sendStatus
+              objectName: "beeperMessageSendStatus"
+              visible: !!text
+              text: !root.outgoing ? "" : root.message.sendStatus?.status === "PENDING" ? "Sending…"
+                : String(root.message.sendStatus?.status || "").startsWith("FAIL") ? "Failed" : ""
+              width: Math.min(implicitWidth, Math.max(0, metadata.width - timeLabel.implicitWidth - 20))
+              elide: Text.ElideRight
+              color: Theme.background
+              font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption * root.textScale }
+            }
+          }
         }
         BeeperQuote {
           id: replyQuote
@@ -255,51 +293,17 @@ Item {
             onPreviewRequested: (attachment, sourceItem) => root.previewRequested(attachment, sourceItem)
           }
         }
-        Item {
-          id: metadata
-          objectName: "beeperMessageMeta"
+        BeeperReactions {
+          id: reactions
+          visible: count > 0
           width: parent.width
-          readonly property bool hasReactions: reactions.count > 0
-          readonly property real reactionWidth: reactions.totalWidth
-          readonly property real reactionLineHeight: Math.max(messageDetails.implicitHeight, reactions.tallestChip)
-          readonly property real widestReaction: reactions.widestChip
-          readonly property bool separateTimeRow: hasReactions && width < widestReaction + messageDetails.implicitWidth + 12
-          implicitWidth: messageDetails.implicitWidth + (hasReactions ? reactionWidth + 12 : 0)
-          implicitHeight: separateTimeRow ? reactions.implicitHeight + 4 + messageDetails.implicitHeight
-            : Math.max(hasReactions ? reactions.implicitHeight : 0, messageDetails.implicitHeight)
-          function forceLayout() { messageDetails.forceLayout(); reactions.forceLayout(); }
-          BeeperReactions {
-            id: reactions
-            visible: metadata.hasReactions
-            width: Math.max(0, parent.width - (metadata.separateTimeRow ? 0 : messageDetails.implicitWidth + 12))
-            people: root.reactionPeople
-            messageIdentity: JSON.stringify([root.message.chatID || root.beeperData?.currentChatID || "", root.message.id])
-            renderMedia: root.renderMedia
-            outgoing: root.outgoing
-            textScale: root.textScale
-            networkAccent: root.networkAccent
-            lineHeight: metadata.reactionLineHeight
-          }
-          Row {
-            id: messageDetails
-            anchors.right: parent.right
-            // Align with the last reaction row when a narrow bubble wraps.
-            y: metadata.separateTimeRow ? parent.height - height : parent.height - (metadata.reactionLineHeight + height) / 2
-            layoutDirection: Qt.RightToLeft
-            spacing: 8
-            Text {
-              objectName: "beeperMessageTime"
-              text: Format.time(root.message.timestamp)
-              color: root.outgoing ? Theme.background : Theme.inactive
-              font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption * root.textScale }
-            }
-            Text {
-              visible: root.outgoing && !!text
-              text: root.message.sendStatus?.status === "PENDING" ? "Sending…" : String(root.message.sendStatus?.status || "").startsWith("FAIL") ? "Failed" : ""
-              color: Theme.background
-              font { family: "Ubuntu Nerd Font"; pixelSize: Theme.beeperFont.caption * root.textScale }
-            }
-          }
+          people: root.reactionPeople
+          messageIdentity: JSON.stringify([root.message.chatID || root.beeperData?.currentChatID || "", root.message.id])
+          renderMedia: root.renderMedia
+          outgoing: root.outgoing
+          textScale: root.textScale
+          networkAccent: root.networkAccent
+          lineHeight: tallestChip
         }
       }
       Rectangle {

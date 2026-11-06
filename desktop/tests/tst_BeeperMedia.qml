@@ -489,5 +489,36 @@ ShellRoot {
       const bubblePoint = bubble.mapToItem(message, 0, 0);
       verify(avatar.x + avatar.width < bubblePoint.x);
     }
+    function test_timestamp_shares_the_sender_line_without_a_footer_data() {
+      return [
+        {tag: "received", outgoing: false, width: 800, scale: 1, status: ""},
+        {tag: "sent", outgoing: true, width: 800, scale: 1, status: ""},
+        {tag: "narrow-zoomed", outgoing: false, width: 220, scale: 1.8, status: ""},
+        {tag: "pending", outgoing: true, width: 220, scale: 1.8, status: "PENDING"},
+        {tag: "failed", outgoing: true, width: 320, scale: 1, status: "FAILED"}
+      ];
+    }
+    function test_timestamp_shares_the_sender_line_without_a_footer(data) {
+      controls.visible = false;
+      message = create("BeeperMessage", {width: data.width, textScale: data.scale, message: {
+        id: "header", senderName: "A very long sender name", isSender: data.outgoing,
+        text: "Hello", timestamp: "2026-09-25T18:13:00Z", sendStatus: {status: data.status}
+      }});
+      message.forceMessageLayout(); wait(20);
+      const bubble = findChild(message, "beeperMessageBubble"), header = findChild(message, "beeperMessageMeta");
+      const name = findChild(message, "beeperSenderName"), time = findChild(message, "beeperMessageTime");
+      const status = findChild(message, "beeperMessageSendStatus"), body = findChild(message, "messageBody");
+      const point = time.mapToItem(header, 0, 0);
+      verify(time.visible && !!time.text);
+      fuzzyCompare(point.x + time.width, header.width, 0.5);
+      fuzzyCompare(point.y + time.height / 2, name.y + name.height / 2, 0.5);
+      verify(name.x + name.width <= point.x);
+      if (data.status) {
+        verify(status.visible && !!status.text);
+        verify(name.x + name.width <= status.mapToItem(header, 0, 0).x);
+      }
+      fuzzyCompare(bubble.height, header.height + body.height + 3 + 12, 0.5,
+        "No timestamp row is reserved below the message");
+    }
   }
 }

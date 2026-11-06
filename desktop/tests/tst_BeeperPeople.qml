@@ -161,7 +161,7 @@ ShellRoot {
       for (const chip of chips()) verify(!findChild(chip, "beeperReactionAvatar").imageEnabled);
       compare(beeperData.requests.filter(request => ["read", "unread", "react"].includes(request.method)).length, 0);
     }
-    function test_wrapping_preserves_left_reactions_right_time_and_no_overlap_at_large_text_sizes() {
+    function test_wrapping_preserves_reactions_below_the_right_aligned_header_time() {
       show({reactions: Array.from({length: 12}, (_, index) => ({participantID: "person-" + index, reactionKey: "👍"}))});
       for (const width of [800, 320, 220]) {
         for (const scale of [1, 1.8]) {
@@ -175,8 +175,9 @@ ShellRoot {
             compare(chips()[0].x, 0);
             for (const chip of chips()) {
               verify(chip.x >= 0 && chip.x + chip.width <= meta.width + 0.5);
-              verify(chip.x + chip.width <= position.x || chip.y + chip.height <= position.y,
-                "Reaction pills must not overlap the timestamp");
+              const chipPosition = chip.mapToItem(meta, 0, 0);
+              verify(chipPosition.y >= position.y + time.height,
+                "Reaction pills stay below the header timestamp");
             }
             const bubble = findChild(messageItem, "beeperMessageBubble"), point = meta.mapToItem(bubble, 0, 0);
             verify(point.y + meta.height <= bubble.height + 0.5);

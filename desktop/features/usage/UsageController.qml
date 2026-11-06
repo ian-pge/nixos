@@ -3,7 +3,8 @@ import QtQuick
 import "UsageLimits.js" as Limits
 
 // One shared pair of brief CLI reads for every bar, refreshed every five
-// minutes while active, with bounded retries for missing startup readings.
+// minutes while active. Missing startup readings retry independently until
+// available: every 30 seconds initially, then once per minute.
 // No per-screen collector or long-running CLI.
 Scope {
   id: root
@@ -21,6 +22,7 @@ Scope {
   property int refreshInterval: 300000
   property int startupRetryInterval: 30000
   property int startupRetryDuration: 300000
+  property int recoveryRetryInterval: 60000
   property real startupStartedAt: 0
   property int timeout: 30000
   property real lastRefresh: 0
@@ -31,11 +33,13 @@ Scope {
   readonly property real now: clock.date.getTime()
 
   function refresh(force = false) {
-    if (!enabled || loading) return;
+    if (!enabled) return;
     if (!force && lastRefresh > 0 && Date.now() - lastRefresh < minimumInterval) return;
-    lastRefresh = Date.now();
-    claudeSource.start();
-    codexSource.start();
+    // A slow provider must not prevent the other from refreshing. Each source
+    // guards its own process, including the asynchronous start/exit interval.
+    const claudeStarted = claudeSource.start();
+    const codexStarted = codexSource.start();
+    if (claudeStarted || codexStarted) lastRefresh = Date.now();
   }
   function expired() {
     return Limits.expired(claudeSource.snapshot, Date.now())
@@ -47,20 +51,22 @@ Scope {
   }
   function scheduleStartupRetry() {
     startupRetry.stop();
-    if (!startupRetriesAllowed()) return;
+    if (!enabled || !active) return;
     const pending = [claudeSource, codexSource].filter(source =>
       source.snapshot === null && !source.loading && source.lastStartedAt > 0);
     if (pending.length === 0) return;
-    const nextAttempt = Math.min(...pending.map(source => source.lastStartedAt + startupRetryInterval));
+    const retryInterval = startupRetriesAllowed() ? startupRetryInterval : recoveryRetryInterval;
+    const nextAttempt = Math.min(...pending.map(source => source.lastCompletedAt + retryInterval));
     startupRetry.interval = Math.max(1, nextAttempt - Date.now());
     startupRetry.start();
   }
   function retryInitialUsage() {
-    if (!startupRetriesAllowed()) return;
+    if (!enabled || !active) return;
     const now = Date.now();
+    const retryInterval = startupRetriesAllowed() ? startupRetryInterval : recoveryRetryInterval;
     for (const source of [claudeSource, codexSource]) {
       if (source.snapshot === null && !source.loading && source.lastStartedAt > 0
-          && now - source.lastStartedAt >= startupRetryInterval)
+          && now - source.lastCompletedAt >= retryInterval)
         source.start();
     }
     scheduleStartupRetry();
@@ -89,7 +95,7 @@ Scope {
   Timer {
     id: startupWindow
     interval: root.startupRetryDuration
-    onTriggered: startupRetry.stop()
+    onTriggered: root.scheduleStartupRetry()
   }
   Timer {
     id: startupRetry

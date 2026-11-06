@@ -9,7 +9,10 @@ local function dispatcher(path)
   })
 end
 local function workspace(id, monitor)
-  if not workspaces[id] then workspaces[id] = {id = id, monitor = monitor} end
+  if not workspaces[id] then
+    workspaces[id] = {id = type(id) == "number" and id or nil,
+      addressable_name = tostring(id), monitor = monitor}
+  end
   return workspaces[id]
 end
 local function monitor(name, active)
@@ -140,14 +143,16 @@ end
 -- and keeps the focused application selected without ever closing it.
 windows = {{name = "external-app", workspace = workspaces[2]},
   {name = "laptop-app", workspace = workspaces[7]},
-  {name = "special-app", workspace = workspace(-98, external)}}
+  {name = "special-app", workspace = workspace("special:Music", external)},
+  {name = "named-app", workspace = workspace("named", external)}}
 focused, focused_window = internal, windows[2]
 internal.active_workspace = workspaces[7]
 monitors["DP-2"] = nil
 for _, value in pairs(workspaces) do value.monitor = internal end
 emit("monitor.removed"); emit("monitor.layout_changed"); flush()
-assert(#windows == 3 and windows[1].workspace.id == 2 and windows[2].workspace.id == 7)
-assert(windows[3].workspace.id == -98)
+assert(#windows == 4 and windows[1].workspace.id == 2 and windows[2].workspace.id == 7)
+assert(windows[3].workspace.addressable_name == "special:Music" and windows[3].workspace.id == nil)
+assert(windows[4].workspace.addressable_name == "named" and windows[4].workspace.id == nil)
 assert(focused_window == windows[2] and internal.active_workspace.id == 7)
 for id = 1, 10 do
   assert(rules[id].monitor == "eDP-1")
@@ -190,11 +195,22 @@ focused, focused_window = external, nil
 emit("monitor.removed"); flush()
 assert(rules[1].monitor == "HDMI-A-1" and not rules[6].persistent)
 assert(windows[2].workspace.id == 2, "A lone external display keeps the existing five-slot merge")
+assert(windows[3].workspace.addressable_name == "special:Music")
+assert(windows[4].workspace.addressable_name == "named")
 for _, key in ipairs({"6", "7", "8", "9", "0"}) do
   local before = #actions
   bindings["SUPER + " .. key](); bindings["SUPER + SHIFT + " .. key]()
   assert(#actions == before, "A lone external display must not create hidden slots")
 end
+
+-- Named active workspaces must not break numeric selection or cycling.
+external.active_workspace = workspaces.named
+emit("config.reloaded"); flush()
+assert(external.active_workspace.id == 1)
+external.active_workspace = workspaces.named
+press("SUPER + ALT + L", 1, "HDMI-A-1")
+external.active_workspace = workspaces.named
+press("SUPER + ALT + H", 5, "HDMI-A-1")
 monitors, focused = {}, nil
 before = #actions
 emit("monitor.removed"); flush()
@@ -212,4 +228,4 @@ for id = 1, 10 do
 end
 press("SUPER + ALT + H", 10, "eDP-1")
 press("SUPER + ALT + L", 1, "eDP-1")
-print("PASS: ten laptop workspaces, dock/undock, direct/shifted/cycle shortcuts, focus and external-only merge")
+print("PASS: ten laptop workspaces, dock/undock, shortcuts, focus, external-only merge and nil IDs on named/special workspaces")

@@ -1,4 +1,4 @@
-{profileDirectory}: {
+{
   disable_ai = false;
   dev_container_suggest_dismissed = true;
   cli_default_open_behavior = "new_window";
@@ -53,7 +53,8 @@
     };
   };
 
-  # Keep ACP adapters from Zed's registry, using the CLIs installed by Nix.
+  # Resolve each CLI in the environment where its ACP adapter runs:
+  # the local Nix profile or the remote/container PATH.
   agent_servers = {
     "claude-acp" = {
       type = "registry";
@@ -65,7 +66,7 @@
         model = "opus";
         effort = "xhigh";
       };
-      env.CLAUDE_CODE_EXECUTABLE = "${profileDirectory}/bin/claude";
+      env.CLAUDE_CODE_EXECUTABLE = "claude";
     };
     "codex-acp" = {
       type = "registry";
@@ -78,7 +79,7 @@
         model = "gpt-6-astra";
       };
       env = {
-        CODEX_PATH = "${profileDirectory}/bin/codex";
+        CODEX_PATH = "codex";
         INITIAL_AGENT_MODE = "agent-full-access";
         # Astra's advertised Codex maximum; 95% gives 828400 usable tokens.
         # Keep these overrides in Zed, without changing standalone Codex.

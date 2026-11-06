@@ -34,9 +34,7 @@ in {
     mutableUserKeymaps = false;
     mutableUserTasks = false;
 
-    userSettings = import ./settings.nix {
-      profileDirectory = config.home.profileDirectory;
-    };
+    userSettings = import ./settings.nix;
     userKeymaps = import ./keymaps.nix;
     userTasks = [];
   };

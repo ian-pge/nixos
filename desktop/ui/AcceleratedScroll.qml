@@ -51,6 +51,9 @@ Item {
     if (wasDriving) animateTo(target, remaining);
   }
   function handleWheel(event) {
+    if ((event.modifiers ?? Qt.NoModifier) !== Qt.NoModifier) {
+      event.accepted = false; return;
+    }
     // Horizontal/empty packets must not interrupt an in-flight vertical step.
     if (!event.angleDelta.y && !event.pixelDelta.y) {
       event.accepted = false; return;
@@ -67,10 +70,14 @@ Item {
     event.accepted = true;
   }
   NumberAnimation { id: glide; target: root.flickable; property: "contentY"; easing.type: Easing.OutCubic }
-  WheelHandler {
-    target: null
-    acceptedModifiers: Qt.NoModifier
-    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+  // MouseArea honors event.accepted=false when passing native gestures to
+  // Flickable. WheelHandler's default blocking also accepts the event point,
+  // so declining its QML WheelEvent still swallows touchpad scrolling.
+  MouseArea {
+    anchors.fill: parent
+    acceptedButtons: Qt.NoButton
+    // Keep the text fields' I-beam and the links' own hover cursors below us.
+    cursorShape: undefined
     onWheel: event => root.handleWheel(event)
   }
   Connections {

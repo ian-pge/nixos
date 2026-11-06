@@ -72,18 +72,21 @@ local function reconcile_workspaces()
     -- Merge corresponding slots without closing applications or touching specials.
     for _, window in ipairs(hl.get_windows()) do
       local workspace = window.workspace
-      if workspace and workspace.id >= 6 and workspace.id <= 10 then
-        hl.dispatch(hl.dsp.window.move({window = window, workspace = workspace.id - 5, follow = false}))
+      local id = workspace and workspace.id
+      if type(id) == "number" and id >= 6 and id <= 10 then
+        hl.dispatch(hl.dsp.window.move({window = window, workspace = id - 5, follow = false}))
         changed = true
       end
     end
   end
 
   for _, workspace in ipairs(hl.get_workspaces()) do
-    if workspace.id >= 1 and workspace.id <= 10 then
-      local target = workspace.id <= 5 and primary or (secondary or primary)
+    -- Named/special workspaces have no numeric ID in Hyprland's Lua API.
+    local id = workspace.id
+    if type(id) == "number" and id >= 1 and id <= 10 then
+      local target = id <= 5 and primary or (secondary or primary)
       if not workspace.monitor or workspace.monitor.name ~= target.name then
-        hl.dispatch(hl.dsp.workspace.move({workspace = workspace.id, monitor = target.name}))
+        hl.dispatch(hl.dsp.workspace.move({workspace = id, monitor = target.name}))
         changed = true
       end
     end
@@ -91,7 +94,8 @@ local function reconcile_workspaces()
 
   local function select_valid_workspace(monitor, first, count)
     local workspace = monitor.active_workspace
-    if not workspace or workspace.id < first or workspace.id >= first + count then
+    local id = workspace and workspace.id
+    if type(id) ~= "number" or id < first or id >= first + count then
       local target = first
       if not secondary and primary_count == 5 and active_id and active_id >= 6 and active_id <= 10 then
         target = active_id - 5

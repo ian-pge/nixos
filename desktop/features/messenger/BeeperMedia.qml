@@ -244,7 +244,8 @@ Item {
         readonly property var audioOutput: root.sharedAudio?.player.audioOutput || null
         readonly property int playbackState: root.currentAudio ? root.sharedAudio.player.playbackState : MediaPlayer.StoppedState
         readonly property real duration: root.currentAudio ? root.sharedAudio.player.duration : 0
-        readonly property real position: root.currentAudio ? root.sharedAudio.player.position : 0
+        readonly property real position: root.currentAudio ? root.sharedAudio.player.position
+          : root.sharedAudio.pausedPositions?.[root.effectiveAudioKey] || 0
         readonly property real playbackRate: root.currentAudio ? root.sharedAudio.player.playbackRate : 1
         readonly property bool seekable: root.currentAudio && root.sharedAudio.player.seekable
         function play() { root.play(); }

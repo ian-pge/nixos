@@ -98,6 +98,7 @@ ShellRoot {
     function test_startup_retry_defaults() {
       compare(usage.startupRetryInterval, 30000);
       compare(usage.startupRetryDuration, 300000);
+      compare(usage.recoveryRetryInterval, 60000);
       compare(usage.refreshInterval, 300000);
       compare(usage.minimumInterval, 60000);
     }
@@ -141,6 +142,40 @@ ShellRoot {
       compare(usage.claude.run, claudeRuns);
       compare(usage.codex.run, codexRuns);
       tryVerify(() => usage.claude.run > claudeRuns && usage.codex.run > codexRuns, 1500);
+    }
+    function test_missing_usage_recovers_after_the_startup_window_without_manual_refresh() {
+      usage.startupRetryInterval = 80;
+      usage.startupRetryDuration = 220;
+      usage.recoveryRetryInterval = 300;
+      usage.refreshInterval = 60000;
+      modes("api-key", "ok");
+      usage.active = true;
+      tryVerify(() => usage.codex.snapshot !== null);
+      tryVerify(() => !usage.startupRetriesAllowed(), 1000);
+      tryCompare(usage, "loading", false);
+      verify(usage.claude.snapshot === null);
+      verify(usage.claude.consecutiveFailures > 0);
+      const attempts = usage.claude.run;
+      modes("ok", "ok");
+      tryVerify(() => usage.claude.snapshot !== null, 1500);
+      tryCompare(usage, "loading", false);
+      compare(usage.claude.run, attempts + 1);
+      compare(usage.claude.consecutiveFailures, 0);
+      compare(usage.codex.run, 1, "Recovery only retries the missing provider");
+      const completed = usage.claude.run;
+      wait(400); compare(usage.claude.run, completed);
+    }
+    function test_periodic_refresh_is_not_blocked_by_a_slow_provider() {
+      usage.startupRetryDuration = 50;
+      usage.refreshInterval = 150;
+      usage.minimumInterval = 0;
+      usage.timeout = 2500;
+      modes("ok", "hang");
+      usage.active = true;
+      tryVerify(() => usage.claude.run >= 3, 1500);
+      verify(usage.codex.loading);
+      compare(usage.codex.run, 1, "Do not overlap attempts for the slow provider");
+      usage.active = false;
     }
     function test_startup_retries_stop_when_disabled_and_do_not_extend_window() {
       usage.startupRetryInterval = 100;

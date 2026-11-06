@@ -13,14 +13,14 @@ Scope {
   property bool playWhenReady: false
   property string errorText: ""
   property int generation: 0
+  property var pausedPositions: ({})
+  property real pendingPosition: 0
   property alias player: player
   readonly property bool playing: player.playbackState === MediaPlayer.PlayingState
   readonly property bool active: playWhenReady || playing
 
   function play(id, attachment) {
     if (!id) return;
-    // Pause explicitly or press Escape before starting a different voice note.
-    if (active && key !== id) return;
     if (key === id && !errorText) {
       if (player.playbackState === MediaPlayer.PlayingState) return;
       playWhenReady = true;
@@ -28,9 +28,18 @@ Scope {
       return;
     }
     ++generation;
+    // Keep one decoder, but let each interrupted vocal resume where it paused.
+    // Advancing the generation also cancels an older pending download.
+    pause();
+    if (key && sourceUrl && !errorText) {
+      const position = player.mediaStatus === MediaPlayer.EndOfMedia ? 0 : pendingPosition || player.position;
+      pausedPositions = Object.assign({}, pausedPositions, {[key]: position});
+    }
+    pendingPosition = 0;
     player.stop();
     key = id; errorText = ""; downloading = false;
     sourceUrl = ""; playWhenReady = true;
+    pendingPosition = pausedPositions[id] || 0;
     const source = Format.attachmentSource(attachment);
     if (/^(file:|https?:|data:)/.test(source)) { sourceUrl = source; player.play(); return; }
     const url = attachment.srcURL || attachment.url || attachment.id || "";
@@ -46,6 +55,14 @@ Scope {
       sourceUrl = result.srcURL;
       if (playWhenReady) player.play();
     });
+  }
+  function restorePosition() {
+    // A new source is seekable only once Qt has loaded its metadata.
+    if (!pendingPosition || !player.seekable || player.duration <= 0
+        || ![MediaPlayer.LoadedMedia, MediaPlayer.BufferingMedia, MediaPlayer.BufferedMedia].includes(player.mediaStatus)) return;
+    const position = pendingPosition;
+    pendingPosition = 0;
+    player.setPosition(position < player.duration ? position : 0);
   }
   function pause() { playWhenReady = false; player.pause(); }
   function seek(delta) {
@@ -65,6 +82,8 @@ Scope {
     source: root.sourceUrl
     audioOutput: AudioOutput { device: devices.defaultAudioOutput }
     onPlaybackStateChanged: if (playbackState === MediaPlayer.PlayingState) root.playWhenReady = false
+    onMediaStatusChanged: root.restorePosition()
+    onSeekableChanged: root.restorePosition()
     onErrorOccurred: (error, message) => { root.playWhenReady = false; root.errorText = message; }
   }
 }

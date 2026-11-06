@@ -84,6 +84,9 @@ Scope {
   property string replyToMessageID: ""
   property bool viewFocused: false
   property var viewOwner: null
+  // Only the last active monitor retains message layouts while the panel is
+  // closed. This is independent of focus/notification and playback ownership.
+  property var historyOwner: null
   property bool viewAtLatest: true
   property var viewPositions: ({})
   property int sequence: 0
@@ -719,6 +722,65 @@ Scope {
       chatPriorityChanged(chatID, changes.isLowPriority);
       refreshChats(false); scheduleUnreadCounts(true);
     });
+  }
+  // The public API has no native forward operation. Copy the message's text
+  // and media, without using either conversation's composer or reply target.
+  function forwardMessage(message, chatID, callback) {
+    const chat = chatStore.records[chatID];
+    if (!chat || chat.isReadOnly || deletedChatIDs[chatID] || sending || !connected || message?.isDeleted) return false;
+    const text = Format.text(message), attachments = (message?.attachments || []).map(file => Object.assign({}, file));
+    if (!text.trim() && !attachments.length) return false;
+    sending = true; lastError = "";
+    const staged = [];
+    let accepted = 0;
+    function finish(error) {
+      sending = false;
+      staged.forEach(file => request("discardAttachment", {path: file.path}));
+      if (error) lastError = (accepted ? accepted + " attachment(s) already forwarded. " : "") + error.message;
+      if (accepted) {
+        if (currentChatID === chatID) loadMessages(false);
+        refreshChats(false);
+      }
+      if (!error) messageSent(chatID);
+      if (callback) callback(error);
+    }
+    function sendNext(index) {
+      if (deletedChatIDs[chatID] || chatStore.records[chatID]?.isReadOnly) { finish({message: "Conversation unavailable."}); return; }
+      request("send", {chatID: chatID, text: index === 0 ? text : "", attachment: staged[index] || null,
+        replyToMessageID: ""}, (result, error) => {
+        // Never retry an uncertain send or repeat files already accepted.
+        if (error) { finish(error); return; }
+        ++accepted;
+        if (index + 1 < staged.length) sendNext(index + 1);
+        else finish(null);
+      });
+    }
+    function prepare(index) {
+      if (index === attachments.length) { sendNext(0); return; }
+      const attachment = attachments[index], source = Format.attachmentSource(attachment);
+      function stage(path) {
+        const type = attachment.isSticker || attachment.type === "sticker" ? "sticker"
+          : attachment.isVoiceNote || ["voice-note", "voiceNote", "voice_note"].includes(attachment.type) ? "voice-note"
+          : Format.attachmentType(attachment);
+        request("stageAttachment", {path: path, type: type}, (file, error) => {
+          if (error || !file?.path) { finish(error || {message: "Could not prepare the forwarded attachment."}); return; }
+          staged.push(Object.assign({}, file, {fileName: attachment.fileName || file.fileName,
+            mimeType: attachment.mimeType || attachment.mime || file.mimeType}));
+          prepare(index + 1);
+        });
+      }
+      if (!source) { finish({message: "This attachment is unavailable."}); return; }
+      if (source.startsWith("file://")) stage(source);
+      else request("download", {url: source}, (result, error) => {
+        if (error || !result?.srcURL?.startsWith("file://")) {
+          finish(error || {message: result?.error || "Could not download the forwarded attachment."}); return;
+        }
+        stage(result.srcURL);
+      });
+    }
+    // Prepare the entire message first: a missing photo must not send just its caption.
+    prepare(0);
+    return true;
   }
   function sendMessage() {
     if (!currentChatID || sending || stagingAttachments || !connected || (!draftText.trim() && !draftAttachments.length)) return;

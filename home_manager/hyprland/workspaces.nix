@@ -1,4 +1,4 @@
-{pwaAppIds}: {
+{
   monitor = [
     {
       output = "DP-2";
@@ -15,18 +15,6 @@
   ];
 
   # Numbered workspace rules are maintained by workspace-policy.lua at runtime.
-  workspace_rule = [
-    {
-      workspace = "special:Agenda";
-      on_created_empty = "google-chrome-stable --profile-directory=Default --app-id=${pwaAppIds.calendar}";
-    }
-    {
-      workspace = "special:Music";
-      on_created_empty = "google-chrome-stable --profile-directory=Default --app-id=${pwaAppIds.spotify}";
-    }
-    {
-      workspace = "special:Notes";
-      on_created_empty = "google-chrome-stable --profile-directory=Default --app-id=${pwaAppIds.keep}";
-    }
-  ];
+  # Special workspaces launch their PWA from the workspace.created handler in
+  # default.nix.
 }

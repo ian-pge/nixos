@@ -29,10 +29,11 @@
       local count = quickshell_workspace_count(monitor)
       local last = first + count - 1
       local target
-      if workspace.id < first or workspace.id > last then
+      local id = workspace.id
+      if type(id) ~= "number" or id < first or id > last then
         target = ${toString step} > 0 and first or last
       else
-        target = ((workspace.id - first + (${toString step})) % count) + first
+        target = ((id - first + (${toString step})) % count) + first
       end
       hl.dispatch(hl.dsp.focus({ workspace = target }))
     end
