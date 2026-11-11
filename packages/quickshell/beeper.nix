@@ -17,7 +17,7 @@ buildGoModule {
       (file: file.hasExt "go" || builtins.elem file.name ["go.mod" "go.sum"])
       ../../tools/quickshell/beeper;
   };
-  vendorHash = "sha256-TqKmn6xxDxK6D5RTJLoWxghqroURERb3WM7FGOPSGWw=";
+  vendorHash = "sha256-+jhv89FlOYTzGgqtbLEfnB9wY11vYg1GSM5IevvRUOU=";
   subPackages = ["."];
   nativeBuildInputs = [makeWrapper];
   nativeCheckInputs = [dbus ffmpeg-full];

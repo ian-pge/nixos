@@ -1,5 +1,5 @@
 // Compile the real messenger/bar graph in an isolated Wayland session.
-// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--video|--drawing|--links|--unread|--people|--host|--desktop|--sidebar|--performance|--preview]
+// Usage: node messenger-wayland_test.mjs /path/to/packaged/quickshell [--avatar|--bubble|--media|--video|--drawing|--links|--unread|--people|--host|--desktop|--fullscreen|--sidebar|--performance|--preview]
 import assert from "node:assert/strict";
 import {spawn, spawnSync, execFile} from "node:child_process";
 import {mkdtemp, mkdir, readdir, readFile, rm, writeFile} from "node:fs/promises";
@@ -45,6 +45,7 @@ const testUnread = process.argv.includes("--unread");
 const renderPeople = process.argv.includes("--people");
 const testHost = process.argv.includes("--host");
 const testDesktop = process.argv.includes("--desktop");
+const testFullscreen = process.argv.includes("--fullscreen");
 const testSidebar = process.argv.includes("--sidebar");
 const testPerformance = process.argv.includes("--performance");
 const renderPreview = process.argv.includes("--preview");
@@ -133,7 +134,7 @@ try {
       return monitors.some(monitor => monitor.width > 0 && monitor.height > 0);
     } catch { return false; }
   }, "nested compositor readiness");
-  if (testDesktop && process.env.QS_TEST_FLOAT === "1") {
+  if ((testDesktop || testHost) && process.env.QS_TEST_FLOAT === "1") {
     // Stabilize OUR temporary compositor window only, as in the glass tests.
     // This opt-in avoids testing a full-screen veil on a tiled, narrow viewport.
     const width = Number(env.QS_BAR_SCREEN_WIDTH || 1600);
@@ -161,7 +162,7 @@ try {
     : testVideo ? "./tst_BeeperVideo.qml" : testDrawing ? "./tst_BeeperImageEditor.qml" : testLinks ? "./tst_BeeperLinks.qml"
     : testUnread ? "./tst_BeeperUnreadOrder.qml"
     : renderPeople ? "./tst_BeeperPeople.qml"
-    : testHost ? "./tst_MessengerHost.qml" : testDesktop ? "./tst_DesktopComposition.qml" : testSidebar ? "./tst_BeeperSidebar.qml"
+    : testHost ? "./tst_MessengerHost.qml" : testFullscreen ? "./tst_FullscreenBar.qml" : testDesktop ? "./tst_DesktopComposition.qml" : testSidebar ? "./tst_BeeperSidebar.qml"
     : testPerformance ? "./tst_BeeperPerformance.qml"
     : renderPreview ? "../preview.qml" : "./messenger-load_test.qml";
   shell = spawn(quickshell, ["--path", path.join(here, testFile), "--no-color"], {env, detached: true});
@@ -179,11 +180,11 @@ try {
   await until(() => {
     if (compositor.exitCode !== null) throw new Error("Nested compositor exited during QML compilation");
     if (renderPreview && shell.exitCode === 0) return true;
-    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testVideo ? /BeeperVideo:/ : testDrawing ? /BeeperImageEditor:/ : testLinks ? /BeeperLinks:/ : testUnread ? /BeeperUnreadOrder:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testDesktop ? /DesktopComposition:/ : testSidebar ? /BeeperSidebar:/ : testPerformance ? /BeeperPerformance:/ : /Messenger integration:/).test(shellLog)) return true;
+    if ((renderAvatar ? /BeeperAvatar:/ : renderBubble ? /BeeperBubble:/ : renderMedia ? /BeeperMedia:/ : testVideo ? /BeeperVideo:/ : testDrawing ? /BeeperImageEditor:/ : testLinks ? /BeeperLinks:/ : testUnread ? /BeeperUnreadOrder:/ : renderPeople ? /BeeperPeople:/ : testHost ? /MessengerHost:/ : testFullscreen ? /FullscreenBar:/ : testDesktop ? /DesktopComposition:/ : testSidebar ? /BeeperSidebar:/ : testPerformance ? /BeeperPerformance:/ : /Messenger integration:/).test(shellLog)) return true;
     if (shell.exitCode !== null) throw new Error("Quickshell exited before reporting the compile result");
     return false;
   }, testDesktop ? "desktop integration tests" : testUnread ? "unread selection tests" : "messenger QML compilation",
-    testDesktop || testSidebar || testHost || testUnread ? 30_000 : 15_000);
+    testDesktop || testFullscreen || testSidebar || testHost || testUnread ? 30_000 : 15_000);
   if (renderPreview) {
     const report = JSON.parse(shellLog.match(/Messenger preview: (\{[^\n]+\})/)?.[1] || "{}");
     assert.equal(report.expanded, true, shellLog);
@@ -191,6 +192,7 @@ try {
   } else assert.match(shellLog, renderAvatar ? /BeeperAvatar: \d+ passed, 0 failed/
     : renderBubble ? /BeeperBubble: \d+ passed, 0 failed/ : renderMedia ? /BeeperMedia: \d+ passed, 0 failed/ : testVideo ? /BeeperVideo: \d+ passed, 0 failed/ : testDrawing ? /BeeperImageEditor: \d+ passed, 0 failed/ : testLinks ? /BeeperLinks: \d+ passed, 0 failed/ : renderPeople ? /BeeperPeople: \d+ passed, 0 failed/ : testHost ? /MessengerHost: \d+ passed, 0 failed/
     : testDesktop ? /DesktopComposition: \d+ passed, 0 failed/
+    : testFullscreen ? /FullscreenBar: \d+ passed, 0 failed/
     : testUnread ? /BeeperUnreadOrder: \d+ passed, 0 failed/
     : testSidebar ? /BeeperSidebar: \d+ passed, 0 failed/
     : testPerformance ? /BeeperPerformance: \d+ passed, 0 failed/
@@ -211,6 +213,7 @@ try {
     : renderPeople ? "PASS: per-person reaction pills, reader avatars, wrapping and live profile updates"
     : testHost ? "PASS: MessengerHost layer surface, keyboard ownership, native dialogs and focus restoration"
     : testDesktop ? "PASS: complete desktop composition and real Bar instantiate with disabled services"
+    : testFullscreen ? "PASS: maximized windows keep the bar; normal and special workspace fullscreen hide it until a widget or chat opens"
     : testSidebar ? "PASS: sidebar animation fixture"
     : testPerformance ? "PASS: conversation performance fixture"
     : renderPreview ? "PASS: messenger preview rendered with the normal Wayland scene graph"

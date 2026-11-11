@@ -351,6 +351,13 @@ Les détails de protocole et de persistance appartiennent au
 
 ### Pagination, modèles et défilement
 
+Les réponses de `local:qwen` utilisent le HTML Markdown produit par le backend,
+dans un lecteur Qt natif sélectionnable. La géométrie dépend du texte rendu,
+y compris hors écran. Une sélection active conserve sa révision affichée
+jusqu'à sa libération pour que le streaming ne déplace pas le texte copié.
+Les autres messages restent sur leur rendu texte/liens existant ; leur contenu
+brut ne doit jamais être interprété comme du HTML.
+
 `KeyedListModel` réconcilie les snapshots par identité. Remplacer tout le modèle
 détruit les delegates, relance les décodeurs et casse les ancres de lecture.
 Cela concerne aussi les pièces jointes et les réactions.

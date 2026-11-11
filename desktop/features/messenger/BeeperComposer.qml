@@ -12,6 +12,7 @@ Rectangle {
   property bool active: false
   property bool dictating: false
   property bool compact: false
+  property bool expanded: false
   property real textSize: Theme.beeperFont.body
   property color networkAccent: Theme.secondary
   property string editMessageID: ""
@@ -29,7 +30,9 @@ Rectangle {
   property var emojiSelection: null
   readonly property bool sendMode: !!composer.text.trim() || !!beeperData.draftAttachment || !!editMessageID
   readonly property bool busy: preparingRecording || beeperData.sending || beeperData.stagingAttachments > 0
-  property real sendReveal: sendMode ? 1 : 0
+  readonly property bool localChat: !!beeperData.currentChat?.localAssistant
+  readonly property bool localReplyPending: localChat && beeperData.localGenerating
+  property real sendReveal: sendMode || localChat ? 1 : 0
   Behavior on sendReveal { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
   signal editTextEdited(string text)
   signal draftTextEdited(string text)
@@ -82,7 +85,7 @@ Rectangle {
   }
   ColumnLayout {
     id: composerColumn
-    anchors { left: parent.left; right: parent.right; top: parent.top; margins: 4 }
+    anchors { fill: parent; margins: 4 }
     spacing: 6
     RowLayout {
       visible: !!root.beeperData.replyToMessageID || !!root.editMessageID
@@ -163,7 +166,7 @@ Rectangle {
       Layout.preferredHeight: visible ? implicitHeight : 0
     }
     RowLayout {
-      Layout.fillWidth: true; spacing: 4
+      Layout.fillWidth: true; Layout.fillHeight: root.expanded; spacing: 4
       Button {
         id: emojiButton
         objectName: "beeperComposerEmoji"
@@ -184,6 +187,7 @@ Rectangle {
       ScrollView {
         id: composerScroll
         Layout.fillWidth: true; Layout.preferredHeight: Math.max(40, Math.min(160, composer.implicitHeight))
+        Layout.fillHeight: root.expanded
         contentWidth: availableWidth
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
         Binding { target: composerScroll.contentItem; property: "boundsBehavior"; value: Flickable.StopAtBounds }
@@ -191,6 +195,7 @@ Rectangle {
         clip: true
         TextArea {
           id: composer; objectName: "beeperComposer"
+          height: Math.max(implicitHeight, composerScroll.availableHeight)
           text: root.editMessageID ? root.editText : root.beeperData.draftText
           placeholderText: root.beeperData.currentChat?.isReadOnly ? "Read-only conversation"
             : root.recording ? ""
@@ -272,11 +277,13 @@ Rectangle {
         id: actionButton
         objectName: "beeperComposerAction"
         Layout.preferredWidth: 40; Layout.preferredHeight: 40; Layout.alignment: Qt.AlignBottom
-        enabled: root.recording || (!root.busy && !composer.inputMethodComposing && root.beeperData.connected)
+        enabled: root.recording || root.localReplyPending || (!root.busy && !composer.inputMethodComposing
+          && (root.beeperData.connected || root.localChat) && (!root.localChat || root.sendMode))
         focusPolicy: Qt.TabFocus
-        Accessible.name: root.recording ? "Finish recording" : root.sendMode ? (root.editMessageID ? "Save message" : "Send message") : "Record a voice message"
+        Accessible.name: root.localReplyPending ? "Stop Qwen's reply" : root.recording ? "Finish recording" : root.sendMode ? (root.editMessageID ? "Save message" : "Send message") : root.localChat ? "Send message" : "Record a voice message"
         onClicked: {
-          if (root.recording) root.recordingToggleRequested();
+          if (root.localReplyPending) root.beeperData.stopLocalReply();
+          else if (root.recording) root.recordingToggleRequested();
           else if (root.sendMode) root.submitRequested();
           else root.recordingToggleRequested();
         }
@@ -289,7 +296,7 @@ Rectangle {
             anchors.centerIn: parent
             name: "square"; size: 16
             color: Theme.error
-            visible: root.recording && !root.busy
+            visible: root.localReplyPending || root.recording && !root.busy
           }
         }
         contentItem: Item {
@@ -298,7 +305,7 @@ Rectangle {
             objectName: "beeperComposerMicrophone"
             anchors.centerIn: parent; name: "mic"
             color: root.networkAccent
-            opacity: root.busy || root.recording ? 0 : 1 - root.sendReveal
+            opacity: root.busy || root.recording || root.localReplyPending ? 0 : 1 - root.sendReveal
             scale: 0.8 + 0.2 * opacity
 
           }
@@ -306,7 +313,7 @@ Rectangle {
             objectName: "beeperComposerSendIcon"
             anchors.centerIn: parent; name: root.editMessageID ? "check" : "send"
             color: root.networkAccent
-            opacity: root.busy || root.recording ? 0 : root.sendReveal
+            opacity: root.busy || root.recording || root.localReplyPending ? 0 : root.sendReveal
             scale: 0.8 + 0.2 * opacity
             size: 21
           }
@@ -318,7 +325,7 @@ Rectangle {
   BeeperEmojiPicker {
     id: emojiPicker
     parent: root
-    y: -height - 8
+    y: root.expanded ? Math.max(0, root.height - height - 48) : -height - 8
     accent: root.networkAccent
     onEmojiSelected: emoji => root.insertEmoji(emoji)
     onCancelRequested: root.closeEmojiPicker(true)

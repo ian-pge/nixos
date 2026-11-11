@@ -12,21 +12,24 @@ Item {
   property bool imageEnabled: true
   property bool accentBackground: false
   property bool connectionProblem: false
-  readonly property string avatarSource: Format.chatAvatarSource(chat)
+  readonly property bool qwenAvatar: chat?.localAssistant === true
+  readonly property string avatarSource: qwenAvatar
+    ? Qt.resolvedUrl("assets/qwen/logo.png").toString() : Format.chatAvatarSource(chat)
   readonly property var network: Format.networkBadge(chat?.network)
   property color accent: [Theme.sideApplications, Theme.sideSystem, Theme.pink, Theme.sideDate][Format.stableHash(chat?.id || Format.chatTitle(chat)) % 4]
   readonly property color effectiveAccent: connectionProblem ? Theme.error : accent
-  readonly property bool imageReady: photo.status === Image.Ready
+  readonly property bool imageReady: qwenAvatar ? qwenLogo.status === Image.Ready : photo.status === Image.Ready
   implicitWidth: diameter
   implicitHeight: diameter
 
   Rectangle {
     anchors.fill: parent
     radius: width / 2
-    color: Qt.alpha(root.accentBackground ? Theme.background : root.effectiveAccent, 0.16)
+    color: root.qwenAvatar ? "#ffffff" : Qt.alpha(root.accentBackground ? Theme.background : root.effectiveAccent, 0.16)
     antialiasing: true
     Text {
       anchors.centerIn: parent
+      visible: !root.qwenAvatar
       text: Format.initials(Format.chatTitle(root.chat))
       textFormat: Text.PlainText
       color: root.accentBackground ? Theme.background : root.effectiveAccent
@@ -40,16 +43,27 @@ Item {
     anchors.fill: parent
     radius: width / 2
     color: "transparent"
-    visible: root.imageReady
+    visible: !root.qwenAvatar && root.imageReady
     Image {
       id: photo
       objectName: "beeperAvatarPhoto"
       anchors.fill: parent
-      source: root.imageEnabled ? root.avatarSource : ""
+      source: root.imageEnabled && !root.qwenAvatar ? root.avatarSource : ""
       sourceSize: Qt.size(root.sourceDiameter * 2, root.sourceDiameter * 2)
       fillMode: Image.PreserveAspectCrop
       asynchronous: true
     }
+  }
+
+  Image {
+    id: qwenLogo
+    anchors.fill: parent
+    anchors.margins: root.diameter * 0.14
+    visible: root.qwenAvatar
+    source: root.qwenAvatar && root.imageEnabled ? root.avatarSource : ""
+    sourceSize: Qt.size(root.sourceDiameter * 2, root.sourceDiameter * 2)
+    fillMode: Image.PreserveAspectFit
+    asynchronous: true
   }
 
   BeeperNetworkBadge {

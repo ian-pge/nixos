@@ -10,11 +10,21 @@ Scope {
     Hyprland.refreshMonitors();
   }
 
+  function refreshWindowModes() {
+    // The exact fullscreen/maximized mode lives in the client IPC snapshot.
+    // Refresh on events, including direct transitions between those modes.
+    Hyprland.refreshToplevels();
+  }
+  Component.onCompleted: refreshWindowModes()
+
   Connections {
     target: Hyprland
 
     function onRawEvent(event) {
       switch (event.name) {
+      case "fullscreen":
+        Qt.callLater(root.refreshWindowModes);
+        break;
       case "workspacev2":
       case "focusedmon":
       case "moveworkspacev2":

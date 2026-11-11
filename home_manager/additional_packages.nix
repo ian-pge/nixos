@@ -21,17 +21,17 @@
     devbox
     devpod
     devcontainer
-    t3code
+    # t3code
     orca-slicer
-    ((bambu-studio.override {
-        withNvidiaGLWorkaround = true;
-      }).overrideAttrs (old: {
-        env =
-          (old.env or {})
-          // {
-            NIX_BUILD_CORES = "12";
-          };
-      }))
+    # ((bambu-studio.override {
+    #     withNvidiaGLWorkaround = true;
+    #   }).overrideAttrs (old: {
+    #     env =
+    #       (old.env or {})
+    #       // {
+    #         NIX_BUILD_CORES = "12";
+    #       };
+    #   }))
     # herdr
     kalker
     blender

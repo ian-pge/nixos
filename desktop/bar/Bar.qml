@@ -30,9 +30,22 @@ PanelWindow {
     ?? null
   readonly property string monitorName: hyprlandMonitor !== null
     ? hyprlandMonitor.name : ""
-  readonly property bool fullscreenActive: hyprlandMonitor !== null
-    && hyprlandMonitor.activeWorkspace !== null
-    && hyprlandMonitor.activeWorkspace.hasFullscreen
+  // A visible special workspace covers the regular active workspace. Match
+  // IPC addresses/names: named workspaces no longer have numeric IDs.
+  readonly property string visibleWorkspaceAddress: {
+    const state = hyprlandMonitor?.lastIpcObject;
+    return state?.specialWorkspace?.address || state?.specialWorkspace?.name
+      || state?.activeWorkspace?.address || state?.activeWorkspace?.name || "";
+  }
+  // hasFullscreen also includes maximized windows. Only the compositor's
+  // fullscreen bit (2), not maximized (1), should hide the resting bar.
+  readonly property bool fullscreenActive: visibleWorkspaceAddress !== ""
+    && Hyprland.toplevels.values.some(client => {
+      const state = client.lastIpcObject;
+      return state?.monitor === hyprlandMonitor?.id
+        && (state?.workspace?.address || state?.workspace?.name) === visibleWorkspaceAddress
+        && ((state?.fullscreen ?? 0) & 2) !== 0;
+    })
   readonly property bool keyboardSelectorActive: centerMorph.keyboardSelectorActive
 
   screen: modelData
@@ -57,10 +70,13 @@ PanelWindow {
   // Render against the full screen; an empty surface reserves the top edge.
   exclusionMode: ExclusionMode.Ignore
   // Raise this monitor's entire bar while a central widget is open. Keep it
-  // above fullscreen through the closing morph, then return to the normal layer.
-  WlrLayershell.layer: fullscreenActive
-    && (centerMorph.overlayVisible || messengerSurface.presented || fullscreenHideDelay.running)
-    ? WlrLayer.Overlay : WlrLayer.Top
+  // mapped through the closing morph. A Top surface hidden by fullscreen stops
+  // receiving frames, so changing its layer can stall before reaching Wayland.
+  // Keep a stable Overlay surface and unmap it while fullscreen is undisturbed.
+  WlrLayershell.layer: WlrLayer.Overlay
+  visible: !fullscreenActive
+    || centerMorph.interactionVisible || messengerSurface.active
+    || messengerSurface.presented || fullscreenHideDelay.running
   WlrLayershell.namespace: "quickshell-top-bar"
   WlrLayershell.keyboardFocus: keyboardSelectorActive
     ? WlrKeyboardFocus.Exclusive : messengerSurface.wantsKeyboard
@@ -146,8 +162,8 @@ PanelWindow {
     monitor: window.hyprlandMonitor
     entered: window.entered
     barTopInset: window.capsuleTopInset
-    onOverlayVisibleChanged: {
-      if (overlayVisible) fullscreenHideDelay.stop();
+    onInteractionVisibleChanged: {
+      if (interactionVisible) fullscreenHideDelay.stop();
       else if (window.fullscreenActive) fullscreenHideDelay.restart();
     }
   }

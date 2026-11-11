@@ -73,6 +73,37 @@ recording. Drafts and prepared attachments under
 `~/.local/state/quickshell-beeper` survive reboots through impermanence; the
 existing keyring and cache persistence retain credentials and downloaded media.
 
+## Voice dictation
+
+`home_manager/voxtype.nix` uses Home Manager's `services.voxtype` module and
+Nixpkgs' Vulkan package. The pinned `large-v3-turbo` model remains in the Nix
+store. Settings explicitly preserve the previous generated configuration,
+including French transcription, media pause, silent feedback and the
+`wtype`/clipboard output order. Hyprland's dictation shortcuts use that same
+package. The local SQLite build dependency can be removed once Nixpkgs adds it
+to Voxtype's recipe.
+
+## Local language models
+
+`system/ollama.nix` enables Ollama with CUDA for the NVIDIA GPU and the signed
+`cache.nixos-cuda.org` binary cache for CUDA packages. Its API listens
+on `127.0.0.1:11434`, and Ollama's cloud features are disabled. Models and server
+state in `/var/lib/ollama` survive reboots through impermanence. The model loader
+downloads `qwen3.5:4b-q4_K_M` after the service starts, without loading it into
+GPU memory until it is used.
+
+After rebuilding the system, check the download and run the model:
+
+```bash
+systemctl status ollama.service
+journalctl -u ollama-model-loader.service -f
+ollama list
+ollama run qwen3.5:4b-q4_K_M
+```
+
+`ollama ps` shows whether a loaded model uses
+the GPU; `ollama stop qwen3.5:4b-q4_K_M` unloads it from memory.
+
 ## Workspace navigation
 
 Alt + Super (Cmd) + H/L cycles backwards/forwards through workspaces 1–8,

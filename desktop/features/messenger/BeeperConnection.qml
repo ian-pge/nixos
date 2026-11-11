@@ -23,7 +23,8 @@ Rectangle {
   implicitWidth: 500
   implicitHeight: connectionContent.implicitHeight + 48
   radius: 20
-  visible: !root.beeperData.connected && (root.beeperData.tokenRequired || root.beeperData.chats.length === 0)
+  visible: !root.beeperData.currentChat?.localAssistant && !root.beeperData.connected
+    && (root.beeperData.tokenRequired || root.beeperData.chats.length === 0)
   color: Theme.surface
   onVisibleChanged: if (visible && active) Qt.callLater(focusInput)
   onActiveChanged: if (active && visible) Qt.callLater(focusInput)
@@ -66,6 +67,7 @@ Rectangle {
         BeeperButton { visible: root.beeperData.tokenRequired; prominent: true; text: root.beeperData.savingToken ? "Connecting…" : "Connect to Beeper"; enabled: !root.beeperData.savingToken && !!tokenField.text.trim(); onClicked: root.connectRequested(tokenField.text) }
         BeeperButton { id: retryButton; objectName: "beeperReconnect"; text: "Retry"; enabled: !root.beeperData.savingToken; onClicked: root.retryRequested() }
         BeeperButton { objectName: "beeperConnectionClose"; text: "Close"; onClicked: root.closeRequested() }
+        BeeperButton { objectName: "beeperLocalChat"; visible: !!root.beeperData.localAssistantEnabled; text: "Chat with Qwen"; onClicked: root.beeperData.selectChat(root.beeperData.localChatID) }
       }
     }
   }

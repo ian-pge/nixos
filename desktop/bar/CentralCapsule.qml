@@ -65,7 +65,9 @@ Rectangle {
   objectName: "centerMorph"
   z: 2
   GlassShape { objectName: "capsuleGlassShape"; anchors.fill: parent; radius: root.radius; enabled: GlassState.enabled && root.drawBackground }
-  readonly property bool overlayVisible: root.notificationActive || root.volumeOverlayActive
+  // Notifications can render in the normal bar, but do not reveal it over video.
+  readonly property bool overlayVisible: root.notificationActive || interactionVisible
+  readonly property bool interactionVisible: root.volumeOverlayActive
     || root.audioSelectorActive || root.calendarActive || root.systemPanelActive || root.storagePanelActive
     || root.brightnessOverlayActive || root.mediaOverlayActive
     || root.appLauncherActive

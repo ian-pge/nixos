@@ -17,14 +17,8 @@
       url = "github:catppuccin/nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    llm-agents = {
-      url = "github:numtide/llm-agents.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    voxtype = {
-      url = "github:peteonrails/voxtype";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # Keep the dependency versions tested and cached by llm-agents.
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
   outputs = inputs @ {nixpkgs, ...}: let

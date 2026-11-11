@@ -28,6 +28,7 @@
     ./home_manager.nix
     ./chrome.nix
     ./nvidia.nix
+    ./ollama.nix
     ./performance.nix
     ./ddcutil.nix
     ./bluetooth.nix

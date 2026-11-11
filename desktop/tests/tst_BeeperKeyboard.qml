@@ -111,6 +111,66 @@ ShellRoot {
       console.log("BeeperKeyboard: " + results.passCount + " passed, " + results.failCount + " failed");
       Qt.callLater(() => Qt.exit(results.failCount ? 1 : 0));
     }
+    function test_ctrl_space_expands_composer_without_changing_draft_data() {
+      return ["plain", "vim-insert", "vim-normal", "vim-visual"].map(mode => ({tag: mode, mode: mode}));
+    }
+    function test_ctrl_space_expands_composer_without_changing_draft(data) {
+      panel.vimEditing = data.mode !== "plain";
+      beeperData.draftText = "Keep this draft\nAnd this line";
+      beeperData.replyToMessageID = "message-0";
+      beeperData.draftAttachments = [{path: "/tmp/keep.txt", type: "file", fileName: "keep.txt"}];
+      panel.compose();
+      panel.composer.cursorPosition = 8;
+      if (data.mode === "vim-normal" || data.mode === "vim-visual") keyClick(Qt.Key_Escape);
+      if (data.mode === "vim-visual") keyClick(Qt.Key_V);
+      else if (data.mode !== "vim-normal") panel.composer.select(5, 9);
+      const before = {text: panel.composer.text, cursor: panel.composer.cursorPosition,
+        start: panel.composer.selectionStart, end: panel.composer.selectionEnd};
+      const surface = findChild(panel, "beeperComposerSurface");
+      wait(30);
+      const restingHeight = surface.height;
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      tryCompare(panel, "composerExpanded", true);
+      tryVerify(() => surface.height > panel.height * 0.7 && surface.y < 100);
+      verify(panel.composer.height > 400, "The editable text itself must fill the expanded area");
+      verify(panel.composer.activeFocus);
+      compare(panel.composer.text, before.text);
+      compare(panel.composer.cursorPosition, before.cursor);
+      compare(panel.composer.selectionStart, before.start);
+      compare(panel.composer.selectionEnd, before.end);
+      compare(beeperData.replyToMessageID, "message-0");
+      compare(beeperData.draftAttachments[0].path, "/tmp/keep.txt");
+      panel.height = 560;
+      tryVerify(() => surface.y < 100 && surface.y + surface.height <= surface.parent.height + 1);
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      tryCompare(panel, "composerExpanded", false);
+      tryVerify(() => Math.abs(surface.height - restingHeight) < 1);
+      compare(panel.composer.text, before.text);
+      compare(panel.composer.selectionStart, before.start);
+      compare(panel.composer.selectionEnd, before.end);
+      compare(closeSpy.count, 0);
+    }
+    function test_ctrl_space_is_scoped_to_composer_and_resets_between_chats() {
+      const surface = findChild(panel, "beeperComposerSurface");
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      compare(panel.composerExpanded, false);
+      panel.compose();
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      tryCompare(panel, "composerExpanded", true);
+      compare(beeperData.draftText, "", "Expanding an empty draft must not insert a space");
+      surface.toggleEmojiPicker();
+      tryCompare(panel, "emojiPickerOpen", true);
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      compare(panel.composerExpanded, true);
+      surface.closeEmojiPicker(true);
+      beeperData.selectChat("chat-b");
+      tryCompare(panel, "composerExpanded", false);
+      panel.compose();
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      tryCompare(panel, "composerExpanded", true);
+      panel.active = false;
+      compare(panel.composerExpanded, false);
+    }
     function test_q_clamps_only_shelby_in_gausst() {
       const long = Array.from({length: 30}, (_, i) => "line " + i).join("\n");
       const lines = index => findChild(findChild(panel, "beeperMessages").itemAtIndex(index), "messageBody").lineCount;

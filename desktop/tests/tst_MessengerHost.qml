@@ -18,6 +18,21 @@ ShellRoot {
   property bool selectorOpen: false
   property bool competingWindowVisible: false
   property string focusStage: ""
+  property var trackedComposer: null
+  property var trackedComposerAction: null
+  property var composerFrames: []
+  FrameAnimation {
+    running: fixture.trackedComposer !== null
+    onTriggered: {
+      const surface = fixture.trackedComposer;
+      const action = fixture.trackedComposerAction;
+      if (surface) fixture.composerFrames.push({
+        bottom: surface.mapToItem(window.contentItem, 0, surface.height).y,
+        actionBottom: action.mapToItem(window.contentItem, 0, action.height).y,
+        height: surface.height
+      });
+    }
+  }
   property int pickerOpens: 0
   property real pickerStartProgress: -1
   Component {
@@ -126,7 +141,9 @@ ShellRoot {
     }
     function cleanup() { if (results.failed) console.error("FAILED", qtest_results.functionName, fixture.focusStage,
       "chat", panel.windowFocused, "grab", grab.active, "photo", host.photoPreviewWindow.visible,
-      "photoActive", host.photoPreviewWindow.viewer.Window.active, "other", otherWindow.contentItem.Window.active); }
+      "photoActive", host.photoPreviewWindow.viewer.Window.active, "other", otherWindow.contentItem.Window.active);
+      fixture.trackedComposer = null;
+    }
     function init() {
       controller.blocked = false; fixture.selectorOpen = false;
       fixture.surfaceFocused = Qt.binding(() => window.contentItem.Window.active);
@@ -147,6 +164,56 @@ ShellRoot {
       controller.targetMonitor = "another-monitor";
       tryCompare(host, "active", false); tryCompare(host, "presented", false);
       verify(!host.wantsKeyboard); verify(!panel.active); verify(!model.viewFocused);
+    }
+    function test_ctrl_space_expands_the_focused_composer_on_the_real_surface() {
+      fixture.focusStage = "expanded composer";
+      panel.compose();
+      tryCompare(panel.composer, "activeFocus", true);
+      // Other host tests edit the same TextArea directly, replacing its binding.
+      panel.composer.text = "Keep this draft";
+      panel.composer.select(5, 9);
+      const surface = findChild(panel, "beeperComposerSurface");
+      wait(30);
+      const restingHeight = surface.height;
+      fixture.composerFrames = [];
+      fixture.trackedComposerAction = findChild(surface, "beeperComposerAction");
+      const bottom = surface.mapToItem(window.contentItem, 0, surface.height).y;
+      const action = fixture.trackedComposerAction;
+      const actionBottom = action.mapToItem(window.contentItem, 0, action.height).y;
+      fixture.trackedComposer = surface;
+      fixture.focusStage = "expand shortcut";
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      tryCompare(panel, "composerExpanded", true);
+      tryCompare(panel, "composerExpansion", 1);
+      fixture.focusStage = "expanded geometry " + JSON.stringify({panel: panel.height, composer: surface.height, y: surface.y});
+      tryVerify(() => surface.height > panel.height * 0.7 && surface.y < 100);
+      fixture.focusStage = "expanded selection " + panel.composer.selectedText;
+      verify(panel.composer.activeFocus); verify(host.wantsKeyboard);
+      compare(panel.composer.selectedText, "this");
+      tryCompare(surface, "y", 0);
+      tryCompare(surface, "height", surface.parent.height);
+      const expandedHeight = surface.height;
+      const openingFrameCount = fixture.composerFrames.length;
+      fixture.focusStage = "restore shortcut";
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      tryCompare(panel, "composerExpanded", false);
+      tryCompare(panel, "composerExpansion", 0);
+      fixture.focusStage = "resting geometry " + surface.height;
+      tryVerify(() => surface.height < 100);
+      fixture.focusStage = "restored text and selection " + panel.composer.selectedText;
+      compare(model.draftText, "Keep this draft");
+      compare(panel.composer.selectedText, "this");
+      wait(30);
+      fixture.trackedComposer = null;
+      const frames = fixture.composerFrames;
+      const intermediate = frame => frame.height > restingHeight + 1 && frame.height < expandedHeight - 1;
+      verify(frames.slice(0, openingFrameCount).some(intermediate), "Expansion must render intermediate geometry");
+      verify(frames.slice(openingFrameCount).some(intermediate), "Collapse must render intermediate geometry");
+      fixture.focusStage = "fixed bottom throughout expansion and collapse";
+      const edgeDrift = Math.max(...frames.map(frame => Math.abs(frame.bottom - bottom)));
+      const buttonDrift = Math.max(...frames.map(frame => Math.abs(frame.actionBottom - actionBottom)));
+      verify(edgeDrift < 0.1, "Bottom edge moved by " + edgeDrift + " px");
+      verify(buttonDrift < 0.1, "Action button moved by " + buttonDrift + " px");
     }
     function test_photo_preview_fills_the_monitor_and_o_restores_the_chat() {
       fixture.focusStage = "open photo";

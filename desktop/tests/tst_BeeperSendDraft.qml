@@ -36,6 +36,60 @@ ShellRoot {
       console.log("BeeperSendDraft: " + results.passCount + " passed, " + results.failCount + " failed");
       Qt.callLater(() => Qt.exit(results.failCount ? 1 : 0));
     }
+    function expandComposer() {
+      panel.compose();
+      keyClick(Qt.Key_Space, Qt.ControlModifier);
+      tryCompare(panel, "composerExpanded", true);
+      tryCompare(panel, "composerExpansion", 1);
+      const surface = findChild(panel, "beeperComposerSurface");
+      tryVerify(() => surface.height > panel.height * 0.7);
+      return surface;
+    }
+    function test_confirmed_send_collapses_without_touching_the_next_draft() {
+      type("First message");
+      const surface = expandComposer();
+      keyClick(Qt.Key_Return);
+      verify(beeperData.sending); verify(panel.composerExpanded);
+      type("Next draft"); panel.composer.select(0, 4);
+      beeperData.respond("send", {});
+      compare(panel.composerExpanded, false);
+      tryCompare(panel, "composerExpansion", 0);
+      tryVerify(() => surface.height < 100);
+      compare(beeperData.draftText, "Next draft");
+      compare(panel.composer.selectedText, "Next");
+      verify(panel.composer.activeFocus);
+    }
+    function test_failed_send_keeps_expanded_editor_and_recovers_the_text() {
+      type("Keep this message");
+      const surface = expandComposer();
+      keyClick(Qt.Key_Return);
+      beeperData.respond("send", null, {message: "Sending failed"});
+      wait(300);
+      verify(panel.composerExpanded); compare(panel.composerExpansion, 1);
+      verify(surface.height > panel.height * 0.65);
+      compare(beeperData.draftText, "Keep this message");
+      compare(panel.composer.text, "Keep this message");
+    }
+    function test_late_send_from_another_chat_does_not_collapse_current_editor() {
+      type("First chat"); expandComposer(); keyClick(Qt.Key_Return);
+      beeperData.selectChat("other");
+      beeperData.respond("getDraft", {});
+      beeperData.respond("messages", {items: [], hasMore: false});
+      tryCompare(panel, "restoringView", false);
+      panel.compose(); type("Other chat draft"); expandComposer();
+      beeperData.respond("send", {});
+      verify(panel.composerExpanded); compare(panel.composerExpansion, 1);
+      compare(beeperData.draftText, "Other chat draft");
+    }
+    function test_successful_edit_restores_compact_editor() {
+      panel.editMessageID = "incoming"; panel.editText = "Edited text";
+      const surface = expandComposer();
+      keyClick(Qt.Key_Return);
+      tryCompare(panel, "editMessageID", "");
+      tryCompare(panel, "composerExpansion", 0);
+      verify(!panel.composerExpanded);
+      tryVerify(() => surface.height < 100);
+    }
     function test_enter_clears_immediately_and_late_success_keeps_the_next_text_and_cursor() {
       type("Premier message 🌿"); keyClick(Qt.Key_Return);
       verify(beeperData.sending); compare(pending("send").length, 1);

@@ -7,7 +7,7 @@
 }: let
   helpers = import ./helpers.nix {inherit lib;};
   pwaAppIds = import ./pwa-apps.nix;
-  voxtypePackage = config.programs.voxtype.package;
+  voxtypePackage = config.services.voxtype.package;
 in {
   imports = [./uwsm-env.nix];
 

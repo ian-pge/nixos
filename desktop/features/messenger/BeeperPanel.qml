@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import Quickshell
 import "../../ui"
 import "../../ui/Theme.js" as Theme
+import "../../ui/Morph.js" as Morph
 import "./BeeperFormat.js" as Format
 
 FocusScope {
@@ -78,6 +79,7 @@ FocusScope {
   readonly property bool canNavigateChats: canNavigatePanes && !emojiPickerOpen
     && !conversationSearchBar.input.inputMethodComposing
   readonly property bool canPickAttachment: canUseComposerShortcuts && composer.activeFocus
+    && !beeperData.currentChat?.localAssistant
     && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !editMessageID
     && !recording && !preparingRecording && !attachmentPicker && !emojiPickerOpen && !beeperData.stagingAttachments
   property bool gPending: false
@@ -96,13 +98,19 @@ FocusScope {
   property alias searchField: sidebar.searchInput
   property alias chatList: sidebar.list
   property alias composer: composerSurface.input
+  property bool composerExpanded: false
+  property real composerExpansion: composerExpanded ? 1 : 0
+  Behavior on composerExpansion {
+    enabled: root.active
+    NumberAnimation { duration: Morph.duration; easing.type: Easing.OutCubic }
+  }
   readonly property bool emojiPickerOpen: composerSurface?.emojiPickerOpen || false
   property alias tokenField: connectionSurface.tokenInput
   property alias modalSurface: dialogs.surface
   readonly property bool compact: width < 780
   readonly property bool recording: recorder !== null && recorder.recording
   readonly property var selectedMessage: messageIndex >= 0 && messageIndex < beeperData.messages.length ? beeperData.messages[messageIndex] : null
-  readonly property var filteredChats: Format.orderChats(beeperData.chats.filter(chat => (forwardSource ? !chat.isReadOnly
+  readonly property var filteredChats: Format.orderChats(beeperData.chats.filter(chat => (forwardSource ? !chat.isReadOnly && !chat.localAssistant
     : Format.isChatInView(chat, showLowPriority) && (networkFilter === "all" || Format.networkBadge(chat.network).key === networkFilter))
     && (!searchField.text || (Format.chatTitle(chat) + " " + Format.preview(chat, beeperData.chatPreviews)).toLowerCase().includes(searchField.text.toLowerCase()))), unreadFirst)
   readonly property bool canCycleNetwork: active && windowFocused && !modal && !beeperData.tokenRequired
@@ -132,6 +140,7 @@ FocusScope {
     && !!beeperData.currentChatID && !searchOpen && !messageSearch.opened
     && !composer.inputMethodComposing && !tokenField.activeFocus
   readonly property bool canStartRecording: active && beeperData.connected && !!beeperData.currentChatID
+    && !beeperData.currentChat?.localAssistant
     && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !beeperData.draftAttachment && !beeperData.stagingAttachments
     && !editMessageID && !dictating && !recorder && !preparingRecording && !composer.inputMethodComposing
   signal closeRequested()
@@ -149,7 +158,8 @@ FocusScope {
   }
   function ensureInitialChat() {
     if (!active || !beeperData.connected || beeperData.currentChatID || !filteredChats.length) return;
-    chooseChat(0);
+    const firstRemote = filteredChats.findIndex(chat => !chat.localAssistant);
+    chooseChat(firstRemote >= 0 ? firstRemote : 0);
   }
   function openChatSearch() {
     closeConversationSearch(false); searchOpen = true; selectSearchChat(0);
@@ -234,6 +244,7 @@ FocusScope {
   function cycleNetwork(direction) {
     if (forwardSource) return;
     const filters = ["all", "telegram", "whatsapp", "instagram", "sms"];
+    if (beeperData.localAssistantEnabled) filters.push("ollama");
     closeChatSearch();
     const index = Math.max(0, filters.indexOf(networkFilter));
     beeperData.networkFilter = filters[(index + direction + filters.length) % filters.length];
@@ -466,7 +477,10 @@ FocusScope {
     if (editMessageID) {
       const id = editMessageID, chatID = beeperData.currentChatID, text = composer.text;
       beeperData.request("edit", {chatID: chatID, messageID: id, text: text}, (result, error) => {
-        if (!error && chatID === beeperData.currentChatID) { editMessageID = ""; editText = ""; beeperData.loadMessages(false); }
+        if (!error && chatID === beeperData.currentChatID) {
+          composerExpanded = false;
+          editMessageID = ""; editText = ""; beeperData.loadMessages(false);
+        }
       });
     } else beeperData.sendMessage();
   }
@@ -617,11 +631,11 @@ FocusScope {
   // boundary even when wheel/trackpad events keep arriving continuously.
   function schedulePagination() { if (active && !paginationTimer.running) paginationTimer.start(); }
   function paginateVisibleLists() {
-    if (!active || !beeperData.connected || connectionSurface.visible) return;
+    if (!active || (!beeperData.connected && !beeperData.currentChat?.localAssistant) || connectionSurface.visible) return;
     const remaining = chatList.originY + chatList.contentHeight - chatList.contentY - chatList.height;
     // Unread-first also needs older pages: an old unread conversation must
     // reach the top without requiring a scroll through all the read chats.
-    if (!beeperData.loading && beeperData.hasMoreChats && !beeperData.chatsPaginationBlocked && (unreadFirst || remaining < 188))
+    if (beeperData.connected && !beeperData.loading && beeperData.hasMoreChats && !beeperData.chatsPaginationBlocked && (unreadFirst || remaining < 188))
       beeperData.refreshChats(true);
     // A prepend temporarily leaves contentY near the old top. Wait for the
     // new rows and their anchor adjustment before deciding to fetch more.
@@ -697,6 +711,7 @@ FocusScope {
   Component.onCompleted: claimHistory()
   onActiveChanged: {
     claimHistory();
+    if (!active) composerExpanded = false;
     if (!active) { pendingReadNavigation = null; arrivalBaseline = null; messageList.clearArrivals(); }
     if (!active) { rememberPosition(); clearMessageSelection(); closeConversationSearch(false); messageWheel.reset(); messageList.cancelFlick(); historyWheelTimer.stop(); pinLatest = false; stopRecording(); beeperData.flushDraft(); modal = ""; closeChatSearch(); }
     else { reconcilePrioritySelection(); restoringView = true; Qt.callLater(ensureInitialChat); Qt.callLater(restorePosition); }
@@ -761,6 +776,7 @@ FocusScope {
     }
     function onMessageSent(chatID) {
       if (!root.active || root.beeperData.currentChatID !== chatID) return;
+      root.composerExpanded = false;
       root.clearMessageSelection();
       root.closeConversationSearch(false);
       root.pinLatest = true;
@@ -805,6 +821,7 @@ FocusScope {
       else { root.rememberPosition(); root.restoringView = true; }
     }
     function onCurrentChatIDChanged() {
+      root.composerExpanded = false;
       if (root.forwardSource) root.closeChatSearch();
       root.arrivalBaseline = null; messageList.clearArrivals();
       root.arrivalReadyChatID = "";
@@ -957,6 +974,12 @@ FocusScope {
     sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; autoRepeat: false
     enabled: root.canUseComposerShortcuts && composerSurface.canPickEmoji
     onActivated: composerSurface.toggleEmojiPicker()
+  }
+  Shortcut {
+    sequence: "Ctrl+Space"; context: Qt.ApplicationShortcut; autoRepeat: false
+    enabled: root.canUseComposerShortcuts && composer.activeFocus && composerSurface.enabled
+      && !root.emojiPickerOpen && !root.attachmentPicker && !root.recording && !root.preparingRecording
+    onActivated: root.composerExpanded = !root.composerExpanded
   }
   Shortcut {
     sequence: "Ctrl+D"; context: Qt.ApplicationShortcut; autoRepeat: false
@@ -1151,12 +1174,13 @@ FocusScope {
       }
       Item {
         Layout.fillWidth: true; Layout.fillHeight: true
+        clip: root.composerExpansion > 0
         enabled: !connectionSurface.visible
         BeeperHistory {
           id: messageList; objectName: "beeperMessages"
           textScale: root.beeperData.chatTextSize / Theme.beeperFont.body
           shiftViewport: delta => messageWheel.shiftOrigin(delta)
-          anchors { fill: parent; bottomMargin: 12 }
+          anchors { fill: parent; bottomMargin: Math.min(12, parent.height) }
           clip: true
           // Reuse the last monitor's layouts on reopen. Other hidden monitors
           // keep no delegates; renderMedia below still unloads hidden media.
@@ -1230,6 +1254,7 @@ FocusScope {
         }
       }
       Rectangle {
+        id: errorBanner
         Layout.fillWidth: true; Layout.bottomMargin: 10
         implicitHeight: errorText.implicitHeight + 18
         visible: !!root.beeperData.lastError && !connectionSurface.visible
@@ -1238,6 +1263,7 @@ FocusScope {
         BeeperButton { id: dismissError; anchors { right: parent.right; verticalCenter: parent.verticalCenter } iconName: "x"; Accessible.name: "Dismiss error"; onClicked: root.beeperData.lastError = "" }
       }
       RowLayout {
+        id: savedSendDraft
         objectName: "beeperSavedSendDraft"
         Layout.fillWidth: true; Layout.bottomMargin: 6; spacing: 8
         visible: root.beeperData.recoverableDrafts.length > 0 && !root.beeperData.sending && !connectionSurface.visible
@@ -1258,7 +1284,18 @@ FocusScope {
       }
       BeeperComposer {
         id: composerSurface
+        // Animate the real layout height, keeping the bottom and text width fixed.
+        // Fill the conversation to its top, allowing any visible search/error/
+        // recovery controls to remain accessible.
+        readonly property real expandedHeight: Math.max(implicitHeight, conversationColumn.height
+          - (conversationSearchBar.visible ? conversationSearchBar.height + 10 : 0)
+          - (errorBanner.visible ? errorBanner.height + 10 : 0)
+          - (savedSendDraft.visible ? savedSendDraft.height + 6 : 0))
         Layout.fillWidth: true
+        // Qt Quick Layouts rounds positions to logical pixels. Round the height
+        // too so its fractional remainder cannot make the bottom/buttons wobble.
+        Layout.preferredHeight: Math.round(implicitHeight + (expandedHeight - implicitHeight) * root.composerExpansion)
+        expanded: root.composerExpanded || root.composerExpansion > 0
         enabled: !connectionSurface.visible && !root.forwardSource && !!root.beeperData.currentChatID && !root.beeperData.currentChat?.isReadOnly
         beeperData: root.beeperData
         networkAccent: root.conversationAccent

@@ -79,8 +79,14 @@ nix run .#quickshellBeeperPreview
 # Local regressions with pinned Qt, D-Bus and backend dependencies.
 nix develop .#desktop -c node desktop/tests/run.mjs
 
+# Only the messenger suites (same isolated fixtures).
+DESKTOP_TEST_FILTER='LocalChat|Beeper|MessengerProtocol' nix develop .#desktop -c node desktop/tests/run.mjs
+
 # Real Wayland object graph in a private nested compositor.
 nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs --desktop
+
+# Bar shortcuts and chat over a real fullscreen client, on a private display.
+nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs --fullscreen
 ```
 
 Use the wrapped runtime, which supplies Liquid Glass, Qt Multimedia, SVG and
@@ -94,7 +100,7 @@ node desktop/tests/run.mjs "$quickshell_runtime/bin/quickshell"
 ```
 
 The Wayland harness needs an existing Wayland session, Hyprland and D-Bus.
-For full desktop tests on a crowded tiled workspace, `QS_TEST_FLOAT=1` floats
+For desktop and messenger-host tests on a crowded tiled workspace, `QS_TEST_FLOAT=1` floats
 and sizes only the harness's temporary compositor window; it does not change
 rules or move existing application windows. This keeps full-screen dimming
 and bar geometry checks independent of the test window's allocated tile size.
@@ -147,6 +153,15 @@ it back in restores the split. A lone external display retains five slots and
 merges windows from 6…10 into the corresponding 1…5 slots. Cmd+Alt+H/L cycles
 within the current screen's range; Shift moves a window to the selected workspace. See the
 [workspace policy](../home_manager/hyprland/workspace-policy.lua).
+
+Cmd+Space maximizes a window while keeping the bar and widgets visible.
+Cmd+Shift+Space enters true fullscreen and hides the resting bar.
+This also applies to videos in visible named/special workspaces; a hidden
+special workspace does not hide the normal desktop's bar.
+During fullscreen playback, shortcuts reveal the bar's widgets and chat above
+the video until they close. The bar stays hidden otherwise, including on mouse
+hover or incoming notifications. Its surface uses a stable Overlay layer: changing a hidden Top surface's
+layer can stall while the compositor withholds frame callbacks.
 
 Validate the generated Lua with
 `lua home_manager/hyprland/tests/workspace-navigation_test.lua GENERATED_HYPRLAND_LUA`.
@@ -224,6 +239,20 @@ See the [storage constraints](docs/DESIGN_GUIDE.md#stockage) and
 
 ## Messages
 
+The inbox also contains **Qwen local**, a text conversation with the installed
+Ollama model. Replies stream into the history; the send button becomes Stop
+while Qwen replies. Local history and drafts survive restarts. Qwen receives
+only this conversation, and remains available through **Chat with Qwen** on
+the Beeper connection screen. Attachments are disabled for this conversation.
+The backend guide describes its local API, context limits and persistence.
+
+Qwen replies render Markdown headings, emphasis, lists, quotations, tables and
+monospaced code. Web and mail links open only when clicked. Selecting text copies
+the rendered selection; copying the whole message retains its Markdown source.
+An active selection holds the displayed revision while the answer streams, then
+catches up when cleared. Image markup is represented as text, without fetching
+external resources. Other conversations keep their existing rendering.
+
 Beeper Desktop must remain running as the local API provider. Create an access
 token in its integration settings and enter it in the connection screen; the
 helper stores it in GNOME Keyring, never Nix. Disable Desktop's notification
@@ -247,6 +276,12 @@ asynchronous responses, focus and rendering decisions.
 Changing workspace on the panel's screen or focusing another screen folds the
 chat back into the bar, preserving the conversation and draft.
 The in-app `?` help is the shortcut reference. `Ctrl+H/L` moves between panes;
+`Ctrl+Space` while the composer has focus expands the writing area all the way to
+the top of the conversation; pressing it again restores the normal height.
+Expansion and collapse use the shell's 220 ms easing, preserving text, selection,
+replies and attachments. A successful send or edit restores the compact composer;
+a failed send keeps it expanded. Changing conversation or closing the chat also
+restores the compact composer.
 `Ctrl+F` in the composer folds the chat back into the bar, then opens Yazi in its usual floating
 1000 × 600 Ghostty window. Selecting files, cancelling or closing Yazi restores
 the chat and draft. Files are previewed individually and sent in selection order,

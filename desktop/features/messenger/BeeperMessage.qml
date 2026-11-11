@@ -27,7 +27,8 @@ Item {
   readonly property int collapsedLines: 3
   readonly property bool clampBody: collapsed && !outgoing && Format.isShelby(sender)
   readonly property string plainBody: Format.text(message)
-  readonly property var linkedParts: Format.messageParts(message)
+  readonly property bool markdownBody: !outgoing && message.chatID === "local:qwen" && typeof message.markdownHTML === "string"
+  readonly property var linkedParts: markdownBody ? [] : Format.messageParts(message)
   readonly property bool hasLinkCards: linkedParts.length > 0
   property var linkOpener: url => Qt.openUrlExternally(url)
   readonly property string highlightedBody: renderMedia ? Format.highlightText(plainBody, searchQuery, Theme.yellow, Theme.background) : ""
@@ -46,7 +47,7 @@ Item {
   readonly property real preferredContentWidth: {
     // History measures delegates while hidden. Effective visibility must not
     // change text wrapping (and therefore move the viewport on reveal).
-    let widest = Math.max(!root.hasLinkCards ? body.implicitWidth : 0, linkedBody.item?.implicitWidth || 0, metadata.implicitWidth, reactions.totalWidth,
+    let widest = Math.max(root.markdownBody ? markdownBodyLoader.item?.implicitWidth || 0 : !root.hasLinkCards ? body.implicitWidth : 0, linkedBody.item?.implicitWidth || 0, metadata.implicitWidth, reactions.totalWidth,
       root.message.linkedMessageID ? replyQuote.implicitWidth : 0);
     // Use intrinsic sizes, never the width assigned by this bubble. children
     // also tracks Repeater insertions/removals and late image dimensions.
@@ -56,7 +57,7 @@ Item {
     }
     return widest;
   }
-  readonly property string selectedText: linkedBody.item?.selectedText || selectionLayer.item?.copyText || ""
+  readonly property string selectedText: markdownBodyLoader.item?.copyText || linkedBody.item?.selectedText || selectionLayer.item?.copyText || ""
   // Keeps the selection layer loaded after the pointer leaves.
   property bool hasTextSelection: false
   signal selectedRequested()
@@ -66,7 +67,7 @@ Item {
   signal heightInvalidated(var item)
   onHeightChanged: heightInvalidated(root)
   function attachmentItem(index) { return attachments.itemAt(index); }
-  function clearTextSelection() { selectionLayer.item?.deselect(); linkedBody.item?.clearTextSelection(); }
+  function clearTextSelection() { selectionLayer.item?.deselect(); linkedBody.item?.clearTextSelection(); markdownBodyLoader.item?.clearTextSelection(); }
   function playArrival() {
     if (!visible || !playbackEnabled || !viewportReady || !inVisibleViewport) return;
     arrivalMessageID = String(message.id || "");
@@ -197,7 +198,7 @@ Item {
           id: body
           objectName: "messageBody"
           width: parent.width
-          visible: !root.hasLinkCards && !!text
+          visible: !root.markdownBody && !root.hasLinkCards && !!text
           text: root.plainBody
           textFormat: Text.PlainText
           wrapMode: Text.Wrap
@@ -249,6 +250,22 @@ Item {
               // A click without dragging still selects the message.
               TapHandler { gesturePolicy: TapHandler.DragThreshold; onTapped: root.selectedRequested() }
             }
+          }
+        }
+        Loader {
+          id: markdownBodyLoader
+          width: parent.width
+          active: root.markdownBody
+          sourceComponent: BeeperMarkdown {
+            objectName: "beeperMarkdownBody"
+            html: root.message.markdownHTML
+            searchQuery: root.searchQuery
+            textScale: root.textScale
+            accent: root.networkAccent
+            renderEnabled: root.renderMedia
+            onSelectedRequested: root.selectedRequested()
+            onTextSelectionStarted: root.textSelectionStarted()
+            onOpenRequested: url => root.linkOpener(url)
           }
         }
         Loader {

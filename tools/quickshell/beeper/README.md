@@ -46,6 +46,34 @@ le résumé de reconnexion, sans conversation, n’en porte pas.
 
 ## Protocole QML
 
+La conversation réservée `local:qwen` utilise uniquement Ollama sur
+`http://127.0.0.1:11434/api/chat`, avec `qwen3.5:4b-q4_K_M`. Elle fonctionne
+sans connexion Beeper. Seuls ses propres messages entrent dans le contexte ;
+aucun brouillon, message, média ou jeton Beeper n'est transmis à Ollama.
+Le client HTTP n'utilise ni proxy d'environnement ni redirection.
+
+`ollamaStatus` renvoie la conversation, les 50 derniers messages, `generating`
+et une `revision`. `send` sur cet identifiant sauvegarde le message puis lance
+une génération ; `ollamaChanged` diffuse des snapshots révisés de la réponse.
+`ollamaCancel` interrompt la génération et conserve le texte déjà reçu.
+`messages`, `message` et la recherche ciblée lisent cet historique local.
+Une coupure de flux est affichée comme un échec, jamais comme une réponse complète.
+Une génération interrompue par un redémarrage n'est pas relancée automatiquement.
+La démo ne contacte jamais Ollama.
+
+L'historique est conservé dans le champ facultatif `localMessages` du même
+`state.json` privé. Le contexte du modèle est limité aux 24 derniers messages
+éligibles et à 24 Ko de texte, dans une fenêtre de 8192 tokens, avec une sortie
+maximale de 2048 tokens. L'historique visible reste paginé et n'est pas tronqué.
+Cette première version accepte du texte uniquement, sans outils ni accès au PC.
+
+Les messages de l'assistant ajoutent `markdownHTML`, produit par Goldmark à
+partir du texte original (CommonMark et extensions GFM). Le rendu ne charge
+aucune image : les images deviennent leur texte alternatif, le HTML brut est
+échappé et seuls les liens HTTP(S)/mailto sont actifs. `plainText` conserve la
+source Markdown pour la copie, la recherche et le contexte du modèle. Le HTML
+n'est pas persisté ; il est régénéré au chargement de l'historique.
+
 Une ligne JSON par requête : `{"id":1,"method":"chats","params":{}}`.
 Réponse : `{"id":1,"result":...}` ou `{"id":1,"error":{"code":"...","message":"..."}}`.
 Événement sans identifiant : `{"event":"messagesChanged","data":{"chatID":"..."}}`.
