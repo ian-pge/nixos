@@ -1,5 +1,10 @@
 {
   fileSystems."/persist".neededForBoot = true;
+  # Populate Chrome's unpacked extension only after its persistent directory
+  # is mounted, including when this mount first appears during a switch.
+  systemd.services.home-manager-ian.unitConfig.RequiresMountsFor = [
+    "/home/ian/.local/share/quickshell-spelling-extension"
+  ];
   environment.persistence."/persist/system" = {
     hideMounts = true;
     directories = [
@@ -13,6 +18,12 @@
       "/var/lib/NetworkManager"
       "/var/lib/flatpak"
       "/etc/NetworkManager/system-connections"
+      {
+        directory = "/var/lib/ollama";
+        user = "ollama";
+        group = "ollama";
+        mode = "0700";
+      }
       {
         directory = "/var/lib/colord";
         user = "colord";
@@ -53,6 +64,7 @@
         ".devpod"
         ".runpod"
         ".config/google-chrome"
+        ".local/share/quickshell-spelling-extension"
         ".local/share/applications"
         ".local/share/icons"
         ".config/BambuStudio"
@@ -90,6 +102,10 @@
         ".config/BeeperTexts"
         {
           directory = ".local/state/quickshell-beeper";
+          mode = "0700";
+        }
+        {
+          directory = ".local/state/quickshell-assistant";
           mode = "0700";
         }
         ".antigravity"

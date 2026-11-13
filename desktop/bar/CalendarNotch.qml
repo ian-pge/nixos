@@ -12,6 +12,8 @@ Item {
   property bool forceHovered: false
   property bool attachedToTop: true
   property bool attachedToBottom: false
+  // BottomNotch draws one morphing background around this content instead.
+  property bool drawBackground: true
   readonly property bool edgeAttached: attachedToTop || attachedToBottom
   readonly property real corner: Math.min(Theme.barSize(18), height / 2)
   readonly property color accent: Theme.electricCyan
@@ -21,6 +23,7 @@ Item {
   readonly property var forecast: controller.weather.days[Calendar.dateKey(controller.today)]
   readonly property string weatherIcon: Calendar.weatherIcon(forecast?.code)
   signal clicked()
+  signal secondaryClicked()
 
   // Share the upper widgets' height and curvature, leaving room for the
   // concave shoulders around the centered clock and its two side readings.
@@ -28,14 +31,14 @@ Item {
   implicitHeight: Theme.barGroupHeight
   Accessible.role: Accessible.Button
   Accessible.name: dateText + ", " + controller.timeText + ", " + controller.weather.temperatureText
-  Accessible.description: "Open calendar and weather"
+  Accessible.description: "Open calendar and weather · Right click: chat with Qwen"
   Accessible.onPressAction: root.clicked()
 
   // Mirror only the backdrop for the bottom edge; text stays upright.
   // Concave shoulders join the screen edge with the rounded inner corners.
   Shape {
     anchors.fill: parent
-    visible: root.edgeAttached
+    visible: root.drawBackground && root.edgeAttached
     transform: Scale {
       origin.y: root.height / 2
       yScale: root.attachedToBottom ? -1 : 1
@@ -58,7 +61,7 @@ Item {
   }
   Rectangle {
     anchors.fill: parent
-    visible: !root.edgeAttached
+    visible: root.drawBackground && !root.edgeAttached
     radius: height / 2
     color: "#000000"
   }
@@ -69,7 +72,7 @@ Item {
     width: root.width - (root.edgeAttached ? 2 * root.corner : 0)
     height: root.height + (root.edgeAttached ? root.corner : 0)
     radius: root.edgeAttached ? root.corner : root.height / 2
-    enabled: GlassState.enabled
+    enabled: GlassState.enabled && root.drawBackground
   }
   component Cell: Row {
     property string text: ""
@@ -147,7 +150,8 @@ Item {
     x: root.edgeAttached ? root.corner : 0
     width: root.width - 2 * x; height: root.height
     hoverEnabled: true
+    acceptedButtons: Qt.LeftButton | Qt.RightButton
     cursorShape: Qt.PointingHandCursor
-    onClicked: root.clicked()
+    onClicked: mouse => mouse.button === Qt.RightButton ? root.secondaryClicked() : root.clicked()
   }
 }

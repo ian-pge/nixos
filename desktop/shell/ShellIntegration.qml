@@ -9,6 +9,7 @@ Scope {
   required property var services
   required property var coordinator
   required property var messenger
+  property var assistant: null
   property bool enabled: true
   function border(overlay) {
     if (!enabled) return;
@@ -47,6 +48,7 @@ Scope {
       });
     }
     function toggleBeeper() { root.messenger.toggle(); }
+    function toggleAssistant() { root.assistant?.toggle(); }
     function dismissNotification() { root.services.notifications.close(); }
     function toggleDoNotDisturb() { root.services.notifications.toggleDoNotDisturb(); }
     function refreshNix() { root.services.updates.refreshStatus(); }

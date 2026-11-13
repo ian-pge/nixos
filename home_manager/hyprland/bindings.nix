@@ -15,6 +15,7 @@
     ;
 
   workspaceCount = 10;
+  screenshots = import ../screenshots.nix;
 
   # Follow the focused monitor's range, including all ten slots on a lone laptop.
   cycleWorkspace = step: ''
@@ -189,10 +190,10 @@ in {
       (mkBind (plainKey "XF86DoNotDisturb") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleDoNotDisturb") {})
       # XKB names the physical F13 key XF86Tools with the default evdev rules.
       (mkBind (plainKey "XF86Tools") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleDoNotDisturb") {})
-      (mkBind (plainKey "PRINT") (mkExec "hyprshot -m region -o ~/Pictures/Screenshots") {})
+      (mkBind (plainKey "PRINT") (mkExec "hyprshot -m region -o ~/${screenshots.directory}") {})
       (mkBind
         (plainKey "mouse:274")
-        (mkExec "hyprshot -m region -o ~/Pictures/Screenshots")
+        (mkExec "hyprshot -m region -o ~/${screenshots.directory}")
         {release = true;})
       (mkBind (mainKey "RETURN") "hl.dsp.exec_cmd(terminal)" {})
       (mkBind (mainKey "W") "hl.dsp.window.close()" {})
@@ -209,6 +210,7 @@ in {
       (mkBind (mainKey "A") "hl.dsp.exec_cmd(menu)" {})
       (mkBind (mainKey "apostrophe") "function() quickshell_show_keyboard_cheatsheet() end" {})
       (mkBind (mainKey "E") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleCalendar") {})
+      (mkBind (mainKey "I") (mkExec "${pkgs.quickshell}/bin/qs --config top-bar ipc call topbar toggleAssistant") {})
       (mkBind (mainKey "Z") ''hl.dsp.layout("togglesplit")'' {})
       (mkBind (mainKey "G") "hl.dsp.exec_cmd(browser)" {})
       (mkBind (mainKey "M") ''hl.dsp.workspace.toggle_special("Agenda")'' {})

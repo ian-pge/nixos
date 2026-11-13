@@ -6,7 +6,6 @@ require (
 	github.com/beeper/desktop-api-go/v6 v6.0.0
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/yuin/goldmark v1.8.7
 	golang.org/x/net v0.59.0
 )
 

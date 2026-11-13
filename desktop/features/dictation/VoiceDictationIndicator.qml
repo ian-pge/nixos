@@ -10,7 +10,7 @@ Rectangle {
   readonly property bool recording: controller.recording
   readonly property color accent: Theme.action
 
-  implicitWidth: Theme.barSize(180)
+  implicitWidth: Theme.barSize(140)
   implicitHeight: Theme.barSize(36)
   radius: Theme.barSize(18)
   color: GlassState.enabled ? "transparent" : Theme.background
@@ -23,7 +23,7 @@ Rectangle {
     anchors.margins: Theme.barSize(10)
     anchors.verticalCenter: parent.verticalCenter
     height: Theme.barSize(22)
-    energy: root.controller.energy
+    spectrumLevels: root.controller.spectrumLevels || []
     speechDetected: root.controller.speechDetected
     accent: root.accent
     active: root.recording

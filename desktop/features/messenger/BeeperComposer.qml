@@ -30,9 +30,7 @@ Rectangle {
   property var emojiSelection: null
   readonly property bool sendMode: !!composer.text.trim() || !!beeperData.draftAttachment || !!editMessageID
   readonly property bool busy: preparingRecording || beeperData.sending || beeperData.stagingAttachments > 0
-  readonly property bool localChat: !!beeperData.currentChat?.localAssistant
-  readonly property bool localReplyPending: localChat && beeperData.localGenerating
-  property real sendReveal: sendMode || localChat ? 1 : 0
+  property real sendReveal: sendMode ? 1 : 0
   Behavior on sendReveal { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
   signal editTextEdited(string text)
   signal draftTextEdited(string text)
@@ -174,6 +172,8 @@ Rectangle {
         enabled: root.canPickEmoji
         focusPolicy: Qt.TabFocus
         Accessible.name: "Choose an emoji"
+        ToolTip.visible: hovered; ToolTip.delay: 600
+        ToolTip.text: "Choose an emoji (Ctrl+S)"
         onClicked: root.toggleEmojiPicker()
         background: Rectangle {
           radius: width / 2
@@ -199,7 +199,7 @@ Rectangle {
           text: root.editMessageID ? root.editText : root.beeperData.draftText
           placeholderText: root.beeperData.currentChat?.isReadOnly ? "Read-only conversation"
             : root.recording ? ""
-            : root.preparingRecording ? "Preparing recording…" : root.dictating ? "Dictation in progress…" : "Write a message…"
+            : root.preparingRecording ? "Preparing recording…" : "Write a message…"
           // Outside Vim's insert mode, only Vim commands may edit the text.
           readOnly: root.recording || root.preparingRecording || !vimEditor.inserting
           // JetBrains Mono lines are taller than Ubuntu's: 7 + 6 px keep one
@@ -277,13 +277,13 @@ Rectangle {
         id: actionButton
         objectName: "beeperComposerAction"
         Layout.preferredWidth: 40; Layout.preferredHeight: 40; Layout.alignment: Qt.AlignBottom
-        enabled: root.recording || root.localReplyPending || (!root.busy && !composer.inputMethodComposing
-          && (root.beeperData.connected || root.localChat) && (!root.localChat || root.sendMode))
+        enabled: root.recording || (!root.busy && !composer.inputMethodComposing && root.beeperData.connected)
         focusPolicy: Qt.TabFocus
-        Accessible.name: root.localReplyPending ? "Stop Qwen's reply" : root.recording ? "Finish recording" : root.sendMode ? (root.editMessageID ? "Save message" : "Send message") : root.localChat ? "Send message" : "Record a voice message"
+        Accessible.name: root.recording ? "Finish recording" : root.sendMode ? (root.editMessageID ? "Save message" : "Send message") : "Record a voice message"
+        ToolTip.visible: hovered; ToolTip.delay: 600
+        ToolTip.text: root.recording ? "Finish recording (Ctrl+D)" : root.sendMode ? (root.editMessageID ? "Save message" : "Send message") : "Record a voice message (Ctrl+D)"
         onClicked: {
-          if (root.localReplyPending) root.beeperData.stopLocalReply();
-          else if (root.recording) root.recordingToggleRequested();
+          if (root.recording) root.recordingToggleRequested();
           else if (root.sendMode) root.submitRequested();
           else root.recordingToggleRequested();
         }
@@ -296,7 +296,7 @@ Rectangle {
             anchors.centerIn: parent
             name: "square"; size: 16
             color: Theme.error
-            visible: root.localReplyPending || root.recording && !root.busy
+            visible: root.recording && !root.busy
           }
         }
         contentItem: Item {
@@ -305,7 +305,7 @@ Rectangle {
             objectName: "beeperComposerMicrophone"
             anchors.centerIn: parent; name: "mic"
             color: root.networkAccent
-            opacity: root.busy || root.recording || root.localReplyPending ? 0 : 1 - root.sendReveal
+            opacity: root.busy || root.recording ? 0 : 1 - root.sendReveal
             scale: 0.8 + 0.2 * opacity
 
           }
@@ -313,7 +313,7 @@ Rectangle {
             objectName: "beeperComposerSendIcon"
             anchors.centerIn: parent; name: root.editMessageID ? "check" : "send"
             color: root.networkAccent
-            opacity: root.busy || root.recording || root.localReplyPending ? 0 : root.sendReveal
+            opacity: root.busy || root.recording ? 0 : root.sendReveal
             scale: 0.8 + 0.2 * opacity
             size: 21
           }

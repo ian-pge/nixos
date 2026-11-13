@@ -1652,6 +1652,23 @@ ShellRoot {
         app.coordinator.close("brightness");
         wait(250); compare(capsule.contentOpacity("workspaces"), 0);
         verify(composer.activeFocus); compare(composer.text, "Keep this draft");
+        fixture.stage = "dictation recording over chat";
+        verify(!app.services.dictation.enabled, "The composition test must never open a microphone");
+        app.services.dictation.setState("recording");
+        app.coordinator.dictationTargetMonitor = bar.monitorName;
+        tryCompare(capsule, "targetMode", "dictation");
+        const waveform = findChild(capsule, "dictationWaveform");
+        tryVerify(() => waveform !== null && waveform.visible && waveform.opacity > 0.99, 1000);
+        compare(findChild(host, "voiceDictationIndicator"), null);
+        verify(!visibleText(host).includes("Dictation"));
+        verify(host.active); verify(composer.activeFocus); compare(composer.text, "Keep this draft");
+        fixture.stage = "dictation transcription over chat";
+        app.services.dictation.setState("transcribing");
+        compare(capsule.targetMode, "dictation"); verify(host.active);
+        verify(composer.activeFocus); compare(composer.text, "Keep this draft");
+        app.services.dictation.setState("stopped");
+        app.coordinator.dictationTargetMonitor = "";
+        wait(250); compare(capsule.contentOpacity("workspaces"), 0);
         app.coordinator.open("audio", bar.monitorName);
         fixture.stage = "audio replacement";
         verify(!host.active); compare(app.coordinator.mode, "audio");
@@ -1666,6 +1683,8 @@ ShellRoot {
         compare(app.coordinator.mode, "workspaces"); compare(composer.text, "Keep this draft");
       } finally {
         noticeState.visible = false;
+        app.services.dictation.setState("stopped");
+        app.coordinator.dictationTargetMonitor = "";
         app.coordinator.messenger.hide();
         app.coordinator.mode = "workspaces";
         capsule.services = Qt.binding(() => app.services);

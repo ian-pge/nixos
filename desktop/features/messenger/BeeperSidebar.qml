@@ -59,8 +59,8 @@ Rectangle {
   signal viewportChanged()
   onNetworkKeyChanged: {
     if (!transitionsReady || !animateListTransition) return;
-    // The model/filter changes immediately. Only the resulting list's visual
-    // transform fades in, so Tab never waits for an outgoing model to finish.
+    // The model/filter changes immediately. Fade the resulting list in place,
+    // so Tab never shifts the list or waits for an outgoing model to finish.
     networkTransition.stop(); networkProgress = 0; networkTransition.start();
   }
   // Search filters on every keystroke: keep the whole list opaque and still,
@@ -215,18 +215,60 @@ Rectangle {
           color: Qt.alpha(networkSelector.accent, networkSelector.hovered || networkSelector.activeFocus ? 0.24 : 0.14)
         }
         contentItem: Item {
-          Icon {
-            anchors.centerIn: parent; size: 30
-            name: root.currentNetwork.iconName || ""; visible: name !== ""
-            color: networkSelector.accent
+          id: networkIcon
+          objectName: "beeperNetworkIcon"
+          readonly property var network: root.currentNetwork
+          readonly property bool animateChanges: root.animateSelection
+          property var displayedNetwork: null
+          property var outgoingNetwork: null
+          property real progress: 1
+          property bool ready: false
+          readonly property bool running: iconTransition.running
+          // Keep the complete symbol on each side of the transition: some
+          // networks use font glyphs, others use SVG icons with an empty glyph.
+          onNetworkChanged: {
+            if (!ready) return;
+            const previous = progress < 0.5 ? outgoingNetwork : displayedNetwork;
+            iconTransition.stop();
+            outgoingNetwork = previous;
+            displayedNetwork = network;
+            if (animateChanges && previous && previous.key !== network.key) {
+              progress = 0; iconTransition.start();
+            } else progress = 1;
           }
-          BeeperRollingText {
-            objectName: "beeperNetworkGlyph"
-            anchors.fill: parent; visible: !root.currentNetwork.iconName
-            clip: false
-            text: networkSelector.text; font: networkSelector.font
-            color: networkSelector.accent
-            animateChanges: root.animateSelection; travel: 8
+          onAnimateChangesChanged: if (!animateChanges) { iconTransition.stop(); progress = 1; }
+          Component.onCompleted: { displayedNetwork = network; outgoingNetwork = network; ready = true; }
+          NumberAnimation {
+            id: iconTransition
+            target: networkIcon; property: "progress"; to: 1
+            duration: 140; easing.type: Easing.OutCubic
+          }
+          Repeater {
+            model: 2
+            delegate: Item {
+              id: symbol
+              required property int index
+              readonly property bool outgoing: index === 0
+              readonly property var network: outgoing ? networkIcon.outgoingNetwork : networkIcon.displayedNetwork
+              objectName: outgoing ? "beeperNetworkOutgoing" : "beeperNetworkIncoming"
+              width: networkIcon.width; height: networkIcon.height
+              x: 8 * (outgoing ? -networkIcon.progress : 1 - networkIcon.progress)
+              opacity: outgoing ? 1 - networkIcon.progress : networkIcon.progress
+              visible: !outgoing || networkIcon.progress < 1
+              Icon {
+                objectName: "beeperNetworkSvg"
+                anchors.centerIn: parent; size: 30
+                name: symbol.network?.iconName || ""; visible: name !== ""
+                color: networkSelector.accent
+              }
+              Text {
+                objectName: "beeperNetworkGlyph"
+                anchors.fill: parent; visible: !symbol.network?.iconName
+                text: symbol.network?.glyph || ""; textFormat: Text.PlainText
+                font: networkSelector.font; color: networkSelector.accent
+                horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+              }
+            }
           }
         }
         Rectangle {
@@ -323,7 +365,6 @@ Rectangle {
       Layout.fillWidth: true; Layout.fillHeight: true
       clip: true; spacing: 5
       opacity: 0.72 + 0.28 * root.networkProgress
-      transform: Translate { x: 6 * (1 - root.networkProgress) }
       model: KeyedListModel {
         id: chatModel
         // The native list only needs identities. Visible delegates read the

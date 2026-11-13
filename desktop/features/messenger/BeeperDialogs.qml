@@ -47,6 +47,8 @@ Rectangle {
     "Enter     Send message / save an edit",
     "Shift + Enter     New line",
     "Ctrl + Space while typing     Expand / restore the writing area",
+    "Alt + Tab     Correct with GPT · Ctrl + Alt + Tab     Correct with Qwen",
+    "Ctrl + Alt + Shift + Tab     Restore the original corrected draft",
     "Ctrl + s     Open / close emoji picker",
     "Ctrl + d     Start / finish a voice recording",
     "Enter while recording     Finish; press Enter again to send",

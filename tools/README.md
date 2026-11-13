@@ -23,7 +23,9 @@ Google Health with explicit OAuth consent; the phone itself stays local.
 | `quickshell/gpu-monitor/` | `quickshell/gpu-monitor.nix` | Persistent Rust NVIDIA telemetry through NVML, with runtime-suspend checks |
 | `quickshell/speedtest/` | `quickshell/speedtest.nix` | Generation-tagged Ookla JSON streaming and cancellation |
 | `quickshell/weather/` | `quickshell/weather.nix` | Rust automatic location, current temperature and daily calendar weather |
+| `quickshell/voice-spectrum/` | `quickshell/voice-spectrum.nix` | Recording-only PipeWire frequency bands for the dictation indicator |
 | `quickshell/beeper/` | `quickshell/beeper.nix` | Persistent Go Beeper API client, drafts, media and local notifications |
+| `quickshell/assistant/` | `quickshell/assistant.nix` | Go bridge to pi for the Qwen (read-only) and OpenAI conversations, Markdown rendering and local spelling correction (Quickshell and Chrome host) |
 | `../desktop/features/messenger/` | `quickshell/beeper-preview.nix` | Standalone messenger design preview with fictional conversations |
 
 The QML application lives in [`../desktop/`](../desktop/README.md); backend
@@ -81,6 +83,9 @@ cd tools/quickshell/beeper
 go test ./...
 go build .
 ```
+
+`tools/quickshell/assistant` is a second, independent Go module tested the same
+way (`cd tools/quickshell/assistant && go test ./...`).
 
 Build the installed, wrapped executable with `nix build .#quickshellBeeper`.
 Its wrapper supplies `secret-tool`, `wl-paste` and `xdg-open` at runtime;

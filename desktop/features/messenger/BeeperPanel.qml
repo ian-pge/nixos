@@ -51,6 +51,62 @@ FocusScope {
   property Item textSelectionOwner: null
   readonly property string selectedText: textSelectionOwner?.selectedText ?? ""
   property string notice: ""
+  // The local assistant service owns the correction engine; hosts inject it.
+  property var corrector: null
+  property bool correctingSpelling: false
+  property int spellingFocusRevision: 0
+  property var spellingUndo: null
+  property string spellingReportID: ""
+  Connections {
+    target: root.corrector
+    ignoreUnknownSignals: true
+    function onCorrectionClosed(id) {
+      if (id === root.spellingReportID && root.active && root.Window.window?.active)
+        Qt.callLater(root.compose);
+    }
+  }
+  function spellingNotice(text) { notice = text; noticeTimer.restart(); }
+  function correctComposerSpelling(undo = false, provider = "qwen") {
+    if (!active || !windowFocused) return;
+    if (!canUseComposerShortcuts || !composer.activeFocus || editMessageID || recording || preparingRecording || beeperData.sending) {
+      return;
+    }
+    if (correctingSpelling) { return; }
+    if (!undo && !corrector) { return; }
+    if (undo) {
+      if (!spellingUndo || spellingUndo.chatID !== beeperData.currentChatID || beeperData.draftText !== spellingUndo.after) {
+        return;
+      }
+      beeperData.draftText = spellingUndo.before;
+      composer.cursorPosition = Math.min(spellingUndo.cursor, composer.length);
+      corrector.finishCorrection?.(spellingUndo.report, "undone"); spellingUndo = null; return;
+    }
+    const original = composer.text, chatID = beeperData.currentChatID;
+    const selected = composer.selectionStart !== composer.selectionEnd;
+    const start = selected ? composer.selectionStart : 0, end = selected ? composer.selectionEnd : original.length;
+    const text = original.slice(start, end);
+    if (!text.trim()) { return; }
+    const generation = beeperData.chatGeneration, revision = beeperData.draftRevision;
+    const cursor = composer.cursorPosition;
+    const selectionStart = composer.selectionStart, selectionEnd = composer.selectionEnd;
+    correctingSpelling = true;
+    spellingReportID = corrector.correctText(text, (result, error) => {
+      correctingSpelling = false;
+      if (error || result?.cancelled) { return; }
+      if (generation !== beeperData.chatGeneration || revision !== beeperData.draftRevision || beeperData.currentChatID !== chatID
+          || composer.text !== original || composer.cursorPosition !== cursor
+          || composer.selectionStart !== selectionStart || composer.selectionEnd !== selectionEnd) {
+        corrector.finishCorrection?.(result, "cancelled"); return;
+      }
+      if (!result?.edits?.length) { corrector.finishCorrection?.(result, "unchanged"); return; }
+      const corrected = original.slice(0, start) + result.text + original.slice(end);
+      spellingUndo = {chatID: chatID, before: original, after: corrected, cursor: cursor, report: result};
+      beeperData.draftText = corrected;
+      composer.cursorPosition = Math.max(0, Math.min(corrected.length, cursor + result.text.length - text.length));
+      corrector.finishCorrection?.(result, "applied");
+
+    }, provider);
+  }
   // Vim-style modal editing in the composer; hosts opt in.
   property bool vimEditing: false
   property bool externalPhotoPreview: false
@@ -79,7 +135,6 @@ FocusScope {
   readonly property bool canNavigateChats: canNavigatePanes && !emojiPickerOpen
     && !conversationSearchBar.input.inputMethodComposing
   readonly property bool canPickAttachment: canUseComposerShortcuts && composer.activeFocus
-    && !beeperData.currentChat?.localAssistant
     && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !editMessageID
     && !recording && !preparingRecording && !attachmentPicker && !emojiPickerOpen && !beeperData.stagingAttachments
   property bool gPending: false
@@ -110,7 +165,7 @@ FocusScope {
   readonly property bool compact: width < 780
   readonly property bool recording: recorder !== null && recorder.recording
   readonly property var selectedMessage: messageIndex >= 0 && messageIndex < beeperData.messages.length ? beeperData.messages[messageIndex] : null
-  readonly property var filteredChats: Format.orderChats(beeperData.chats.filter(chat => (forwardSource ? !chat.isReadOnly && !chat.localAssistant
+  readonly property var filteredChats: Format.orderChats(beeperData.chats.filter(chat => (forwardSource ? !chat.isReadOnly
     : Format.isChatInView(chat, showLowPriority) && (networkFilter === "all" || Format.networkBadge(chat.network).key === networkFilter))
     && (!searchField.text || (Format.chatTitle(chat) + " " + Format.preview(chat, beeperData.chatPreviews)).toLowerCase().includes(searchField.text.toLowerCase()))), unreadFirst)
   readonly property bool canCycleNetwork: active && windowFocused && !modal && !beeperData.tokenRequired
@@ -140,7 +195,6 @@ FocusScope {
     && !!beeperData.currentChatID && !searchOpen && !messageSearch.opened
     && !composer.inputMethodComposing && !tokenField.activeFocus
   readonly property bool canStartRecording: active && beeperData.connected && !!beeperData.currentChatID
-    && !beeperData.currentChat?.localAssistant
     && !beeperData.currentChat?.isReadOnly && !beeperData.sending && !beeperData.draftAttachment && !beeperData.stagingAttachments
     && !editMessageID && !dictating && !recorder && !preparingRecording && !composer.inputMethodComposing
   signal closeRequested()
@@ -158,8 +212,7 @@ FocusScope {
   }
   function ensureInitialChat() {
     if (!active || !beeperData.connected || beeperData.currentChatID || !filteredChats.length) return;
-    const firstRemote = filteredChats.findIndex(chat => !chat.localAssistant);
-    chooseChat(firstRemote >= 0 ? firstRemote : 0);
+    chooseChat(0);
   }
   function openChatSearch() {
     closeConversationSearch(false); searchOpen = true; selectSearchChat(0);
@@ -244,7 +297,6 @@ FocusScope {
   function cycleNetwork(direction) {
     if (forwardSource) return;
     const filters = ["all", "telegram", "whatsapp", "instagram", "sms"];
-    if (beeperData.localAssistantEnabled) filters.push("ollama");
     closeChatSearch();
     const index = Math.max(0, filters.indexOf(networkFilter));
     beeperData.networkFilter = filters[(index + direction + filters.length) % filters.length];
@@ -473,6 +525,7 @@ FocusScope {
   }
   function resumePreviewStep() { if (pendingPreviewStep) stepPreview(pendingPreviewStep); }
   function submitMessage() {
+    if (correctingSpelling) { corrector?.decideCorrection(true); return; }
     if (recorder || preparingRecording || composer.inputMethodComposing) return;
     if (editMessageID) {
       const id = editMessageID, chatID = beeperData.currentChatID, text = composer.text;
@@ -631,11 +684,11 @@ FocusScope {
   // boundary even when wheel/trackpad events keep arriving continuously.
   function schedulePagination() { if (active && !paginationTimer.running) paginationTimer.start(); }
   function paginateVisibleLists() {
-    if (!active || (!beeperData.connected && !beeperData.currentChat?.localAssistant) || connectionSurface.visible) return;
+    if (!active || !beeperData.connected || connectionSurface.visible) return;
     const remaining = chatList.originY + chatList.contentHeight - chatList.contentY - chatList.height;
     // Unread-first also needs older pages: an old unread conversation must
     // reach the top without requiring a scroll through all the read chats.
-    if (beeperData.connected && !beeperData.loading && beeperData.hasMoreChats && !beeperData.chatsPaginationBlocked && (unreadFirst || remaining < 188))
+    if (!beeperData.loading && beeperData.hasMoreChats && !beeperData.chatsPaginationBlocked && (unreadFirst || remaining < 188))
       beeperData.refreshChats(true);
     // A prepend temporarily leaves contentY near the old top. Wait for the
     // new rows and their anchor adjustment before deciding to fetch more.
@@ -718,6 +771,7 @@ FocusScope {
     updateView(); schedulePagination();
   }
   onWindowFocusedChanged: {
+    ++spellingFocusRevision;
     if (!windowFocused && !modal && !emojiPickerOpen) clearMessageSelection();
     updateView();
   }
@@ -730,6 +784,7 @@ FocusScope {
   Connections {
     target: root.composer
     function onActiveFocusChanged() {
+      ++root.spellingFocusRevision;
       if (root.composer.activeFocus) { root.clearMessageSelection(); root.navigation = "compose"; }
     }
   }
@@ -919,9 +974,10 @@ FocusScope {
   // popups and the separate fullscreen window. Only the active monitor owns it.
   Shortcut {
     sequence: "Escape"; context: Qt.ApplicationShortcut; autoRepeat: false
-    enabled: root.active && (root.windowFocused && (root.recorder !== null || root.preparingRecording) || !!root.beeperData.audioPlayback?.active)
+    enabled: root.active && (root.windowFocused && (root.correctingSpelling || root.recorder !== null || root.preparingRecording) || !!root.beeperData.audioPlayback?.active)
     onActivated: {
-      if (root.recorder || root.preparingRecording) root.cancelRecording();
+      if (root.correctingSpelling) root.corrector?.decideCorrection(false);
+      else if (root.recorder || root.preparingRecording) root.cancelRecording();
       else root.beeperData.audioPlayback.pause();
     }
   }
@@ -976,6 +1032,21 @@ FocusScope {
     onActivated: composerSurface.toggleEmojiPicker()
   }
   Shortcut {
+    sequence: "Alt+Tab"; context: Qt.ApplicationShortcut; autoRepeat: false
+    enabled: root.canUseComposerShortcuts && composer.activeFocus
+    onActivated: root.correctComposerSpelling(false, "openai")
+  }
+  Shortcut {
+    sequence: "Ctrl+Alt+Tab"; context: Qt.ApplicationShortcut; autoRepeat: false
+    enabled: root.canUseComposerShortcuts && composer.activeFocus
+    onActivated: root.correctComposerSpelling()
+  }
+  Shortcut {
+    sequence: "Ctrl+Alt+Shift+Tab"; context: Qt.ApplicationShortcut; autoRepeat: false
+    enabled: root.canUseComposerShortcuts && composer.activeFocus
+    onActivated: root.correctComposerSpelling(true)
+  }
+  Shortcut {
     sequence: "Ctrl+Space"; context: Qt.ApplicationShortcut; autoRepeat: false
     enabled: root.canUseComposerShortcuts && composer.activeFocus && composerSurface.enabled
       && !root.emojiPickerOpen && !root.attachmentPicker && !root.recording && !root.preparingRecording
@@ -990,8 +1061,11 @@ FocusScope {
   Shortcut {
     sequences: ["Return", "Enter"]; context: Qt.ApplicationShortcut; autoRepeat: false
     enabled: root.active && root.windowFocused && !root.composer.inputMethodComposing
-      && (root.recording || root.preparingRecording)
-    onActivated: { root.stopRecording(); if (!root.modal) root.compose(); }
+      && (root.correctingSpelling || root.recording || root.preparingRecording)
+    onActivated: {
+      if (root.correctingSpelling) root.corrector?.decideCorrection(true);
+      else { root.stopRecording(); if (!root.modal) root.compose(); }
+    }
   }
   Shortcut {
     sequence: "Alt+/"; context: Qt.WindowShortcut; autoRepeat: false

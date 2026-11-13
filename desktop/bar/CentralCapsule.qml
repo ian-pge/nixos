@@ -30,7 +30,7 @@ Rectangle {
   readonly property bool notificationActive: services.notifications.visible
     && monitorName === services.notifications.targetMonitor
   readonly property bool dictationOverlayActive: services.dictation.active
-    && monitorName === coordinator.dictationTargetMonitor && !messengerHost.active
+    && monitorName === coordinator.dictationTargetMonitor
   readonly property bool volumeOverlayActive: coordinator.isOpen("volume", monitorName)
   readonly property bool audioSelectorActive: coordinator.isOpen("audio", monitorName)
   readonly property bool calendarActive: coordinator.isOpen("calendar", monitorName)
@@ -226,6 +226,7 @@ Rectangle {
     // the OSD fade, including expiration while the chat is still open.
     if (mode === "workspaces" && (targetMode === "volume"
         || targetMode === "brightness" || targetMode === "notification"
+        || targetMode === "dictation"
         || root.messengerHost.originContentOpacity <= 0))
       return 0;
     const startOpacity = startOpacities[mode] === undefined

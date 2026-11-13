@@ -10,6 +10,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	extast "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/util"
 )
@@ -18,6 +19,7 @@ import (
 // image/resources or raw HTML, and only explicit web/mail links are clickable.
 var localMarkdown = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithParserOptions(parser.WithInlineParsers(util.Prioritized(markdownMathParser{}, 50))),
 	goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(markdownRenderer{}, 100))),
 )
 
@@ -32,6 +34,7 @@ func renderMarkdown(source string) string {
 type markdownRenderer struct{}
 
 func (markdownRenderer) RegisterFuncs(r renderer.NodeRendererFuncRegisterer) {
+	r.Register(kindMarkdownMath, renderMarkdownMath)
 	r.Register(ast.KindImage, renderMarkdownLiteral)
 	r.Register(ast.KindHTMLBlock, renderMarkdownLiteral)
 	r.Register(ast.KindRawHTML, renderMarkdownLiteral)

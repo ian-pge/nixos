@@ -1,0 +1,6 @@
+{
+  "name": "quickshell-math",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": { "mathjax": "4.1.3" }
+}

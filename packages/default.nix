@@ -5,17 +5,24 @@
   liquidGlassClient = pkgs.callPackage ./quickshell/liquid-glass-client.nix {};
   quickshellRuntime = pkgs.callPackage ./quickshell/runtime.nix {inherit liquidGlassClient;};
   quickshellBeeper = pkgs.callPackage ./quickshell/beeper.nix {};
+  llmAgents = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
+  quickshellAssistant = pkgs.callPackage ./quickshell/assistant.nix {
+    inherit (llmAgents) pi;
+    screenshotsDirectory = (import ../home_manager/screenshots.nix).directory;
+  };
+  quickshellSpellingExtension = pkgs.callPackage ./quickshell/spelling-extension.nix {inherit quickshellAssistant;};
+  quickshellMath = pkgs.callPackage ./quickshell/math.nix {};
   quickshellSystemStats = pkgs.callPackage ./quickshell/system-stats.nix {};
   quickshellWeather = pkgs.callPackage ./quickshell/weather.nix {};
+  quickshellVoiceSpectrum = pkgs.callPackage ./quickshell/voice-spectrum.nix {};
   batteryRelayReceiver = pkgs.callPackage ./battery-relay.nix {};
-  llmAgents = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
   quickshellDesktop = pkgs.callPackage ./quickshell/desktop.nix {
-    inherit quickshellBeeper quickshellSystemStats quickshellWeather batteryRelayReceiver;
+    inherit quickshellBeeper quickshellAssistant quickshellMath quickshellSystemStats quickshellWeather quickshellVoiceSpectrum batteryRelayReceiver;
     inherit (llmAgents) claude-code codex;
   };
 in
   {
-    inherit liquidGlassClient quickshellRuntime quickshellDesktop quickshellBeeper quickshellSystemStats quickshellWeather batteryRelayReceiver;
+    inherit liquidGlassClient quickshellRuntime quickshellDesktop quickshellBeeper quickshellAssistant quickshellSpellingExtension quickshellMath quickshellSystemStats quickshellWeather quickshellVoiceSpectrum batteryRelayReceiver;
     liquidGlass = pkgs.callPackage ./quickshell/liquid-glass.nix {};
     hyprlock = pkgs.writeShellApplication {
       name = "hyprlock";

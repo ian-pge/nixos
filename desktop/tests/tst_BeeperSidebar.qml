@@ -7,6 +7,7 @@ import Quickshell
 ShellRoot {
   id: fixture
   property var sidebar: null
+  property var format: null
   property bool measuring: false
   property real lastFrame: 0
   property var frameGaps: []
@@ -37,6 +38,7 @@ ShellRoot {
     }
   }
   Component.onCompleted: {
+    format = Qt.createQmlObject('import QtQml; import "file://' + Quickshell.shellDir + '/../features/messenger/BeeperFormat.js" as F; QtObject { property var library: F }', fixture).library;
     const path = referenceSource || Quickshell.shellDir + "/../features/messenger/BeeperSidebar.qml";
     const component = Qt.createComponent("file://" + path);
     if (component.status !== Component.Ready) { console.error(component.errorString()); Qt.exit(1); return; }
@@ -223,18 +225,41 @@ ShellRoot {
     function test_network_transitions_follow_latest_filter_without_delaying_data() {
       if (fixture.referenceSource) return;
       const original = sidebar.currentNetwork;
-      const glyph = findChild(sidebar, "beeperNetworkGlyph");
+      const icon = findChild(sidebar, "beeperNetworkIcon");
+      const incoming = findChild(icon, "beeperNetworkIncoming");
+      const outgoing = findChild(icon, "beeperNetworkOutgoing");
+      const row = sidebar.list.itemAtIndex(0);
+      const position = row.mapToItem(sidebar, 0, 0);
+      function verifySymbol(item, network) {
+        const svg = findChild(item, "beeperNetworkSvg"), glyph = findChild(item, "beeperNetworkGlyph");
+        compare(svg.visible, !!network.iconName); compare(glyph.visible, !network.iconName);
+        if (network.iconName) compare(svg.name, network.iconName);
+        else compare(glyph.text, network.glyph);
+      }
       try {
-        sidebar.currentNetwork = {key: "telegram", name: "Telegram", glyph: "T"};
-        compare(glyph.text, "T"); compare(glyph.displayedText, "T");
-        verify(glyph.running); compare(sidebar.networkProgress, 0);
-        wait(40); verify(sidebar.networkProgress > 0 && sidebar.networkProgress < 1);
-        sidebar.currentNetwork = {key: "whatsapp", name: "WhatsApp", glyph: "W"};
-        compare(glyph.text, "W"); compare(glyph.displayedText, "W");
-        wait(180); verify(!glyph.running); compare(sidebar.networkProgress, 1);
+        sidebar.currentNetwork = format.networkBadge("all"); wait(180);
+        // Exercise the real Tab / Shift+Tab sequence, including glyph-to-SVG
+        // and SVG-to-glyph transitions and wrapping at both ends.
+        for (const key of ["telegram", "whatsapp", "instagram", "sms", "all",
+          "sms", "instagram", "whatsapp", "telegram", "all"]) {
+          const previous = sidebar.currentNetwork;
+          sidebar.currentNetwork = format.networkBadge(key);
+          compare(icon.displayedNetwork.key, key); verify(icon.running); compare(sidebar.networkProgress, 0);
+          wait(40);
+          verifySymbol(incoming, sidebar.currentNetwork); verifySymbol(outgoing, previous);
+          verify(incoming.x > 0 && outgoing.x < 0, key + " slides horizontally");
+          compare(incoming.y, 0); compare(outgoing.y, 0);
+          compare(row.mapToItem(sidebar, 0, 0), position, "The list stays in place during Tab");
+          verify(sidebar.networkProgress > 0 && sidebar.networkProgress < 1);
+          wait(180); verify(!icon.running); compare(incoming.x, 0); compare(incoming.opacity, 1);
+        }
+        sidebar.currentNetwork = format.networkBadge("telegram");
+        sidebar.currentNetwork = format.networkBadge("sms");
+        compare(icon.displayedNetwork.key, "sms"); verify(icon.running);
+        wait(180); verify(!icon.running); verifySymbol(incoming, sidebar.currentNetwork);
         sidebar.visible = false;
-        sidebar.currentNetwork = {key: "sms", name: "SMS", glyph: "S"};
-        compare(glyph.displayedText, "S"); verify(!glyph.running); compare(sidebar.networkProgress, 1);
+        sidebar.currentNetwork = format.networkBadge("all");
+        compare(icon.displayedNetwork.key, "all"); verify(!icon.running); compare(sidebar.networkProgress, 1);
       } finally { sidebar.visible = true; sidebar.currentNetwork = original; wait(180); }
     }
     function test_search_finishes_an_inflight_list_transition() {
@@ -257,7 +282,8 @@ ShellRoot {
       if (fixture.referenceSource) return;
       const original = sidebar.currentNetwork;
       const button = findChild(sidebar, "beeperNetworkFilter");
-      const glyph = findChild(sidebar, "beeperNetworkGlyph");
+      const icon = findChild(sidebar, "beeperNetworkIcon");
+      const glyph = findChild(findChild(icon, "beeperNetworkIncoming"), "beeperNetworkGlyph");
       logoMetrics.font = button.font;
       try {
         for (const network of [
@@ -274,7 +300,7 @@ ShellRoot {
           const ink = logoMetrics.tightBoundingRect;
           const left = glyph.mapToItem(button, (glyph.width - logoMetrics.advanceWidth) / 2 + ink.x, 0).x;
           verify(left >= 0 && left + ink.width <= button.width, network.name + " fits inside its button");
-          compare(glyph.progress, 1);
+          compare(icon.progress, 1);
         }
       } finally { sidebar.currentNetwork = original; wait(180); }
     }

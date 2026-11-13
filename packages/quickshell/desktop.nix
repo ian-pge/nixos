@@ -10,7 +10,10 @@
   sound-theme-freedesktop,
   quickshellSystemStats,
   quickshellWeather,
+  quickshellVoiceSpectrum,
   quickshellBeeper,
+  quickshellAssistant,
+  quickshellMath,
   batteryRelayReceiver,
   claude-code,
   nodejs,
@@ -52,6 +55,8 @@ in
   runCommand "quickshell-desktop" {} ''
     cp -R ${source} "$out"
     chmod -R u+w "$out"
+    substituteInPlace "$out/features/dictation/DictationController.qml" \
+      --replace-fail '"quickshell-voice-spectrum"' '"${quickshellVoiceSpectrum}/bin/quickshell-voice-spectrum"'
     substituteInPlace "$out/features/system/SystemController.qml" \
       --replace-fail '"quickshell-system-stats"' '"${quickshellSystemStats}/bin/quickshell-system-stats"'
     substituteInPlace "$out/features/power/BatteryRelayData.qml" \
@@ -65,6 +70,10 @@ in
       --replace-fail '"quickshell-weather"' '"${quickshellWeather}/bin/quickshell-weather"'
     substituteInPlace "$out/features/messenger/BeeperData.qml" \
       --replace-fail '"quickshell-beeper"' '"${quickshellBeeper}/bin/quickshell-beeper"'
+    substituteInPlace "$out/features/assistant/AssistantData.qml" \
+      --replace-fail '"quickshell-assistant"' '"${quickshellAssistant}/bin/quickshell-assistant"'
+    substituteInPlace "$out/features/assistant/AssistantMath.qml" \
+      --replace-fail '"quickshell-math"' '"${quickshellMath}/bin/quickshell-math"'
     substituteInPlace "$out/features/messenger/BeeperAttachmentPicker.qml" \
       --replace-fail 'property var command: ["bash", Qt.resolvedUrl("../../../tools/quickshell/pick-attachment.sh").toString().replace(/^file:\/\//, "")]' \
         'property var command: ["${attachmentPicker}/bin/quickshell-beeper-pick-file"]'

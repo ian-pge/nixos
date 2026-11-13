@@ -80,7 +80,7 @@ var rows = [
    key("Q", "Config Nix", "app"), key("W", "Fermer", "window"),
    key("E", "Calendrier", "system"), key("R", "Stockage", "system"),
    key("T", "Audio", "system"), key("Y"), key("U", "Mises à jour", "system"),
-   key("I"), key("O"), key("P", "Onglets", "app"),
+   key("I", "Qwen", "app"), key("O"), key("P", "Onglets", "app"),
    key("["), key("]"), key("Backspace", "", "", 1.5)],
   [key("Control", "", "modifier", 1.75),
    key("A", "Lanceur", "app"), key("S", "LLM", "workspace"),

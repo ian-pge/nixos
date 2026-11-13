@@ -80,7 +80,7 @@ nix run .#quickshellBeeperPreview
 nix develop .#desktop -c node desktop/tests/run.mjs
 
 # Only the messenger suites (same isolated fixtures).
-DESKTOP_TEST_FILTER='LocalChat|Beeper|MessengerProtocol' nix develop .#desktop -c node desktop/tests/run.mjs
+DESKTOP_TEST_FILTER='Assistant|Beeper|MessengerProtocol' nix develop .#desktop -c node desktop/tests/run.mjs
 
 # Real Wayland object graph in a private nested compositor.
 nix develop .#desktop -c node desktop/tests/messenger-wayland_test.mjs qs --desktop
@@ -239,19 +239,29 @@ See the [storage constraints](docs/DESIGN_GUIDE.md#stockage) and
 
 ## Messages
 
-The inbox also contains **Qwen local**, a text conversation with the installed
-Ollama model. Replies stream into the history; the send button becomes Stop
-while Qwen replies. Local history and drafts survive restarts. Qwen receives
-only this conversation, and remains available through **Chat with Qwen** on
-the Beeper connection screen. Attachments are disabled for this conversation.
-The backend guide describes its local API, context limits and persistence.
+**Alt+Tab** uses GPT; **Ctrl+Alt+Tab** uses local Qwen to correct spelling/grammar in the selected text, or the whole
+draft when nothing is selected. **Ctrl+Alt+Shift+Tab** restores the last correction
+while its text is unchanged. The field stays untouched during preview: **Enter**
+applies the ready proposal and closes it; **Escape** closes it without applying,
+including during generation. Correction never sends the message. The selected
+model receives this text alone, in a separate request with no chat history.
+Only conservative word substitutions are applied; formatting, punctuation,
+numbers, URLs and emojis remain untouched. Ambiguous or larger rewrites are skipped.
 
-Qwen replies render Markdown headings, emphasis, lists, quotations, tables and
-monospaced code. Web and mail links open only when clicked. Selecting text copies
-the rendered selection; copying the whole message retains its Markdown source.
-An active selection holds the displayed revision while the answer streams, then
-catches up when cleared. Image markup is represented as text, without fetching
-external resources. Other conversations keep their existing rendering.
+The Chrome extension in `tools/quickshell/spelling-extension` provides the same
+shortcuts in standard web text fields. It uses DOM text/value APIs and Chrome's
+native-messaging API, sharing the Go correction engine of `quickshell-assistant`
+with Quickshell. It
+neither simulates keystrokes nor reads the clipboard. Only an explicit shortcut
+sends text to the selected model. A changed field, cursor or selection cancels
+replacement. The preview can take focus for review without changing the source.
+Undo stays in page memory; content is not written to browser storage.
+
+Apply NixOS, then load `~/.local/share/quickshell-spelling-extension` as an unpacked
+extension through `chrome://extensions` (Developer mode → Load unpacked).
+The native host manifest is managed under Chrome's `NativeMessagingHosts` folder.
+Chrome internal pages, password fields, closed shadow roots and unsupported
+custom editors are excluded. No global Hyprland correction binding is needed.
 
 Beeper Desktop must remain running as the local API provider. Create an access
 token in its integration settings and enter it in the connection screen; the
@@ -289,6 +299,72 @@ with the text on the first message; a failure preserves only the remaining files
 The picker preserves the original conversation if selection changes while it is
 open. `BEEPER_PREVIEW_MEDIA=1` adds fictional audio to the preview, without a
 real recording or account.
+
+## Qwen and OpenAI in the bottom notch
+
+**Cmd+I**, or a right click on the black date/time/weather notch, opens the
+assistant chat; the left click still opens the calendar. The notch grows upward
+from the screen edge, keeping its black fill and concave shoulders, with the
+central capsule's 220 ms motion: the clock fades out as the chat fades in.
+**Esc** steps back (help, selection, search, composer), then folds the chat into
+the clock; changing workspace or screen also folds it. The chat takes the keyboard
+like the messenger and dims the background. It replaces the messenger and the top
+bar's keyboard panels; volume, brightness, notifications, media and dictation
+feedback stay available.
+
+Two agents run through [pi](../tools/quickshell/assistant/README.md), each with
+its own conversation, history and draft. **Tab** / **Shift+Tab** (in the history or
+in Vim's normal mode, never while typing) switches between them. There is no
+header: an empty conversation shows the model in the middle (logo, name, access),
+and a click on its logo also switches (the logo changes without animation);
+accent, name and avatar follow the model. The composer caret stays solid while
+you type and blinks again at rest.
+
+- **Qwen** (local, flamingo): `huihui_ai/qwen3.5-abliterated:9b` through Ollama,
+  always read-only. It can read, list and search files anywhere you can, but
+  cannot modify anything or run commands. Nothing leaves the computer.
+- **OpenAI** (lavender): `gpt-6.1-sol` through your pi sign-in, with every tool.
+  It can read, edit, write and run shell commands with your permissions, without
+  asking first. The conversation and everything it reads go to OpenAI and count
+  against the Codex quota shown in the bar. It knows where Print saves your
+  screenshots (`home_manager/screenshots.nix`, shared with the binding): say
+  « regarde ma dernière capture » and it opens the newest ones; it never opens
+  them unprompted. Qwen is not told about them.
+
+**Ctrl+Tab** (Shift to go back), or a click on the big dot right of the
+composer, sets how much the current model thinks. Qwen's thinking is off or on;
+OpenAI goes from low through medium and high to extra high (`xhigh`). The dot is
+green at the lowest level and red at the highest, with yellow and peach between.
+Each conversation keeps its level across restarts; Qwen starts off and OpenAI at
+medium. A change applies from the next model request, even during a reply.
+
+Tool calls appear in the reply as one quoted line each (`▸ bash · …`). While an
+agent thinks (before the first word, and during each tool call) its avatar
+breathes and a playful verb (« Pondering… », « Noodling… », drawn anew at each
+thinking phase) shimmers in its color in the bubble. The send
+button becomes Stop while an agent replies. The reset icon (**Ctrl+S**) stops any
+reply and clears the conversation and its model context, keeping the unsent draft.
+For Qwen only, the power icon with an empty draft (**Ctrl+D**) unloads the model
+from GPU memory; the next message reloads it. History, drafts and the selected
+model survive restarts in `~/.local/state/quickshell-assistant`. The composer has
+Vim editing, Enter / Shift+Enter, **Ctrl+Space** expansion and **Ctrl+Alt+Tab**
+correction (always local). **Ctrl+J/K** (or j/k) select messages, `y` copies the
+selection or the message's Markdown source, `l` opens its first link, **Ctrl+/**
+searches the current conversation (accent-insensitive, Enter or Ctrl+J/K between
+matches), **Ctrl +/−/0** and Ctrl+wheel zoom, and `?` lists the shortcuts.
+Attachments are not sent.
+
+Replies render Markdown headings, emphasis, lists, quotations, tables and
+monospaced code. Web and mail links open only when clicked. Selecting text copies
+the rendered selection; copying the whole message retains its Markdown source.
+LaTeX between `$…$`, `$$…$$`, `\(…\)` and `\[…\]` renders as local SVGs,
+including fractions, roots and matrices. MathJax runs in a lazy shared worker,
+with its fonts bundled by Nix; formulas never require a web service. Copying a
+selection containing a formula preserves its TeX notation. Code blocks stay literal.
+An active selection holds the displayed revision while the answer streams, then
+catches up when cleared. Image markup is represented as text, without fetching
+external resources. The [backend README](../tools/quickshell/assistant/README.md)
+owns the protocol, tools, context and persistence.
 
 ## Plan limits
 
@@ -354,3 +430,5 @@ lua desktop/tests/keyboard-cheatsheet_test.lua GENERATED_HYPRLAND_LUA
 The Qt view checks are included in the desktop runner; these additional checks
 validate the actual XKB behavior and generated bindings without injecting
 keystrokes into the desktop.
+
+Spelling corrections open the bottom AI panel without stealing the source field’s focus. Accepted replacements are red, with short French explanations. Chrome and the composers show no spelling toast. The Chrome extension is installed in a real persistent directory so its unpacked path stays stable across Nix builds.

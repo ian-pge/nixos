@@ -208,6 +208,18 @@ ShellRoot {
       dictation.parseAudio('{"status":"connected"}'); verify(dictation.audioConnected);
       dictation.parseAudio('{"peak":"bad","rms":1}'); compare(dictation.energy, 0);
     }
+    function test_dictation_spectrum_is_bounded_expires_and_ignores_late_frames() {
+      const frame = JSON.stringify({bands: Array(19).fill(2)});
+      dictation.setState("recording"); dictation.parseSpectrum(frame);
+      compare(dictation.spectrumLevels.length, 19); compare(dictation.spectrumLevels[0], 1);
+      dictation.parseSpectrum('{"bands":[1,2]}'); compare(dictation.spectrumLevels.length, 19);
+      dictation.parseSpectrum(JSON.stringify({bands: Array(19).fill("bad")}));
+      compare(dictation.spectrumLevels[0], 1);
+      tryCompare(dictation, "spectrumLevels", [], 1000);
+      dictation.parseSpectrum(frame); dictation.setState("transcribing");
+      compare(dictation.spectrumLevels.length, 0);
+      dictation.parseSpectrum(frame); compare(dictation.spectrumLevels.length, 0);
+    }
     function test_calendar_today_following_does_not_override_user_navigation() {
       calendar.today = new Date(2026, 8, 10, 12); calendar.goToday();
       compare(calendar.selectedDate, "2026-09-10");

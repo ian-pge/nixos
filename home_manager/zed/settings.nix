@@ -145,6 +145,22 @@
         };
       };
     };
+    # LaTeX : compile à l'enregistrement (lualatex, sortie dans build/) puis ouvre le PDF dans sioyek
+    texlab = {
+      settings.texlab = {
+        build = {
+          onSave = true;
+          forwardSearchAfter = true;
+          executable = "latexmk";
+          args = ["-lualatex" "-interaction=nonstopmode" "-synctex=1" "-outdir=build" "%f"];
+          pdfDirectory = "build";
+        };
+        forwardSearch = {
+          executable = "sioyek";
+          args = ["--reuse-window" "--forward-search-file" "%f" "--forward-search-line" "%l" "%p"];
+        };
+      };
+    };
     texpresso-lsp = {
       initialization_options = {
         root_tex = "main.tex";

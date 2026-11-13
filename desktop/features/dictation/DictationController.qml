@@ -2,18 +2,21 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
-// Reads only VoxType's public status and local audio bridge. No monitor or focus state.
+// VoxType owns dictation. A recording-only PipeWire reader supplies display bands.
 Scope {
   id: root
   property bool enabled: true
   property list<string> statusCommand: ["voxtype", "status", "--follow", "--format", "json"]
   property list<string> audioCommand: ["voxtype-audio-bridge"]
+  property list<string> spectrumCommand: ["quickshell-voice-spectrum"]
   property int statusRestartDelay: 2000
   property int audioRestartDelay: 1000
+  property int spectrumRestartDelay: 1000
   property string state: "stopped"
   property bool audioConnected: false
   property real energy: 0
   property bool speechDetected: false
+  property var spectrumLevels: []
   readonly property bool active: recording || transcribing
   readonly property bool recording: state === "recording" || state === "streaming"
   readonly property bool transcribing: state === "transcribing"
@@ -21,11 +24,16 @@ Scope {
   property int frameIndex: 0
   readonly property var frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
   readonly property string brailleFrame: frames[frameIndex]
-  onRecordingChanged: if (!recording) resetAudio()
+  onRecordingChanged: {
+    spectrumRestart.stop();
+    spectrumProcess.running = enabled && recording;
+    resetAudio();
+  }
   onTranscribingChanged: frameIndex = 0
   onEnabledChanged: {
-    statusRestart.stop(); audioRestart.stop();
+    statusRestart.stop(); audioRestart.stop(); spectrumRestart.stop();
     statusProcess.running = enabled; audioProcess.running = enabled;
+    spectrumProcess.running = enabled && recording;
     if (!enabled) { setState("stopped"); audioConnected = false; resetAudio(); }
   }
 
@@ -44,8 +52,23 @@ Scope {
   }
 
   function resetAudio() {
+    audioExpiry.stop(); spectrumExpiry.stop();
     energy = 0;
     speechDetected = false;
+    spectrumLevels = [];
+  }
+
+  function parseSpectrum(line) {
+    if (!recording) return;
+    try {
+      const bands = JSON.parse(line).bands;
+      if (!Array.isArray(bands) || bands.length !== 19
+          || bands.some(value => typeof value !== "number" || !isFinite(value))) return;
+      spectrumLevels = bands.map(value => Math.max(0, Math.min(1, value)));
+      spectrumExpiry.restart();
+    } catch (error) {
+      console.warn("Unable to parse dictation spectrum:", error);
+    }
   }
 
   function parseAudio(line) {
@@ -76,6 +99,7 @@ Scope {
       const rms = Math.max(0, Math.min(1, frame.rms));
       energy = Math.max(peak, rms);
       speechDetected = frame.vad === 1;
+      audioExpiry.restart();
     } catch (error) {
       console.warn("Unable to parse VoxType audio frame:", error);
     }
@@ -103,5 +127,18 @@ Scope {
     }
   }
   Timer { id: audioRestart; interval: root.audioRestartDelay; onTriggered: if (root.enabled) audioProcess.running = true }
+  Process {
+    id: spectrumProcess
+    command: root.spectrumCommand
+    running: root.enabled && root.recording
+    stdout: SplitParser { onRead: data => root.parseSpectrum(data) }
+    onExited: {
+      root.spectrumLevels = []; spectrumExpiry.stop();
+      if (root.enabled && root.recording) spectrumRestart.restart();
+    }
+  }
+  Timer { id: spectrumRestart; interval: root.spectrumRestartDelay; onTriggered: if (root.enabled && root.recording) spectrumProcess.running = true }
+  Timer { id: spectrumExpiry; interval: 250; onTriggered: root.spectrumLevels = [] }
+  Timer { id: audioExpiry; interval: 250; onTriggered: root.resetAudio() }
   Timer { interval: 80; repeat: true; running: root.enabled && root.transcribing; onTriggered: root.frameIndex = (root.frameIndex + 1) % root.frames.length }
 }

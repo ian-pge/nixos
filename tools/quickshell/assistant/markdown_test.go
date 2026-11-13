@@ -1,24 +1,47 @@
 package main
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 )
 
+func TestLocalMarkdownMathPreservesTeXAndCode(t *testing.T) {
+	for _, source := range []string{`$$ (A-B)^2=A^2-2AB+B^2 $$`, `$x_i^2$`, `\(\frac{a}{b}\)`, "\\[\n\\sqrt{x^2+1}\n\\]", "$$\n\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\n$$"} {
+		rendered := renderMarkdown(source)
+		if !strings.Contains(rendered, `data-math="`) || strings.Contains(rendered, "<em>") {
+			t.Fatalf("math not preserved: %s", rendered)
+		}
+	}
+	got := renderMarkdown(`Avant $x_i$ puis **gras**.`)
+	if !strings.Contains(got, base64.StdEncoding.EncodeToString([]byte("x_i"))) || !strings.Contains(got, "<strong>gras</strong>") {
+		t.Fatal(got)
+	}
+	for _, source := range []string{"`$x_i$`", "```tex\n$$x_i$$\n```", `Prix : $5 et $10`, `Prix : \$5`, `Formule incomplète $$x_i`} {
+		if got := renderMarkdown(source); strings.Contains(got, `data-math="`) {
+			t.Fatalf("unexpected math: %s", got)
+		}
+	}
+	got = renderMarkdown(`$$\text{<img src="https://example.test">}$$`)
+	if strings.Contains(got, "<img") {
+		t.Fatal("raw HTML in math escaped its placeholder")
+	}
+}
+
 func TestLocalMarkdownStructureAndSourcePreservation(t *testing.T) {
 	source := "# Titre\n\nDu **gras**, de l'*italique* et du `code`.\n\n- premier\n  - enfant\n\n1. un\n2. deux\n\n> citation\n\n```go\nif x < 2 { println(\"OK\") }\n```\n\n| A | B |\n| --- | --- |\n| un | deux |\n\n- [x] fini\n- [ ] ensuite"
-	m := localMessage{Role: "assistant", Content: source, State: "complete"}.display()
-	if m["plainText"] != source {
+	m := chatMessage{Role: "assistant", Content: source, State: "complete"}.display()
+	if m["text"] != source {
 		t.Fatal("copyable Markdown source changed")
 	}
-	html := m["markdownHTML"].(string)
+	html := m["html"].(string)
 	for _, token := range []string{"<h1>", "<strong>gras</strong>", "<em>italique</em>", "<code>code</code>", "<ul>", "<ol>", "<blockquote>", "<pre><code", "x &lt; 2", "<table>", "☑", "☐"} {
 		if !strings.Contains(html, token) {
 			t.Fatalf("missing %q in %s", token, html)
 		}
 	}
-	if _, ok := (localMessage{Role: "user", Content: source}).display()["markdownHTML"]; ok {
-		t.Fatal("user message changed renderer")
+	if user := (chatMessage{Role: "user", Content: source}).display()["html"].(string); strings.Contains(user, "<h1>") || !strings.Contains(user, "# Titre") {
+		t.Fatal("user message was rendered as Markdown")
 	}
 }
 

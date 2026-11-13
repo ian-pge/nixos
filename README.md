@@ -89,7 +89,7 @@ to Voxtype's recipe.
 `cache.nixos-cuda.org` binary cache for CUDA packages. Its API listens
 on `127.0.0.1:11434`, and Ollama's cloud features are disabled. Models and server
 state in `/var/lib/ollama` survive reboots through impermanence. The model loader
-downloads `qwen3.5:4b-q4_K_M` after the service starts, without loading it into
+downloads `huihui_ai/qwen3.5-abliterated:9b` after the service starts, without loading it into
 GPU memory until it is used.
 
 After rebuilding the system, check the download and run the model:
@@ -98,11 +98,14 @@ After rebuilding the system, check the download and run the model:
 systemctl status ollama.service
 journalctl -u ollama-model-loader.service -f
 ollama list
-ollama run qwen3.5:4b-q4_K_M
+ollama run huihui_ai/qwen3.5-abliterated:9b
 ```
 
 `ollama ps` shows whether a loaded model uses
-the GPU; `ollama stop qwen3.5:4b-q4_K_M` unloads it from memory.
+the GPU; `ollama stop huihui_ai/qwen3.5-abliterated:9b` unloads it from memory.
+In the desktop, Cmd+I opens the Qwen/OpenAI chat in the bottom notch, which uses
+this model through pi with a 32k context; see
+[the desktop README](desktop/README.md#qwen-and-openai-in-the-bottom-notch).
 
 ## Workspace navigation
 

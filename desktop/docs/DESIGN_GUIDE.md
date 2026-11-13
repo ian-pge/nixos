@@ -256,6 +256,51 @@ Le chat est centré dans la zone de travail. Les marges externes de
 `BeeperBubble` correspondent aux `general.gaps_out` de Hyprland ; les maintenir
 cohérentes. Son contenu garde sa mise en page finale pendant la transformation.
 
+### Encoche du bas et Qwen
+
+L'encoche noire date/heure/météo est une seule surface (`BottomNotch`) qui
+possède sa géométrie, son fond à épaules concaves et son `GlassShape`.
+`CalendarNotch` n'y est qu'un contenu sans fond. Ouvrir Qwen agrandit cette
+surface vers le haut, bord inférieur fixe, avec le langage de la capsule centrale :
+taille OutCubic de `Morph.duration`, fondus temporels `Morph.incoming/outgoing`
+qui repartent des opacités affichées, `MorphScale` indépendant sur chaque axe.
+Le panneau est mis en page à sa taille finale ; ne jamais le faire suivre les
+bords animés. Le clic gauche reste le calendrier, le clic droit et Cmd+I ouvrent
+Qwen. Le masque d'entrée suit la surface animée.
+
+Un `AssistantData` et un processus `quickshell-assistant` servent toute la
+session ; chaque écran n'active que sa vue. Fermer l'encoche n'interrompt pas une
+réponse. Deux agents pi, chacun avec sa conversation, sa session et son brouillon :
+Qwen local en lecture seule, OpenAI avec tous les outils. La liste d'outils est
+fixée au lancement de chaque pi, jamais par la conversation : ne pas faire passer
+Qwen par `set_model` sur le processus OpenAI. Pas de barre d'en-tête : une conversation vide affiche
+au centre le logo, le nom et l'accès du modèle. Basculer (Tab dans l'historique ou
+en mode normal Vim, jamais en insertion ; clic sur le logo) vide immédiatement l'historique affiché avant de charger l'autre :
+un message ne doit jamais apparaître sous le logo de l'autre modèle, et aucune
+conversation n'est envoyée à l'autre modèle. Le logo change sans animation. Le niveau de réflexion est un gros point à droite
+du champ de saisie, raccourci d'autant : vert au plus bas, rouge au plus haut,
+jaune et pêche entre les deux (Ctrl+Tab, ou clic). Qwen n'a que off/on (Ollama
+reçoit `reasoning_effort` `none` ou `high`) ; OpenAI va de low à xhigh.
+L'encoche et la messagerie sont exclusives,
+comme l'encoche et les panneaux clavier du haut ; les retours passifs (volume, luminosité, notifications, média, dictée)
+coexistent. Le focus suit la règle du chat : `HyprlandFocusGrab` sans lien avec
+la visibilité, un clic extérieur rend le clavier sans fermer.
+
+Les messages arrivent en HTML produit par le backend : Goldmark pour les réponses,
+texte échappé pour ceux de l'utilisateur. Un seul lecteur Qt natif sélectionnable
+les affiche ; la recherche ne surligne que les nœuds texte. Une sélection active
+conserve sa révision affichée jusqu'à sa libération pour que le streaming ne
+déplace pas le texte copié. Les snapshots sont révisionnés : un fragment ancien
+ne remplace jamais un état plus récent, et une réinitialisation invalide les pages
+en vol. L'historique ancré en bas suit le streaming ; un geste vers le haut libère
+l'ancre, et une page plus ancienne conserve la position de lecture.
+
+La correction Ctrl+Alt+Tab de la messagerie et de l'extension Chrome passe aussi
+par `quickshell-assistant`, toujours vers Qwen local et sans pi : un seul moteur
+et un seul nom de modèle. Le texte
+part seul, sans historique, et n'est appliqué qu'au brouillon, curseur et focus
+inchangés.
+
 ## Couleurs et verre
 
 Les pictogrammes d'interface passent par `ui/Icon.qml` et le catalogue Lucide
@@ -351,12 +396,10 @@ Les détails de protocole et de persistance appartiennent au
 
 ### Pagination, modèles et défilement
 
-Les réponses de `local:qwen` utilisent le HTML Markdown produit par le backend,
-dans un lecteur Qt natif sélectionnable. La géométrie dépend du texte rendu,
-y compris hors écran. Une sélection active conserve sa révision affichée
-jusqu'à sa libération pour que le streaming ne déplace pas le texte copié.
-Les autres messages restent sur leur rendu texte/liens existant ; leur contenu
-brut ne doit jamais être interprété comme du HTML.
+La messagerie n'affiche que du texte brut et des cartes de liens ; aucun contenu
+Beeper n'est interprété comme du HTML. Qwen vit dans l'encoche du bas (voir
+[Encoche du bas et Qwen](#encoche-du-bas-et-qwen)) ; le backend Beeper ne
+contacte jamais Ollama.
 
 `KeyedListModel` réconcilie les snapshots par identité. Remplacer tout le modèle
 détruit les delegates, relance les décodeurs et casse les ancres de lecture.
@@ -532,7 +575,9 @@ ouverte. Un clic extérieur libère le focus sans fermer le chat ; ne pas lier
 le grab à la seule visibilité ni reprendre le clavier à l'autre application.
 
 Les bulles utilisent un chemin rempli unique pour éviter un joint transparent
-entre pointe et corps. Les médias ne peignent pas une seconde carte dessous.
+entre pointe et corps. Ce chemin (`ui/MessageBubbleShape.qml`) et la recherche
+sans casse ni accents avec surlignage (`ui/TextSearch.js`) sont partagés avec le
+chat de l'encoche du bas : les modifier change les deux chats. Les médias ne peignent pas une seconde carte dessous.
 Conserver texte, avatars et résolution de décodage stables pendant les
 animations de sélection ; les transforms évitent les recalculs coûteux de
 texte à chaque image. `ClippingRectangle` réalise le masque circulaire :
@@ -552,8 +597,10 @@ réactiver les vues, ce qui perdrait leurs sélections. Une notification seule
 ne réclame pas de clavier exclusif. À sa fin, restaurer le mode encore actif,
 pas un OSD déjà expiré.
 
-Volume, luminosité et notifications ordinaires coexistent avec le chat dans
-la barre. Les autres panneaux centraux le remplacent ; ouvrir le chat les
+Volume, luminosité, dictée et notifications ordinaires coexistent avec le chat
+dans la barre. La dictée garde son widget commun pendant l'enregistrement et
+la transcription, sans bandeau dans le chat ni changement de focus ou de brouillon.
+Les autres panneaux centraux le remplacent ; ouvrir le chat les
 ferme. Les arrivées MPRIS passives n'ouvrent pas un panneau : les applications
 publient aussi leurs vocaux et vidéos comme lecteurs.
 

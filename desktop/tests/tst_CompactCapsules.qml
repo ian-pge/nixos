@@ -24,6 +24,7 @@ ShellRoot {
     property bool recording: false
     property real energy: 0.5
     property bool speechDetected: true
+    property var spectrumLevels: []
   }
   QtObject {
     id: media
@@ -47,7 +48,7 @@ ShellRoot {
       create("dictation/VoiceDictationIndicator", {controller: dictation, y: 100}),
       create("audio/NowPlayingIndicator", {controller: media, y: 150})];
     standaloneWaveform = create("dictation/VoiceWaveform", {
-      energy: 0, speechDetected: false, accent: "white", active: false, y: 210
+      speechDetected: false, accent: "white", active: false, y: 210
     });
   }
   TestResult { id: results }
@@ -66,7 +67,7 @@ ShellRoot {
       }
       compare(views[0].implicitWidth, fixture.theme.barSize(280));
       compare(views[1].implicitWidth, fixture.theme.barSize(280));
-      compare(views[2].implicitWidth, fixture.theme.barSize(180));
+      compare(views[2].implicitWidth, fixture.theme.barSize(140));
       compare(views[0].radius, fixture.theme.barSize(18));
     }
     function test_content_grows_with_the_background() {
@@ -81,15 +82,33 @@ ShellRoot {
     function test_only_the_bar_waveform_is_scaled() {
       const waveform = findChild(views[2], "dictationWaveform");
       compare(waveform.height, fixture.theme.barSize(22));
-      fuzzyCompare(waveform.barWidth, 3 * fixture.theme.barScale, 0.001);
+      fuzzyCompare(waveform.barWidth, 2.2 * fixture.theme.barScale, 0.001);
       compare(standaloneWaveform.sizeScale, 1);
-      compare(standaloneWaveform.barWidth, 3);
+      compare(standaloneWaveform.barWidth, 2.2);
       compare(standaloneWaveform.implicitHeight, 22);
       dictation.recording = true;
       wait(50);
       verify(waveform.visible);
-      verify(waveform.barCount >= waveform.minimumBarCount);
+      compare(waveform.barCount, 19);
       dictation.recording = false;
+    }
+    function test_voice_bars_stay_in_place_and_keep_the_same_scale_after_a_peak() {
+      const wave = standaloneWaveform;
+      wave.active = true; wave.speechDetected = true;
+      const levels = Array.from({length: 19}, (_, i) => i === 9 ? 0.5 : 0.1);
+      wave.spectrumLevels = levels;
+      wait(250);
+      const bars = Array.from({length: 19}, (_, i) => findChild(wave, "voiceBar" + i));
+      const heights = bars.map(bar => bar.height), positions = bars.map(bar => bar.x);
+      verify(heights[9] > heights[0]);
+      wait(200);
+      bars.forEach((bar, i) => { fuzzyCompare(bar.height, heights[i], 0.001); compare(bar.x, positions[i]); });
+      wave.spectrumLevels = Array(19).fill(1); wait(150);
+      wave.spectrumLevels = levels; wait(250);
+      bars.forEach((bar, i) => fuzzyCompare(bar.height, heights[i], 0.001));
+      wave.speechDetected = false; wait(250);
+      bars.forEach(bar => fuzzyCompare(bar.height, wave.barWidth, 0.001));
+      wave.active = false; wave.spectrumLevels = [];
     }
     function test_media_uses_catppuccin_yellow() {
       const indicator = views[3], icon = findChild(indicator, "mediaPlaybackIcon");

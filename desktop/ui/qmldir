@@ -8,3 +8,4 @@ KeyedListModel 1.0 KeyedListModel.qml
 AcceleratedScroll 1.0 AcceleratedScroll.qml
 VimEditing 1.0 VimEditing.qml
 VimSearchPrompt 1.0 VimSearchPrompt.qml
+MessageBubbleShape 1.0 MessageBubbleShape.qml

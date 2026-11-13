@@ -5,6 +5,7 @@
 pkgs.mkShell {
   packages = [
     localPackages.quickshellRuntime
+    localPackages.quickshellMath
     pkgs.nodejs
     pkgs.jq
     pkgs.dbus

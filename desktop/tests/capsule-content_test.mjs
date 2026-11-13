@@ -71,7 +71,7 @@ for (const name of ['contentOpacity']) {
 
 // The new target is known before the coalesced transition callback. No cached
 // workspace pixels may become visible as the OSD container starts to appear.
-for (const mode of ['volume', 'brightness', 'notification']) {
+for (const mode of ['volume', 'brightness', 'notification', 'dictation']) {
   for (const chatOpacity of [0, 0.2, 1]) {
     state.messengerHost.originContentOpacity = chatOpacity;
     state.targetMode = mode;
@@ -128,4 +128,4 @@ state.messengerHost.originContentOpacity = 0;
 assert.equal(state.contentOpacity('calendar'), 0);
 state.chatSourceOpacities = {workspaces: 1};
 assert.equal(state.contentOpacity('workspaces'), 0);
-console.log('PASS: volume/brightness/notification entry, interruption and expiry never flash hidden workspaces; chat handoff still restores them');
+console.log('PASS: volume/brightness/notification/dictation entry, interruption and expiry never flash hidden workspaces; chat handoff still restores them');

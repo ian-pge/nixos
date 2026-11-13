@@ -29,7 +29,8 @@ ShellRoot {
   }
   Component.onCompleted: {
     system = create("system/SystemController", {enabled: false, statsRestartDelay: 30, gpuRestartDelay: 30});
-    dictation = create("dictation/DictationController", {enabled: false, statusRestartDelay: 30, audioRestartDelay: 30});
+    dictation = create("dictation/DictationController", {enabled: false, statusRestartDelay: 30,
+      audioRestartDelay: 30, spectrumRestartDelay: 30, spectrumCommand: fixture.stream('{"bands":[]}')});
     system.brightnessSample.connect(value => { systemSamples++; systemProcesses.push(value); });
     system.gpuTextChanged.connect(() => {
       if (system.gpuText === "--") return;
@@ -100,6 +101,25 @@ ShellRoot {
       verify(!dictation.active); verify(!dictation.audioConnected); compare(dictation.energy, 0);
       const starts = recordings, connections = audioConnections;
       wait(160); compare(recordings, starts); compare(audioConnections, connections);
+    }
+    function test_spectrum_runs_only_while_recording_and_recovers_after_exit() {
+      dictation.statusCommand = ["node", "-e", "setInterval(()=>{},1000)"];
+      dictation.audioCommand = fixture.stream('{"status":"connected"}');
+      dictation.spectrumCommand = fixture.stream(JSON.stringify({bands: Array(19).fill(0.4)}));
+      let received = 0;
+      const count = () => { if (dictation.spectrumLevels.length) received++; };
+      dictation.spectrumLevelsChanged.connect(count);
+      try {
+        dictation.enabled = true; wait(200); compare(received, 0);
+        dictation.setState("recording"); tryVerify(() => received >= 2, 3000);
+        dictation.setState("transcribing"); wait(200);
+        compare(dictation.spectrumLevels.length, 0);
+        const stopped = received; wait(180); compare(received, stopped);
+        dictation.setState("recording"); tryVerify(() => received > stopped, 3000);
+        dictation.enabled = false; wait(200);
+        const disabled = received; wait(180); compare(received, disabled);
+        compare(dictation.spectrumLevels.length, 0);
+      } finally { dictation.spectrumLevelsChanged.disconnect(count); }
     }
   }
 }

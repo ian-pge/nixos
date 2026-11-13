@@ -18,6 +18,7 @@ PanelWindow {
   required property var services
   required property var coordinator
   required property var messenger
+  required property var assistant
 
   property bool entered: false
   readonly property bool beeperActive: messengerSurface.active
@@ -76,10 +77,10 @@ PanelWindow {
   WlrLayershell.layer: WlrLayer.Overlay
   visible: !fullscreenActive
     || centerMorph.interactionVisible || messengerSurface.active
-    || messengerSurface.presented || fullscreenHideDelay.running
+    || messengerSurface.presented || bottomNotch.presented || fullscreenHideDelay.running
   WlrLayershell.namespace: "quickshell-top-bar"
   WlrLayershell.keyboardFocus: keyboardSelectorActive
-    ? WlrKeyboardFocus.Exclusive : messengerSurface.wantsKeyboard
+    ? WlrKeyboardFocus.Exclusive : messengerSurface.wantsKeyboard || bottomNotch.wantsKeyboard
     ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
   function restoreCenterFocus() {
@@ -89,7 +90,7 @@ PanelWindow {
   mask: Region {
     Region { item: topModules }
     Region { item: rightModules }
-    Region { item: calendarNotch }
+    Region { item: bottomNotch }
     Region { item: centerMorph.visible ? centerMorph : null }
     Region { item: messengerSurface.presented ? messengerSurface.surfaceItem : null }
   }
@@ -115,7 +116,7 @@ PanelWindow {
   DimmingPolicy {
     id: dimmingPolicy
     centralMode: centerMorph.targetMode
-    chatOpen: messengerSurface.active
+    chatOpen: messengerSurface.active || bottomNotch.active
     specialWorkspaceOpen: (window.hyprlandMonitor?.lastIpcObject?.specialWorkspace?.id ?? 0) < 0
     opaqueTheme: !GlassState.enabled
   }
@@ -136,18 +137,22 @@ PanelWindow {
     z: 1
   }
 
-  CalendarNotch {
-    id: calendarNotch
-    objectName: "calendarNotch"
+  BottomNotch {
+    id: bottomNotch
     parent: contentFrame
     z: 2
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
-    attachedToTop: false
-    attachedToBottom: true
-    controller: services.calendar
-    forceHovered: coordinator.isOpen("calendar", window.monitorName)
-    onClicked: coordinator.toggle("calendar", window.monitorName)
+    calendar: services.calendar
+    assistant: window.assistant
+    panelWindow: window
+    monitorName: window.monitorName
+    windowFocused: window.contentItem.Window.active
+    availableWidth: parent.width
+    availableHeight: parent.height - window.reservedTop
+    calendarOpen: coordinator.isOpen("calendar", window.monitorName)
+    onCalendarRequested: coordinator.toggle("calendar", window.monitorName)
+    onReturnFocusRequested: window.restoreCenterFocus()
     opacity: window.entered ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 240 } }
   }
@@ -173,13 +178,13 @@ PanelWindow {
     parent: contentFrame
     anchors.fill: parent
     controller: window.messenger
+    corrector: services.assistant
     panelWindow: window
     monitorName: window.monitorName
     windowFocused: window.contentItem.Window.active
     keyboardSelectorActive: window.keyboardSelectorActive
     dictating: services.dictation.active
       && window.monitorName === coordinator.dictationTargetMonitor
-    transcribing: services.dictation.transcribing
     barTop: window.capsuleTopInset
     workAreaTop: window.reservedTop
     sourceWidth: presented ? centerMorph.targetWidth : centerMorph.width

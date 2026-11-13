@@ -2,10 +2,9 @@ import QtQuick
 import Quickshell.Hyprland
 import "../features/messenger"
 import "../ui"
-import "../ui/Theme.js" as Theme
 
 // Per-monitor shell adapter: shared layer-surface focus, placement, animation
-// and dictation feedback. Notifications always belong to the top bar.
+// and animation. Dictation feedback and notifications belong to the top bar.
 Item {
   id: root
   required property var controller
@@ -14,7 +13,8 @@ Item {
   property bool windowFocused: false
   property bool keyboardSelectorActive: false
   property bool dictating: false
-  property bool transcribing: false
+  // Spelling correction engine (the shared local assistant service).
+  property var corrector: null
   property real barTop: 10
   property real workAreaTop: 46
   property real sourceWidth: 434
@@ -98,6 +98,7 @@ Item {
     anchors.fill: parent
     beeperData: root.controller.beeperData
     dictating: root.dictating
+    corrector: root.corrector
     vimEditing: true
     externalPhotoPreview: true
     attachmentPickerReady: root.nativeDialogOpen && !bubble.visible && !root.controller.blocked
@@ -145,22 +146,5 @@ Item {
       Qt.callLater(() => { if (root.active && !root.controller.blocked) { focusGrab.active = true; panel.compose(); } });
     }
     onStepRequested: delta => panel.stepPreview(delta)
-  }
-  Rectangle {
-    parent: bubble.contentItem
-    anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 16 }
-    width: 250; height: 32; radius: 16; color: Theme.surfaceRaised
-    visible: root.active && root.dictating
-    z: 3
-    Row {
-      anchors.centerIn: parent
-      spacing: 6
-      Icon { name: root.transcribing ? "loader-circle" : "mic"; spinning: root.transcribing; color: Theme.state; size: 16; anchors.verticalCenter: parent.verticalCenter }
-      Text {
-        text: root.transcribing ? "Dictation · transcribing…" : "Dictation in progress"
-        color: Theme.state
-        font.family: "Ubuntu Nerd Font"; font.pixelSize: Theme.beeperFont.secondary
-      }
-    }
   }
 }

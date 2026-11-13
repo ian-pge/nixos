@@ -18,14 +18,6 @@ Scope {
   property string statusMessage: ""
   property string lastError: ""
   readonly property bool connected: state === "connected" || state === "demo"
-  property bool localAssistantEnabled: enabled && !demo && state !== "demo"
-  readonly property string localChatID: "local:qwen"
-  property real localRevision: -1
-  property bool localGenerating: false
-  property var localAssistantChat: ({id: "local:qwen", title: "Qwen local", network: "ollama", type: "single",
-    localAssistant: true, unreadCount: 0, preview: "Chat with Qwen on this computer",
-    capabilities: {reply: false, edit: false, delete: false, reaction: false}})
-  readonly property bool localChatSelected: localAssistantEnabled && currentChatID === localChatID
   property var accounts: []
   property bool loadingAccounts: false
   property int accountsGeneration: 0
@@ -41,8 +33,7 @@ Scope {
   property var attachmentSaveOperations: ({})
   property var chatStore: ({records: {}, order: [], versions: {}, complete: false})
   property int chatStateSequence: 0
-  readonly property var chats: (localAssistantEnabled ? [localAssistantChat] : [])
-    .concat(chatStore.order.map(id => chatStore.records[id]).filter(Boolean))
+  readonly property var chats: chatStore.order.map(id => chatStore.records[id]).filter(Boolean)
   readonly property alias chatPreviews: previewResolver.entries
   property bool loadingUnreadCounts: false
   property bool unreadCountsDirty: false
@@ -60,7 +51,7 @@ Scope {
   property var searchResults: []
   property string currentChatID: ""
   property string targetMessageID: ""
-  readonly property var currentChat: localChatSelected ? localAssistantChat : chatStore.records[currentChatID] || null
+  readonly property var currentChat: chatStore.records[currentChatID] || null
   property var senderColorRegistry: ({})
   property var senderColors: ({})
   property bool loading: false
@@ -199,9 +190,7 @@ Scope {
       Qt.callLater(processWaveforms);
       Qt.callLater(() => scheduleUnreadCounts(true));
     } else {
-      const pendingLocalHistory = localChatSelected && navigationLoadTimer.running;
       navigationLoadTimer.stop();
-      if (pendingLocalHistory) Qt.callLater(() => loadMessages(false));
       ++accountsGeneration; loadingAccounts = false;
       ++unreadCountsGeneration; unreadCountsTimer.stop();
       loadingUnreadCounts = false;
@@ -220,7 +209,7 @@ Scope {
     const ids = [], seen = new Set();
     const stateFields = ["unreadCount", "isMarkedUnread", "network", "isLowPriority"];
     for (const row of rows) {
-      if (!row?.id || row.id === localChatID || deletedChatIDs[row.id] || seen.has(row.id)) continue;
+      if (!row?.id || deletedChatIDs[row.id] || seen.has(row.id)) continue;
       ids.push(row.id); seen.add(row.id);
       const previous = records[row.id] || {};
       const merged = Object.assign({}, previous, row);
@@ -264,7 +253,7 @@ Scope {
     chatStore = {records: records, order: order, versions: versions,
       complete: mode === "states" || (mode === "replace" ? demo : chatStore.complete)};
     for (const id of completedReads) readStateApplied(id);
-    if (mode === "states" && currentChatID && !localChatSelected && !records[currentChatID]) clearSelection();
+    if (mode === "states" && currentChatID && !records[currentChatID]) clearSelection();
   }
   function removeChats(ids) {
     const records = Object.assign({}, chatStore.records), versions = Object.assign({}, chatStore.versions);
@@ -327,29 +316,10 @@ Scope {
     pending[id] = {callback: callback, method: method, quiet: quiet === true};
     backend.write(JSON.stringify({id: id, method: method, params: params || {}}) + "\n");
   }
-  function refreshLocalChat() {
-    if (!localAssistantEnabled) return;
-    request("ollamaStatus", {}, (result, error) => { if (!error) applyLocalSnapshot(result); }, true);
-  }
-  function applyLocalSnapshot(result) {
-    if (!localAssistantEnabled || !result?.chat || result.revision < localRevision) return;
-    localRevision = result.revision;
-    localAssistantChat = result.chat;
-    localGenerating = result.generating === true;
-    if (localChatSelected && result.items) {
-      messagesUpdating();
-      messages = Format.mergeMessages(messages, result.items);
-      messagesLoaded(false);
-    }
-  }
-  function stopLocalReply() {
-    if (localGenerating) request("ollamaCancel", {chatID: localChatID});
-  }
   function acceptLine(line) {
     let response;
     try { response = JSON.parse(line); } catch (_) { lastError = "Could not read the service response."; return; }
     if (response.event) {
-      if (response.event === "ollamaChanged") { applyLocalSnapshot(response.data); return; }
       if (response.event === "status") {
         applyStatus(response.data);
       } else if (response.event === "chatsChanged") { refreshTimer.restart(); scheduleUnreadCounts(); }
@@ -395,7 +365,6 @@ Scope {
     if (connected && !wasConnected) refresh();
   }
   function initialize() {
-    refreshLocalChat();
     request("status", {}, (result, error) => {
       if (error || !result) return;
       applyStatus(result);
@@ -435,7 +404,6 @@ Scope {
     }, true);
   }
   function refreshChats(older) {
-    if (!connected) return;
     if (older && (!hasMoreChats || !chatsCursor || chatsPaginationBlocked)) return;
     if (loading) { if (!older) trailingChatsRefresh = true; return; }
     if (!older) chatsPaginationBlocked = false;
@@ -529,14 +497,7 @@ Scope {
       if (error || !result) { messagesPaginationBlocked = true; loadingMessages = false; return; }
       messagesUpdating();
       const deleted = deletedMessageIDs[chatID] || {};
-      let incoming = result.items || [];
-      // Old pages may still fill history while a streamed reply advances.
-      // They must not replace a newer snapshot of that reply.
-      if (chatID === localChatID && typeof result.revision === "number" && result.revision < localRevision) {
-        const present = new Set(messages.map(message => message.id));
-        incoming = incoming.filter(message => !present.has(message.id));
-      }
-      messages = Format.mergeMessages(messages, incoming).filter(message => !deleted[message.id]);
+      messages = Format.mergeMessages(messages, result.items || []).filter(message => !deleted[message.id]);
       if (older || !oldestCursor) {
         oldestCursor = result.oldestCursor || "";
         hasOlderMessages = !!result.hasMore && !!oldestCursor && oldestCursor !== cursor;
@@ -716,7 +677,6 @@ Scope {
       && typeof result.isMarkedUnread === "boolean";
   }
   function changeReadState(chatID, method, messageID, callback) {
-    if (chatID === localChatID) return false;
     const chat = chatStore.records[chatID];
     if (!chat || !connected || deletedChatIDs[chatID] || readStateOperations[chatID]) return false;
     // Setting an already-confirmed state is a no-op, not another write.
@@ -748,7 +708,6 @@ Scope {
     commitChatRows([changes], ++chatStateSequence, "patch");
   }
   function setChatLowPriority(chatID, lowPriority) {
-    if (chatID === localChatID) return;
     const chat = chats.find(item => item.id === chatID);
     if (!connected || !chat || lowPriorityPending[chatID] || typeof lowPriority !== "boolean") return;
     lastError = "";
@@ -824,8 +783,7 @@ Scope {
     return true;
   }
   function sendMessage() {
-    if (!currentChatID || sending || stagingAttachments || (!connected && !localChatSelected)
-        || (localChatSelected && localGenerating) || (!draftText.trim() && !draftAttachments.length)) return;
+    if (!currentChatID || sending || stagingAttachments || !connected || (!draftText.trim() && !draftAttachments.length)) return;
     const chatID = currentChatID, snapshot = draftSnapshot();
     // Snapshot the boundary before sending so a message arriving during the
     // request stays unread, even if the user switches conversations meanwhile.
@@ -849,10 +807,10 @@ Scope {
       retireSendDraft(chatID, savedID);
       if (!deletedChatIDs[chatID]) persistChatDraft(chatID);
       viewPositions[chatID] = {atLatest: true};
-      if (chatID !== localChatID) markChatRead(chatID, readThroughID);
+      markChatRead(chatID, readThroughID);
       messageSent(chatID);
       if (currentChatID === chatID) loadMessages(false);
-      if (chatID !== localChatID) refreshChats(false);
+      refreshChats(false);
     }
     function sendNext() {
       if (deletedChatIDs[chatID]) { finish({message: "Conversation removed"}); return; }
@@ -874,7 +832,6 @@ Scope {
     sendNext();
   }
   function stageAttachment(path, chatID = currentChatID) {
-    if (chatID === localChatID) { lastError = "Qwen currently accepts text messages only."; return; }
     ++stagingAttachments;
     request("stageAttachment", {path: path}, (result, error) => {
       --stagingAttachments;
@@ -882,7 +839,6 @@ Scope {
     });
   }
   function stageAttachments(paths, chatID = currentChatID) {
-    if (chatID === localChatID) { lastError = "Qwen currently accepts text messages only."; return; }
     if (!paths.length) return;
     if (paths.length === 1) { stageAttachment(paths[0], chatID); return; }
     ++stagingAttachments;
@@ -898,7 +854,6 @@ Scope {
     persistChatDraft(chatID);
   }
   function pasteAttachment() {
-    if (localChatSelected) return;
     const chatID = currentChatID;
     request("clipboardAttachment", {}, (result, error) => { if (!error && result?.path) appendAttachments(chatID, [result]); });
   }
@@ -952,17 +907,13 @@ Scope {
     running: root.enabled && !root.demo
     stdinEnabled: true
     onStarted: {
-      root.localRevision = -1;
-      root.localGenerating = false;
       root.statusRevision = -1;
       root.state = "loading-token";
       root.statusMessage = "Restoring your saved access token…";
       root.initialize();
-      if (root.localChatSelected) root.loadMessages(false);
     }
     stdout: SplitParser { onRead: data => root.acceptLine(data) }
     onExited: {
-      root.localGenerating = false;
       root.state = "offline"; root.statusMessage = "Reconnecting to the service…";
       const callbacks = root.pending; root.pending = ({});
       for (const id in callbacks) if (callbacks[id].callback) callbacks[id].callback(null, {message: "Connection interrupted. Check the result before sending again."});

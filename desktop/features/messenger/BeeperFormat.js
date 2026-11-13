@@ -1,4 +1,5 @@
 .pragma library
+.import "../../ui/TextSearch.js" as TextSearch
 
 function chatTitle(chat) { return chat ? String(chat.title || chat.name || "Conversation") : "Messages"; }
 function isChatUnread(chat) { return !!chat && (chat.unreadCount > 0 || chat.isMarkedUnread === true); }
@@ -12,7 +13,6 @@ function isChatInInbox(chat) { return !!chat && !chat.isLowPriority; }
 function isChatInView(chat, lowPriorityOnly) { return lowPriorityOnly ? chat?.isLowPriority === true : isChatInInbox(chat); }
 function chatSubtitle(chat) {
   if (!chat) return "All your conversations, in one place";
-  if (chat.localAssistant) return "Local AI · Qwen3.5 4B";
   let subtitle = "";
   if (chat.type === "group") {
     const participants = chat.participants;
@@ -42,7 +42,6 @@ function networkBadge(network) {
   const key = name.toLowerCase().replace(/[\s_-]/g, "");
   // Brand glyphs from the installed Nerd Font; no remote icon downloads.
   if (key === "all") return {key: "all", name: "All", glyph: "", iconName: "messages-square", logo: true};
-  if (key === "ollama") return {key: "ollama", name: "Local AI", glyph: "", iconName: "cpu", logo: true};
   if (key.startsWith("whatsapp")) return {key: "whatsapp", name: "WhatsApp", glyph: "\uf232", logo: true};
   if (key.startsWith("telegram")) return {key: "telegram", name: "Telegram", glyph: "\ue217", logo: true};
   if (key.startsWith("instagram")) return {key: "instagram", name: "Instagram", glyph: "\uf16d", logo: true};
@@ -93,7 +92,6 @@ function serviceConnectionIssue(state) {
   })[state] || "";
 }
 function networkConnectionIssue(network, issues, serviceIssue) {
-  if (network === "ollama") return "";
   if (serviceIssue) return serviceIssue;
   const messages = Object.values(issues || {}).filter(issue => network === "all" || issue.network === network)
     .map(issue => (network === "all" ? issue.name + ": " : "") + issue.message);
@@ -101,7 +99,6 @@ function networkConnectionIssue(network, issues, serviceIssue) {
 }
 function chatConnectionIssue(chat, issues, serviceIssue) {
   if (!chat) return "";
-  if (chat.localAssistant) return "";
   if (serviceIssue) return serviceIssue;
   if (chat.accountID) return issues?.[chat.accountID]?.message || "";
   return networkConnectionIssue(networkBadge(chat.network).key, issues, "");
@@ -136,13 +133,11 @@ function senderProfile(message, chat, accounts) {
   const account = (accounts || []).find(account => (account.id || account.accountID) === (message.accountID || chat?.accountID));
   const person = (message.senderID ? people.find(person => person.id === message.senderID) : null)
     || (message.isSender ? people.find(person => person.isSelf === true) || account?.user : null);
-  const profile = {
+  return {
     id: senderKey(message),
     title: message.isSender ? "You" : message.senderName || person?.fullName || person?.displayName || "Contact",
     imgURL: person?.imgURL || (!message.isSender && chat?.type === "single" ? chat.imgURL || "" : "")
   };
-  if (!message.isSender && (chat?.localAssistant || message.chatID === "local:qwen")) profile.localAssistant = true;
-  return profile;
 }
 function participantProfile(id, chat, accounts, accountID) {
   const person = (chat?.participants?.items || []).find(person => person.id === id);
@@ -255,41 +250,10 @@ function assignSenderColors(previous, identities, palette) {
   return colors;
 }
 function text(message) { return message ? String(message.plainText !== undefined ? message.plainText : message.text || "") : ""; }
-function escapeTextMarkup(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-function searchTextRanges(text, query) {
-  // Keep original UTF-16 offsets while folding case/accents, including emoji
-  // and decomposed accents. The API query itself is left completely unchanged.
-  function fold(value) { return value.normalize("NFD").toLowerCase().replace(/[\u0300-\u036f]/g, ""); }
-  const words = [...new Set(String(query || "").trim().split(/\s+/).map(fold).filter(Boolean))];
-  if (!words.length || !text) return [];
-  let normalized = "", offset = 0;
-  const positions = [];
-  for (const character of Array.from(text)) {
-    const value = fold(character), end = offset + character.length;
-    for (let i = 0; i < value.length; ++i) positions.push({start: offset, end: end});
-    if (!value && positions.length) positions[positions.length - 1].end = end;
-    normalized += value; offset = end;
-  }
-  const ranges = [];
-  for (const word of words) {
-    let start = normalized.indexOf(word);
-    while (start >= 0) {
-      ranges.push({start: positions[start].start, end: positions[start + word.length - 1].end});
-      start = normalized.indexOf(word, start + 1);
-    }
-  }
-  ranges.sort((a, b) => a.start - b.start || b.end - a.end);
-  const merged = [];
-  for (const range of ranges) {
-    const last = merged[merged.length - 1];
-    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
-    else merged.push({start: range.start, end: range.end});
-  }
-  return merged;
-}
+// Shared with the assistant chat: one implementation of literal, case- and
+// accent-insensitive matching with original offsets.
+function escapeTextMarkup(value) { return TextSearch.escapeTextMarkup(value); }
+function searchTextRanges(text, query) { return TextSearch.searchTextRanges(text, query); }
 // Escaped markup laid out like the plain messageBody: preserved whitespace and
 // line breaks, and the same 120 % line height.
 function paragraphMarkup(html) {
@@ -298,43 +262,11 @@ function paragraphMarkup(html) {
 }
 function highlightText(text, query, background, foreground) {
   const ranges = searchTextRanges(text, query);
-  if (!ranges.length) return "";
-  let html = "", start = 0;
-  for (const range of ranges) {
-    html += escapeTextMarkup(text.slice(start, range.start))
-      + '<span style="background-color:' + background + ';color:' + foreground + '">'
-      + escapeTextMarkup(text.slice(range.start, range.end)) + '</span>';
-    start = range.end;
-  }
-  // Only our spans become markup: message content can never create links,
-  // images or external resource loads.
-  return paragraphMarkup(html + escapeTextMarkup(text.slice(start)));
+  return ranges.length ? paragraphMarkup(TextSearch.highlightPlain(text, ranges, background, foreground)) : "";
 }
 // The mouse selection layer: the same escaped text, without any spans.
 function selectableText(text) {
   return paragraphMarkup(escapeTextMarkup(text));
-}
-// Goldmark emits escaped text and a controlled set of tags. Highlight text
-// nodes only, never attributes or tags; keep search layout identical.
-function highlightMarkdownHTML(html, query, background, foreground) {
-  if (!String(query || "").trim()) return html;
-  const entities = {amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\u00a0"};
-  return String(html).split(/(<[^>]*>)/g).map(part => {
-    if (part.startsWith("<")) return part;
-    const text = part.replace(/&(#x[0-9a-f]+|#[0-9]+|amp|lt|gt|quot|apos|nbsp);/gi, (match, key) => {
-      if (key[0] !== "#") return entities[key.toLowerCase()] || match;
-      const number = parseInt(key.slice(/^#x/i.test(key) ? 2 : 1), /^#x/i.test(key) ? 16 : 10);
-      return number > 0 && number <= 0x10ffff ? String.fromCodePoint(number) : match;
-    });
-    const ranges = searchTextRanges(text, query);
-    let rendered = "", start = 0;
-    for (const range of ranges) {
-      rendered += escapeTextMarkup(text.slice(start, range.start)) + '<span style="background-color:' + background
-        + ';color:' + foreground + '">' + escapeTextMarkup(text.slice(range.start, range.end)) + '</span>';
-      start = range.end;
-    }
-    return rendered + escapeTextMarkup(text.slice(start));
-  }).join("");
 }
 function quotePreview(message) {
   const body = text(message).trim();

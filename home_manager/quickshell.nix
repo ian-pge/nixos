@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   localPackages,
   ...
 }: {
@@ -28,6 +29,48 @@
   };
 
   config = {
+    # Chrome canonicalizes an unpacked extension's path. A real directory
+    # keeps it stable across Nix generations, unlike a link into the store.
+    home.activation.quickshellSpellingExtension = lib.hm.dag.entryAfter ["linkGeneration"] ''
+      spellingDir=${lib.escapeShellArg "${config.xdg.dataHome}/quickshell-spelling-extension"}
+      if [ -L "$spellingDir" ]; then run ${pkgs.coreutils}/bin/rm "$spellingDir"; fi
+      run ${pkgs.coreutils}/bin/mkdir -p "$spellingDir"
+      for spellingFile in manifest.json background.js editor.js content.js popup.html; do
+        run ${pkgs.coreutils}/bin/install -m 644 "${localPackages.quickshellSpellingExtension}/extension/$spellingFile" "$spellingDir/$spellingFile"
+      done
+    '';
+    xdg.configFile."google-chrome/NativeMessagingHosts/com.quickshell.spelling.json" = {
+      source = "${localPackages.quickshellSpellingExtension}/native-messaging/com.quickshell.spelling.json";
+      force = true;
+    };
+    # The local model for pi, used by the Qwen conversation of the bottom notch.
+    # Thinking is switched from the chat (Ctrl+Tab): only off and high exist,
+    # sent to Ollama as reasoning_effort "none" and "high".
+    home.file.".pi/agent/models.json".text = builtins.toJSON {
+      providers.ollama = {
+        baseUrl = "http://127.0.0.1:11434/v1";
+        api = "openai-completions";
+        apiKey = "ollama";
+        models = [
+          {
+            id = "huihui_ai/qwen3.5-abliterated:9b";
+            name = "Qwen3.5 9B Abliterated";
+            reasoning = true;
+            thinkingLevelMap = {
+              off = "none";
+              minimal = null;
+              low = null;
+              medium = null;
+              high = "high";
+            };
+            input = ["text"];
+            contextWindow = 32768;
+            # Reasoning and the answer share this budget.
+            maxTokens = 16384;
+          }
+        ];
+      };
+    };
     home.packages = with localPackages; [
       quickshellUpdateChecker
       quickshellUpdateDiff
@@ -35,6 +78,7 @@
       quickshellNixCleaner
       quickshellBrightness
       quickshellBeeper
+      quickshellAssistant
       quickshellSystemStats
       quickshellGpuMonitor
       quickshellWeather

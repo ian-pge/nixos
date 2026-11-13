@@ -3,6 +3,7 @@ import Quickshell.Hyprland
 import QtQuick
 import "./bar"
 import "./ui"
+import "./features/assistant"
 import "./features/audio"
 import "./features/auth"
 import "./features/brightness"
@@ -39,10 +40,17 @@ ShellRoot {
     beeperData: messageData
     blocked: authFeature.active
   }
+  AssistantData { id: assistantFeature; enabled: desktop.servicesEnabled }
+  AssistantController {
+    id: assistantController
+    assistantData: assistantFeature
+    blocked: authFeature.active
+  }
 
   // References only: each feature owns its own state, commands and lifetime.
   QtObject {
     id: featureRegistry
+    readonly property var assistant: assistantFeature
     readonly property var audio: audioFeature
     readonly property var auth: authFeature
     readonly property var appLauncher: appLauncherFeature
@@ -64,10 +72,11 @@ ShellRoot {
     id: panels
     services: featureRegistry
     messenger: messengerController
+    assistant: assistantController
     focusedMonitor: Hyprland.focusedMonitor?.name || ""
     monitors: Hyprland.monitors.values.map(monitor => monitor.name)
   }
-  ShellIntegration { services: featureRegistry; coordinator: panels; messenger: messengerController; enabled: desktop.servicesEnabled }
+  ShellIntegration { services: featureRegistry; coordinator: panels; messenger: messengerController; assistant: assistantController; enabled: desktop.servicesEnabled }
 
   AudioController { id: audioFeature; enabled: desktop.servicesEnabled; selectorVisible: panels.mode === "audio" }
   AppLauncherController { id: appLauncherFeature; onCloseRequested: panels.close("launcher") }
@@ -137,6 +146,7 @@ ShellRoot {
       services: featureRegistry
       coordinator: panels
       messenger: messengerController
+      assistant: assistantController
     }
   }
 }

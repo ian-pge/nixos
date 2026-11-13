@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Shapes
 import "../../ui"
 import "../../ui/Theme.js" as Theme
 import "./BeeperFormat.js" as Format
@@ -27,8 +26,7 @@ Item {
   readonly property int collapsedLines: 3
   readonly property bool clampBody: collapsed && !outgoing && Format.isShelby(sender)
   readonly property string plainBody: Format.text(message)
-  readonly property bool markdownBody: !outgoing && message.chatID === "local:qwen" && typeof message.markdownHTML === "string"
-  readonly property var linkedParts: markdownBody ? [] : Format.messageParts(message)
+  readonly property var linkedParts: Format.messageParts(message)
   readonly property bool hasLinkCards: linkedParts.length > 0
   property var linkOpener: url => Qt.openUrlExternally(url)
   readonly property string highlightedBody: renderMedia ? Format.highlightText(plainBody, searchQuery, Theme.yellow, Theme.background) : ""
@@ -47,7 +45,7 @@ Item {
   readonly property real preferredContentWidth: {
     // History measures delegates while hidden. Effective visibility must not
     // change text wrapping (and therefore move the viewport on reveal).
-    let widest = Math.max(root.markdownBody ? markdownBodyLoader.item?.implicitWidth || 0 : !root.hasLinkCards ? body.implicitWidth : 0, linkedBody.item?.implicitWidth || 0, metadata.implicitWidth, reactions.totalWidth,
+    let widest = Math.max(!root.hasLinkCards ? body.implicitWidth : 0, linkedBody.item?.implicitWidth || 0, metadata.implicitWidth, reactions.totalWidth,
       root.message.linkedMessageID ? replyQuote.implicitWidth : 0);
     // Use intrinsic sizes, never the width assigned by this bubble. children
     // also tracks Repeater insertions/removals and late image dimensions.
@@ -57,7 +55,7 @@ Item {
     }
     return widest;
   }
-  readonly property string selectedText: markdownBodyLoader.item?.copyText || linkedBody.item?.selectedText || selectionLayer.item?.copyText || ""
+  readonly property string selectedText: linkedBody.item?.selectedText || selectionLayer.item?.copyText || ""
   // Keeps the selection layer loaded after the pointer leaves.
   property bool hasTextSelection: false
   signal selectedRequested()
@@ -67,7 +65,7 @@ Item {
   signal heightInvalidated(var item)
   onHeightChanged: heightInvalidated(root)
   function attachmentItem(index) { return attachments.itemAt(index); }
-  function clearTextSelection() { selectionLayer.item?.deselect(); linkedBody.item?.clearTextSelection(); markdownBodyLoader.item?.clearTextSelection(); }
+  function clearTextSelection() { selectionLayer.item?.deselect(); linkedBody.item?.clearTextSelection(); }
   function playArrival() {
     if (!visible || !playbackEnabled || !viewportReady || !inVisibleViewport) return;
     arrivalMessageID = String(message.id || "");
@@ -115,27 +113,12 @@ Item {
       width: Math.min(parent.width, Math.max(110, root.preferredContentWidth + 28))
       height: bubble.implicitHeight + 12
       anchors.right: root.outgoing ? parent.right : undefined
-      Shape {
+      MessageBubbleShape {
         objectName: "beeperMessageShape"
-        preferredRendererType: Shape.CurveRenderer
-        antialiasing: true
         visible: root.renderMedia
         anchors.fill: parent
-        // One continuous filled path avoids alpha seams at the small tail.
-        transform: Scale { origin.x: messageSurface.width / 2; xScale: root.outgoing ? -1 : 1 }
-        ShapePath {
-          strokeWidth: 0; strokeColor: "transparent"; fillColor: root.bubbleColor
-          startX: 18; startY: 0
-          PathLine { x: messageSurface.width - 18; y: 0 }
-          PathQuad { x: messageSurface.width; y: 18; controlX: messageSurface.width; controlY: 0 }
-          PathLine { x: messageSurface.width; y: messageSurface.height - 18 }
-          PathQuad { x: messageSurface.width - 18; y: messageSurface.height; controlX: messageSurface.width; controlY: messageSurface.height }
-          PathLine { x: 2; y: messageSurface.height }
-          PathCubic { x: -7.5; y: messageSurface.height - 0.5; control1X: -2; control1Y: messageSurface.height; control2X: -6; control2Y: messageSurface.height }
-          PathCubic { x: 0; y: messageSurface.height - 14; control1X: -1; control1Y: messageSurface.height - 3; control2X: 0; control2Y: messageSurface.height - 7 }
-          PathLine { x: 0; y: 18 }
-          PathQuad { x: 18; y: 0; controlX: 0; controlY: 0 }
-        }
+        outgoing: root.outgoing
+        fillColor: root.bubbleColor
       }
       Column {
         id: bubble
@@ -198,7 +181,7 @@ Item {
           id: body
           objectName: "messageBody"
           width: parent.width
-          visible: !root.markdownBody && !root.hasLinkCards && !!text
+          visible: !root.hasLinkCards && !!text
           text: root.plainBody
           textFormat: Text.PlainText
           wrapMode: Text.Wrap
@@ -250,22 +233,6 @@ Item {
               // A click without dragging still selects the message.
               TapHandler { gesturePolicy: TapHandler.DragThreshold; onTapped: root.selectedRequested() }
             }
-          }
-        }
-        Loader {
-          id: markdownBodyLoader
-          width: parent.width
-          active: root.markdownBody
-          sourceComponent: BeeperMarkdown {
-            objectName: "beeperMarkdownBody"
-            html: root.message.markdownHTML
-            searchQuery: root.searchQuery
-            textScale: root.textScale
-            accent: root.networkAccent
-            renderEnabled: root.renderMedia
-            onSelectedRequested: root.selectedRequested()
-            onTextSelectionStarted: root.textSelectionStarted()
-            onOpenRequested: url => root.linkOpener(url)
           }
         }
         Loader {

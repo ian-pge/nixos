@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Correction GPT et Qwen",
+  "version": "0.3.0",
+  "description": "Alt+Tab : GPT. Ctrl+Alt+Tab : Qwen local. Corrections expliquées dans le panneau IA Quickshell.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApUcVyqzyQeZyJBw1+EBfnNFPI2m1LaLUvcnes8Y4FqGndRWVaxdT5Vqqi/K4Q0+6qnRqRThKdOpKafwJngYEWJqQRmH0o/hFuXpGkbF66MSGGPEDjuIWuQVc2bjxa9u4ud7P6RvDhytyDVP/9MgVrDVIp5uOF1GtooIEawfUxKoKqlwppFau3peooGXYRMLEx9woNwUXz0rU/tDUUVhCdFdLkX5ncY523mmjQFTPyNYuPKDVqrE6AHsO5B1PVc55SOQEyuNbOQouTT6lLGNj01UOuTlfzUEuCEAaneUszuD2hR50AQDHjrlsOJLi0J18jkqFk+FvTNd97ZJdBuxKsQIDAQAB",
+  "permissions": [
+    "nativeMessaging"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "editor.js",
+        "content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

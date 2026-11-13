@@ -40,12 +40,11 @@ type savedDraft struct {
 	ReplyToMessageID string        `json:"replyToMessageID,omitempty"`
 }
 type diskState struct {
-	Version       int               `json:"version"`
-	Drafts        map[string]draft  `json:"drafts"`
-	Seen          map[string]int64  `json:"seen"`
-	Pending       map[string]string `json:"pending"`
-	LastSync      time.Time         `json:"lastSync"`
-	LocalMessages []localMessage    `json:"localMessages,omitempty"`
+	Version  int               `json:"version"`
+	Drafts   map[string]draft  `json:"drafts"`
+	Seen     map[string]int64  `json:"seen"`
+	Pending  map[string]string `json:"pending"`
+	LastSync time.Time         `json:"lastSync"`
 }
 
 func loadState(dir string, demo bool) (*diskState, error) {

@@ -89,9 +89,6 @@ type backend struct {
 	notifications        notificationSink
 	started              time.Time
 	waveformCache        map[string]waveformResult
-	localCancel          context.CancelFunc
-	localRevision        uint64
-	localURL             string
 }
 
 func main() {
@@ -146,12 +143,6 @@ func newBackend(ctx context.Context, out io.Writer, dir string, demo bool) (*bac
 	if err != nil {
 		return nil, err
 	}
-	b.localURL = "http://127.0.0.1:11434/api/chat"
-	for i := range b.state.LocalMessages {
-		if b.state.LocalMessages[i].State == "generating" {
-			b.state.LocalMessages[i].State = "interrupted"
-		}
-	}
 	if demo {
 		b.initDemo()
 		b.stateName = "demo"
@@ -198,7 +189,7 @@ func (b *backend) serve(in io.Reader) error {
 		}
 		// Preserve draft/control ordering while media and HTTP work cannot block focus updates.
 		switch req.Method {
-		case "status", "reconnect", "setView", "saveDraft", "getDraft", "discardAttachment", "ollamaCancel":
+		case "status", "reconnect", "setView", "saveDraft", "getDraft", "discardAttachment":
 			respond(req, p)
 		default:
 			if b.demo {
@@ -370,12 +361,6 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 			return nil, fail("demo", "Real audio analysis is disabled in the demo.")
 		}
 		return b.waveform(ctx, p.URL)
-	}
-	if method == "ollamaStatus" || method == "ollamaCancel" || p.ChatID == localChatID {
-		if b.demo {
-			return nil, fail("demo", "Local AI is disabled in the demo.")
-		}
-		return b.handleLocal(ctx, method, p)
 	}
 	if b.demo {
 		return b.handleDemo(method, p)

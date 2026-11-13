@@ -7,6 +7,8 @@ Scope {
   id: root
   required property var services
   required property var messenger
+  // The Qwen bottom notch; optional for fixtures without it.
+  property var assistant: null
   property string focusedMonitor: ""
   property var monitors: []
   property string mode: "workspaces"
@@ -15,7 +17,7 @@ Scope {
   property string microphoneFeedbackTargetMonitor: ""
   readonly property bool microphoneFeedbackActive: microphoneFeedback.running
   readonly property bool highlightFocusedWindow: mode !== "workspaces"
-    || (messenger.visible && messenger.beeperData.viewFocused)
+    || (messenger.visible && messenger.beeperData.viewFocused) || !!assistant?.visible
   readonly property bool systemProcessListsWanted: mode === "system" && !services.auth.active
     && !(services.dictation.active && dictationTargetMonitor === targetMonitor)
     && !(services.notifications.visible && services.notifications.targetMonitor === targetMonitor)
@@ -34,12 +36,28 @@ Scope {
   }
   function canShareWithMessenger(kind) { return ["workspaces", "volume", "brightness"].includes(kind); }
   function messengerOpened() {
-    if (messenger.visible && !canShareWithMessenger(mode)) close(mode);
+    if (!messenger.visible) return;
+    if (!canShareWithMessenger(mode)) close(mode);
+    assistant?.hide();
+  }
+  // The Qwen notch shares the screen with passive top-bar feedback only.
+  function canShareWithAssistant(kind) { return ["workspaces", "volume", "brightness", "media"].includes(kind); }
+  function assistantOpened() {
+    if (!assistant?.visible) return;
+    if (assistant.passive) return;
+    if (!canShareWithAssistant(mode)) close(mode);
+    if (messenger.visible) messenger.hide();
   }
   Connections {
     target: root.messenger
     function onVisibleChanged() { root.messengerOpened(); }
     function onFocusSerialChanged() { root.messengerOpened(); }
+  }
+  Connections {
+    target: root.assistant
+    ignoreUnknownSignals: true
+    function onVisibleChanged() { root.assistantOpened(); }
+    function onFocusSerialChanged() { root.assistantOpened(); }
   }
   function open(kind, monitor = "", restore = false) {
     if (!["workspaces", "volume", "brightness", "media", "audio", "calendar", "system",
@@ -67,6 +85,7 @@ Scope {
     // Resolve the destination layout before the messenger captures its return
     // geometry, so it morphs to this widget rather than a stale workspace pill.
     if (messenger.visible && !canShareWithMessenger(kind)) messenger.hide();
+    if (assistant?.visible && !canShareWithAssistant(kind)) assistant.hide();
   }
   function close(kind) {
     if (mode !== kind) return;
