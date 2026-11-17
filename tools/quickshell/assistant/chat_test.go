@@ -65,6 +65,34 @@ func fakePi() {
 		emit(object{"id": command["id"], "type": "response", "command": "prompt", "success": true, "data": object{"disposition": "started"}})
 		message, _ := command["message"].(string)
 		if strings.Contains(strings.Join(os.Args, " "), "--no-tools") {
+			if gate := os.Getenv("FAKE_PI_CORRECTION_GATE"); gate != "" {
+				fixed := strings.ReplaceAll(message, "fille", "filles")
+				encoded, _ := json.Marshal(fixed)
+				prefix := `{"text":` + string(encoded) + `,"explanations":[`
+				emit(object{"type": "message_start", "message": object{"role": "assistant", "content": []object{}}})
+				delta(prefix)
+				for {
+					if _, err := os.Stat(gate); err == nil {
+						break
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
+				if os.Getenv("FAKE_PI_CORRECTION_FAIL") == "1" {
+					os.Exit(1)
+				}
+				explanation := `{"from":"fille","to":"filles","reason":"Après « les », le nom prend le pluriel."}`
+				delta(explanation)
+				for {
+					if _, err := os.Stat(gate + ".finish"); err == nil {
+						break
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
+				delta(`]}`)
+				emit(object{"type": "message_end", "message": object{"role": "assistant", "stopReason": "stop", "content": []object{{"type": "text", "text": prefix + explanation + `]}`}}}})
+				emit(object{"type": "agent_settled"})
+				continue
+			}
 			text(`{"text":"Les filles","explanations":[{"from":"fille","to":"filles","reason":"Après « les », le nom prend le pluriel."}]}`)
 			emit(object{"type": "agent_settled", "aborted": false})
 			continue

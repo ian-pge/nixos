@@ -39,6 +39,7 @@ Rectangle {
     "h     Return to conversations",
     "Enter     Write in the selected conversation",
     "Ctrl + h / l     Focus conversations / composer (also while typing)",
+    "Ctrl + n     New conversation: j / k choose a network, Enter confirms, Esc goes back",
     "Ctrl + j / k     Next / previous message (also while typing)",
     "gg / G     First / last conversation or message",
     "Ctrl + u     Scroll up half a page",

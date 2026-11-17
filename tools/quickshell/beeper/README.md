@@ -62,7 +62,7 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | `status`, `connect`, `reconnect`, `refresh` | `connect {token}` ; états `loading-token`, `keyring-unavailable`, `needs-token`, `invalid-token`, `connecting`, `connected`, `offline`, `demo` |
 | `accounts`, `chats` | Objets API ; `chats {cursor?,direction?}` retourne `{items,hasMore,oldestCursor,newestCursor}`, avec le classement natif `isLowPriority` de Beeper |
 | `messages`, `message`, `search` | `{chatID,cursor?,direction?}`, `{chatID,messageID}`, `{query,chatID?,cursor?,direction?}` ; une recherche explicite dans un chat inclut aussi ses messages en sourdine/basse priorité |
-| `contacts`, `startChat` | `{accountID,query}`, `{accountID,userID}` ; retour API Chat avec `id` |
+| `contacts`, `startChat` | `{accountID,query}`, `{accountID,user:{id?,phoneNumber?,username?,email?,fullName?}}` ; `userID` reste accepté pour les anciens clients ; retour API Chat avec `id` |
 | `send` | `{chatID,text,replyToMessageID?,attachment?:{path,type}}` ; retourne `{chatID,pendingMessageID}` |
 | `edit`, `delete`, `react` | `{chatID,messageID,text?}`, réaction `{reactionKey,remove?}` |
 | `read`, `updateChat` | `{chatID,messageID?}`, `{chatID,changes:{isMuted?,isPinned?,isLowPriority?}}` |
@@ -77,6 +77,20 @@ maximum s’exécutent en parallèle ; les commandes de focus et brouillon sont 
 | `upload`, `download` | `{path}` retourne l’upload API ; `{url}` retourne `{srcURL,error?}` pour les URL média Beeper |
 | `saveAttachment` | `{url,fileName?,mimeType?}` copie le média dans le dossier de téléchargement XDG (`XDG_DOWNLOAD_DIR`, `user-dirs.dirs`, sinon `~/Downloads`) et retourne `{path,name}` ; nom d’origine assaini, jamais d’écrasement (`nom (2).ext`) ; une URL non locale passe par `POST /v1/assets/download`, refusée en démo |
 | `waveform` | `{url}` retourne `{peaks:[0…1],durationMs}` ; analyse locale bornée, sans lecture sonore |
+
+Le bouton « New conversation » et `Ctrl+N` ouvrent la liste des réseaux avec
+leurs logos, couleurs et noms. `j` / `k` déplacent la sélection et Entrée confirme
+le compte avant la saisie du contact ; Échap revient au choix du réseau.
+Un numéro international (`+33…`), une adresse e-mail ou
+un `@pseudo` permettent aussi une résolution exacte hors des conversations
+existantes ; un nom seul cherche parmi les contacts. `startChat` utilise
+`POST /v1/chats/start` (Beeper 4.2.808+) et réutilise une discussion existante.
+L'ouverture ne transmet aucun message et ne marque pas la discussion lue ;
+l'utilisateur écrit ensuite dans le composeur habituel. Les restrictions et
+erreurs du réseau restent affichées dans la fenêtre ; les contacts signalés
+`cannotMessage` ne sont pas sélectionnables. Aucun réessai automatique.
+Les réseaux exigeant un premier message dès la création peuvent refuser cette
+ouverture sans texte : leur erreur est affichée, sans envoi implicite.
 
 Les événements sont `status`, `chatsChanged`, `chatsDeleted`, `messagesChanged`, `messagesDeleted`, `openChat`, `warning`,
 `sendFailed` et `pendingResolved`. `openChat` contient `chatID` et `messageID` quand

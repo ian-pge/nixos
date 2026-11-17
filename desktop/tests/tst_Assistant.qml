@@ -209,12 +209,16 @@ ShellRoot {
         verify(panel.showingCorrection);verify(controller.visible);
         keyClick(Qt.Key_Return);compare(store.pending("decideCorrection").length,0);
         store.respond("correctText",{reportId:id,text:"Les filles",edits:[{start:4,end:9,replacement:"filles"}]});
-        store.acceptLine(JSON.stringify({event:"correctionChanged",data:Object.assign({},report,{state:"ready",html:"<p>Les filles</p>"})}));
+        store.acceptLine(JSON.stringify({event:"correctionChanged",data:Object.assign({},report,{state:"ready",explaining:true,html:"<p>Les filles</p>",explanations:[]})}));
         compare(store.draftText,"Les fille");verify(panel.correctingSpelling);
+        verify(find("assistantCorrectionProgress").running);
+        const preview=find("assistantCorrectedText");compare(preview.getText(0,preview.length),"Les filles");
         keyClick(Qt.Key_Return);compare(store.pending("decideCorrection")[0].params.status,"accept");
         store.acceptLine(JSON.stringify({event:"correctionChanged",data:Object.assign({},report,{state:"accepted"})}));
         compare(store.draftText,"Les filles");verify(!panel.correctingSpelling);verify(!controller.visible);
         compare(store.pending("finishCorrection")[0].params.status,"applied");compare(store.pending("send").length,0);
+        store.acceptLine(JSON.stringify({event:"correctionChanged",data:Object.assign({},report,{state:"ready",explaining:false,html:"<p>Les filles</p>"})}));
+        verify(!controller.visible);compare(store.correction,null);
       } finally {controller.destroy();wait(0);}
     }
     function test_escape_keeps_original_even_if_the_result_arrives_late() {

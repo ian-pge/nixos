@@ -31,6 +31,7 @@ Rectangle {
   property bool unreadLoading: false
   property bool searchOpen: false
   property bool forwarding: false
+  property bool canStartChat: true
   property alias searchInput: searchField
   property alias list: chatList
   property string visibleSelectionToFollow: ""
@@ -52,6 +53,7 @@ Rectangle {
   property Item revealItem: null
   readonly property bool browsing: chatWheel.driving || chatList.moving || chatScrollBar.pressed
   signal networkCycleRequested()
+  signal newChatRequested()
   signal searchAccepted()
   signal searchChanged()
   signal searchCycled(int delta)
@@ -316,6 +318,13 @@ Rectangle {
         }
       }
       Item { visible: !root.searchOpen; Layout.fillWidth: true }
+      BeeperButton {
+        objectName: "beeperNewChatButton"
+        visible: !root.searchOpen; enabled: root.canStartChat && !root.forwarding
+        iconName: "plus"; Accessible.name: "New conversation"
+        ToolTip.visible: hovered; ToolTip.text: "New conversation · Ctrl+N"
+        onClicked: root.newChatRequested()
+      }
       Item {
         id: unreadCounter
         visible: !root.forwarding

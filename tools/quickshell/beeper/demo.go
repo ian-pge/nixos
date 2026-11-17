@@ -154,8 +154,31 @@ func (b *backend) handleDemo(method string, p parameters) (any, error) {
 		b.emit("chatsChanged", object{})
 		return result, nil
 	case "startChat":
+		user, err := startChatContact(p)
+		if err != nil {
+			return nil, err
+		}
+		key := user.ID + "|" + user.PhoneNumber + "|" + user.Username + "|" + user.Email
+		for _, chat := range b.demoChats {
+			if textField(chat, "accountID") == p.AccountID && textField(chat, "demoContactKey") == key {
+				return chat, nil
+			}
+		}
 		id := fmt.Sprintf("demo-chat-%d", time.Now().UnixNano())
-		chat := object{"id": id, "chatID": id, "title": "Alex (fictif)", "network": "Signal", "accountID": p.AccountID, "unreadCount": 0, "type": "single"}
+		title := user.FullName
+		if title == "" {
+			for _, value := range []string{user.PhoneNumber, user.Username, user.Email, "Alex (fictif)"} {
+				if value != "" {
+					title = value
+					break
+				}
+			}
+		}
+		network := "Signal"
+		if p.AccountID == "demo-whatsapp" {
+			network = "WhatsApp"
+		}
+		chat := object{"id": id, "chatID": id, "title": title, "network": network, "accountID": p.AccountID, "unreadCount": 0, "type": "single", "demoContactKey": key}
 		b.demoChats = append([]object{chat}, b.demoChats...)
 		b.demoMessages[id] = []object{}
 		b.emit("chatsChanged", object{})

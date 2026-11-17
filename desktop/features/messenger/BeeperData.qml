@@ -428,6 +428,16 @@ Scope {
       loading = false;
     });
   }
+  function startChat(accountID, user, callback) {
+    request("startChat", {accountID: accountID, user: user}, (result, error) => {
+      const id = result?.id || result?.chatID;
+      if (!error && !id) error = {message: "Beeper did not return a conversation. Refresh before trying again."};
+      if (error) { callback(null, error); return; }
+      const chat = Object.assign({}, chatStore.records[id], result, {id: id});
+      commitChatRows([chat], ++chatStateSequence, "page");
+      callback(chat, null);
+    }, true);
+  }
   function selectChat(chatID, messageID, deferHistory = false) {
     targetMessageID = messageID || "";
     if (!chatID) return;
@@ -949,6 +959,17 @@ Scope {
     if (method === "status") result = {state: "demo"};
     else if (method === "accounts") result = {items: accounts};
     else if (method === "chats") result = {items: chats};
+    else if (method === "contacts") result = {items: [{id: "demo-alex", fullName: "Alex (demo)", username: "alex"}].filter(user =>
+      (user.fullName + " @" + user.username).toLowerCase().includes(params.query.toLowerCase()))};
+    else if (method === "startChat") {
+      const user = params.user || {id: params.userID};
+      const id = "demo-new-" + params.accountID + "-" + (user.id || user.phoneNumber || user.username || user.email);
+      result = chatStore.records[id] || {id: id, accountID: params.accountID,
+        network: accounts.find(account => (account.accountID || account.id) === params.accountID)?.network || "Beeper",
+        title: user.fullName || user.phoneNumber || user.username || user.email || "Alex (demo)",
+        type: "single", unreadCount: 0, participants: {items: [user], total: 1, hasMore: false}};
+      if (!demoMessages[id]) demoMessages[id] = [];
+    }
     else if (method === "messages") result = {items: demoMessages[params.chatID] || []};
     else if (method === "message") result = (demoMessages[params.chatID] || []).find(message => message.id === params.messageID) || {};
     else if (method === "getDraft") result = localDrafts[params.chatID] || {};

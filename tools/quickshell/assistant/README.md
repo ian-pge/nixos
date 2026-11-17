@@ -28,9 +28,9 @@ partagés entre réflexion et réponse).
 Ollama sert Qwen avec une fenêtre de 32 768 tokens (`system/ollama.nix`).
 
 La correction Qwen et le déchargement GPU appellent directement Ollama, sans
-proxy ni redirection. La correction utilise toujours la réflexion activée
-(`think: true`, le maximum exposé par ce Qwen), avec 16 384 tokens partagés
-entre réflexion et réponse et un délai maximal de cinq minutes. Échap reste
+proxy ni redirection. La correction utilise la réponse directe sans réflexion
+(`think: false`), avec au plus 4 096 tokens de réponse et un délai maximal
+de 75 secondes. Échap reste
 disponible pour annuler le calcul. Ce choix est indépendant du niveau choisi
 pour la conversation Qwen. La correction GPT lance un pi éphémère, sans outils,
 session enregistrée, extensions, MCP ni accès aux instructions du répertoire.
@@ -100,12 +100,20 @@ streaming). `resetRevision` écarte les pages antérieures à une réinitialisat
 ## Correction orthographique
 
 Alt+Tab choisit GPT, Ctrl+Alt+Tab Qwen. Le texte part seul, sans historique.
+Les deux modèles reçoivent la même consigne : toutes les explications sont en
+français, même pour un texte anglais ; le texte corrigé garde sa langue d'origine.
 Le résultat est reconstruit à partir des mots validés ; seules les explications
 correspondant aux changements retenus sont affichées. `correctionChanged`
 diffuse un compte rendu temporaire (jamais ajouté à l'historique des chats).
 Le panneau noir s'ouvre dès le début du traitement, sans voler le focus à Chrome
 ou Beeper : logo du modèle animé pendant l'attente et texte original, puis remplacements en rouge
-et règle courte par faute. Le champ d'origine reste inchangé pendant cette
+et règle courte par faute. Pour GPT, le texte est proposé dès que son champ JSON complet
+a passé le filtre habituel ; les explications arrivent ensuite progressivement.
+Le logo reste animé pendant leur génération. Entrée peut valider immédiatement
+le texte déjà vérifié ; Entrée et Échap arrêtent les explications restantes.
+Une explication incomplète n'est pas affichée et une erreur tardive conserve
+la proposition déjà vérifiée. Le texte proposé ne change plus pendant les explications.
+Le champ d'origine reste inchangé pendant cette
 prévisualisation : Entrée applique la proposition prête et ferme le panneau,
 Échap le ferme sans modification, même pendant le calcul. Ces touches sont
 prises en charge dans le champ d'origine et dans le panneau, sans envoyer le

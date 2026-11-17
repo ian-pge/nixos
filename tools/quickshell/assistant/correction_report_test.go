@@ -24,12 +24,12 @@ func TestCorrectionProvidersReportsAndToolIsolation(t *testing.T) {
 		if r.Text != "Les filles" || r.ReportID == "" || len(r.Explanations) != 1 || !strings.Contains(r.Explanations[0].Reason, "pluriel") {
 			t.Fatalf("bad report: %+v", r)
 		}
-		if !strings.Contains(b.correction["html"].(string), `color:#ed8796`) {
+		if !strings.Contains(correctionSnapshot(b)["html"].(string), `color:#ed8796`) {
 			t.Fatal("correction not highlighted")
 		}
 		b.decideCorrection(parameters{ReportID: r.ReportID, Status: "accept"})
 		b.finishCorrection(parameters{ReportID: r.ReportID, Status: "applied"})
-		if b.correction["state"] != "applied" {
+		if correctionSnapshot(b)["state"] != "applied" {
 			t.Fatal("missing applied status")
 		}
 	}

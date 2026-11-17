@@ -16,7 +16,7 @@ import (
 	"unicode/utf8"
 )
 
-const localCorrectionTimeout = 5 * time.Minute
+const localCorrectionTimeout = 75 * time.Second
 const correctionBridgeTimeout = localCorrectionTimeout + 10*time.Second
 
 func correctionSocketPath() string {
@@ -133,37 +133,89 @@ func (b *backend) runCorrection(parent context.Context, p parameters) (correctio
 	if key == "qwen" {
 		timeout = localCorrectionTimeout
 	}
-	ctx, cancel := context.WithTimeout(parent, timeout)
-	review := &correctionReview{id: id, wake: make(chan struct{}), cancel: cancel}
+	// The worker outlives the initial RPC: the client receives the validated
+	// draft first, while explanation updates continue on the panel event stream.
+	ctx, cancel := context.WithTimeout(b.ctx, timeout)
+	review := &correctionReview{id: id, wake: make(chan struct{}), cancel: cancel, done: make(chan struct{})}
 	b.correctionReview = review
 	b.correction = object{"id": id, "provider": key, "source": p.Text, "state": "running"}
-	initial := b.correction
-	b.emit("correctionChanged", initial)
+	b.emit("correctionChanged", b.correction)
 	b.mu.Unlock()
-	defer cancel()
-	var result correctionResult
-	if key == "qwen" {
-		result, err = correctSpelling(ctx, b.chatURL, p.Text)
-	} else {
-		result, err = b.correctWithGPT(ctx, p.Text)
+	type outcome struct {
+		result correctionResult
+		err    error
 	}
-	result.ReportID = id
-	report := object{"id": id, "provider": key, "source": p.Text, "state": "ready", "text": result.Text, "html": correctionHTML(p.Text, result), "explanations": result.Explanations, "skipped": result.Skipped}
-	if err != nil {
-		report["state"] = "error"
-		report["message"] = safeError(err).Message
+	first := make(chan outcome, 1)
+	b.correctionJobs.Add(1)
+	go func() {
+		defer b.correctionJobs.Done()
+		defer close(review.done)
+		defer cancel()
+		var preview *correctionResult
+		publish := func(result correctionResult, explaining bool) {
+			result.ReportID = id
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			if b.correctionReview != review || review.decision != "" {
+				return
+			}
+			b.correction = object{"id": id, "provider": key, "source": p.Text, "state": "ready",
+				"text": result.Text, "html": correctionHTML(p.Text, result), "explanations": result.Explanations,
+				"skipped": result.Skipped, "explaining": explaining}
+			b.emit("correctionChanged", b.correction)
+			if preview == nil {
+				first <- outcome{result: result}
+			}
+			copy := result
+			preview = &copy
+		}
+		var result correctionResult
+		var err error
+		if key == "qwen" {
+			result, err = correctSpelling(ctx, b.chatURL, p.Text)
+		} else {
+			result, err = b.correctWithGPT(ctx, p.Text, func(partial correctionResult) { publish(partial, true) })
+		}
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		if b.correctionReview != review || review.decision != "" {
+			if preview == nil {
+				first <- outcome{result: correctionResult{ReportID: id, Cancelled: true}}
+			}
+			return
+		}
+		b.correcting = false
+		if err != nil && preview != nil {
+			// A late explanation failure cannot revoke or replace an already
+			// validated draft. The user can still accept that exact proposal.
+			result = *preview
+		}
+		result.ReportID = id
+		report := object{"id": id, "provider": key, "source": p.Text, "state": "ready", "text": result.Text,
+			"html": correctionHTML(p.Text, result), "explanations": result.Explanations, "skipped": result.Skipped, "explaining": false}
+		if err != nil {
+			if preview == nil {
+				report["state"] = "error"
+				report["message"] = safeError(err).Message
+			} else {
+				report["message"] = "Les explications n’ont pas pu être terminées. La proposition reste disponible."
+			}
+		}
+		b.correction = report
+		b.emit("correctionChanged", report)
+		if preview == nil {
+			first <- outcome{result: result, err: err}
+		}
+	}()
+	select {
+	case reply := <-first:
+		return reply.result, reply.err
+	case <-parent.Done():
+		b.decideCorrection(parameters{ReportID: id, Status: "reject"})
+		return correctionResult{}, parent.Err()
 	}
-	b.mu.Lock()
-	b.correcting = false
-	if review.decision == "reject" {
-		b.mu.Unlock()
-		return correctionResult{ReportID: id, Cancelled: true}, nil
-	}
-	b.correction = report
-	b.emit("correctionChanged", report)
-	b.mu.Unlock()
-	return result, err
 }
+
 func (b *backend) finishCorrection(p parameters) (any, error) {
 	switch p.Status {
 	case "applied", "unchanged", "cancelled", "undone", "error":
@@ -196,7 +248,7 @@ func (b *backend) finishCorrection(p parameters) (any, error) {
 	b.emit("correctionChanged", report)
 	return object{}, nil
 }
-func (b *backend) correctWithGPT(ctx context.Context, source string) (correctionResult, error) {
+func (b *backend) correctWithGPT(ctx context.Context, source string, progress func(correctionResult)) (correctionResult, error) {
 	args := append(append([]string{}, b.piCommand[1:]...), "--mode", "rpc", "--model", specs["openai"].Model, "--thinking", "low", "--no-tools", "--no-session", "--system-prompt", correctionPrompt, "--no-extensions", "--no-skills", "--no-mcp", "--no-context-files", "--no-prompt-templates", "--no-themes")
 	cmd := exec.CommandContext(ctx, b.piCommand[0], args...)
 	cmd.Dir = b.workDir
@@ -217,7 +269,27 @@ func (b *backend) correctWithGPT(ctx context.Context, source string) (correction
 	json.NewEncoder(input).Encode(object{"type": "prompt", "message": source})
 	reader := bufio.NewScanner(io.LimitReader(output, 2*1024*1024))
 	reader.Buffer(make([]byte, 4096), 1024*1024)
-	answer := ""
+	answer, frozenText, lastProgress := "", "", ""
+	published := false
+	update := func() error {
+		partial, ready, err := partialCorrection(source, answer)
+		if err != nil {
+			return fail("correction", "La réponse n’a pas pu être vérifiée. Le texte reste intact.")
+		}
+		if !ready {
+			return nil
+		}
+		if published && partial.Text != frozenText {
+			return fail("correction", "La proposition a changé pendant la réponse.")
+		}
+		published, frozenText = true, partial.Text
+		encoded, _ := json.Marshal(partial)
+		if string(encoded) != lastProgress {
+			lastProgress = string(encoded)
+			progress(partial)
+		}
+		return nil
+	}
 	for reader.Scan() {
 		var record piRecord
 		if json.Unmarshal(reader.Bytes(), &record) != nil {
@@ -226,14 +298,33 @@ func (b *backend) correctWithGPT(ctx context.Context, source string) (correction
 		if record.Type == "response" && record.Success != nil && !*record.Success {
 			return correctionResult{}, fail("correction", record.Error)
 		}
+		if record.Type == "message_start" && record.Message.Role == "assistant" {
+			answer = messageText(record.Message.Content)
+			if err := update(); err != nil {
+				return correctionResult{}, err
+			}
+		}
+		if record.Type == "message_update" && record.Event.Type == "text_delta" {
+			answer += record.Event.Delta
+			if err := update(); err != nil {
+				return correctionResult{}, err
+			}
+		}
 		if record.Type == "message_end" && record.Message.Role == "assistant" {
 			if record.Message.StopReason == "error" {
 				return correctionResult{}, fail("correction", record.Message.ErrorMessage)
 			}
 			answer = messageText(record.Message.Content)
+			if err := update(); err != nil {
+				return correctionResult{}, err
+			}
 		}
 		if record.Type == "agent_settled" {
-			return parseCorrection(source, answer)
+			result, err := parseCorrection(source, answer)
+			if err == nil && published && result.Text != frozenText {
+				return correctionResult{}, fail("correction", "La proposition a changé pendant la réponse.")
+			}
+			return result, err
 		}
 	}
 	return correctionResult{}, fail("correction", "GPT n’a pas terminé la correction. Le texte reste intact.")

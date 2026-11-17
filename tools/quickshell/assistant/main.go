@@ -75,6 +75,7 @@ type backend struct {
 	correcting       bool
 	correction       object
 	correctionReview *correctionReview
+	correctionJobs   sync.WaitGroup
 }
 
 func main() {
@@ -194,6 +195,10 @@ func (b *backend) serve(in io.Reader) error {
 
 func (b *backend) shutdown() {
 	b.mu.Lock()
+	review := b.correctionReview
+	if review != nil {
+		review.cancel()
+	}
 	agents := []*piAgent{}
 	for _, r := range b.runtimes {
 		if r.agent != nil {
@@ -202,6 +207,7 @@ func (b *backend) shutdown() {
 		}
 	}
 	b.mu.Unlock()
+	b.correctionJobs.Wait()
 	var wait sync.WaitGroup
 	for _, agent := range agents {
 		wait.Add(1)

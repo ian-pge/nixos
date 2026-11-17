@@ -12,6 +12,7 @@ type correctionReview struct {
 	decision string
 	wake     chan struct{}
 	cancel   context.CancelFunc
+	done     chan struct{}
 }
 
 func (b *backend) decideCorrection(p parameters) (any, error) {
@@ -31,9 +32,9 @@ func (b *backend) decideCorrection(p parameters) (any, error) {
 	}
 	r.decision = p.Status
 	close(r.wake)
-	if p.Status == "reject" {
-		r.cancel()
-	}
+	// The user has finished reviewing: remaining explanations are unnecessary.
+	r.cancel()
+	b.correcting = false
 	report := object{}
 	for key, value := range b.correction {
 		report[key] = value

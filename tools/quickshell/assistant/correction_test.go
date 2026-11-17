@@ -64,7 +64,7 @@ func TestSpellingRequestIsIsolatedAndDoesNotFollowRedirects(t *testing.T) {
 		var payload object
 		json.NewDecoder(r.Body).Decode(&payload)
 		raw, _ := json.Marshal(payload)
-		if strings.Contains(string(raw), "private chat history") || len(payload["messages"].([]any)) != 2 || payload["think"] != true || payload["stream"] != false {
+		if strings.Contains(string(raw), "private chat history") || len(payload["messages"].([]any)) != 2 || payload["think"] != false || payload["stream"] != false {
 			t.Error("incorrect correction request")
 		}
 		jsonResponse(w, object{"done": true, "message": object{"content": `{"text":"Les filles"}`}})

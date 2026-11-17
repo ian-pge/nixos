@@ -218,6 +218,11 @@ FocusScope {
     closeConversationSearch(false); searchOpen = true; selectSearchChat(0);
     Qt.callLater(() => { if (active && searchOpen) searchField.forceActiveFocus(); });
   }
+  function openNewChat() {
+    if (!canNavigatePanes || !beeperData.connected || recording || preparingRecording || beeperData.sending) return;
+    closeChatSearch(); closeConversationSearch(false); composerSurface.closeEmojiPicker();
+    modal = "newChat";
+  }
   function closeChatSearch() { searchOpen = false; forwardSource = null; searchChatID = ""; searchField.text = ""; if (active) navigationFocus.forceActiveFocus(); }
   function forwardSelectedMessage() {
     if (!selectedMessage || selectedMessage.isDeleted || beeperData.sending || !beeperData.connected || recording || preparingRecording) return;
@@ -1068,6 +1073,11 @@ FocusScope {
     }
   }
   Shortcut {
+    sequence: "Ctrl+N"; context: Qt.WindowShortcut; autoRepeat: false
+    enabled: root.canNavigatePanes && root.beeperData.connected
+    onActivated: root.openNewChat()
+  }
+  Shortcut {
     sequence: "Alt+/"; context: Qt.WindowShortcut; autoRepeat: false
     enabled: root.canNavigateChats && !root.recording && !root.preparingRecording
     onActivated: root.openChatSearch()
@@ -1221,6 +1231,8 @@ FocusScope {
       unreadLoading: root.beeperData.loadingUnreadCounts
       searchOpen: root.searchOpen
       forwarding: !!root.forwardSource
+      canStartChat: root.beeperData.connected && !root.recording && !root.preparingRecording && !root.beeperData.sending
+      onNewChatRequested: root.openNewChat()
       onNetworkCycleRequested: root.cycleNetwork(1)
       onSearchChanged: root.selectSearchChat(0)
       onSearchCycled: delta => root.cycleSearchChat(delta)
@@ -1435,6 +1447,15 @@ FocusScope {
     onCloseRequested: root.closeRequested()
   }
 
+  BeeperNewChat {
+    anchors.fill: parent
+    beeperData: root.beeperData
+    opened: root.modal === "newChat"
+    active: root.active
+    preferredNetwork: root.networkFilter
+    onCloseRequested: root.closeModal()
+    onChatStarted: chat => { root.closeModal(); root.openChat(chat.id, ""); root.compose(); }
+  }
   BeeperDialogs {
     id: dialogs
     anchors.fill: parent

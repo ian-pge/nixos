@@ -64,6 +64,7 @@ try {
   await qml('tst_SpellingCorrection.qml');
   await qml('tst_BeeperImageEditor.qml');
   await qml('tst_BeeperLinks.qml');
+  await qml('tst_BeeperNewChat.qml');
   if (process.env.BEEPER_TEST_BACKEND) await qml('tst_MessengerProtocol.qml');
   else console.log('SKIP Go protocol integration: set BEEPER_TEST_BACKEND to the built demo-capable executable.');
 

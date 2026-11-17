@@ -276,6 +276,14 @@ Hidden media are unloaded; only the viewport and its prefetch band reactivate.
 Live edits and deletions still update the retained rows. Opening on another
 monitor transfers ownership and releases the previous hidden layout.
 
+Use the sidebar **+** or **Ctrl+N** to start a conversation. The first screen shows
+the network logos, colors and names. Move with **j / k** or the arrow keys and
+press **Enter** to choose; **Esc** from the contact field returns to the networks.
+Then search a contact by name or enter an international phone number,
+`@username` or email address. Exact identifiers can resolve people outside your
+existing chats, subject to the network's restrictions. Opening the chat preserves
+drafts and unread state; write and send from the usual composer afterward.
+
 Drafts, staged attachments and pending-send recovery live in
 `~/.local/state/quickshell-beeper`. The
 [backend README](../tools/quickshell/beeper/README.md) owns credential, protocol,

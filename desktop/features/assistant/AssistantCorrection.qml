@@ -13,6 +13,7 @@ Rectangle {
   signal focusRequested()
   TapHandler { onPressedChanged: if (pressed) root.focusRequested() }
   readonly property bool pending: report?.state === "running"
+  readonly property bool explaining: report?.state === "ready" && report?.explaining === true
   // Natural height comes from the wrapped content, independently of the
   // viewport height. The notch caps it when the report needs scrolling.
   implicitHeight: reportLayout.implicitHeight + 44
@@ -26,12 +27,12 @@ Rectangle {
       Layout.alignment: Qt.AlignLeft
       radius: width / 2; color: "#ffffff"; antialiasing: true
       Accessible.role: Accessible.Graphic
-      Accessible.name: (root.report?.provider === "openai" ? "GPT" : "Qwen") + (root.pending ? " · Correction en cours" : "")
+      Accessible.name: (root.report?.provider === "openai" ? "GPT" : "Qwen") + (root.pending ? " · Correction en cours" : root.explaining ? " · Explications en cours" : "")
       property real pulseTime: 0
-      scale: root.pending ? 1 + 0.06 * Math.sin(pulseTime * Math.PI * 1.25) : 1
+      scale: root.pending || root.explaining ? 1 + 0.06 * Math.sin(pulseTime * Math.PI * 1.25) : 1
       FrameAnimation {
         objectName: "assistantCorrectionProgress"
-        running: root.pending && root.visible
+        running: (root.pending || root.explaining) && root.visible
         onTriggered: avatar.pulseTime += frameTime
       }
       Image {
@@ -59,10 +60,10 @@ Rectangle {
           objectName: "assistantCorrectionStatus"
           width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText
           visible: text.length > 0
-          text: root.report?.state === "error" ? root.report?.message || "La correction n’a pas abouti."
+          text: root.report?.message || (root.report?.state === "error" ? "La correction n’a pas abouti."
             : root.report?.state === "cancelled" ? "Le texte a changé : ces propositions n’ont pas été appliquées."
             : root.report?.state === "undone" ? "Le texte original a été restauré."
-            : root.report?.skipped ? "Les propositions incertaines ont été écartées." : ""
+            : root.report?.skipped ? "Les propositions incertaines ont été écartées." : "")
           color: root.report?.state === "error" ? Theme.error : Theme.secondary
           font { family: "Ubuntu Nerd Font"; pixelSize: 17 }
         }

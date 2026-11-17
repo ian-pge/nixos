@@ -42,6 +42,7 @@ type parameters struct {
 	MessageID        string        `json:"messageID"`
 	AccountID        string        `json:"accountID"`
 	UserID           string        `json:"userID"`
+	User             *chatContact  `json:"user"`
 	Text             string        `json:"text"`
 	Query            string        `json:"query"`
 	Cursor           string        `json:"cursor"`
@@ -427,10 +428,11 @@ func (b *backend) handle(ctx context.Context, method string, p parameters) (any,
 	case "upload":
 		return b.upload(ctx, p.Path)
 	case "startChat":
-		if p.AccountID == "" || p.UserID == "" {
-			return nil, fail("invalid_params", "An account and a contact are required.")
+		user, err := startChatContact(p)
+		if err != nil {
+			return nil, err
 		}
-		r, e := b.raw(ctx, "POST", "v1/chats/start", object{"accountID": p.AccountID, "user": object{"id": p.UserID}})
+		r, e := b.raw(ctx, "POST", "v1/chats/start", object{"accountID": p.AccountID, "user": user})
 		if e == nil {
 			b.emit("chatsChanged", object{})
 		}
